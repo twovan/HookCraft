@@ -1,0 +1,295 @@
+'use client';
+
+import { useCreditStore } from '@/store/creditStore';
+import { useMembershipStore } from '@/store/membershipStore';
+
+export interface UsageDashboardProps {
+  onUpgrade?: () => void;
+  onBuyCredits?: () => void;
+}
+
+/**
+ * 额度面板组件
+ * - 付费用户：显示剩余 Credits / 总量、已消耗 Credits、刷新倒计时
+ * - Free 用户：显示剩余 Preview 次数（如"剩余 2/3 次预览"）
+ * - Credits < 20%：琥珀色高亮警告，推荐 Credits Pack
+ * - Credits 耗尽：禁用按钮，显示"Credits 不足"
+ * - Free 用户次数耗尽：禁用 Preview 按钮，显示升级提示
+ */
+export default function UsageDashboard({ onUpgrade, onBuyCredits }: UsageDashboardProps) {
+  const credits = useCreditStore((s) => s.credits);
+  const previewCount = useCreditStore((s) => s.previewCount);
+  const isLow = useCreditStore((s) => s.isLow());
+  const isExhausted = useCreditStore((s) => s.isExhausted());
+  const resetCountdown = useCreditStore((s) => s.resetCountdown());
+  const isPaid = useMembershipStore((s) => s.isPaid());
+  const currentTier = useMembershipStore((s) => s.currentTier());
+
+  const isFreeExhausted = !isPaid && previewCount !== null && previewCount.remaining === 0;
+
+  return (
+    <div
+      style={{
+        background: isExhausted
+          ? 'linear-gradient(135deg, #FFF5F5 0%, #FFF0F0 100%)'
+          : isLow
+            ? 'linear-gradient(135deg, #FFFBF0 0%, #FFF8E6 100%)'
+            : 'white',
+        borderRadius: '16px',
+        padding: '20px 24px',
+        border: isExhausted
+          ? '1px solid #FED7D7'
+          : isLow
+            ? '1px solid #F6E05E'
+            : '1px solid #f0ebe4',
+        boxShadow: '0 2px 12px rgba(212, 165, 116, 0.08)',
+      }}
+      role="region"
+      aria-label="用量面板"
+    >
+      {/* 标题行 */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '12px',
+        }}
+      >
+        <h3
+          style={{
+            fontFamily: "'Playfair Display', serif",
+            fontSize: '16px',
+            fontWeight: 600,
+            color: '#2D2D2D',
+            margin: 0,
+          }}
+        >
+          {isPaid ? 'Credits 用量' : '预览次数'}
+        </h3>
+        {resetCountdown && (
+          <span
+            style={{
+              fontSize: '12px',
+              color: '#999',
+              fontWeight: 400,
+            }}
+          >
+            {resetCountdown}
+          </span>
+        )}
+      </div>
+
+      {/* 付费用户：Credits 显示 */}
+      {isPaid && credits && (
+        <>
+          {/* 进度条 */}
+          <div
+            style={{
+              background: '#f0ebe4',
+              borderRadius: '8px',
+              height: '8px',
+              overflow: 'hidden',
+              marginBottom: '12px',
+            }}
+          >
+            <div
+              style={{
+                height: '100%',
+                borderRadius: '8px',
+                width: `${credits.total > 0 ? ((credits.total - credits.remaining) / credits.total) * 100 : 0}%`,
+                background: isExhausted
+                  ? '#E53E3E'
+                  : isLow
+                    ? '#D69E2E'
+                    : 'linear-gradient(90deg, #D4A574, #C9A86A)',
+                transition: 'width 0.3s ease',
+              }}
+            />
+          </div>
+
+          {/* 数值 */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: '8px',
+              marginBottom: '8px',
+            }}
+          >
+            <span
+              style={{
+                fontSize: '28px',
+                fontWeight: 700,
+                color: isExhausted ? '#E53E3E' : isLow ? '#D69E2E' : '#D4A574',
+                fontFamily: "'Playfair Display', serif",
+              }}
+            >
+              {credits.remaining}
+            </span>
+            <span style={{ fontSize: '14px', color: '#6B6B6B' }}>
+              / {credits.total} Credits
+            </span>
+          </div>
+
+          {/* 已消耗 */}
+          <div style={{ fontSize: '13px', color: '#999', marginBottom: '12px' }}>
+            本月已消耗 {credits.used} Credits
+          </div>
+
+          {/* 警告状态 */}
+          {isExhausted && (
+            <div
+              style={{
+                background: '#FED7D7',
+                borderRadius: '8px',
+                padding: '10px 14px',
+                fontSize: '13px',
+                color: '#C53030',
+                fontWeight: 500,
+                marginBottom: '12px',
+              }}
+              role="alert"
+            >
+              Credits 不足，请购买 Credits 充值包或升级会员
+            </div>
+          )}
+
+          {isLow && !isExhausted && (
+            <div
+              style={{
+                background: '#FEFCBF',
+                borderRadius: '8px',
+                padding: '10px 14px',
+                fontSize: '13px',
+                color: '#975A16',
+                fontWeight: 500,
+                marginBottom: '12px',
+              }}
+              role="alert"
+            >
+              Credits 即将用尽，推荐购买 Credits 充值包
+            </div>
+          )}
+
+          {/* 购买按钮 */}
+          {(isLow || isExhausted) && onBuyCredits && (
+            <button
+              onClick={onBuyCredits}
+              style={{
+                width: '100%',
+                padding: '10px 16px',
+                border: 'none',
+                borderRadius: '20px',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                background: 'linear-gradient(135deg, #D4A574 0%, #C9A86A 100%)',
+                color: 'white',
+                fontFamily: "'Inter', sans-serif",
+              }}
+            >
+              购买 Credits 充值包
+            </button>
+          )}
+        </>
+      )}
+
+      {/* Free 用户：Preview 次数显示 */}
+      {!isPaid && previewCount && (
+        <>
+          {/* 圆点指示器 */}
+          <div
+            style={{
+              display: 'flex',
+              gap: '8px',
+              marginBottom: '12px',
+            }}
+          >
+            {Array.from({ length: previewCount.total }).map((_, i) => (
+              <div
+                key={i}
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  background: i < previewCount.used
+                    ? '#E2E8F0'
+                    : 'linear-gradient(135deg, #D4A574 0%, #C9A86A 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '14px',
+                  color: i < previewCount.used ? '#A0AEC0' : 'white',
+                  fontWeight: 600,
+                }}
+                aria-hidden="true"
+              >
+                {i < previewCount.used ? '✓' : '♪'}
+              </div>
+            ))}
+          </div>
+
+          {/* 文字 */}
+          <div
+            style={{
+              fontSize: '14px',
+              color: isFreeExhausted ? '#E53E3E' : '#2D2D2D',
+              fontWeight: 500,
+              marginBottom: '12px',
+            }}
+          >
+            剩余 {previewCount.remaining}/{previewCount.total} 次预览
+          </div>
+
+          {/* 次数耗尽提示 */}
+          {isFreeExhausted && (
+            <>
+              <div
+                style={{
+                  background: '#FED7D7',
+                  borderRadius: '8px',
+                  padding: '10px 14px',
+                  fontSize: '13px',
+                  color: '#C53030',
+                  fontWeight: 500,
+                  marginBottom: '12px',
+                }}
+                role="alert"
+              >
+                本月预览次数已用尽，升级到专业版获取更多创作额度
+              </div>
+              {onUpgrade && (
+                <button
+                  onClick={onUpgrade}
+                  style={{
+                    width: '100%',
+                    padding: '10px 16px',
+                    border: 'none',
+                    borderRadius: '20px',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    background: 'linear-gradient(135deg, #D4A574 0%, #C9A86A 100%)',
+                    color: 'white',
+                    fontFamily: "'Inter', sans-serif",
+                  }}
+                >
+                  升级到专业版
+                </button>
+              )}
+            </>
+          )}
+        </>
+      )}
+
+      {/* 加载状态 */}
+      {!credits && isPaid && (
+        <div style={{ fontSize: '13px', color: '#999' }}>加载中...</div>
+      )}
+      {!previewCount && !isPaid && (
+        <div style={{ fontSize: '13px', color: '#999' }}>加载中...</div>
+      )}
+    </div>
+  );
+}
