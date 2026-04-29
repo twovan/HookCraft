@@ -1,22 +1,14 @@
 // GET /api/templates - 获取模板列表（按等级过滤）
+// 模板列表为公开数据，不需要认证
 
 import { NextRequest, NextResponse } from 'next/server';
 import { TemplateService } from '../../../lib/template/TemplateService';
 import { supabaseAdmin } from '../../../lib/supabase/server';
-import { getAuthUser } from '../../../lib/supabase/auth-helpers';
 import type { MembershipTier } from '../../../types/membership';
 import { TIER_CONFIGS } from '../../../config/tierConfig';
 
 export async function GET(req: NextRequest) {
   try {
-    const user = await getAuthUser();
-    if (!user) {
-      return NextResponse.json(
-        { error: '未登录，请先登录' },
-        { status: 401 }
-      );
-    }
-
     const { searchParams } = new URL(req.url);
     const userTier = (searchParams.get('tier') ?? 'free') as MembershipTier;
 
@@ -37,7 +29,7 @@ export async function GET(req: NextRequest) {
       tierFeatures.includes(t.category)
     );
 
-    return NextResponse.json({ templates: accessibleTemplates });
+    return NextResponse.json(accessibleTemplates);
   } catch (error: any) {
     console.error('获取模板列表失败:', error);
     return NextResponse.json(
