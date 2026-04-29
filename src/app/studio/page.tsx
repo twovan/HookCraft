@@ -79,7 +79,8 @@ export default function StudioPage() {
       const res = await fetch('/api/templates');
       if (res.ok) {
         const data = await res.json();
-        setTemplates(data);
+        // API 返回 { templates: [...] } 或直接数组
+        setTemplates(Array.isArray(data) ? data : data.templates ?? []);
       }
     } catch {
       // Silently fail
