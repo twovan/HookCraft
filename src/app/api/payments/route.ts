@@ -1,3 +1,4 @@
+// GET /api/payments - 获取用户支付记录
 // POST /api/payments - 创建支付会话
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -5,6 +6,33 @@ import { PaymentService } from '../../../lib/payment/PaymentService';
 import { supabaseAdmin } from '../../../lib/supabase/server';
 import { getAuthUser } from '../../../lib/supabase/auth-helpers';
 import type { MembershipTier, BillingCycle, PaymentProvider } from '../../../types/membership';
+
+export async function GET() {
+  try {
+    const user = await getAuthUser();
+    if (!user) {
+      return NextResponse.json([], { status: 200 });
+    }
+
+    // 查询用户的已完成支付记录
+    const { data, error } = await supabaseAdmin
+      .from('payments')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (error) {
+      console.error('获取支付记录失败:', error);
+      return NextResponse.json([], { status: 200 });
+    }
+
+    return NextResponse.json(data || []);
+  } catch {
+    return NextResponse.json([], { status: 200 });
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {

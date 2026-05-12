@@ -3,10 +3,12 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { fetchWithAuth } from '@/lib/fetchWithAuth';
 import type { MembershipTier, BillingCycle } from '@/types/membership';
 import type { TierConfig } from '@/config/tierConfig';
 import TierCard from '@/components/membership/TierCard';
 import { useMembershipStore } from '@/store/membershipStore';
+import { useCreditStore } from '@/store/creditStore';
 
 interface PricingContentProps {
   tiers: TierConfig[];
@@ -21,19 +23,54 @@ const CREDITS_PACKS = [
 
 export default function PricingContent({ tiers }: PricingContentProps) {
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
+  const [upgrading, setUpgrading] = useState(false);
+  const [upgradeResult, setUpgradeResult] = useState<{ tier: string; tier_name: string; monthly_credits: number } | null>(null);
+  const [upgradeError, setUpgradeError] = useState<string | null>(null);
   const router = useRouter();
   const { user } = useAuth();
   const currentTier = useMembershipStore((s) => s.currentTier());
+  const fetchCredits = useCreditStore((s) => s.fetchCredits);
+  const fetchMembership = useMembershipStore((s) => s.fetchMembership);
   const isBusiness = currentTier === 'business';
 
-  const handleSubscribe = (tier: MembershipTier, cycle: BillingCycle) => {
+  const handleSubscribe = async (tier: MembershipTier, cycle: BillingCycle) => {
     if (tier === 'free') return;
     // 未登录用户先跳转到登录页
     if (!user) {
       router.push(`/login?redirectTo=/pricing`);
       return;
     }
-    router.push(`/payments?tier=${tier}&cycle=${cycle}`);
+    if (tier === currentTier) return;
+
+    setUpgrading(true);
+    setUpgradeError(null);
+    setUpgradeResult(null);
+    try {
+      const res = await fetchWithAuth('/api/membership/upgrade', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetTier: tier, billingCycle: cycle }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        const tierConfig = tiers.find((t) => t.tier === tier);
+        setUpgradeResult({
+          tier,
+          tier_name: tierConfig?.name || tier,
+          monthly_credits: tierConfig?.monthlyCredits || 0,
+        });
+        // Refresh membership store
+        await fetchMembership();
+      } else {
+        setUpgradeError(data.error || '升级失败，请重试');
+        setTimeout(() => setUpgradeError(null), 5000);
+      }
+    } catch {
+      setUpgradeError('网络错误，请重试');
+      setTimeout(() => setUpgradeError(null), 5000);
+    } finally {
+      setUpgrading(false);
+    }
   };
 
   return (
@@ -112,6 +149,40 @@ export default function PricingContent({ tiers }: PricingContentProps) {
           </span>
         </button>
       </div>
+
+      {/* Upgrade result/error messages */}
+      {upgradeResult && (
+        <div style={{
+          maxWidth: 600, margin: '0 auto 32px', padding: '20px 24px', borderRadius: 16,
+          background: '#f0fdf4', border: '1px solid #bbf7d0', textAlign: 'center',
+        }}>
+          <div style={{ fontSize: 24, marginBottom: 8 }}>🎉</div>
+          <div style={{ fontSize: 16, fontWeight: 600, color: '#16a34a', marginBottom: 4 }}>
+            升级成功！
+          </div>
+          <div style={{ fontSize: 14, color: '#15803d' }}>
+            已升级至 {upgradeResult.tier_name}，每月 {upgradeResult.monthly_credits} Credits
+          </div>
+        </div>
+      )}
+      {upgradeError && (
+        <div style={{
+          maxWidth: 600, margin: '0 auto 32px', padding: '16px 24px', borderRadius: 16,
+          background: '#fef2f2', border: '1px solid #fecaca', textAlign: 'center',
+          color: '#dc2626', fontSize: 14, fontWeight: 500,
+        }}>
+          {upgradeError}
+        </div>
+      )}
+      {upgrading && (
+        <div style={{
+          maxWidth: 600, margin: '0 auto 32px', padding: '16px 24px', borderRadius: 16,
+          background: '#fffbeb', border: '1px solid #fde68a', textAlign: 'center',
+          color: '#92400e', fontSize: 14, fontWeight: 500,
+        }}>
+          正在升级中...
+        </div>
+      )}
 
       {/* Tier cards grid */}
       <div
@@ -251,7 +322,24 @@ export default function PricingContent({ tiers }: PricingContentProps) {
                 ¥{((isBusiness ? pack.discountPrice : pack.price) / 100 / pack.credits).toFixed(1)}/Credit
               </div>
               <button
-                onClick={() => router.push(`/payments/credits-pack?pack=${pack.id}`)}
+                onClick={async () => {
+                  if (!user) { router.push('/login?redirectTo=/pricing'); return; }
+                  try {
+                    const res = await fetchWithAuth('/api/payments/credits-pack', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ packId: pack.id }),
+                    });
+                    const data = await res.json();
+                    if (res.ok && data.success) {
+                      // Refresh credit store after successful purchase
+                      fetchCredits();
+                      alert(`充值成功！已增加 ${data.credits_added} Credits，当前剩余 ${data.remaining} Credits`);
+                    } else {
+                      alert(data.error || '充值失败');
+                    }
+                  } catch { alert('网络错误，请重试'); }
+                }}
                 style={{
                   width: '100%',
                   padding: '12px 20px',

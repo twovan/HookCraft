@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { TemplateAdminService } from "../../../../../../lib/admin/TemplateAdminService";
 import { supabaseAdmin } from "../../../../../../lib/supabase/server";
-import { getAuthUser, isAdmin } from "../../../../../../lib/supabase/auth-helpers";
+import { requireAdmin } from "../../../../../../lib/admin/auth";
 import type { ManualTemplateAnalysis } from "../../../../../../types/template";
 
 /**
@@ -16,20 +16,8 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const user = await getAuthUser();
-    if (!user) {
-      return NextResponse.json(
-        { error: '未登录，请先登录' },
-        { status: 401 }
-      );
-    }
-
-    if (!isAdmin(user)) {
-      return NextResponse.json(
-        { error: '无权访问，需要管理员权限' },
-        { status: 403 }
-      );
-    }
+    const { admin, response } = await requireAdmin(_req);
+    if (response) return response;
 
     const { id } = params;
 
@@ -75,20 +63,8 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const user = await getAuthUser();
-    if (!user) {
-      return NextResponse.json(
-        { error: '未登录，请先登录' },
-        { status: 401 }
-      );
-    }
-
-    if (!isAdmin(user)) {
-      return NextResponse.json(
-        { error: '无权访问，需要管理员权限' },
-        { status: 403 }
-      );
-    }
+    const { admin, response } = await requireAdmin(req);
+    if (response) return response;
 
     const { id } = params;
 

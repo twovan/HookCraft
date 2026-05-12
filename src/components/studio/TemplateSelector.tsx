@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMembershipStore } from '@/store/membershipStore';
 import type { Template, TemplateCategory } from '@/types/template';
 
@@ -22,14 +22,52 @@ export default function TemplateSelector({
   selectedTemplateId,
   onSelect,
 }: TemplateSelectorProps) {
-  const [activeTab, setActiveTab] = useState<TemplateCategory>('free_template');
+  const [activeTab, setActiveTab] = useState<TemplateCategory | 'purchased'>('free_template');
   const isPaid = useMembershipStore((s) => s.isPaid());
+  const [purchasedTemplates, setPurchasedTemplates] = useState<Template[]>([]);
+  const [purchasedLoading, setPurchasedLoading] = useState(false);
 
   const freeTemplates = templates.filter((t) => t.category === 'free_template');
   const paidTemplates = templates.filter((t) => t.category === 'paid_template');
-  const displayTemplates = activeTab === 'free_template' ? freeTemplates : paidTemplates;
+
+  // Fetch purchased templates when tab is active
+  useEffect(() => {
+    if (activeTab !== 'purchased') return;
+    setPurchasedLoading(true);
+    fetch('/api/templates/purchased')
+      .then((res) => {
+        if (res.ok) return res.json();
+        return { templates: [] };
+      })
+      .then((data) => {
+        const mapped: Template[] = (data.templates || []).map((t: { id: string; name: string; genre: string; cover_url: string | null; category: string }) => ({
+          id: t.id,
+          name: t.name,
+          genre: t.genre,
+          coverUrl: t.cover_url,
+          category: t.category as TemplateCategory,
+          description: '',
+        }));
+        setPurchasedTemplates(mapped);
+      })
+      .catch(() => setPurchasedTemplates([]))
+      .finally(() => setPurchasedLoading(false));
+  }, [activeTab]);
+
+  const displayTemplates = activeTab === 'free_template'
+    ? freeTemplates
+    : activeTab === 'paid_template'
+      ? paidTemplates
+      : purchasedTemplates;
 
   const isLocked = !isPaid && activeTab === 'paid_template';
+  const isPurchasedTab = activeTab === 'purchased';
+
+  const tabs: { key: TemplateCategory | 'purchased'; label: string; icon?: string }[] = [
+    { key: 'free_template', label: '免费' },
+    { key: 'paid_template', label: '付费', icon: !isPaid ? '🔒' : undefined },
+    { key: 'purchased', label: '已购' },
+  ];
 
   return (
     <div>
@@ -42,47 +80,31 @@ export default function TemplateSelector({
           borderBottom: '1px solid #f0ebe4',
         }}
       >
-        <button
-          onClick={() => setActiveTab('free_template')}
-          style={{
-            padding: '10px 20px',
-            border: 'none',
-            background: 'transparent',
-            fontSize: '14px',
-            fontWeight: activeTab === 'free_template' ? 600 : 400,
-            color: activeTab === 'free_template' ? '#D4A574' : '#6B6B6B',
-            borderBottom: activeTab === 'free_template' ? '2px solid #D4A574' : '2px solid transparent',
-            cursor: 'pointer',
-            fontFamily: "'Inter', sans-serif",
-            transition: 'all 0.2s ease',
-          }}
-          aria-selected={activeTab === 'free_template'}
-          role="tab"
-        >
-          免费
-        </button>
-        <button
-          onClick={() => setActiveTab('paid_template')}
-          style={{
-            padding: '10px 20px',
-            border: 'none',
-            background: 'transparent',
-            fontSize: '14px',
-            fontWeight: activeTab === 'paid_template' ? 600 : 400,
-            color: activeTab === 'paid_template' ? '#D4A574' : '#6B6B6B',
-            borderBottom: activeTab === 'paid_template' ? '2px solid #D4A574' : '2px solid transparent',
-            cursor: 'pointer',
-            fontFamily: "'Inter', sans-serif",
-            transition: 'all 0.2s ease',
-          }}
-          aria-selected={activeTab === 'paid_template'}
-          role="tab"
-        >
-          付费
-          {!isPaid && (
-            <span style={{ marginLeft: '4px', fontSize: '12px' }}>🔒</span>
-          )}
-        </button>
+        {tabs.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            style={{
+              padding: '10px 20px',
+              border: 'none',
+              background: 'transparent',
+              fontSize: '14px',
+              fontWeight: activeTab === tab.key ? 600 : 400,
+              color: activeTab === tab.key ? '#D4A574' : '#6B6B6B',
+              borderBottom: activeTab === tab.key ? '2px solid #D4A574' : '2px solid transparent',
+              cursor: 'pointer',
+              fontFamily: "'Inter', sans-serif",
+              transition: 'all 0.2s ease',
+            }}
+            aria-selected={activeTab === tab.key}
+            role="tab"
+          >
+            {tab.label}
+            {tab.icon && (
+              <span style={{ marginLeft: '4px', fontSize: '12px' }}>{tab.icon}</span>
+            )}
+          </button>
+        ))}
       </div>
 
       {/* Template Grid - 3 per row, 2:3 aspect ratio */}
@@ -102,11 +124,11 @@ export default function TemplateSelector({
             <button
               key={template.id}
               onClick={() => {
-                if (!isLocked) {
+                if (!isLocked || isPurchasedTab) {
                   onSelect(template);
                 }
               }}
-              disabled={isLocked}
+              disabled={isLocked && !isPurchasedTab}
               role="option"
               aria-selected={isSelected}
               aria-disabled={isLocked}
@@ -219,7 +241,7 @@ export default function TemplateSelector({
       </div>
 
       {/* Empty state */}
-      {displayTemplates.length === 0 && (
+      {displayTemplates.length === 0 && !purchasedLoading && (
         <div
           style={{
             textAlign: 'center',
@@ -228,7 +250,19 @@ export default function TemplateSelector({
             fontSize: '13px',
           }}
         >
-          暂无模板
+          {activeTab === 'purchased' ? '暂无已购模板，去模板中心看看吧' : '暂无模板'}
+        </div>
+      )}
+      {purchasedLoading && activeTab === 'purchased' && (
+        <div
+          style={{
+            textAlign: 'center',
+            padding: '32px 16px',
+            color: '#999',
+            fontSize: '13px',
+          }}
+        >
+          加载中...
         </div>
       )}
     </div>

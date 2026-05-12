@@ -1,34 +1,43 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
+import StatCard from '@/components/admin/StatCard';
+import DataTable, { Column } from '@/components/admin/DataTable';
+import Tag from '@/components/admin/Tag';
 
-interface CreditQuota {
+interface CreditsStats {
+  totalIssued: number;
+  totalConsumed: number;
+  consumptionRate: number;
+  exhaustedCount: number;
+  daysUntilReset: number;
+}
+
+interface TierBreakdown {
   tier: string;
-  monthlyCredits: number;
+  users: number;
+  monthlyQuota: number;
+  totalIssued: number;
+  totalConsumed: number;
+  avgUsage: number;
+  consumptionRate: number;
 }
 
-interface ChangeLog {
-  id: string;
-  operatorName: string;
-  configType: string;
-  description: string;
-  changedAt: string;
+interface ExhaustedUser {
+  userId: string;
+  userName: string;
+  email: string;
+  tier: string;
+  creditsUsed: number;
+  creditsTotal: number;
+  exhaustedAt: string;
 }
 
-const TIER_LABELS: Record<string, string> = {
-  free: '免费版（Preview 次数）',
-  pro: '专业版（Credits）',
-  business: '商业版（Credits）',
-};
-
-export default function AdminCreditsQuotaPage() {
-  const [quotas, setQuotas] = useState<CreditQuota[]>([]);
-  const [editQuotas, setEditQuotas] = useState<CreditQuota[]>([]);
-  const [history, setHistory] = useState<ChangeLog[]>([]);
+export default function AdminCreditsPage() {
+  const [stats, setStats] = useState<CreditsStats>({ totalIssued: 0, totalConsumed: 0, consumptionRate: 0, exhaustedCount: 0, daysUntilReset: 0 });
+  const [tierBreakdown, setTierBreakdown] = useState<TierBreakdown[]>([]);
+  const [exhaustedUsers, setExhaustedUsers] = useState<ExhaustedUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [editing, setEditing] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -37,263 +46,190 @@ export default function AdminCreditsQuotaPage() {
   async function fetchData() {
     setLoading(true);
     try {
-      const [quotaRes, historyRes] = await Promise.all([
-        fetch('/api/admin/config/quota'),
-        fetch('/api/admin/config/changelog?limit=10'),
-      ]);
-      const quotaData = await quotaRes.json();
-      const historyData = await historyRes.json();
-      setQuotas(quotaData.creditQuotas || []);
-      setEditQuotas(quotaData.creditQuotas || []);
-      setHistory(
-        (historyData.history || []).filter(
-          (h: ChangeLog) => h.configType === 'credit_quota'
-        )
-      );
+      const res = await fetch('/api/admin/credits');
+      if (!res.ok) throw new Error('请求失败');
+      const result = await res.json();
+      setStats(result.stats);
+      setTierBreakdown(result.tierBreakdown || []);
+      setExhaustedUsers(result.exhaustedUsers || []);
     } catch {
-      // silent
+      // ignore
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
-  function handleEdit(tier: string, value: number) {
-    setEditQuotas((prev) =>
-      prev.map((q) => (q.tier === tier ? { ...q, monthlyCredits: value } : q))
-    );
-  }
+  const tierLabels: Record<string, string> = {
+    free: 'Free',
+    pro: 'Pro',
+    business: 'Business',
+  };
 
-  async function handleSave() {
-    setSaving(true);
-    setSaved(false);
-    try {
-      const res = await fetch('/api/admin/config/quota', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ creditQuotas: editQuotas, operatorId: 'admin-001' }),
-      });
-      if (res.ok) {
-        setSaved(true);
-        setEditing(false);
-        await fetchData();
-        setTimeout(() => setSaved(false), 3000);
-      }
-    } catch {
-      // silent
-    }
-    setSaving(false);
-  }
+  const exhaustedColumns: Column<ExhaustedUser>[] = [
+    {
+      key: 'userName',
+      title: '用户',
+      render: (row) => (
+        <div>
+          <div style={{ fontWeight: 500, color: '#1f2937' }}>{row.userName}</div>
+          <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{row.email || row.userId.slice(0, 12)}</div>
+        </div>
+      ),
+    },
+    {
+      key: 'tier',
+      title: '等级',
+      render: (row) => {
+        const colorMap: Record<string, 'gray' | 'blue' | 'purple'> = { free: 'gray', pro: 'blue', business: 'purple' };
+        return <Tag label={tierLabels[row.tier] || row.tier} color={colorMap[row.tier] || 'gray'} />;
+      },
+    },
+    {
+      key: 'credits',
+      title: '积分使用',
+      render: (row) => (
+        <span style={{ fontSize: 13, fontWeight: 500 }}>
+          {row.creditsUsed}/{row.creditsTotal}
+        </span>
+      ),
+    },
+    {
+      key: 'exhaustedAt',
+      title: '耗尽日期',
+      render: (row) => (
+        <span style={{ fontSize: 12, color: '#6b7280' }}>
+          {row.exhaustedAt ? new Date(row.exhaustedAt).toLocaleDateString('zh-CN') : '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      title: '操作',
+      render: () => (
+        <button style={actionBtnStyle}>发送升级邀请</button>
+      ),
+    },
+  ];
 
   if (loading) {
-    return (
-      <div style={pageContainer}>
-        <div style={topbar}>
-          <div style={{ fontSize: 18, fontWeight: 700, color: '#1a1a2e' }}>等级配额配置</div>
-        </div>
-        <div style={{ padding: '24px 32px', color: '#888' }}>加载中...</div>
-      </div>
-    );
+    return <div style={{ padding: 24, color: '#6b7280' }}>加载中...</div>;
   }
 
   return (
-    <div style={pageContainer}>
-      <div style={topbar}>
-        <div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: '#1a1a2e' }}>等级配额配置</div>
-          <div style={{ fontSize: 12, color: '#999' }}>管理 / Credits 配额</div>
+    <div>
+      {/* Stats */}
+      <div style={statsGridStyle}>
+        <StatCard label="月度总配额" value={stats.totalIssued} icon="📊" iconColor="blue" />
+        <StatCard label="已消耗" value={`${stats.totalConsumed} (${stats.consumptionRate}%)`} icon="🔥" iconColor="orange" />
+        <StatCard label="已耗尽用户" value={stats.exhaustedCount} icon="⚠️" iconColor="red" />
+        <StatCard label="距下次重置" value={`${stats.daysUntilReset}天`} icon="🔄" iconColor="green" />
+      </div>
+
+      {/* Tier Usage Overview */}
+      <div style={tierCardStyle}>
+        <h3 style={{ margin: '0 0 16px 0', fontSize: 16, fontWeight: 600, color: '#1f2937' }}>等级用量概览</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {tierBreakdown.map((tier) => (
+            <div key={tier.tier} style={tierRowStyle}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 120 }}>
+                <Tag label={tierLabels[tier.tier] || tier.tier} color={tier.tier === 'free' ? 'gray' : tier.tier === 'pro' ? 'blue' : 'purple'} />
+                <span style={{ fontSize: 12, color: '#6b7280' }}>{tier.users} 用户</span>
+              </div>
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 16 }}>
+                <div style={{ fontSize: 12, color: '#6b7280', minWidth: 80 }}>
+                  配额: {tier.monthlyQuota}/月
+                </div>
+                <div style={{ fontSize: 12, color: '#6b7280', minWidth: 120 }}>
+                  {tier.totalConsumed}/{tier.totalIssued}
+                </div>
+                <div style={{ fontSize: 12, color: '#6b7280', minWidth: 80 }}>
+                  人均: {tier.avgUsage}
+                </div>
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={progressBarBgStyle}>
+                    <div style={{ ...progressBarFillStyle, width: `${Math.min(tier.consumptionRate, 100)}%` }} />
+                  </div>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: tier.consumptionRate > 80 ? '#ef4444' : '#D4A574', minWidth: 36 }}>
+                    {tier.consumptionRate}%
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
-      <div style={{ padding: '24px 32px' }}>
-        {saved && (
-          <div style={successBanner}>✅ 配置已保存，将在 5 秒内生效</div>
-        )}
-
-        {/* Current Config Card */}
-        <div style={card}>
-          <div style={cardHeader}>
-            <span style={{ fontSize: 15, fontWeight: 700 }}>当前配额配置</span>
-            {!editing && (
-              <button style={btnPrimary} onClick={() => setEditing(true)}>
-                编辑配置
-              </button>
-            )}
-          </div>
-          <div style={cardBody}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th style={th}>等级</th>
-                  <th style={th}>月度配额</th>
-                  {editing && <th style={th}>新值</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {quotas.map((q) => (
-                  <tr key={q.tier}>
-                    <td style={td}>{TIER_LABELS[q.tier] || q.tier}</td>
-                    <td style={td}>
-                      {q.tier === 'free'
-                        ? `${q.monthlyCredits} 次 Preview/月`
-                        : `${q.monthlyCredits} Credits/月`}
-                    </td>
-                    {editing && (
-                      <td style={td}>
-                        <input
-                          type="number"
-                          min={0}
-                          value={editQuotas.find((e) => e.tier === q.tier)?.monthlyCredits ?? 0}
-                          onChange={(e) => handleEdit(q.tier, parseInt(e.target.value) || 0)}
-                          style={formInput}
-                        />
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            {editing && (
-              <div style={{ display: 'flex', gap: 8, marginTop: 16, justifyContent: 'flex-end' }}>
-                <button
-                  style={btnSecondary}
-                  onClick={() => {
-                    setEditing(false);
-                    setEditQuotas(quotas);
-                  }}
-                >
-                  取消
-                </button>
-                <button style={btnPrimary} onClick={handleSave} disabled={saving}>
-                  {saving ? '保存中...' : '保存配置'}
-                </button>
-              </div>
-            )}
-          </div>
+      {/* Daily Consumption Trend (placeholder) */}
+      <div style={{ ...tierCardStyle, marginTop: 16 }}>
+        <h3 style={{ margin: '0 0 16px 0', fontSize: 16, fontWeight: 600, color: '#1f2937' }}>每日消耗趋势</h3>
+        <div style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: 13 }}>
+          📈 趋势图表（数据加载中...）
         </div>
+      </div>
 
-        {/* Change History */}
-        <div style={card}>
-          <div style={cardHeader}>
-            <span style={{ fontSize: 15, fontWeight: 700 }}>变更历史</span>
-          </div>
-          <div style={cardBody}>
-            {history.length === 0 ? (
-              <div style={{ color: '#ccc', textAlign: 'center', padding: 40 }}>暂无变更记录</div>
-            ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr>
-                    <th style={th}>操作人</th>
-                    <th style={th}>描述</th>
-                    <th style={th}>时间</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {history.map((h) => (
-                    <tr key={h.id}>
-                      <td style={td}>{h.operatorName}</td>
-                      <td style={td}>{h.description}</td>
-                      <td style={td}>{new Date(h.changedAt).toLocaleString('zh-CN')}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
+      {/* Exhausted Users */}
+      <div style={{ marginTop: 16 }}>
+        <h3 style={{ margin: '0 0 12px 0', fontSize: 16, fontWeight: 600, color: '#1f2937' }}>已耗尽积分用户</h3>
+        <DataTable
+          columns={exhaustedColumns}
+          data={exhaustedUsers}
+          total={exhaustedUsers.length}
+          page={1}
+          pageSize={20}
+          onPageChange={() => {}}
+          loading={false}
+        />
       </div>
     </div>
   );
 }
 
-const pageContainer: React.CSSProperties = { minHeight: '100vh' };
-
-const topbar: React.CSSProperties = {
-  position: 'sticky',
-  top: 0,
-  zIndex: 50,
-  background: '#fff',
-  height: 60,
-  display: 'flex',
-  alignItems: 'center',
-  padding: '0 32px',
-  borderBottom: '1px solid #e8e8e8',
-  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+const statsGridStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(4, 1fr)',
+  gap: 16,
+  marginBottom: 16,
 };
 
-const card: React.CSSProperties = {
+const tierCardStyle: React.CSSProperties = {
   background: '#fff',
   borderRadius: 12,
+  padding: '20px 24px',
   boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-  marginBottom: 24,
+  border: '1px solid rgba(0,0,0,0.04)',
 };
 
-const cardHeader: React.CSSProperties = {
-  padding: '18px 24px',
-  borderBottom: '1px solid #f0f0f0',
+const tierRowStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  justifyContent: 'space-between',
+  gap: 16,
+  padding: '12px 0',
+  borderBottom: '1px solid #f3f4f6',
 };
 
-const cardBody: React.CSSProperties = { padding: '20px 24px' };
-
-const th: React.CSSProperties = {
-  textAlign: 'left',
-  padding: '12px 16px',
-  fontSize: 12,
-  fontWeight: 600,
-  color: '#888',
-  textTransform: 'uppercase',
-  letterSpacing: 0.5,
-  borderBottom: '1px solid #f0f0f0',
-  background: '#fafafa',
+const progressBarBgStyle: React.CSSProperties = {
+  flex: 1,
+  height: 8,
+  background: '#f3f4f6',
+  borderRadius: 4,
+  overflow: 'hidden',
 };
 
-const td: React.CSSProperties = {
-  padding: '14px 16px',
-  borderBottom: '1px solid #f5f5f5',
-  fontSize: 13,
-  verticalAlign: 'middle',
-};
-
-const formInput: React.CSSProperties = {
-  width: 120,
-  padding: '8px 12px',
-  border: '1px solid #e0e0e0',
-  borderRadius: 8,
-  fontSize: 13,
-  outline: 'none',
-  fontFamily: 'inherit',
-};
-
-const btnPrimary: React.CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 6,
-  padding: '8px 16px',
-  borderRadius: 8,
-  border: 'none',
-  fontSize: 13,
-  fontWeight: 500,
-  cursor: 'pointer',
+const progressBarFillStyle: React.CSSProperties = {
+  height: '100%',
   background: '#D4A574',
-  color: '#fff',
-  fontFamily: 'inherit',
+  borderRadius: 4,
+  transition: 'width 0.3s ease',
 };
 
-const btnSecondary: React.CSSProperties = {
-  ...btnPrimary,
-  background: '#f5f5f5',
-  color: '#555',
-};
-
-const successBanner: React.CSSProperties = {
-  padding: '12px 20px',
-  background: '#e8f8f0',
-  color: '#27ae60',
-  borderRadius: 8,
-  fontSize: 13,
-  fontWeight: 500,
-  marginBottom: 20,
+const actionBtnStyle: React.CSSProperties = {
+  padding: '4px 10px',
+  borderRadius: 6,
+  border: '1px solid #e5e7eb',
+  background: '#fff',
+  fontSize: 12,
+  cursor: 'pointer',
+  fontFamily: "'Inter', sans-serif",
+  color: '#D4A574',
+  whiteSpace: 'nowrap',
 };

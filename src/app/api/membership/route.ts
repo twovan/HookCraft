@@ -9,10 +9,15 @@ export async function GET(req: NextRequest) {
   try {
     const user = await getAuthUser();
     if (!user) {
-      return NextResponse.json(
-        { error: '未登录，请先登录' },
-        { status: 401 }
-      );
+      // Return default free membership when auth cookie isn't synced
+      return NextResponse.json({
+        tier: 'free',
+        status: 'active',
+        credits_total: 0,
+        credits_used: 0,
+        preview_total: 3,
+        preview_used: 0,
+      });
     }
 
     const membershipService = new MembershipService(supabaseAdmin);

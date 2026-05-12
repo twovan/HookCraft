@@ -1,5 +1,5 @@
-// GET /api/credits - 获取 Credits 信息
-// POST /api/credits - 消耗 Credits
+// GET /api/credits - 获取 Credits 信息（增强版）
+// POST /api/credits - 消耗 Credits（优先扣除）
 
 import { NextRequest, NextResponse } from 'next/server';
 import { CreditService } from '../../../lib/credits/CreditService';
@@ -11,16 +11,39 @@ export async function GET(req: NextRequest) {
   try {
     const user = await getAuthUser();
     if (!user) {
-      return NextResponse.json(
-        { error: '未登录，请先登录' },
-        { status: 401 }
-      );
+      // Return default free tier credits when auth cookie isn't synced
+      return NextResponse.json({
+        used: 0,
+        total: 0,
+        remaining: 0,
+        tier: 'free',
+        monthlyUsed: 0,
+        monthlyTotal: 0,
+        monthlyRemaining: 0,
+        purchasedBalance: 0,
+        totalAvailable: 0,
+      });
     }
 
     const creditService = new CreditService(supabaseAdmin);
-    const credits = await creditService.getCredits(user.id);
+    const credits = await creditService.getCreditsEnhanced(user.id);
 
-    return NextResponse.json(credits);
+    return NextResponse.json({
+      // Enhanced fields
+      userId: credits.userId,
+      tier: credits.tier,
+      monthlyUsed: credits.monthlyUsed,
+      monthlyTotal: credits.monthlyTotal,
+      monthlyRemaining: credits.monthlyRemaining,
+      purchasedBalance: credits.purchasedBalance,
+      totalAvailable: credits.totalAvailable,
+      periodStart: credits.periodStart,
+      periodEnd: credits.periodEnd,
+      // Backward-compatible fields
+      used: credits.monthlyUsed,
+      total: credits.monthlyTotal,
+      remaining: credits.totalAvailable,
+    });
   } catch (error: any) {
     console.error('获取 Credits 信息失败:', error);
     return NextResponse.json(
@@ -64,7 +87,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json(result);
+    return NextResponse.json({
+      success: result.success,
+      consumed: result.consumed,
+      monthlyCost: result.monthlyCost ?? 0,
+      purchasedCost: result.purchasedCost ?? 0,
+      monthlyRemaining: result.monthlyRemaining ?? 0,
+      purchasedRemaining: result.purchasedRemaining ?? 0,
+      totalAvailable: (result.monthlyRemaining ?? 0) + (result.purchasedRemaining ?? 0),
+      // Backward-compatible field
+      remaining: (result.monthlyRemaining ?? 0) + (result.purchasedRemaining ?? 0),
+    });
   } catch (error: any) {
     console.error('消耗 Credits 失败:', error);
     return NextResponse.json(

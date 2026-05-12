@@ -1,7 +1,17 @@
 'use client';
 
 import { create } from 'zustand';
+import { supabase } from '@/lib/supabase/client';
 import type { MembershipInfo, MembershipTier } from '@/types/membership';
+
+/** 获取带 auth header 的 fetch options */
+async function getAuthHeaders(): Promise<HeadersInit> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.access_token) {
+    return { 'Authorization': `Bearer ${session.access_token}` };
+  }
+  return {};
+}
 
 export interface MembershipStore {
   membership: MembershipInfo | null;
@@ -27,7 +37,8 @@ export const useMembershipStore = create<MembershipStore>((set, get) => ({
   fetchMembership: async () => {
     set({ isLoading: true, error: null });
     try {
-      const res = await fetch('/api/membership');
+      const headers = await getAuthHeaders();
+      const res = await fetch('/api/membership', { headers });
       if (!res.ok) {
         throw new Error(`Failed to fetch membership: ${res.statusText}`);
       }

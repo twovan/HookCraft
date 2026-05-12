@@ -100,7 +100,9 @@ export type GenerationTaskStatus =
   | 'post_processing'              // 正在后处理（FFmpeg）
   | 'completed'                    // 完成
   | 'failed'                       // 失败
-  | 'safety_blocked';              // 被安全过滤器拦截
+  | 'safety_blocked'               // 被安全过滤器拦截
+  | 'selected'                     // 用户选中的版本
+  | 'archived';                    // 未选中的版本（已归档）
 
 /** 生成错误 */
 export interface GenerationError {
@@ -133,3 +135,41 @@ export interface GeminiRawResponse {
 export type GeminiResponsePart =
   | { text: string; inlineData?: never }
   | { text?: never; inlineData: { mimeType: string; data: string } };
+
+// ===== 多版本批量生成相关类型 =====
+
+/** 批量生成请求 */
+export interface GenerateBatchRequest {
+  templateId?: string;
+  userPrompt?: string;
+  generationType: GenerationType;
+  usePremiumSinger?: boolean;
+  images?: ImageInput[];
+}
+
+/** 批量生成响应 */
+export interface GenerateBatchResponse {
+  batchId: string;
+  versions: VersionResult[];
+  totalCreditsConsumed: number;
+}
+
+/** 批量生成结果（服务层返回） */
+export interface BatchGenerationResult {
+  batchId: string;
+  versions: VersionResult[];
+  totalCreditsConsumed: number;
+  status: 'completed' | 'partial' | 'failed';
+}
+
+/** 单个版本生成结果 */
+export interface VersionResult {
+  taskId: string;
+  versionNumber: number;
+  status: GenerationTaskStatus;
+  audioUrl?: string;
+  lyrics?: string;
+  durationSeconds?: number;
+  creditsConsumed: number;
+  error?: { code: string; message: string };
+}

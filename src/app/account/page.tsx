@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMembershipStore } from '@/store/membershipStore';
 import { useCreditStore } from '@/store/creditStore';
+import { fetchWithAuth } from '@/lib/fetchWithAuth';
 import SubscriptionPanel from '@/components/membership/SubscriptionPanel';
 import type { PaymentRecord } from '@/types/payment';
 import type { CreditHistory } from '@/types/credits';
@@ -44,20 +45,26 @@ export default function AccountPage() {
 
   useEffect(() => {
     fetchMembership();
-    if (isPaid) {
-      fetchCredits();
-    } else {
-      fetchPreviewCount();
-    }
     // Fetch credit history
     fetchCreditHistory();
     // Fetch purchase history
     fetchPurchaseHistory();
   }, []);
 
+  // 在 membership 加载完成后，根据等级加载对应的 credits 数据
+  useEffect(() => {
+    if (membership) {
+      if (isPaid) {
+        fetchCredits();
+      } else {
+        fetchPreviewCount();
+      }
+    }
+  }, [membership]);
+
   const fetchCreditHistory = async () => {
     try {
-      const res = await fetch('/api/credits/history');
+      const res = await fetchWithAuth('/api/credits/history');
       if (res.ok) {
         const data = await res.json();
         setCreditHistory(data);
@@ -69,7 +76,7 @@ export default function AccountPage() {
 
   const fetchPurchaseHistory = async () => {
     try {
-      const res = await fetch('/api/payments');
+      const res = await fetchWithAuth('/api/payments');
       if (res.ok) {
         const data = await res.json();
         setPurchaseHistory(data.filter((r: PaymentRecord) => r.status !== 'pending'));
@@ -82,7 +89,7 @@ export default function AccountPage() {
   const handleRetryPayment = async () => {
     setIsRetrying(true);
     try {
-      const res = await fetch('/api/payments', { method: 'POST' });
+      const res = await fetchWithAuth('/api/payments', { method: 'POST' });
       if (res.ok) {
         setPaymentError(null);
       } else {
@@ -98,7 +105,7 @@ export default function AccountPage() {
 
   const handleUpgrade = async (targetTier: MembershipTier) => {
     try {
-      const res = await fetch('/api/membership/upgrade', {
+      const res = await fetchWithAuth('/api/membership/upgrade', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ targetTier }),
@@ -117,7 +124,7 @@ export default function AccountPage() {
 
   const handleDowngrade = async (targetTier: MembershipTier) => {
     try {
-      const res = await fetch('/api/membership/downgrade', {
+      const res = await fetchWithAuth('/api/membership/downgrade', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ targetTier }),
@@ -135,7 +142,7 @@ export default function AccountPage() {
 
   const handleCancel = async () => {
     try {
-      const res = await fetch('/api/membership/cancel', { method: 'POST' });
+      const res = await fetchWithAuth('/api/membership/cancel', { method: 'POST' });
       if (res.ok) {
         fetchMembership();
       } else {
@@ -302,10 +309,10 @@ export default function AccountPage() {
                         fontFamily: "'Playfair Display', serif",
                       }}
                     >
-                      {credits.used}
+                      {credits.monthlyUsed}
                     </span>
                     <span style={{ fontSize: '14px', color: '#6B6B6B' }}>
-                      / {credits.total} Credits 已消耗
+                      / {credits.monthlyTotal} Credits 已消耗
                     </span>
                   </div>
                   {/* Progress bar */}
@@ -321,14 +328,24 @@ export default function AccountPage() {
                       style={{
                         height: '100%',
                         borderRadius: '6px',
-                        width: `${credits.total > 0 ? (credits.used / credits.total) * 100 : 0}%`,
+                        width: `${credits.monthlyTotal > 0 ? (credits.monthlyUsed / credits.monthlyTotal) * 100 : 0}%`,
                         background: 'linear-gradient(90deg, #D4A574, #C9A86A)',
                         transition: 'width 0.3s ease',
                       }}
                     />
                   </div>
-                  <div style={{ fontSize: '12px', color: '#999', marginTop: '8px' }}>
-                    剩余 {credits.remaining} Credits
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
+                    <span style={{ fontSize: '12px', color: '#999' }}>
+                      月度剩余 {credits.monthlyRemaining} Credits
+                    </span>
+                    {credits.purchasedBalance > 0 && (
+                      <span style={{ fontSize: '12px', color: '#6B46C1', fontWeight: 500 }}>
+                        购买余额 {credits.purchasedBalance}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#6B6B6B', marginTop: '4px' }}>
+                    总可用 {credits.totalAvailable} Credits
                   </div>
                 </div>
               </>
@@ -420,7 +437,9 @@ export default function AccountPage() {
                 aria-label="月度使用趋势柱状图"
               >
                 {creditHistory.slice(-6).map((month) => {
-                  const heightPercent = maxUsage > 0 ? (month.used / maxUsage) * 100 : 0;
+                  const monthlyHeight = maxUsage > 0 ? ((month.monthlyUsed ?? 0) / maxUsage) * 100 : 0;
+                  const purchasedHeight = maxUsage > 0 ? ((month.purchasedUsed ?? 0) / maxUsage) * 100 : 0;
+                  const totalHeight = monthlyHeight + purchasedHeight;
                   return (
                     <div
                       key={month.month}
@@ -438,14 +457,49 @@ export default function AccountPage() {
                         style={{
                           width: '100%',
                           maxWidth: '32px',
-                          height: `${Math.max(heightPercent, 4)}%`,
-                          background: 'linear-gradient(180deg, #D4A574 0%, #E8C9A8 100%)',
-                          borderRadius: '4px 4px 0 0',
-                          transition: 'height 0.3s ease',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          height: `${Math.max(totalHeight, 4)}%`,
                           minHeight: '4px',
                         }}
-                        title={`${month.month}: ${month.used}/${month.total}`}
-                      />
+                        title={`${month.month}: 月度 ${month.monthlyUsed ?? 0} + 购买 ${month.purchasedUsed ?? 0} / ${month.total}`}
+                      >
+                        {/* 购买 Credits 部分（紫色，上方） */}
+                        {(month.purchasedUsed ?? 0) > 0 && (
+                          <div
+                            style={{
+                              width: '100%',
+                              flex: purchasedHeight,
+                              background: 'linear-gradient(180deg, #9F7AEA 0%, #B794F4 100%)',
+                              borderRadius: monthlyHeight > 0 ? '4px 4px 0 0' : '4px',
+                              transition: 'flex 0.3s ease',
+                            }}
+                          />
+                        )}
+                        {/* 月度 Credits 部分（金色，下方） */}
+                        {(month.monthlyUsed ?? 0) > 0 && (
+                          <div
+                            style={{
+                              width: '100%',
+                              flex: monthlyHeight,
+                              background: 'linear-gradient(180deg, #D4A574 0%, #E8C9A8 100%)',
+                              borderRadius: purchasedHeight > 0 ? '0 0 0 0' : '4px 4px 0 0',
+                              transition: 'flex 0.3s ease',
+                            }}
+                          />
+                        )}
+                        {/* Fallback if both are 0 but used > 0 (legacy data) */}
+                        {(month.monthlyUsed ?? 0) === 0 && (month.purchasedUsed ?? 0) === 0 && month.used > 0 && (
+                          <div
+                            style={{
+                              width: '100%',
+                              flex: 1,
+                              background: 'linear-gradient(180deg, #D4A574 0%, #E8C9A8 100%)',
+                              borderRadius: '4px 4px 0 0',
+                            }}
+                          />
+                        )}
+                      </div>
                       <span style={{ fontSize: '10px', color: '#999', whiteSpace: 'nowrap' }}>
                         {month.month.slice(5)}月
                       </span>

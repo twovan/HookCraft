@@ -17,6 +17,8 @@ import type {
   GenerationError,
   GenerationErrorCode,
   LyriaModelId,
+  BatchGenerationResult,
+  VersionResult,
 } from '../../types/generation';
 import type { CreditOperationType } from '../../types/credits';
 import type { CreditService } from '../credits/CreditService';
@@ -386,6 +388,466 @@ export class MusicGenerationService {
       .eq('id', taskId);
 
     if (error) throw toAppError(error, 'generation_tasks', 'update');
+  }
+
+  // ─── 多版本批量生成方法 ─────────────────────────────────
+
+  /**
+   * 批量生成多个版本
+   *
+   * 1. 检查 Credits/Preview 余额（versionCount × 单版本消耗）
+   * 2. 创建 generation_batches 记录
+   * 3. 创建 N 个 generation_tasks 记录
+   * 4. 并行发起 N 个 Lyria 3 生成请求
+   * 5. 每个版本独立：生成 → 上传 → 更新状态 → 扣减 Credits
+   * 6. 失败版本不扣减 Credits
+   *
+   * @param userId 用户 ID
+   * @param userTier 用户当前会员等级
+   * @param input 生成输入参数
+   * @param versionCount 版本数量（默认 3）
+   * @returns BatchGenerationResult
+   */
+  async generateBatch(
+    userId: string,
+    userTier: MembershipTier,
+    input: MusicGenerationInput,
+    versionCount = 3,
+  ): Promise<BatchGenerationResult> {
+    const tierConfig = TIER_CONFIGS[userTier];
+    const modelId: LyriaModelId = input.generationType === 'preview'
+      ? 'lyria-3-clip-preview'
+      : 'lyria-3-pro-preview';
+
+    // ── Step 1: 权限校验 ──────────────────────────────────
+
+    const requiredFeature: FeatureKey =
+      input.generationType === 'full_demo' ? 'full_demo' : 'preview';
+    if (!tierConfig.features.includes(requiredFeature)) {
+      throw new Error(
+        input.generationType === 'full_demo'
+          ? '您的等级不支持完整 Demo 生成，请升级到专业版'
+          : '您的等级不支持此功能',
+      );
+    }
+
+    if (input.images && input.images.length > 0) {
+      if (userTier === 'free') {
+        throw new Error('升级到专业版解锁图片灵感创作');
+      }
+      if (input.images.length > 10) {
+        throw new Error('图片数量超限，最多 10 张');
+      }
+    }
+
+    // ── Step 2: Credits/Preview 余额预检查 ────────────────
+
+    const operations = this.getOperations(input);
+    const singleVersionCost = this.creditService.calculateTotalCost(operations);
+
+    if (userTier === 'free') {
+      // Free 用户使用 Preview 次数
+      const previewInfo = await this.creditService.getPreviewCount(userId);
+      if (previewInfo.remaining < versionCount) {
+        throw new Error(
+          `Preview 次数不足，需要 ${versionCount} 次，剩余 ${previewInfo.remaining} 次`,
+        );
+      }
+    } else {
+      // 付费用户使用 Credits
+      const creditInfo = await this.creditService.getCredits(userId);
+      const totalCost = singleVersionCost * versionCount;
+      if (creditInfo.remaining < totalCost) {
+        throw new Error(
+          `Credits 余额不足，需要 ${totalCost} Credits，剩余 ${creditInfo.remaining} Credits`,
+        );
+      }
+    }
+
+    // ── Step 3: 构建 Prompt ───────────────────────────────
+
+    const prompt = await this.buildPrompt(input);
+
+    // ── Step 4: 创建 batch 和 tasks 记录 ──────────────────
+
+    const batchId = `batch-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    const { error: batchError } = await this.supabase
+      .from('generation_batches')
+      .insert({
+        id: batchId,
+        user_id: userId,
+        template_id: input.templateId ?? null,
+        prompt: input.userPrompt ?? null,
+        generation_type: input.generationType,
+        use_premium_singer: input.usePremiumSinger ?? false,
+        version_count: versionCount,
+        status: 'generating',
+      });
+
+    if (batchError) throw toAppError(batchError, 'generation_batches', 'insert');
+
+    // 创建 N 个 generation_tasks 记录
+    const taskIds: string[] = [];
+    for (let i = 1; i <= versionCount; i++) {
+      const taskId = `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}-v${i}`;
+      taskIds.push(taskId);
+
+      const { error: taskError } = await this.supabase
+        .from('generation_tasks')
+        .insert({
+          id: taskId,
+          user_id: userId,
+          generation_type: input.generationType,
+          status: 'pending',
+          prompt: input.userPrompt ?? null,
+          template_id: input.templateId ?? null,
+          model_id: modelId,
+          batch_id: batchId,
+          version_number: i,
+        });
+
+      if (taskError) throw toAppError(taskError, 'generation_tasks', 'insert');
+    }
+
+    // ── Step 5: 并行生成 ─────────────────────────────────
+
+    const request: GenerationRequest = {
+      prompt,
+      outputFormat: input.outputFormat ?? 'audio/mpeg',
+      images: input.images,
+    };
+
+    const generateVersion = async (taskId: string, versionNumber: number): Promise<VersionResult> => {
+      try {
+        // 更新状态为 generating
+        await this.updateTaskStatus(taskId, 'generating');
+
+        // 调用 Lyria 3
+        let response: GenerationResponse;
+        if (input.generationType === 'preview') {
+          response = await this.provider.generatePreview(request);
+        } else {
+          response = await this.provider.generateFullDemo(request);
+        }
+
+        // 检查安全过滤器
+        if (!response.success) {
+          await this.failTask(taskId, {
+            code: 'SAFETY_FILTER_BLOCKED',
+            message: '内容被安全过滤器拦截',
+            modelId: response.modelId,
+          });
+          return {
+            taskId,
+            versionNumber,
+            status: 'safety_blocked',
+            creditsConsumed: 0,
+            error: { code: 'SAFETY_FILTER_BLOCKED', message: '内容被安全过滤器拦截' },
+          };
+        }
+
+        // 上传音频到 Storage
+        let audioPath: string | undefined;
+        if (response.audioData) {
+          audioPath = await this.uploadAudio(
+            userId,
+            batchId,
+            versionNumber,
+            response.audioData,
+            response.audioMimeType ?? 'audio/mpeg',
+          );
+        }
+
+        // 扣减 Credits
+        let creditsConsumed = 0;
+        if (userTier === 'free') {
+          const consumeResult = await this.creditService.consumePreview(userId);
+          creditsConsumed = consumeResult.consumed;
+        } else {
+          const consumeResult = await this.creditService.consumeCredits(userId, operations);
+          creditsConsumed = consumeResult.consumed;
+        }
+
+        // 更新任务完成状态
+        await this.completeTask(taskId, {
+          audioPath,
+          lyrics: response.lyrics,
+          songStructure: response.songStructureDescription,
+          creditsConsumed,
+        });
+
+        return {
+          taskId,
+          versionNumber,
+          status: 'completed',
+          audioUrl: audioPath,
+          lyrics: response.lyrics,
+          creditsConsumed,
+        };
+      } catch (err) {
+        // 生成失败
+        const errorMessage = err instanceof Error ? err.message : '生成失败';
+        await this.failTask(taskId, {
+          code: 'LYRIA_GENERATION_FAILED',
+          message: errorMessage,
+        });
+        return {
+          taskId,
+          versionNumber,
+          status: 'failed',
+          creditsConsumed: 0,
+          error: { code: 'LYRIA_GENERATION_FAILED', message: errorMessage },
+        };
+      }
+    };
+
+    // 使用 Promise.allSettled 并行生成
+    const results = await Promise.allSettled(
+      taskIds.map((taskId, index) => generateVersion(taskId, index + 1)),
+    );
+
+    // 收集结果
+    const versions: VersionResult[] = results.map((result) => {
+      if (result.status === 'fulfilled') {
+        return result.value;
+      }
+      // Promise rejected（不应发生，因为 generateVersion 内部已 catch）
+      return {
+        taskId: '',
+        versionNumber: 0,
+        status: 'failed' as const,
+        creditsConsumed: 0,
+        error: { code: 'LYRIA_GENERATION_FAILED', message: '未知错误' },
+      };
+    });
+
+    // ── Step 6: 更新 batch 状态 ──────────────────────────
+
+    const completedCount = versions.filter((v) => v.status === 'completed').length;
+    let batchStatus: 'completed' | 'partial' | 'failed';
+    if (completedCount === versionCount) {
+      batchStatus = 'completed';
+    } else if (completedCount > 0) {
+      batchStatus = 'partial';
+    } else {
+      batchStatus = 'failed';
+    }
+
+    const { error: updateBatchError } = await this.supabase
+      .from('generation_batches')
+      .update({
+        status: batchStatus,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', batchId);
+
+    if (updateBatchError) throw toAppError(updateBatchError, 'generation_batches', 'update');
+
+    const totalCreditsConsumed = versions.reduce((sum, v) => sum + v.creditsConsumed, 0);
+
+    return {
+      batchId,
+      versions,
+      totalCreditsConsumed,
+      status: batchStatus,
+    };
+  }
+
+  /**
+   * 选择版本
+   *
+   * 使用数据库事务：将选中版本状态设为 selected，其余版本设为 archived。
+   * 更新 generation_batches.selected_task_id。
+   *
+   * @param userId 用户 ID
+   * @param batchId 批次 ID
+   * @param taskId 选中的任务 ID
+   */
+  async selectVersion(
+    userId: string,
+    batchId: string,
+    taskId: string,
+  ): Promise<{ success: boolean; selectedTaskId: string; archivedTaskIds: string[] }> {
+    // 验证 batch 属于该用户
+    const { data: batch, error: batchError } = await this.supabase
+      .from('generation_batches')
+      .select('*')
+      .eq('id', batchId)
+      .eq('user_id', userId)
+      .single();
+
+    if (batchError || !batch) {
+      throw new Error('批次不存在或无权操作');
+    }
+
+    // 验证 taskId 属于该 batch
+    const { data: tasks, error: tasksError } = await this.supabase
+      .from('generation_tasks')
+      .select('id, status')
+      .eq('batch_id', batchId)
+      .eq('user_id', userId);
+
+    if (tasksError) throw toAppError(tasksError, 'generation_tasks', 'select');
+
+    const targetTask = tasks?.find((t) => t.id === taskId);
+    if (!targetTask) {
+      throw new Error('任务不属于该批次或无权操作');
+    }
+
+    if (targetTask.status !== 'completed' && targetTask.status !== 'selected') {
+      throw new Error('只能选择已完成的版本');
+    }
+
+    // 将选中版本设为 selected
+    const { error: selectError } = await this.supabase
+      .from('generation_tasks')
+      .update({
+        status: 'selected' as const,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', taskId);
+
+    if (selectError) throw toAppError(selectError, 'generation_tasks', 'update');
+
+    // 将其余版本设为 archived
+    const otherTaskIds = (tasks ?? [])
+      .filter((t) => t.id !== taskId && (t.status === 'completed' || t.status === 'selected'))
+      .map((t) => t.id);
+
+    if (otherTaskIds.length > 0) {
+      const { error: archiveError } = await this.supabase
+        .from('generation_tasks')
+        .update({
+          status: 'archived' as const,
+          updated_at: new Date().toISOString(),
+        })
+        .in('id', otherTaskIds);
+
+      if (archiveError) throw toAppError(archiveError, 'generation_tasks', 'update');
+    }
+
+    // 更新 batch 的 selected_task_id
+    const { error: batchUpdateError } = await this.supabase
+      .from('generation_batches')
+      .update({
+        selected_task_id: taskId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', batchId);
+
+    if (batchUpdateError) throw toAppError(batchUpdateError, 'generation_batches', 'update');
+
+    return {
+      success: true,
+      selectedTaskId: taskId,
+      archivedTaskIds: otherTaskIds,
+    };
+  }
+
+  /**
+   * 获取用户最近一个未完成选择的批次
+   *
+   * 查询条件：selected_task_id IS NULL 且 status 为 generating/completed/partial
+   * 返回批次详情含所有版本
+   */
+  async getLatestIncompleteBatch(
+    userId: string,
+  ): Promise<{
+    batch: {
+      id: string;
+      templateId: string | null;
+      prompt: string | null;
+      generationType: string;
+      status: string;
+      createdAt: string;
+    };
+    versions: VersionResult[];
+  } | null> {
+    const { data: batch, error: batchError } = await this.supabase
+      .from('generation_batches')
+      .select('*')
+      .eq('user_id', userId)
+      .is('selected_task_id', null)
+      .in('status', ['generating', 'completed', 'partial'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (batchError) throw toAppError(batchError, 'generation_batches', 'select');
+    if (!batch) return null;
+
+    // 查询该批次的所有版本
+    const { data: tasks, error: tasksError } = await this.supabase
+      .from('generation_tasks')
+      .select('*')
+      .eq('batch_id', batch.id)
+      .order('version_number', { ascending: true });
+
+    if (tasksError) throw toAppError(tasksError, 'generation_tasks', 'select');
+
+    const versions: VersionResult[] = (tasks ?? []).map((task) => ({
+      taskId: task.id,
+      versionNumber: task.version_number ?? 0,
+      status: task.status,
+      audioUrl: task.audio_path ?? undefined,
+      lyrics: task.lyrics ?? undefined,
+      durationSeconds: task.duration_seconds ?? undefined,
+      creditsConsumed: task.credits_consumed,
+      error: task.error_code
+        ? { code: task.error_code, message: task.error_message ?? '' }
+        : undefined,
+    }));
+
+    return {
+      batch: {
+        id: batch.id,
+        templateId: batch.template_id,
+        prompt: batch.prompt,
+        generationType: batch.generation_type,
+        status: batch.status,
+        createdAt: batch.created_at,
+      },
+      versions,
+    };
+  }
+
+  // ─── 音频上传方法 ──────────────────────────────────────
+
+  /**
+   * 上传音频到 Supabase Storage
+   *
+   * 路径格式: generations/{userId}/{batchId}/v{n}.mp3
+   *
+   * @param userId 用户 ID
+   * @param batchId 批次 ID
+   * @param versionNumber 版本号
+   * @param audioData 音频二进制数据
+   * @param mimeType 音频 MIME 类型
+   * @returns storage path
+   */
+  private async uploadAudio(
+    userId: string,
+    batchId: string,
+    versionNumber: number,
+    audioData: Buffer,
+    mimeType: string,
+  ): Promise<string> {
+    const extension = mimeType === 'audio/wav' ? 'wav' : 'mp3';
+    const path = `${userId}/${batchId}/v${versionNumber}.${extension}`;
+
+    const { data, error } = await this.supabase.storage
+      .from('generations')
+      .upload(path, audioData, {
+        upsert: true,
+        contentType: mimeType,
+      });
+
+    if (error) {
+      throw new Error(`音频上传失败: ${error.message}`);
+    }
+
+    return data.path;
   }
 
   // ─── 内部方法 ───────────────────────────────────────────

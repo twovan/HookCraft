@@ -53,6 +53,7 @@ export default function PromptInput({
           lineHeight: 1.6,
           resize: 'vertical',
           outline: 'none',
+          boxSizing: 'border-box',
           transition: 'border-color 0.2s ease',
           opacity: disabled ? 0.6 : 1,
           cursor: disabled ? 'not-allowed' : 'text',

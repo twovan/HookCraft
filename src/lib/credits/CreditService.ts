@@ -5,14 +5,17 @@ import type { Database } from '../supabase/types';
 import type { MembershipTier } from '../../types/membership';
 import type {
   CreditInfo,
+  CreditInfoEnhanced,
   CreditHistory,
+  CreditHistoryEnhanced,
   ConsumeResult,
   CreditOperationType,
   PreviewCountInfo,
+  PurchaseResult,
 } from '../../types/credits';
 import { CREDITS_COST } from '../../config/creditsCost';
 import { TIER_CONFIGS } from '../../config/tierConfig';
-import { toCreditInfo, toCreditHistory, toPreviewCount } from '../supabase/mappers/credits';
+import { toCreditInfo, toCreditHistory, toCreditInfoEnhanced, toCreditHistoryEnhanced, toPreviewCount } from '../supabase/mappers/credits';
 import { toAppError } from '../supabase/errors';
 
 /**
@@ -46,14 +49,14 @@ export class CreditService {
   }
 
   /**
-   * 消耗 Credits
+   * 消耗 Credits（优先扣除逻辑）
    *
-   * 根据操作类型列表计算总消耗，支持复合消耗场景。
-   * 使用乐观锁确保并发安全：读取当前 version → 检查余额 → 以 WHERE version = expected_version 条件更新。
+   * 调用 consume_credits_with_priority RPC 函数实现原子性优先扣除。
+   * 优先从月度 Credits 扣除，不足部分从购买 Credits 补扣。
    *
    * @param userId - 用户 ID
    * @param operations - 本次操作涉及的消耗类型列表
-   * @returns ConsumeResult 包含 success/remaining/consumed/error
+   * @returns ConsumeResult 包含 success/remaining/consumed/error 及拆分明细
    */
   async consumeCredits(
     userId: string,
@@ -62,53 +65,107 @@ export class CreditService {
     const totalCost = this.calculateTotalCost(operations);
 
     // 1. 读取当前 credits 及 version
-    const { data: current, error: readError } = await this.supabase
+    const { data: currentCredits, error: creditsReadError } = await this.supabase
       .from('credits')
       .select('*')
       .eq('user_id', userId)
       .single();
 
-    if (readError) throw toAppError(readError, 'credits', 'select');
+    if (creditsReadError) throw toAppError(creditsReadError, 'credits', 'select');
 
-    // 2. 检查余额是否充足
-    if (current.used + totalCost > current.total) {
-      return {
-        success: false,
-        remaining: current.total - current.used,
-        consumed: 0,
-        error: 'no_credits',
-      };
-    }
-
-    // 3. 使用乐观锁更新（WHERE version = expected_version）
-    const { data, error, count } = await this.supabase
-      .from('credits')
-      .update({
-        used: current.used + totalCost,
-        version: current.version + 1,
-        updated_at: new Date().toISOString(),
-      })
+    // 2. 读取当前 purchased_credits 及 version（可能不存在）
+    const { data: currentPurchased, error: purchasedReadError } = await this.supabase
+      .from('purchased_credits')
+      .select('*')
       .eq('user_id', userId)
-      .eq('version', current.version)
-      .select('*');
+      .maybeSingle();
 
-    if (error) throw toAppError(error, 'credits', 'update');
+    if (purchasedReadError) throw toAppError(purchasedReadError, 'purchased_credits', 'select');
 
-    // 如果没有行被更新，说明并发修改冲突
-    if (!data || data.length === 0) {
+    const purchasedVersion = currentPurchased?.version ?? 0;
+
+    // 3. 调用 consume_credits_with_priority RPC 函数
+    const operationType = operations.length === 1 ? operations[0] : operations.join('+');
+    const { data: rpcResult, error: rpcError } = await this.supabase.rpc(
+      'consume_credits_with_priority',
+      {
+        p_user_id: userId,
+        p_total_cost: totalCost,
+        p_operation_type: operationType,
+        p_credits_version: currentCredits.version,
+        p_purchased_version: purchasedVersion,
+      }
+    );
+
+    if (rpcError) throw toAppError(rpcError, 'credits', 'update');
+
+    // 4. 解析 JSONB 结果
+    const result = rpcResult as Record<string, unknown>;
+
+    if (!result.success) {
+      const monthlyRemaining = currentCredits.total - currentCredits.used;
+      const purchasedBalance = currentPurchased?.balance ?? 0;
       return {
         success: false,
-        remaining: current.total - current.used,
+        remaining: monthlyRemaining + purchasedBalance,
         consumed: 0,
-        error: 'concurrent_limit',
+        error: result.error as 'no_credits' | 'concurrent_limit',
       };
     }
+
+    const monthlyCost = result.monthly_cost as number;
+    const purchasedCost = result.purchased_cost as number;
+    const monthlyRemaining = result.monthly_remaining as number;
+    const purchasedRemaining = result.purchased_remaining as number;
 
     return {
       success: true,
-      remaining: data[0].total - data[0].used,
+      remaining: monthlyRemaining + purchasedRemaining,
       consumed: totalCost,
+      monthlyCost,
+      purchasedCost,
+      monthlyRemaining,
+      purchasedRemaining,
     };
+  }
+
+  /**
+   * 获取用户购买 Credits 余额
+   * 从 purchased_credits 表查询，无记录时返回 0
+   */
+  async getPurchasedBalance(userId: string): Promise<number> {
+    const { data, error } = await this.supabase
+      .from('purchased_credits')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (error) throw toAppError(error, 'purchased_credits', 'select');
+    return data?.balance ?? 0;
+  }
+
+  /**
+   * 获取用户增强版 Credits 信息
+   * 查询 credits 表和 purchased_credits 表，返回完整的分类信息
+   */
+  async getCreditsEnhanced(userId: string): Promise<CreditInfoEnhanced> {
+    const { data: creditsRow, error: creditsError } = await this.supabase
+      .from('credits')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+
+    if (creditsError) throw toAppError(creditsError, 'credits', 'select');
+
+    const { data: purchasedRow, error: purchasedError } = await this.supabase
+      .from('purchased_credits')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (purchasedError) throw toAppError(purchasedError, 'purchased_credits', 'select');
+
+    return toCreditInfoEnhanced(creditsRow, purchasedRow);
   }
 
   /**
@@ -132,6 +189,8 @@ export class CreditService {
    *
    * 事务性操作：归档当前周期到 credit_history + 重置 credits 表。
    * 将 used 归零，total 设为当前等级的月度配额，更新计费周期。
+   * 购买 Credits 保持不变。
+   * 归档时从 credit_transactions 汇总 monthly_cost 和 purchased_cost。
    */
   async resetMonthlyCredits(userId: string): Promise<void> {
     // 1. 读取当前 credits 记录
@@ -143,27 +202,57 @@ export class CreditService {
 
     if (readError) throw toAppError(readError, 'credits', 'select');
 
-    // 2. 归档当前周期到 credit_history
+    // 2. 查询当前周期内的 credit_transactions 汇总 monthly_cost 和 purchased_cost
     const periodStart = new Date(current.period_start);
+    const periodEnd = new Date(current.period_end);
     const month = `${periodStart.getFullYear()}-${String(
       periodStart.getMonth() + 1
     ).padStart(2, '0')}`;
 
+    const { data: transactions, error: txError } = await this.supabase
+      .from('credit_transactions')
+      .select('monthly_cost, purchased_cost')
+      .eq('user_id', userId)
+      .gte('created_at', periodStart.toISOString())
+      .lt('created_at', periodEnd.toISOString())
+      .neq('operation_type', 'purchase');
+
+    if (txError) throw toAppError(txError, 'credit_transactions', 'select');
+
+    // 汇总 monthly_cost 和 purchased_cost
+    let monthlyUsed = 0;
+    let purchasedUsed = 0;
+    if (transactions && transactions.length > 0) {
+      for (const tx of transactions) {
+        monthlyUsed += tx.monthly_cost;
+        purchasedUsed += tx.purchased_cost;
+      }
+    }
+
+    // 如果没有 transactions 记录，回退到 credits.used 作为 monthlyUsed
+    const totalUsed = monthlyUsed + purchasedUsed;
+    if (totalUsed === 0 && current.used > 0) {
+      monthlyUsed = current.used;
+    }
+
+    // 3. 归档当前周期到 credit_history（含分类消耗）
     const { error: insertError } = await this.supabase
       .from('credit_history')
       .insert({
         user_id: userId,
         month,
-        used: current.used,
+        used: monthlyUsed + purchasedUsed || current.used,
         total: current.total,
+        monthly_used: monthlyUsed,
+        purchased_used: purchasedUsed,
       });
 
     if (insertError) throw toAppError(insertError, 'credit_history', 'insert');
 
-    // 3. 重置 credits 表
+    // 4. 重置 credits 表（purchased_credits 保持不变）
     const now = new Date();
-    const periodEnd = new Date(now);
-    periodEnd.setMonth(periodEnd.getMonth() + 1);
+    const newPeriodEnd = new Date(now);
+    newPeriodEnd.setMonth(newPeriodEnd.getMonth() + 1);
     const monthlyCredits = TIER_CONFIGS[current.tier].monthlyCredits;
 
     const { error: updateError } = await this.supabase
@@ -172,13 +261,114 @@ export class CreditService {
         used: 0,
         total: monthlyCredits,
         period_start: now.toISOString(),
-        period_end: periodEnd.toISOString(),
+        period_end: newPeriodEnd.toISOString(),
         version: current.version + 1,
         updated_at: now.toISOString(),
       })
       .eq('user_id', userId);
 
     if (updateError) throw toAppError(updateError, 'credits', 'update');
+  }
+
+  /**
+   * 购买 Credits 入账
+   *
+   * 将购买的 Credits 累加到 purchased_credits 表。
+   * 首次购买时创建记录，后续购买使用乐观锁累加。
+   * 成功后写入 operation_type 为 'purchase' 的 credit_transactions 记录。
+   *
+   * @param userId - 用户 ID
+   * @param amount - 购买数量
+   * @returns PurchaseResult 包含新余额和总可用量
+   */
+  async purchaseCredits(userId: string, amount: number): Promise<PurchaseResult> {
+    // 1. 尝试读取现有 purchased_credits 记录
+    const { data: existing, error: readError } = await this.supabase
+      .from('purchased_credits')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (readError) throw toAppError(readError, 'purchased_credits', 'select');
+
+    let newBalance: number;
+
+    if (existing) {
+      // 2a. 已有记录：使用乐观锁更新 balance += amount, total_purchased += amount
+      const { data: updated, error: updateError } = await this.supabase
+        .from('purchased_credits')
+        .update({
+          balance: existing.balance + amount,
+          total_purchased: existing.total_purchased + amount,
+          version: existing.version + 1,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', userId)
+        .eq('version', existing.version)
+        .select('*');
+
+      if (updateError) throw toAppError(updateError, 'purchased_credits', 'update');
+
+      // 乐观锁冲突
+      if (!updated || updated.length === 0) {
+        return {
+          success: false,
+          purchasedBalance: existing.balance,
+          totalAvailable: 0,
+          error: 'concurrent_limit',
+        };
+      }
+
+      newBalance = updated[0].balance;
+    } else {
+      // 2b. 无记录：插入新记录
+      const { data: inserted, error: insertError } = await this.supabase
+        .from('purchased_credits')
+        .insert({
+          user_id: userId,
+          balance: amount,
+          total_purchased: amount,
+          version: 0,
+        })
+        .select('*');
+
+      if (insertError) throw toAppError(insertError, 'purchased_credits', 'insert');
+
+      newBalance = inserted![0].balance;
+    }
+
+    // 3. 获取月度 Credits 剩余量
+    const { data: creditsRow, error: creditsError } = await this.supabase
+      .from('credits')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+
+    if (creditsError) throw toAppError(creditsError, 'credits', 'select');
+
+    const monthlyRemaining = creditsRow.total - creditsRow.used;
+    const totalAvailable = monthlyRemaining + newBalance;
+
+    // 4. 写入 credit_transactions 记录（purchase 类型，purchased_cost 为负值表示增加）
+    const { error: txError } = await this.supabase
+      .from('credit_transactions')
+      .insert({
+        user_id: userId,
+        operation_type: 'purchase',
+        total_cost: amount,
+        monthly_cost: 0,
+        purchased_cost: -amount,
+        monthly_remaining_after: monthlyRemaining,
+        purchased_remaining_after: newBalance,
+      });
+
+    if (txError) throw toAppError(txError, 'credit_transactions', 'insert');
+
+    return {
+      success: true,
+      purchasedBalance: newBalance,
+      totalAvailable,
+    };
   }
 
   /**

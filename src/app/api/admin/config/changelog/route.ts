@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AdminConfigService } from '../../../../../lib/admin/AdminConfigService';
 import { supabaseAdmin } from '../../../../../lib/supabase/server';
-import { getAuthUser, isAdmin } from '../../../../../lib/supabase/auth-helpers';
+import { requireAdmin } from '../../../../../lib/admin/auth';
 
 /**
  * GET /api/admin/config/changelog?limit=20
@@ -9,13 +9,8 @@ import { getAuthUser, isAdmin } from '../../../../../lib/supabase/auth-helpers';
  */
 export async function GET(req: NextRequest) {
   try {
-    const user = await getAuthUser();
-    if (!user) {
-      return NextResponse.json({ error: '未登录，请先登录' }, { status: 401 });
-    }
-    if (!isAdmin(user)) {
-      return NextResponse.json({ error: '无权访问，需要管理员权限' }, { status: 403 });
-    }
+    const { admin, response } = await requireAdmin(req);
+    if (response) return response;
 
     const { searchParams } = new URL(req.url);
     const limit = parseInt(searchParams.get('limit') ?? '20', 10);

@@ -1,162 +1,117 @@
 'use client';
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { ReactNode } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
+import AdminSidebar from '@/components/admin/AdminSidebar';
+import AdminTopBar from '@/components/admin/AdminTopBar';
+import { usePathname, useRouter } from 'next/navigation';
 
-const NAV_SECTIONS = [
-  {
-    title: '概览',
-    items: [
-      { label: '数据看板', icon: '📊', href: '/admin' },
-    ],
-  },
-  {
-    title: 'AI 管理',
-    items: [
-      { label: 'Credits 配额', icon: '⚡', href: '/admin/credits' },
-      { label: '消耗规则', icon: '📐', href: '/admin/credits/cost-rules' },
-      { label: '会员价格', icon: '💰', href: '/admin/credits/pricing' },
-      { label: 'Credits Pack', icon: '📦', href: '/admin/credits/credits-pack' },
-    ],
-  },
-];
+const pageTitles: Record<string, { title: string; breadcrumb: string }> = {
+  '/admin': { title: '数据看板', breadcrumb: '首页 / 概览' },
+  '/admin/templates': { title: '模板管理', breadcrumb: '首页 / 内容管理 / 模板管理' },
+  '/admin/review': { title: '内容审核', breadcrumb: '首页 / 内容管理 / 内容审核' },
+  '/admin/categories': { title: '分类管理', breadcrumb: '首页 / 内容管理 / 分类管理' },
+  '/admin/users': { title: '用户管理', breadcrumb: '首页 / 用户管理 / 用户列表' },
+  '/admin/producers': { title: '制作人管理', breadcrumb: '首页 / 用户管理 / 制作人' },
+  '/admin/membership': { title: '会员管理', breadcrumb: '首页 / 用户管理 / 会员管理' },
+  '/admin/orders': { title: '订单管理', breadcrumb: '首页 / 交易管理 / 订单管理' },
+  '/admin/revenue': { title: '收入结算', breadcrumb: '首页 / 交易管理 / 收入结算' },
+  '/admin/ai-tasks': { title: 'AI 任务监控', breadcrumb: '首页 / AI 管理 / AI 任务' },
+  '/admin/credits': { title: 'Credits 管理', breadcrumb: '首页 / AI 管理 / Credits' },
+  '/admin/settings': { title: '系统设置', breadcrumb: '首页 / 系统 / 系统设置' },
+  '/admin/logs': { title: '操作日志', breadcrumb: '首页 / 系统 / 操作日志' },
+};
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [checking, setChecking] = useState(true);
+  const [authenticated, setAuthenticated] = useState(false);
+
+  const isLoginPage = pathname === '/admin/login';
+
+  useEffect(() => {
+    // 登录页不需要检查认证
+    if (isLoginPage) {
+      setChecking(false);
+      return;
+    }
+
+    // 检查管理员会话
+    const checkSession = async () => {
+      try {
+        const res = await fetch('/api/admin/auth/session');
+        if (res.ok) {
+          setAuthenticated(true);
+        } else {
+          router.replace('/admin/login');
+        }
+      } catch {
+        router.replace('/admin/login');
+      } finally {
+        setChecking(false);
+      }
+    };
+
+    checkSession();
+  }, [isLoginPage, router]);
+
+  // 登录页：不显示侧边栏和顶栏
+  if (isLoginPage) {
+    return <>{children}</>;
+  }
+
+  // 检查中：显示加载状态
+  if (checking) {
+    return (
+      <div style={loadingStyle}>
+        <div style={spinnerStyle}>加载中...</div>
+      </div>
+    );
+  }
+
+  // 未认证：不渲染内容（正在跳转到登录页）
+  if (!authenticated) {
+    return null;
+  }
+
+  const pageInfo = pageTitles[pathname] || { title: '管理后台', breadcrumb: '首页' };
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
-      {/* Sidebar */}
-      <aside style={sidebarStyle}>
-        <div style={logoContainerStyle}>
-          <div style={logoIconStyle}>H</div>
-          <div>
-            <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: 0.5 }}>HookCraft</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>管理后台</div>
-          </div>
+      <AdminSidebar />
+      <main style={mainStyle}>
+        <AdminTopBar title={pageInfo.title} breadcrumb={pageInfo.breadcrumb} />
+        <div style={contentStyle}>
+          {children}
         </div>
-
-        <nav style={{ flex: 1, padding: '16px 0', overflowY: 'auto' }}>
-          {NAV_SECTIONS.map((section) => (
-            <div key={section.title} style={{ padding: '0 16px', marginBottom: 8 }}>
-              <div style={sectionTitleStyle}>{section.title}</div>
-              {section.items.map((item) => {
-                const isActive = pathname === item.href;
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    style={{
-                      ...navItemStyle,
-                      ...(isActive ? navItemActiveStyle : {}),
-                    }}
-                  >
-                    <span style={{ fontSize: 18, width: 22, textAlign: 'center' }}>{item.icon}</span>
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </div>
-          ))}
-        </nav>
-
-        <div style={footerStyle}>
-          <div style={avatarStyle}>管</div>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 600 }}>管理员</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>超级管理员</div>
-          </div>
-        </div>
-      </aside>
-
-      {/* Main content */}
-      <main style={{ flex: 1, marginLeft: 240, background: '#f0f2f5', minHeight: '100vh' }}>
-        {children}
       </main>
     </div>
   );
 }
 
-const sidebarStyle: React.CSSProperties = {
-  position: 'fixed',
-  left: 0,
-  top: 0,
-  bottom: 0,
-  width: 240,
-  background: '#1a1a2e',
-  color: '#fff',
-  zIndex: 100,
+const mainStyle: React.CSSProperties = {
+  flex: 1,
+  marginLeft: 240,
+  background: '#f0f2f5',
+  minHeight: '100vh',
   display: 'flex',
   flexDirection: 'column',
-  overflow: 'hidden',
 };
 
-const logoContainerStyle: React.CSSProperties = {
-  padding: '20px 24px',
-  borderBottom: '1px solid rgba(255,255,255,0.08)',
-  display: 'flex',
-  alignItems: 'center',
-  gap: 12,
+const contentStyle: React.CSSProperties = {
+  flex: 1,
+  padding: '24px 32px',
 };
 
-const logoIconStyle: React.CSSProperties = {
-  width: 36,
-  height: 36,
-  background: 'linear-gradient(135deg, #D4A574, #c4956a)',
-  borderRadius: 10,
+const loadingStyle: React.CSSProperties = {
+  minHeight: '100vh',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  fontSize: 18,
-  fontWeight: 700,
-  color: '#fff',
+  background: '#f0f2f5',
 };
 
-const sectionTitleStyle: React.CSSProperties = {
-  fontSize: 11,
-  fontWeight: 600,
-  color: 'rgba(255,255,255,0.35)',
-  textTransform: 'uppercase',
-  letterSpacing: 1,
-  padding: '8px 8px 4px',
-};
-
-const navItemStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 12,
-  padding: '10px 16px',
-  margin: '2px 8px',
-  borderRadius: 8,
-  cursor: 'pointer',
-  color: 'rgba(255,255,255,0.65)',
-  fontSize: 13,
-  fontWeight: 500,
-  textDecoration: 'none',
-};
-
-const navItemActiveStyle: React.CSSProperties = {
-  background: 'rgba(212,165,116,0.2)',
-  color: '#D4A574',
-};
-
-const footerStyle: React.CSSProperties = {
-  padding: '16px 24px',
-  borderTop: '1px solid rgba(255,255,255,0.08)',
-  display: 'flex',
-  alignItems: 'center',
-  gap: 10,
-};
-
-const avatarStyle: React.CSSProperties = {
-  width: 32,
-  height: 32,
-  borderRadius: '50%',
-  background: 'linear-gradient(135deg, #D4A574, #c4956a)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  fontSize: 13,
-  fontWeight: 600,
+const spinnerStyle: React.CSSProperties = {
+  fontSize: 16,
+  color: '#6b7280',
 };

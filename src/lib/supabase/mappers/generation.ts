@@ -10,7 +10,7 @@ export interface GenerationTask {
   id: string;
   userId: string;
   generationType: 'preview' | 'full_demo';
-  status: 'pending' | 'building_prompt' | 'generating' | 'post_processing' | 'completed' | 'failed' | 'safety_blocked';
+  status: 'pending' | 'building_prompt' | 'generating' | 'post_processing' | 'completed' | 'failed' | 'safety_blocked' | 'selected' | 'archived';
   prompt: string | null;
   templateId: string | null;
   modelId: string;
@@ -21,6 +21,9 @@ export interface GenerationTask {
   creditsConsumed: number;
   errorCode: string | null;
   errorMessage: string | null;
+  batchId: string | null;
+  versionNumber: number | null;
+  durationSeconds: number | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -44,6 +47,9 @@ export function toGenerationTask(row: Tables<'generation_tasks'>): GenerationTas
     creditsConsumed: row.credits_consumed,
     errorCode: row.error_code,
     errorMessage: row.error_message,
+    batchId: row.batch_id,
+    versionNumber: row.version_number,
+    durationSeconds: row.duration_seconds,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
   };
@@ -68,6 +74,9 @@ export function fromGenerationTask(info: GenerationTask): Partial<UpdateTables<'
     credits_consumed: info.creditsConsumed,
     error_code: info.errorCode,
     error_message: info.errorMessage,
+    batch_id: info.batchId,
+    version_number: info.versionNumber,
+    duration_seconds: info.durationSeconds,
     created_at: info.createdAt.toISOString(),
     updated_at: info.updatedAt.toISOString(),
   };

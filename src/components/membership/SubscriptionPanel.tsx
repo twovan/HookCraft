@@ -480,50 +480,136 @@ export default function SubscriptionPanel({
             暂无充值记录
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {creditsPurchaseHistory.map((record) => (
-              <div
-                key={record.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '12px 16px',
-                  borderRadius: '10px',
-                  background: '#FDFBF7',
-                  border: '1px solid #f0ebe4',
-                }}
-              >
-                <div>
-                  <div style={{ fontSize: '13px', fontWeight: 500, color: '#2D2D2D' }}>
-                    Credits 充值包
-                  </div>
-                  <div style={{ fontSize: '11px', color: '#999', marginTop: '2px' }}>
-                    {formatDate(record.createdAt)}
-                  </div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '14px', fontWeight: 600, color: '#D4A574' }}>
-                    {formatAmount(record.amount)}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: '11px',
-                      color: record.status === 'completed' ? '#38A169' : record.status === 'failed' ? '#E53E3E' : '#DD6B20',
-                      marginTop: '2px',
-                    }}
-                  >
-                    {record.status === 'completed' && '已完成'}
-                    {record.status === 'pending' && '处理中'}
-                    {record.status === 'failed' && '失败'}
-                    {record.status === 'refunded' && '已退款'}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+          <CreditsPurchaseList records={creditsPurchaseHistory} />
         )}
       </div>
+    </div>
+  );
+}
+
+
+// ─── Credits 充值记录子组件（含分页和 Credits 数量显示） ───
+
+const CREDITS_PACKS_MAP: Record<number, number> = {
+  9900: 50,
+  17900: 100,
+  32900: 200,
+  7900: 50,   // 商业版折扣价
+  14300: 100, // 商业版折扣价
+  26300: 200, // 商业版折扣价
+};
+
+function getCreditsFromAmount(amount: number): number | null {
+  return CREDITS_PACKS_MAP[amount] || null;
+}
+
+function CreditsPurchaseList({ records }: { records: PaymentRecord[] }) {
+  const [page, setPage] = useState(1);
+  const pageSize = 5;
+
+  // 按时间倒序排列
+  const sortedRecords = [...records].sort((a, b) => {
+    const dateA = new Date((a as any).created_at || a.createdAt || 0).getTime();
+    const dateB = new Date((b as any).created_at || b.createdAt || 0).getTime();
+    return dateB - dateA;
+  });
+
+  const totalPages = Math.ceil(sortedRecords.length / pageSize);
+  const paginatedRecords = sortedRecords.slice((page - 1) * pageSize, page * pageSize);
+
+  const fmtDate = (date: Date | string | null): string => {
+    if (!date) return '—';
+    const d = date instanceof Date ? date : new Date(date);
+    return d.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  };
+
+  const fmtAmount = (amount: number): string => {
+    return `¥${(amount / 100).toFixed(2)}`;
+  };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {paginatedRecords.map((record) => {
+          const creditsAmount = getCreditsFromAmount(record.amount);
+          return (
+            <div
+              key={record.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 16px',
+                borderRadius: '10px',
+                background: '#FDFBF7',
+                border: '1px solid #f0ebe4',
+              }}
+            >
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: 500, color: '#2D2D2D' }}>
+                  Credits 充值包
+                  {creditsAmount && (
+                    <span style={{ marginLeft: 8, fontSize: 12, color: '#D4A574', fontWeight: 600 }}>
+                      +{creditsAmount} Credits
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: '11px', color: '#999', marginTop: '2px' }}>
+                  {fmtDate(record.createdAt || (record as any).created_at || (record as any).completed_at)}
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '14px', fontWeight: 600, color: '#D4A574' }}>
+                  {fmtAmount(record.amount)}
+                </div>
+                <div
+                  style={{
+                    fontSize: '11px',
+                    color: record.status === 'completed' ? '#38A169' : record.status === 'failed' ? '#E53E3E' : '#DD6B20',
+                    marginTop: '2px',
+                  }}
+                >
+                  {record.status === 'completed' && '已完成'}
+                  {record.status === 'pending' && '处理中'}
+                  {record.status === 'failed' && '失败'}
+                  {record.status === 'refunded' && '已退款'}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 16 }}>
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page <= 1}
+            style={{
+              padding: '6px 12px', borderRadius: 8, border: '1px solid #e5e7eb',
+              background: 'white', fontSize: 12, cursor: page <= 1 ? 'not-allowed' : 'pointer',
+              opacity: page <= 1 ? 0.4 : 1, fontFamily: "'Inter', sans-serif",
+            }}
+          >
+            上一页
+          </button>
+          <span style={{ fontSize: 12, color: '#6B6B6B' }}>
+            {page} / {totalPages}
+          </span>
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page >= totalPages}
+            style={{
+              padding: '6px 12px', borderRadius: 8, border: '1px solid #e5e7eb',
+              background: 'white', fontSize: 12, cursor: page >= totalPages ? 'not-allowed' : 'pointer',
+              opacity: page >= totalPages ? 0.4 : 1, fontFamily: "'Inter', sans-serif",
+            }}
+          >
+            下一页
+          </button>
+        </div>
+      )}
     </div>
   );
 }

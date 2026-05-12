@@ -10,10 +10,11 @@ export interface UsageDashboardProps {
 
 /**
  * 额度面板组件
- * - 付费用户：显示剩余 Credits / 总量、已消耗 Credits、刷新倒计时
+ * - 付费用户：显示月度 Credits 进度条 + 购买 Credits 余额 + 总可用量
  * - Free 用户：显示剩余 Preview 次数（如"剩余 2/3 次预览"）
  * - Credits < 20%：琥珀色高亮警告，推荐 Credits Pack
  * - Credits 耗尽：禁用按钮，显示"Credits 不足"
+ * - 月度用尽但购买有余额：显示提示信息
  * - Free 用户次数耗尽：禁用 Preview 按钮，显示升级提示
  */
 export default function UsageDashboard({ onUpgrade, onBuyCredits }: UsageDashboardProps) {
@@ -21,9 +22,9 @@ export default function UsageDashboard({ onUpgrade, onBuyCredits }: UsageDashboa
   const previewCount = useCreditStore((s) => s.previewCount);
   const isLow = useCreditStore((s) => s.isLow());
   const isExhausted = useCreditStore((s) => s.isExhausted());
+  const isMonthlyExhausted = useCreditStore((s) => s.isMonthlyExhausted());
   const resetCountdown = useCreditStore((s) => s.resetCountdown());
   const isPaid = useMembershipStore((s) => s.isPaid());
-  const currentTier = useMembershipStore((s) => s.currentTier());
 
   const isFreeExhausted = !isPaid && previewCount !== null && previewCount.remaining === 0;
 
@@ -83,32 +84,72 @@ export default function UsageDashboard({ onUpgrade, onBuyCredits }: UsageDashboa
       {/* 付费用户：Credits 显示 */}
       {isPaid && credits && (
         <>
-          {/* 进度条 */}
+          {/* 月度 Credits 进度条 */}
+          <div style={{ marginBottom: '12px' }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '6px',
+              }}
+            >
+              <span style={{ fontSize: '12px', color: '#6B6B6B', fontWeight: 500 }}>
+                月度 Credits
+              </span>
+              <span style={{ fontSize: '12px', color: '#999' }}>
+                {credits.monthlyUsed} / {credits.monthlyTotal}
+              </span>
+            </div>
+            <div
+              style={{
+                background: '#f0ebe4',
+                borderRadius: '8px',
+                height: '8px',
+                overflow: 'hidden',
+              }}
+            >
+              <div
+                style={{
+                  height: '100%',
+                  borderRadius: '8px',
+                  width: `${credits.monthlyTotal > 0 ? (credits.monthlyUsed / credits.monthlyTotal) * 100 : 0}%`,
+                  background: isMonthlyExhausted
+                    ? '#D69E2E'
+                    : 'linear-gradient(90deg, #D4A574, #C9A86A)',
+                  transition: 'width 0.3s ease',
+                }}
+              />
+            </div>
+          </div>
+
+          {/* 购买 Credits 余额 */}
           <div
             style={{
-              background: '#f0ebe4',
-              borderRadius: '8px',
-              height: '8px',
-              overflow: 'hidden',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
               marginBottom: '12px',
             }}
           >
-            <div
+            <span style={{ fontSize: '12px', color: '#6B6B6B', fontWeight: 500 }}>
+              购买 Credits
+            </span>
+            <span
               style={{
-                height: '100%',
-                borderRadius: '8px',
-                width: `${credits.total > 0 ? ((credits.total - credits.remaining) / credits.total) * 100 : 0}%`,
-                background: isExhausted
-                  ? '#E53E3E'
-                  : isLow
-                    ? '#D69E2E'
-                    : 'linear-gradient(90deg, #D4A574, #C9A86A)',
-                transition: 'width 0.3s ease',
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#6B46C1',
+                background: '#F3E8FF',
+                padding: '2px 8px',
+                borderRadius: '10px',
               }}
-            />
+            >
+              {credits.purchasedBalance}
+            </span>
           </div>
 
-          {/* 数值 */}
+          {/* 总可用量 */}
           <div
             style={{
               display: 'flex',
@@ -125,17 +166,35 @@ export default function UsageDashboard({ onUpgrade, onBuyCredits }: UsageDashboa
                 fontFamily: "'Playfair Display', serif",
               }}
             >
-              {credits.remaining}
+              {credits.totalAvailable}
             </span>
             <span style={{ fontSize: '14px', color: '#6B6B6B' }}>
-              / {credits.total} Credits
+              可用 Credits
             </span>
           </div>
 
           {/* 已消耗 */}
           <div style={{ fontSize: '13px', color: '#999', marginBottom: '12px' }}>
-            本月已消耗 {credits.used} Credits
+            本月已消耗 {credits.monthlyUsed} Credits
           </div>
+
+          {/* 月度用尽但购买有余额提示 */}
+          {isMonthlyExhausted && !isExhausted && (
+            <div
+              style={{
+                background: '#EBF8FF',
+                borderRadius: '8px',
+                padding: '10px 14px',
+                fontSize: '13px',
+                color: '#2B6CB0',
+                fontWeight: 500,
+                marginBottom: '12px',
+              }}
+              role="status"
+            >
+              月度额度已用尽，当前使用购买 Credits
+            </div>
+          )}
 
           {/* 警告状态 */}
           {isExhausted && (
@@ -155,7 +214,7 @@ export default function UsageDashboard({ onUpgrade, onBuyCredits }: UsageDashboa
             </div>
           )}
 
-          {isLow && !isExhausted && (
+          {isLow && !isExhausted && !isMonthlyExhausted && (
             <div
               style={{
                 background: '#FEFCBF',

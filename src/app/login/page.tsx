@@ -202,7 +202,7 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
             <input type="checkbox" style={{ width: 18, height: 18, cursor: 'pointer' }} />
             <span style={{ fontSize: 14, color: '#6B6B6B' }}>记住我</span>
           </label>
-          <a href="#" style={{ fontSize: 14, color: '#D4A574', textDecoration: 'none', fontWeight: 600 }}>忘记密码？</a>
+          <a href="#" onClick={(e) => { e.preventDefault(); alert('忘记密码功能即将上线'); }} style={{ fontSize: 14, color: '#D4A574', textDecoration: 'none', fontWeight: 600 }}>忘记密码？</a>
         </div>
 
         <button

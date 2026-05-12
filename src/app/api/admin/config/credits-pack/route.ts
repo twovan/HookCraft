@@ -1,21 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AdminConfigService } from '../../../../../lib/admin/AdminConfigService';
 import { supabaseAdmin } from '../../../../../lib/supabase/server';
-import { getAuthUser, isAdmin } from '../../../../../lib/supabase/auth-helpers';
+import { requireAdmin } from '../../../../../lib/admin/auth';
 
 /**
  * GET /api/admin/config/credits-pack
  * 获取当前 Credits_Pack 配置
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const user = await getAuthUser();
-    if (!user) {
-      return NextResponse.json({ error: '未登录，请先登录' }, { status: 401 });
-    }
-    if (!isAdmin(user)) {
-      return NextResponse.json({ error: '无权访问，需要管理员权限' }, { status: 403 });
-    }
+    const { admin, response } = await requireAdmin(request);
+    if (response) return response;
 
     const service = new AdminConfigService(supabaseAdmin);
     const config = await service.getCurrentConfig();
@@ -33,13 +28,8 @@ export async function GET() {
  */
 export async function PUT(req: NextRequest) {
   try {
-    const user = await getAuthUser();
-    if (!user) {
-      return NextResponse.json({ error: '未登录，请先登录' }, { status: 401 });
-    }
-    if (!isAdmin(user)) {
-      return NextResponse.json({ error: '无权访问，需要管理员权限' }, { status: 403 });
-    }
+    const { admin, response } = await requireAdmin(req);
+    if (response) return response;
 
     const body = await req.json();
     const { creditsPacks } = body;
@@ -49,7 +39,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const service = new AdminConfigService(supabaseAdmin);
-    await service.updateConfig({ creditsPacks }, user.id);
+    await service.updateConfig({ creditsPacks }, admin.adminId);
     return NextResponse.json({ success: true });
   } catch (error: any) {
     return NextResponse.json({ error: '配置保存失败，请重试' }, { status: 500 });

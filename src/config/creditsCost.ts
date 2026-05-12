@@ -18,6 +18,7 @@ export const CREDITS_COST: Record<CreditOperationType, number> = {
   premium_singer: 5,
   export_wav: 3,
   export_stems: 10,
+  purchase: 0,            // 购买入账不消耗 Credits
 };
 
 /** 消耗规则详情列表（含描述） */

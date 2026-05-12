@@ -1,7 +1,8 @@
 'use client';
 
 import { create } from 'zustand';
-import type { CreditInfo } from '@/types/credits';
+import { supabase } from '@/lib/supabase/client';
+import type { CreditInfoEnhanced } from '@/types/credits';
 
 export interface PreviewCount {
   used: number;
@@ -9,20 +10,31 @@ export interface PreviewCount {
   remaining: number;
 }
 
+/** 获取带 auth header 的 fetch options */
+async function getAuthHeaders(): Promise<HeadersInit> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.access_token) {
+    return { 'Authorization': `Bearer ${session.access_token}` };
+  }
+  return {};
+}
+
 export interface CreditStore {
-  credits: CreditInfo | null;
+  credits: CreditInfoEnhanced | null;
   previewCount: PreviewCount | null;
   isLoading: boolean;
 
   // Actions
   fetchCredits: () => Promise<void>;
   fetchPreviewCount: () => Promise<void>;
-  decrementCredits: (amount: number) => void;
+  decrementCredits: (amount: number, monthlyCost: number, purchasedCost: number) => void;
+  addPurchasedCredits: (amount: number) => void;
   decrementPreview: () => void;
 
   // Computed
   isLow: () => boolean;
   isExhausted: () => boolean;
+  isMonthlyExhausted: () => boolean;
   usagePercentage: () => number;
   resetCountdown: () => string;
 }
@@ -35,12 +47,25 @@ export const useCreditStore = create<CreditStore>((set, get) => ({
   fetchCredits: async () => {
     set({ isLoading: true });
     try {
-      const res = await fetch('/api/credits');
+      const headers = await getAuthHeaders();
+      const res = await fetch('/api/credits', { headers });
       if (!res.ok) {
         throw new Error(`Failed to fetch credits: ${res.statusText}`);
       }
-      const data: CreditInfo = await res.json();
-      set({ credits: data, isLoading: false });
+      const data = await res.json();
+      // Parse enhanced API response into CreditInfoEnhanced
+      const credits: CreditInfoEnhanced = {
+        userId: data.userId ?? '',
+        tier: data.tier ?? 'free',
+        monthlyUsed: data.monthlyUsed ?? 0,
+        monthlyTotal: data.monthlyTotal ?? 0,
+        monthlyRemaining: data.monthlyRemaining ?? 0,
+        purchasedBalance: data.purchasedBalance ?? 0,
+        totalAvailable: data.totalAvailable ?? 0,
+        periodStart: data.periodStart ? new Date(data.periodStart) : new Date(),
+        periodEnd: data.periodEnd ? new Date(data.periodEnd) : new Date(),
+      };
+      set({ credits, isLoading: false });
     } catch {
       set({ isLoading: false });
     }
@@ -49,7 +74,8 @@ export const useCreditStore = create<CreditStore>((set, get) => ({
   fetchPreviewCount: async () => {
     set({ isLoading: true });
     try {
-      const res = await fetch('/api/credits/preview');
+      const headers = await getAuthHeaders();
+      const res = await fetch('/api/credits/preview', { headers });
       if (!res.ok) {
         throw new Error(`Failed to fetch preview count: ${res.statusText}`);
       }
@@ -60,15 +86,30 @@ export const useCreditStore = create<CreditStore>((set, get) => ({
     }
   },
 
-  decrementCredits: (amount: number) => {
+  decrementCredits: (amount: number, monthlyCost: number, purchasedCost: number) => {
     const { credits } = get();
     if (!credits) return;
 
     set({
       credits: {
         ...credits,
-        used: credits.used + amount,
-        remaining: Math.max(0, credits.remaining - amount),
+        monthlyUsed: credits.monthlyUsed + monthlyCost,
+        monthlyRemaining: Math.max(0, credits.monthlyRemaining - monthlyCost),
+        purchasedBalance: Math.max(0, credits.purchasedBalance - purchasedCost),
+        totalAvailable: Math.max(0, credits.totalAvailable - amount),
+      },
+    });
+  },
+
+  addPurchasedCredits: (amount: number) => {
+    const { credits } = get();
+    if (!credits) return;
+
+    set({
+      credits: {
+        ...credits,
+        purchasedBalance: credits.purchasedBalance + amount,
+        totalAvailable: credits.totalAvailable + amount,
       },
     });
   },
@@ -88,20 +129,28 @@ export const useCreditStore = create<CreditStore>((set, get) => ({
 
   isLow: (): boolean => {
     const { credits } = get();
-    if (!credits || credits.total === 0) return false;
-    return credits.remaining / credits.total < 0.2;
+    if (!credits) return false;
+    const totalPool = credits.monthlyTotal + credits.purchasedBalance;
+    if (totalPool === 0) return false;
+    return credits.totalAvailable / totalPool < 0.2;
   },
 
   isExhausted: (): boolean => {
     const { credits } = get();
     if (!credits) return false;
-    return credits.remaining === 0;
+    return credits.totalAvailable === 0;
+  },
+
+  isMonthlyExhausted: (): boolean => {
+    const { credits } = get();
+    if (!credits) return false;
+    return credits.monthlyRemaining === 0 && credits.purchasedBalance > 0;
   },
 
   usagePercentage: (): number => {
     const { credits } = get();
-    if (!credits || credits.total === 0) return 0;
-    return (credits.used / credits.total) * 100;
+    if (!credits || credits.monthlyTotal === 0) return 0;
+    return (credits.monthlyUsed / credits.monthlyTotal) * 100;
   },
 
   resetCountdown: (): string => {

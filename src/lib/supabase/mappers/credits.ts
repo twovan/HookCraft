@@ -1,7 +1,13 @@
 // mappers/credits.ts - CreditInfo / CreditHistory / PreviewCountInfo ↔ DB 行转换
 
 import type { Tables, UpdateTables } from '../types';
-import type { CreditInfo, CreditHistory, PreviewCountInfo } from '../../../types/credits';
+import type {
+  CreditInfo,
+  CreditHistory,
+  CreditInfoEnhanced,
+  CreditHistoryEnhanced,
+  PreviewCountInfo,
+} from '../../../types/credits';
 
 /**
  * 将数据库 credits 行转换为业务层 CreditInfo 对象
@@ -33,6 +39,29 @@ export function fromCreditInfo(info: CreditInfo): Partial<UpdateTables<'credits'
 }
 
 /**
+ * 将数据库 credits 行 + purchased_credits 行转换为增强版 CreditInfoEnhanced 对象
+ */
+export function toCreditInfoEnhanced(
+  creditsRow: Tables<'credits'>,
+  purchasedRow: Tables<'purchased_credits'> | null
+): CreditInfoEnhanced {
+  const monthlyRemaining = creditsRow.total - creditsRow.used;
+  const purchasedBalance = purchasedRow?.balance ?? 0;
+
+  return {
+    userId: creditsRow.user_id,
+    tier: creditsRow.tier,
+    monthlyUsed: creditsRow.used,
+    monthlyTotal: creditsRow.total,
+    monthlyRemaining,
+    purchasedBalance,
+    totalAvailable: monthlyRemaining + purchasedBalance,
+    periodStart: new Date(creditsRow.period_start),
+    periodEnd: new Date(creditsRow.period_end),
+  };
+}
+
+/**
  * 将数据库 credit_history 行转换为业务层 CreditHistory 对象
  */
 export function toCreditHistory(row: Tables<'credit_history'>): CreditHistory {
@@ -40,6 +69,21 @@ export function toCreditHistory(row: Tables<'credit_history'>): CreditHistory {
     month: row.month,
     used: row.used,
     total: row.total,
+    monthlyUsed: row.monthly_used ?? 0,
+    purchasedUsed: row.purchased_used ?? 0,
+  };
+}
+
+/**
+ * 将数据库 credit_history 行转换为增强版 CreditHistoryEnhanced 对象
+ */
+export function toCreditHistoryEnhanced(row: Tables<'credit_history'>): CreditHistoryEnhanced {
+  return {
+    month: row.month,
+    used: row.used,
+    total: row.total,
+    monthlyUsed: row.monthly_used ?? 0,
+    purchasedUsed: row.purchased_used ?? 0,
   };
 }
 

@@ -10,10 +10,8 @@ export async function GET(req: NextRequest) {
   try {
     const user = await getAuthUser();
     if (!user) {
-      return NextResponse.json(
-        { error: '未登录，请先登录' },
-        { status: 401 }
-      );
+      // Return default free tier preview count when auth cookie isn't synced
+      return NextResponse.json({ used: 0, total: 3, remaining: 3 });
     }
 
     const creditService = new CreditService(supabaseAdmin);

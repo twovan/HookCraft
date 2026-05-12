@@ -7,19 +7,21 @@ import type { Template } from '../../../types/template';
  * 将数据库 templates 行转换为业务层 Template 对象
  */
 export function toTemplate(row: Tables<'templates'>): Template {
+  // 使用 (row as any) 确保能访问所有字段，包括后来 ALTER TABLE 添加的
+  const r = row as any;
   return {
-    id: row.id,
-    name: row.name,
-    description: row.description,
-    category: row.category,
-    genre: row.genre,
-    previewUrl: row.preview_url ?? undefined,
-    coverUrl: row.cover_url ?? undefined,
-    referenceAudioUrl: row.reference_audio_url ?? undefined,
-    analysisResult: row.analysis_result ?? undefined,
-    lyriaPrompt: row.lyria_prompt ?? undefined,
-    analyzedAt: row.analyzed_at ? new Date(row.analyzed_at) : undefined,
-    analysisStatus: row.analysis_status,
+    id: r.id,
+    name: r.name,
+    description: r.description,
+    category: r.category,
+    genre: r.genre,
+    previewUrl: r.preview_url || undefined,
+    coverUrl: r.cover_url || undefined,
+    referenceAudioUrl: r.reference_audio_url || undefined,
+    analysisResult: r.analysis_result || undefined,
+    lyriaPrompt: r.lyria_prompt || undefined,
+    analyzedAt: r.analyzed_at ? new Date(r.analyzed_at) : undefined,
+    analysisStatus: r.analysis_status || 'pending',
   };
 }
 

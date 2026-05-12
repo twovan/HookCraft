@@ -6,7 +6,9 @@ export type SubscriptionStatus = 'active' | 'expiring' | 'expired' | 'cancelled'
 export type TemplateCategory = 'free_template' | 'paid_template';
 export type AnalysisStatus = 'pending' | 'analyzing' | 'completed' | 'failed';
 export type GenerationType = 'preview' | 'full_demo';
-export type TaskStatus = 'pending' | 'building_prompt' | 'generating' | 'post_processing' | 'completed' | 'failed' | 'safety_blocked';
+export type TaskStatus = 'pending' | 'building_prompt' | 'generating' | 'post_processing' | 'completed' | 'failed' | 'safety_blocked' | 'selected' | 'archived';
+export type BatchStatus = 'generating' | 'completed' | 'partial' | 'failed';
+export type ProducerStatus = 'active' | 'inactive';
 export type PaymentStatus = 'pending' | 'completed' | 'failed' | 'refunded';
 export type ConfigType = 'credit_quota' | 'cost_rule' | 'pricing' | 'credits_pack';
 export type AccessStatus = 'accessible' | 'upgrade_required';
@@ -114,6 +116,8 @@ export interface Database {
           month: string;
           used: number;
           total: number;
+          monthly_used: number;
+          purchased_used: number;
           created_at: string;
         };
         Insert: {
@@ -122,6 +126,8 @@ export interface Database {
           month: string;
           used: number;
           total: number;
+          monthly_used?: number;
+          purchased_used?: number;
           created_at?: string;
         };
         Update: {
@@ -130,6 +136,76 @@ export interface Database {
           month?: string;
           used?: number;
           total?: number;
+          monthly_used?: number;
+          purchased_used?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+
+      purchased_credits: {
+        Row: {
+          id: string;
+          user_id: string;
+          balance: number;
+          total_purchased: number;
+          version: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          balance?: number;
+          total_purchased?: number;
+          version?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          balance?: number;
+          total_purchased?: number;
+          version?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+
+      credit_transactions: {
+        Row: {
+          id: string;
+          user_id: string;
+          operation_type: string;
+          total_cost: number;
+          monthly_cost: number;
+          purchased_cost: number;
+          monthly_remaining_after: number;
+          purchased_remaining_after: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          operation_type: string;
+          total_cost: number;
+          monthly_cost?: number;
+          purchased_cost?: number;
+          monthly_remaining_after: number;
+          purchased_remaining_after: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          operation_type?: string;
+          total_cost?: number;
+          monthly_cost?: number;
+          purchased_cost?: number;
+          monthly_remaining_after?: number;
+          purchased_remaining_after?: number;
           created_at?: string;
         };
         Relationships: [];
@@ -170,6 +246,7 @@ export interface Database {
           description: string;
           category: TemplateCategory;
           genre: string;
+          genre_tags: string[] | null;
           preview_url: string | null;
           cover_url: string | null;
           reference_audio_url: string | null;
@@ -177,6 +254,10 @@ export interface Database {
           lyria_prompt: string | null;
           analyzed_at: string | null;
           analysis_status: AnalysisStatus;
+          producer_id: string | null;
+          price: number;
+          sales_count: number;
+          status: string;
           created_at: string;
           updated_at: string;
         };
@@ -186,6 +267,7 @@ export interface Database {
           description: string;
           category: TemplateCategory;
           genre: string;
+          genre_tags?: string[] | null;
           preview_url?: string | null;
           cover_url?: string | null;
           reference_audio_url?: string | null;
@@ -193,6 +275,10 @@ export interface Database {
           lyria_prompt?: string | null;
           analyzed_at?: string | null;
           analysis_status?: AnalysisStatus;
+          producer_id?: string | null;
+          price?: number;
+          sales_count?: number;
+          status?: string;
           created_at?: string;
           updated_at?: string;
         };
@@ -202,6 +288,7 @@ export interface Database {
           description?: string;
           category?: TemplateCategory;
           genre?: string;
+          genre_tags?: string[] | null;
           preview_url?: string | null;
           cover_url?: string | null;
           reference_audio_url?: string | null;
@@ -209,6 +296,10 @@ export interface Database {
           lyria_prompt?: string | null;
           analyzed_at?: string | null;
           analysis_status?: AnalysisStatus;
+          producer_id?: string | null;
+          price?: number;
+          sales_count?: number;
+          status?: string;
           created_at?: string;
           updated_at?: string;
         };
@@ -231,6 +322,9 @@ export interface Database {
           credits_consumed: number;
           error_code: string | null;
           error_message: string | null;
+          batch_id: string | null;
+          version_number: number | null;
+          duration_seconds: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -249,6 +343,9 @@ export interface Database {
           credits_consumed?: number;
           error_code?: string | null;
           error_message?: string | null;
+          batch_id?: string | null;
+          version_number?: number | null;
+          duration_seconds?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -267,6 +364,132 @@ export interface Database {
           credits_consumed?: number;
           error_code?: string | null;
           error_message?: string | null;
+          batch_id?: string | null;
+          version_number?: number | null;
+          duration_seconds?: number | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+
+      generation_batches: {
+        Row: {
+          id: string;
+          user_id: string;
+          template_id: string | null;
+          prompt: string | null;
+          generation_type: GenerationType;
+          use_premium_singer: boolean;
+          version_count: number;
+          status: BatchStatus;
+          selected_task_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          user_id: string;
+          template_id?: string | null;
+          prompt?: string | null;
+          generation_type: GenerationType;
+          use_premium_singer?: boolean;
+          version_count?: number;
+          status?: BatchStatus;
+          selected_task_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          template_id?: string | null;
+          prompt?: string | null;
+          generation_type?: GenerationType;
+          use_premium_singer?: boolean;
+          version_count?: number;
+          status?: BatchStatus;
+          selected_task_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+
+      download_counts: {
+        Row: {
+          id: string;
+          user_id: string;
+          used: number;
+          total: number;
+          period_start: string;
+          period_end: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          used?: number;
+          total: number;
+          period_start: string;
+          period_end: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          used?: number;
+          total?: number;
+          period_start?: string;
+          period_end?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+
+      producers: {
+        Row: {
+          id: string;
+          user_id: string | null;
+          display_name: string;
+          avatar_url: string | null;
+          bio: string | null;
+          style_tags: string[];
+          total_downloads: number;
+          is_featured: boolean;
+          status: ProducerStatus;
+          joined_at: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string | null;
+          display_name: string;
+          avatar_url?: string | null;
+          bio?: string | null;
+          style_tags?: string[];
+          total_downloads?: number;
+          is_featured?: boolean;
+          status?: ProducerStatus;
+          joined_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string | null;
+          display_name?: string;
+          avatar_url?: string | null;
+          bio?: string | null;
+          style_tags?: string[];
+          total_downloads?: number;
+          is_featured?: boolean;
+          status?: ProducerStatus;
+          joined_at?: string;
           created_at?: string;
           updated_at?: string;
         };
@@ -467,6 +690,275 @@ export interface Database {
         };
         Relationships: [];
       };
+
+      categories: {
+        Row: {
+          id: string;
+          name: string;
+          icon: string;
+          enabled: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          icon?: string;
+          enabled?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          icon?: string;
+          enabled?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+
+      tags: {
+        Row: {
+          id: string;
+          name: string;
+          icon: string;
+          enabled: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          icon?: string;
+          enabled?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          icon?: string;
+          enabled?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+
+      operation_logs: {
+        Row: {
+          id: string;
+          operator_id: string;
+          operator_name: string;
+          operation_type: string;
+          operation_description: string;
+          target_type: string | null;
+          target_id: string | null;
+          ip_address: string | null;
+          metadata: Record<string, unknown> | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          operator_id: string;
+          operator_name: string;
+          operation_type: string;
+          operation_description: string;
+          target_type?: string | null;
+          target_id?: string | null;
+          ip_address?: string | null;
+          metadata?: Record<string, unknown> | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          operator_id?: string;
+          operator_name?: string;
+          operation_type?: string;
+          operation_description?: string;
+          target_type?: string | null;
+          target_id?: string | null;
+          ip_address?: string | null;
+          metadata?: Record<string, unknown> | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+
+      producer_invitations: {
+        Row: {
+          id: string;
+          invitee_name: string;
+          invitee_email: string;
+          expertise_tags: string[];
+          revenue_share: number;
+          expiry_days: number;
+          personal_note: string | null;
+          status: string;
+          invited_by: string;
+          accepted_at: string | null;
+          revoked_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          invitee_name: string;
+          invitee_email: string;
+          expertise_tags?: string[];
+          revenue_share?: number;
+          expiry_days?: number;
+          personal_note?: string | null;
+          status?: string;
+          invited_by: string;
+          accepted_at?: string | null;
+          revoked_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          invitee_name?: string;
+          invitee_email?: string;
+          expertise_tags?: string[];
+          revenue_share?: number;
+          expiry_days?: number;
+          personal_note?: string | null;
+          status?: string;
+          invited_by?: string;
+          accepted_at?: string | null;
+          revoked_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+
+      settlements: {
+        Row: {
+          id: string;
+          settlement_number: string;
+          producer_id: string;
+          producer_name: string;
+          template_sales_amount: number;
+          platform_commission: number;
+          settlement_amount: number;
+          status: string;
+          settlement_date: string;
+          paid_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          settlement_number: string;
+          producer_id: string;
+          producer_name: string;
+          template_sales_amount?: number;
+          platform_commission?: number;
+          settlement_amount?: number;
+          status?: string;
+          settlement_date?: string;
+          paid_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          settlement_number?: string;
+          producer_id?: string;
+          producer_name?: string;
+          template_sales_amount?: number;
+          platform_commission?: number;
+          settlement_amount?: number;
+          status?: string;
+          settlement_date?: string;
+          paid_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+
+      platform_settings: {
+        Row: {
+          id: string;
+          setting_key: string;
+          setting_value: Record<string, unknown>;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          setting_key: string;
+          setting_value: Record<string, unknown>;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          setting_key?: string;
+          setting_value?: Record<string, unknown>;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+
+      template_purchases: {
+        Row: {
+          id: string;
+          user_id: string;
+          template_id: string;
+          purchase_price: number;
+          order_id: string;
+          purchased_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          template_id: string;
+          purchase_price?: number;
+          order_id: string;
+          purchased_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          template_id?: string;
+          purchase_price?: number;
+          order_id?: string;
+          purchased_at?: string;
+        };
+        Relationships: [];
+      };
+
+      admin_accounts: {
+        Row: {
+          id: string;
+          username: string;
+          password_hash: string;
+          display_name: string | null;
+          role: string;
+          is_active: boolean;
+          last_login_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          username: string;
+          password_hash: string;
+          display_name?: string | null;
+          role?: string;
+          is_active?: boolean;
+          last_login_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          username?: string;
+          password_hash?: string;
+          display_name?: string | null;
+          role?: string;
+          is_active?: boolean;
+          last_login_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
 
     Views: {
@@ -483,6 +975,16 @@ export interface Database {
         };
         Returns: undefined;
       };
+      consume_credits_with_priority: {
+        Args: {
+          p_user_id: string;
+          p_total_cost: number;
+          p_operation_type: string;
+          p_credits_version: number;
+          p_purchased_version: number;
+        };
+        Returns: Record<string, unknown>;
+      };
     };
 
     Enums: {
@@ -494,6 +996,8 @@ export interface Database {
       analysis_status: AnalysisStatus;
       generation_type: GenerationType;
       task_status: TaskStatus;
+      batch_status: BatchStatus;
+      producer_status: ProducerStatus;
       payment_status: PaymentStatus;
       config_type: ConfigType;
       access_status: AccessStatus;
