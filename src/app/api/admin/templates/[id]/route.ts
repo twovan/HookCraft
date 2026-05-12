@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '../../../../../lib/supabase/server';
 import { requireAdmin } from '../../../../../lib/admin/auth';
+import { TemplateAdminService } from '../../../../../lib/admin/TemplateAdminService';
 
 /**
  * PUT /api/admin/templates/[id]
@@ -106,6 +107,34 @@ export async function PATCH(
       pending: '设为待审核',
       rejected: '拒绝',
     };
+
+    // Auto-trigger analysis when publishing a template with audio that hasn't been analyzed
+    if (status === 'published' && data.preview_url && ['pending', 'failed'].includes(data.analysis_status)) {
+      try {
+        // Download audio from storage and trigger analysis
+        const audioUrl = data.preview_url;
+        const audioResponse = await fetch(audioUrl);
+        if (audioResponse.ok) {
+          const audioBuffer = Buffer.from(await audioResponse.arrayBuffer());
+          const audioBase64 = audioBuffer.toString('base64');
+          const mimeType = audioResponse.headers.get('content-type') || 'audio/mpeg';
+
+          // Update status to analyzing
+          await supabaseAdmin
+            .from('templates')
+            .update({ analysis_status: 'analyzing' })
+            .eq('id', id);
+
+          // Trigger async analysis
+          const service = new TemplateAdminService(supabaseAdmin);
+          service.analyzeTemplate(id, audioBase64, mimeType).catch((err) => {
+            console.error(`[Auto Analysis on Publish] Template ${id} analysis failed:`, err);
+          });
+        }
+      } catch (analysisErr) {
+        console.error(`[Auto Analysis on Publish] Failed to fetch audio for template ${id}:`, analysisErr);
+      }
+    }
 
     // Log operation
     await supabaseAdmin.from('operation_logs').insert({

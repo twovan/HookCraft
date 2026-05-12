@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '../../../../../../lib/supabase/server';
 import { requireAdmin } from '../../../../../../lib/admin/auth';
 import { uploadTemplateAsset } from '../../../../../../lib/supabase/storage';
+import { TemplateAdminService } from '../../../../../../lib/admin/TemplateAdminService';
 
 /**
  * POST /api/admin/templates/[id]/audio
@@ -46,13 +47,21 @@ export async function POST(
 
     const previewUrl = urlData.publicUrl;
 
-    // Update template with preview URL
+    // Update template with preview URL and set analysis_status to analyzing
     const { error: updateError } = await supabaseAdmin
       .from('templates')
-      .update({ preview_url: previewUrl } as any)
+      .update({ preview_url: previewUrl, analysis_status: 'analyzing' } as any)
       .eq('id', id);
 
     if (updateError) throw updateError;
+
+    // Trigger async analysis (don't await - let it run in background)
+    const audioBase64 = buffer.toString('base64');
+    const mimeType = file.type || 'audio/mpeg';
+    const service = new TemplateAdminService(supabaseAdmin);
+    service.analyzeTemplate(id, audioBase64, mimeType).catch((err) => {
+      console.error(`[Auto Analysis] Template ${id} analysis failed:`, err);
+    });
 
     await supabaseAdmin.from('operation_logs').insert({
       operator_id: admin.adminId,
