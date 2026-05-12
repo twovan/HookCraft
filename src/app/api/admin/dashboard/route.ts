@@ -85,10 +85,25 @@ export async function GET(request: NextRequest) {
       percentage: Math.round((count / totalMembers) * 100),
     }));
 
-    // Recent orders
-    const recentOrders = (recentPaymentsResult.data || []).map((p: any) => ({
+    // Recent orders - fetch user info for display
+    const recentPayments = recentPaymentsResult.data || [];
+    const userIds = [...new Set(recentPayments.map((p: any) => p.user_id).filter(Boolean))];
+    
+    // Fetch user emails from auth
+    const userNameMap: Record<string, string> = {};
+    if (userIds.length > 0) {
+      const { data: usersData } = await supabaseAdmin.auth.admin.listUsers({ perPage: 100 });
+      if (usersData?.users) {
+        for (const user of usersData.users) {
+          const displayName = user.user_metadata?.display_name || user.user_metadata?.name || user.email?.split('@')[0] || user.id.slice(0, 8);
+          userNameMap[user.id] = displayName;
+        }
+      }
+    }
+
+    const recentOrders = recentPayments.map((p: any) => ({
       orderNumber: p.id?.slice(0, 8) || 'N/A',
-      userName: p.user_id?.slice(0, 8) || '用户',
+      userName: userNameMap[p.user_id] || p.user_id?.slice(0, 8) || '用户',
       templateName: p.description || p.type || '订单',
       amount: p.amount || 0,
       status: p.status || 'pending',
