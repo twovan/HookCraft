@@ -136,24 +136,23 @@ export default function AdminDashboardPage() {
               const trend = data.revenueTrend || [];
               const maxAmount = Math.max(...trend.map(t => t.amount), 1);
               return (
-                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 120 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 140 }}>
                   {trend.map((item, i) => {
-                    const heightPct = maxAmount > 0 ? (item.amount / maxAmount) * 100 : 0;
+                    const heightPct = maxAmount > 0 ? Math.max((item.amount / maxAmount) * 100, item.amount > 0 ? 15 : 4) : 4;
                     return (
-                      <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                        <span style={{ fontSize: 10, color: '#6b7280', fontWeight: 500 }}>
+                      <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}>
+                        <span style={{ fontSize: 10, color: '#6b7280', fontWeight: 500, marginBottom: 4 }}>
                           {item.amount > 0 ? `¥${(item.amount / 100).toFixed(0)}` : ''}
                         </span>
                         <div style={{
-                          width: '100%',
-                          height: `${Math.max(heightPct, 4)}%`,
+                          width: '70%',
+                          height: `${heightPct}%`,
                           background: item.amount > 0
-                            ? 'linear-gradient(180deg, #D4A574 0%, rgba(212,165,116,0.3) 100%)'
+                            ? 'linear-gradient(180deg, #D4A574 0%, rgba(212,165,116,0.4) 100%)'
                             : '#f3f4f6',
                           borderRadius: 4,
-                          minHeight: 4,
                         }} />
-                        <span style={{ fontSize: 10, color: '#9ca3af' }}>{item.label}</span>
+                        <span style={{ fontSize: 10, color: '#9ca3af', marginTop: 6 }}>{item.label}</span>
                       </div>
                     );
                   })}
