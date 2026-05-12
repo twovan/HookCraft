@@ -20,6 +20,7 @@ interface DashboardData {
   membershipDistribution: { tier: string; count: number; percentage: number }[];
   topTemplates: { name: string; category: string; price: number; salesCount: number }[];
   recentActivity: { type: string; description: string; time: string }[];
+  revenueTrend: { label: string; amount: number }[];
 }
 
 export default function AdminDashboardPage() {
@@ -32,11 +33,15 @@ export default function AdminDashboardPage() {
     fetchDashboard();
   }, []);
 
+  useEffect(() => {
+    if (!loading) fetchDashboard();
+  }, [revenueTab]);
+
   async function fetchDashboard() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/admin/dashboard');
+      const res = await fetch(`/api/admin/dashboard?trendPeriod=${revenueTab}`);
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: '请求失败' }));
         throw new Error(err.error || '请求失败');
@@ -126,23 +131,35 @@ export default function AdminDashboardPage() {
             </div>
           </div>
           <div style={{ padding: '20px 24px' }}>
-            {/* Placeholder revenue chart bars */}
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 120 }}>
-              {[65, 45, 80, 55, 90, 70, 85].map((h, i) => (
-                <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                  <div style={{
-                    width: '100%',
-                    height: `${h}%`,
-                    background: 'linear-gradient(180deg, #D4A574 0%, rgba(212,165,116,0.3) 100%)',
-                    borderRadius: 4,
-                    minHeight: 8,
-                  }} />
-                  <span style={{ fontSize: 10, color: '#9ca3af' }}>
-                    {revenueTab === 'day' ? `${i + 1}h` : revenueTab === 'week' ? ['一', '二', '三', '四', '五', '六', '日'][i] : `W${i + 1}`}
-                  </span>
+            {/* Revenue chart bars from real data */}
+            {(() => {
+              const trend = data.revenueTrend || [];
+              const maxAmount = Math.max(...trend.map(t => t.amount), 1);
+              return (
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 120 }}>
+                  {trend.map((item, i) => {
+                    const heightPct = maxAmount > 0 ? (item.amount / maxAmount) * 100 : 0;
+                    return (
+                      <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                        <span style={{ fontSize: 10, color: '#6b7280', fontWeight: 500 }}>
+                          {item.amount > 0 ? `¥${(item.amount / 100).toFixed(0)}` : ''}
+                        </span>
+                        <div style={{
+                          width: '100%',
+                          height: `${Math.max(heightPct, 4)}%`,
+                          background: item.amount > 0
+                            ? 'linear-gradient(180deg, #D4A574 0%, rgba(212,165,116,0.3) 100%)'
+                            : '#f3f4f6',
+                          borderRadius: 4,
+                          minHeight: 4,
+                        }} />
+                        <span style={{ fontSize: 10, color: '#9ca3af' }}>{item.label}</span>
+                      </div>
+                    );
+                  })}
                 </div>
-              ))}
-            </div>
+              );
+            })()}
           </div>
         </div>
 

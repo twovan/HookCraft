@@ -124,6 +124,70 @@ export async function GET(request: NextRequest) {
       salesCount: t.sales_count || 0,
     }));
 
+    // Revenue trend data (last 7 days / 7 weeks / 7 months based on query param)
+    const { searchParams } = new URL(request.url);
+    const trendPeriod = searchParams.get('trendPeriod') || 'week';
+
+    const revenueTrend: { label: string; amount: number }[] = [];
+    
+    if (trendPeriod === 'day') {
+      // Last 7 days
+      for (let i = 6; i >= 0; i--) {
+        const dayStart = new Date(now);
+        dayStart.setDate(dayStart.getDate() - i);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(dayStart);
+        dayEnd.setHours(23, 59, 59, 999);
+        
+        const { data: dayPayments } = await supabaseAdmin
+          .from('payments')
+          .select('amount')
+          .gte('created_at', dayStart.toISOString())
+          .lte('created_at', dayEnd.toISOString())
+          .eq('status', 'completed');
+        
+        const dayTotal = (dayPayments || []).reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+        const label = `${dayStart.getMonth() + 1}/${dayStart.getDate()}`;
+        revenueTrend.push({ label, amount: dayTotal });
+      }
+    } else if (trendPeriod === 'week') {
+      // Last 7 weeks
+      for (let i = 6; i >= 0; i--) {
+        const weekEnd = new Date(now);
+        weekEnd.setDate(weekEnd.getDate() - i * 7);
+        weekEnd.setHours(23, 59, 59, 999);
+        const weekStart = new Date(weekEnd);
+        weekStart.setDate(weekStart.getDate() - 6);
+        weekStart.setHours(0, 0, 0, 0);
+        
+        const { data: weekPayments } = await supabaseAdmin
+          .from('payments')
+          .select('amount')
+          .gte('created_at', weekStart.toISOString())
+          .lte('created_at', weekEnd.toISOString())
+          .eq('status', 'completed');
+        
+        const weekTotal = (weekPayments || []).reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+        revenueTrend.push({ label: `W${7 - i}`, amount: weekTotal });
+      }
+    } else {
+      // Last 7 months
+      for (let i = 6; i >= 0; i--) {
+        const mStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const mEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999);
+        
+        const { data: monthPayments } = await supabaseAdmin
+          .from('payments')
+          .select('amount')
+          .gte('created_at', mStart.toISOString())
+          .lte('created_at', mEnd.toISOString())
+          .eq('status', 'completed');
+        
+        const monthTotal = (monthPayments || []).reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+        revenueTrend.push({ label: `${mStart.getMonth() + 1}月`, amount: monthTotal });
+      }
+    }
+
     // Recent activity (placeholder based on recent data)
     const recentActivity = [
       { type: 'user', description: '新用户注册', time: new Date().toISOString() },
@@ -142,6 +206,7 @@ export async function GET(request: NextRequest) {
       membershipDistribution,
       topTemplates,
       recentActivity,
+      revenueTrend,
     });
   } catch (error) {
     console.error('[Admin Dashboard API Error]', error);
