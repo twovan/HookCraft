@@ -324,9 +324,9 @@ export default function TemplatesPage() {
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <div style={{ fontSize: 26, fontWeight: 700, color: '#D4A574', letterSpacing: -0.5 }}>
-                              {price > 0 ? `￥${price}` : '免费'}
+                              {t.category === 'paid_template' ? (price > 0 ? `￥${price}` : '待定价') : '免费'}
                             </div>
-                            {price > 0 ? (
+                            {t.category === 'paid_template' ? (
                               <span onClick={(e) => { e.preventDefault(); e.stopPropagation(); addItem({ template_id: t.id, name: t.name, price: t.price || 0, cover_url: t.coverUrl || null, genre: t.genre, added_at: new Date().toISOString() }); }} style={{
                                 padding: '8px 16px', borderRadius: 24, background: 'linear-gradient(135deg, #D4A574, #C9A86A)',
                                 color: 'white', fontSize: 12, fontWeight: 600, cursor: 'pointer',
