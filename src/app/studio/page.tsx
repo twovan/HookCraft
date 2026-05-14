@@ -100,32 +100,8 @@ export default function StudioPage() {
   };
 
   const checkIncompleteBatch = async () => {
-    try {
-      const res = await fetch('/api/batches?range=7d&pageSize=1');
-      if (res.ok) {
-        const data = await res.json();
-        const batches = data.batches || [];
-        // Find the latest batch that is completed/partial but has no selected version
-        const incompleteBatch = batches.find(
-          (b: { status: string; selectedVersionId?: string }) =>
-            (b.status === 'completed' || b.status === 'partial') && !b.selectedVersionId
-        );
-        if (incompleteBatch) {
-          // Fetch batch details
-          const detailRes = await fetch(`/api/batches/${incompleteBatch.batchId}`);
-          if (detailRes.ok) {
-            const detail = await detailRes.json();
-            setBatchId(incompleteBatch.batchId);
-            setVersions(detail.versions || []);
-            setCompletedCount(
-              (detail.versions || []).filter((v: VersionResult) => v.status === 'completed').length
-            );
-          }
-        }
-      }
-    } catch {
-      // Silently fail
-    }
+    // Disabled: don't reload previous generation results on page load
+    // Users can view history in /account/creations
   };
 
   // Calculate total cost (1 version)
@@ -343,9 +319,8 @@ export default function StudioPage() {
           }}>
             {versions[0]?.status === 'completed' ? (
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 48, marginBottom: 12 }}>🎵</div>
                 <h3 style={{
-                  fontSize: 18, fontWeight: 600, color: '#2D2D2D', marginBottom: 8,
+                  fontSize: 18, fontWeight: 600, color: '#2D2D2D', marginBottom: 16,
                   fontFamily: "'Playfair Display', serif",
                 }}>生成完成</h3>
                 {versions[0]?.audioUrl && (
@@ -353,33 +328,17 @@ export default function StudioPage() {
                     <audio controls src={versions[0].audioUrl} style={{ width: '100%', maxWidth: 400 }} />
                   </div>
                 )}
-                <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-                  <button
-                    onClick={handleDownload}
-                    disabled={isDownloading}
-                    style={{
-                      padding: '14px 32px', borderRadius: 24, border: 'none',
-                      background: 'linear-gradient(135deg, #D4A574, #C9A86A)', color: 'white',
-                      fontSize: 15, fontWeight: 700, cursor: isDownloading ? 'not-allowed' : 'pointer',
-                      fontFamily: "'Inter', sans-serif",
-                      boxShadow: '0 4px 16px rgba(212, 165, 116, 0.3)',
-                      opacity: isDownloading ? 0.7 : 1,
-                    }}
-                  >
-                    {isDownloading ? '下载中...' : '下载 MP3'}
-                  </button>
-                  <button
-                    onClick={() => { setBatchId(null); setVersions([]); setSelectedVersionId(undefined); }}
-                    style={{
-                      padding: '14px 32px', borderRadius: 24,
-                      border: '1px solid #D4A574', background: 'transparent', color: '#D4A574',
-                      fontSize: 15, fontWeight: 600, cursor: 'pointer',
-                      fontFamily: "'Inter', sans-serif",
-                    }}
-                  >
-                    继续创作
-                  </button>
-                </div>
+                <button
+                  onClick={() => { setBatchId(null); setVersions([]); setSelectedVersionId(undefined); }}
+                  style={{
+                    padding: '14px 32px', borderRadius: 24,
+                    border: '1px solid #D4A574', background: 'transparent', color: '#D4A574',
+                    fontSize: 15, fontWeight: 600, cursor: 'pointer',
+                    fontFamily: "'Inter', sans-serif",
+                  }}
+                >
+                  继续创作
+                </button>
               </div>
             ) : (
               <div style={{ textAlign: 'center' }}>
