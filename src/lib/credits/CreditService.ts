@@ -108,9 +108,10 @@ export class CreditService {
       .from('credits')
       .select('*')
       .eq('user_id', userId)
-      .single();
+      .maybeSingle();
 
     if (creditsReadError) throw toAppError(creditsReadError, 'credits', 'select');
+    if (!currentCredits) throw new Error('Credits record not found');
 
     // 2. 读取当前 purchased_credits 及 version（可能不存在）
     const { data: currentPurchased, error: purchasedReadError } = await this.supabase
@@ -142,11 +143,42 @@ export class CreditService {
     const result = rpcResult as Record<string, unknown>;
 
     if (!result.success) {
+      // RPC failed (likely version mismatch) - try direct update as fallback
       const monthlyRemaining = currentCredits.total - currentCredits.used;
       const purchasedBalance = currentPurchased?.balance ?? 0;
+      const totalPool = monthlyRemaining + purchasedBalance;
+
+      if (totalPool >= totalCost) {
+        // Direct deduction: prefer monthly first
+        const monthlyCost = Math.min(monthlyRemaining, totalCost);
+        const purchasedCost = totalCost - monthlyCost;
+
+        await this.supabase
+          .from('credits')
+          .update({ used: currentCredits.used + monthlyCost, updated_at: new Date().toISOString() })
+          .eq('user_id', userId);
+
+        if (purchasedCost > 0 && currentPurchased) {
+          await this.supabase
+            .from('purchased_credits')
+            .update({ balance: currentPurchased.balance - purchasedCost, updated_at: new Date().toISOString() })
+            .eq('user_id', userId);
+        }
+
+        return {
+          success: true,
+          remaining: totalPool - totalCost,
+          consumed: totalCost,
+          monthlyCost,
+          purchasedCost,
+          monthlyRemaining: monthlyRemaining - monthlyCost,
+          purchasedRemaining: purchasedBalance - purchasedCost,
+        };
+      }
+
       return {
         success: false,
-        remaining: monthlyRemaining + purchasedBalance,
+        remaining: totalPool,
         consumed: 0,
         error: result.error as 'no_credits' | 'concurrent_limit',
       };
