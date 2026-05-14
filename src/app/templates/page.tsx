@@ -58,7 +58,7 @@ export default function TemplatesPage() {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch('/api/templates');
+        const res = await fetch('/api/templates?tier=business');
         if (!res.ok) {
           setError('加载模板失败，请稍后重试');
           return;
