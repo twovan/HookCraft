@@ -442,63 +442,7 @@ export default function StudioPage() {
               </div>
 
               {/* Premium Singer Toggle (paid users only) */}
-              {isPaid && (
-                <div
-                  style={{
-                    background: 'white',
-                    borderRadius: '20px',
-                    padding: '20px 24px',
-                    border: '1px solid #f0ebe4',
-                    boxShadow: '0 4px 20px rgba(212, 165, 116, 0.06)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: '14px', fontWeight: 600, color: '#9ca3af', fontFamily: "'Inter', sans-serif" }}>
-                        高级歌手声模
-                      </span>
-                      <span style={{ fontSize: '10px', padding: '2px 6px', background: '#f3f4f6', color: '#6b7280', borderRadius: 4, fontWeight: 500 }}>即将上线</span>
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#ccc', marginTop: '2px' }}>
-                      额外消耗 {CREDITS_COST.premium_singer} Credits/版本
-                    </div>
-                  </div>
-                  <button
-                    disabled={true}
-                    style={{
-                      width: '44px',
-                      height: '24px',
-                      borderRadius: '12px',
-                      border: 'none',
-                      background: '#E2E8F0',
-                      cursor: 'not-allowed',
-                      position: 'relative',
-                      transition: 'background 0.2s ease',
-                      opacity: 0.5,
-                    }}
-                    role="switch"
-                    aria-checked={false}
-                    aria-label="高级歌手声模（即将上线）"
-                  >
-                    <div
-                      style={{
-                        width: '20px',
-                        height: '20px',
-                        borderRadius: '50%',
-                        background: 'white',
-                        position: 'absolute',
-                        top: '2px',
-                        left: usePremiumSinger ? '22px' : '2px',
-                        transition: 'left 0.2s ease',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                      }}
-                    />
-                  </button>
-                </div>
-              )}
+              {/* Premium Singer - hidden, coming soon */}
 
               {/* Total Cost Display */}
               <div

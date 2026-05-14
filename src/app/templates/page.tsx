@@ -50,6 +50,7 @@ export default function TemplatesPage() {
   const [error, setError] = useState<string | null>(null);
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState('newest');
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -85,6 +86,13 @@ export default function TemplatesPage() {
   const filteredTemplates = (() => {
     let result = templates;
     
+    // Category filter
+    if (categoryFilter === 'free') {
+      result = result.filter((t) => t.category === 'free_template');
+    } else if (categoryFilter === 'paid') {
+      result = result.filter((t) => t.category === 'paid_template');
+    }
+    
     // Genre filter
     if (selectedGenres.length > 0) {
       result = result.filter((t) =>
@@ -101,11 +109,9 @@ export default function TemplatesPage() {
         result = [...result].sort((a, b) => (b.price || 0) - (a.price || 0));
         break;
       case 'popular':
-        // Keep original order (API default)
         break;
       case 'newest':
       default:
-        // Keep original order (API default is newest)
         break;
     }
     
@@ -133,6 +139,23 @@ export default function TemplatesPage() {
             position: 'sticky', top: 140,
             boxShadow: '0 4px 20px rgba(0,0,0,0.04)', border: '1px solid rgba(212,165,116,0.1)',
           }}>
+            {/* Category */}
+            <div style={{ marginBottom: 24 }}>
+              <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 14, color: '#2D2D2D', letterSpacing: 0.3, textTransform: 'uppercase' }}>类型</h3>
+              {[{ key: 'all', label: '全部' }, { key: 'free', label: '免费模板' }, { key: 'paid', label: '付费模板' }].map((opt) => (
+                <label key={opt.key} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, cursor: 'pointer' }}>
+                  <input
+                    type="radio"
+                    name="category"
+                    checked={categoryFilter === opt.key}
+                    onChange={() => { setCategoryFilter(opt.key); setCurrentPage(1); }}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <span style={{ fontSize: 14, fontWeight: 500, color: categoryFilter === opt.key ? '#D4A574' : '#2D2D2D' }}>{opt.label}</span>
+                </label>
+              ))}
+            </div>
+
             {/* Genre */}
             <div style={{ marginBottom: 24 }}>
               <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 14, color: '#2D2D2D', letterSpacing: 0.3, textTransform: 'uppercase' }}>风格</h3>
@@ -200,7 +223,7 @@ export default function TemplatesPage() {
             </div>
 
             <button
-              onClick={() => { setSelectedGenres([]); setCurrentPage(1); }}
+              onClick={() => { setSelectedGenres([]); setCategoryFilter('all'); setCurrentPage(1); }}
               style={{
                 width: '100%', padding: '12px 28px', border: '1px solid #E5E5E5', borderRadius: 24,
                 background: 'transparent', color: '#6B6B6B', fontSize: 14, fontWeight: 600,
