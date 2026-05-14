@@ -153,30 +153,40 @@ export class CreditService {
       .from('credits')
       .select('*')
       .eq('user_id', userId)
-      .single();
+      .maybeSingle();
 
-    if (creditsError) {
-      // If no credits record exists, create a default free one
-      if (creditsError.code === 'PGRST116') {
-        const now = new Date();
-        const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-        const { data: newCredits, error: insertError } = await this.supabase
+    if (creditsError) throw toAppError(creditsError, 'credits', 'select');
+
+    // If no credits record, create one
+    let finalCreditsRow = creditsRow;
+    if (!finalCreditsRow) {
+      const now = new Date();
+      const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      const { data: newCredits, error: insertError } = await this.supabase
+        .from('credits')
+        .insert({
+          user_id: userId,
+          tier: 'free',
+          total: 0,
+          used: 0,
+          period_start: now.toISOString(),
+          period_end: periodEnd.toISOString(),
+        } as any)
+        .select()
+        .single();
+
+      if (insertError) {
+        // If insert fails (e.g. unique constraint), try to read again
+        const { data: retryRow } = await this.supabase
           .from('credits')
-          .insert({
-            user_id: userId,
-            tier: 'free',
-            total: 0,
-            used: 0,
-            period_start: now.toISOString(),
-            period_end: periodEnd.toISOString(),
-          } as any)
-          .select()
-          .single();
-
-        if (insertError) throw toAppError(insertError, 'credits', 'insert');
-        return toCreditInfoEnhanced(newCredits, null);
+          .select('*')
+          .eq('user_id', userId)
+          .maybeSingle();
+        finalCreditsRow = retryRow;
+        if (!finalCreditsRow) throw toAppError(insertError, 'credits', 'insert');
+      } else {
+        finalCreditsRow = newCredits;
       }
-      throw toAppError(creditsError, 'credits', 'select');
     }
 
     const { data: purchasedRow, error: purchasedError } = await this.supabase
@@ -187,7 +197,7 @@ export class CreditService {
 
     if (purchasedError) throw toAppError(purchasedError, 'purchased_credits', 'select');
 
-    return toCreditInfoEnhanced(creditsRow, purchasedRow);
+    return toCreditInfoEnhanced(finalCreditsRow, purchasedRow);
   }
 
   /**
@@ -364,11 +374,11 @@ export class CreditService {
       .from('credits')
       .select('*')
       .eq('user_id', userId)
-      .single();
+      .maybeSingle();
 
     if (creditsError) throw toAppError(creditsError, 'credits', 'select');
 
-    const monthlyRemaining = creditsRow.total - creditsRow.used;
+    const monthlyRemaining = creditsRow ? (creditsRow.total - creditsRow.used) : 0;
     const totalAvailable = monthlyRemaining + newBalance;
 
     // 4. 写入 credit_transactions 记录（purchase 类型，purchased_cost 为负值表示增加）
