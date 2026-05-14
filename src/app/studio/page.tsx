@@ -331,22 +331,8 @@ export default function StudioPage() {
           </div>
         )}
 
-        {/* Version Panel (after generation) */}
-        {batchId && versions.length > 0 && !isGenerating && !selectionConfirmed && (
-          <div style={{ marginBottom: '32px' }}>
-            <VersionPanel
-              batchId={batchId}
-              versions={versions}
-              selectedVersionId={selectedVersionId}
-              onSelect={handleSelectVersion}
-              onConfirm={handleConfirmSelection}
-              isLoading={isConfirming}
-            />
-          </div>
-        )}
-
-        {/* Download section (after selection confirmed) */}
-        {selectionConfirmed && selectedVersionId && (
+        {/* Generation Result (after generation) */}
+        {batchId && versions.length > 0 && !isGenerating && (
           <div style={{
             marginBottom: '32px',
             background: 'white',
@@ -354,45 +340,74 @@ export default function StudioPage() {
             padding: 24,
             border: '1px solid #f0ebe4',
             boxShadow: '0 4px 20px rgba(212, 165, 116, 0.06)',
-            textAlign: 'center',
           }}>
-            <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
-            <h3 style={{
-              fontSize: 18,
-              fontWeight: 600,
-              color: '#2D2D2D',
-              marginBottom: 8,
-              fontFamily: "'Playfair Display', serif",
-            }}>
-              版本已确认
-            </h3>
-            <p style={{ fontSize: 14, color: '#6B6B6B', marginBottom: 20 }}>
-              您选择的版本已保存，可以下载 MP3 文件
-            </p>
-            <button
-              onClick={handleDownload}
-              disabled={isDownloading}
-              style={{
-                padding: '14px 32px',
-                borderRadius: 24,
-                border: 'none',
-                background: 'linear-gradient(135deg, #D4A574, #C9A86A)',
-                color: 'white',
-                fontSize: 15,
-                fontWeight: 700,
-                cursor: isDownloading ? 'not-allowed' : 'pointer',
-                fontFamily: "'Inter', sans-serif",
-                boxShadow: '0 4px 16px rgba(212, 165, 116, 0.3)',
-                opacity: isDownloading ? 0.7 : 1,
-              }}
-            >
-              {isDownloading ? '下载中...' : '下载 MP3'}
-            </button>
+            {versions[0]?.status === 'completed' ? (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 48, marginBottom: 12 }}>🎵</div>
+                <h3 style={{
+                  fontSize: 18, fontWeight: 600, color: '#2D2D2D', marginBottom: 8,
+                  fontFamily: "'Playfair Display', serif",
+                }}>生成完成</h3>
+                {versions[0]?.audioUrl && (
+                  <div style={{ marginBottom: 20 }}>
+                    <audio controls src={versions[0].audioUrl} style={{ width: '100%', maxWidth: 400 }} />
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+                  <button
+                    onClick={handleDownload}
+                    disabled={isDownloading}
+                    style={{
+                      padding: '14px 32px', borderRadius: 24, border: 'none',
+                      background: 'linear-gradient(135deg, #D4A574, #C9A86A)', color: 'white',
+                      fontSize: 15, fontWeight: 700, cursor: isDownloading ? 'not-allowed' : 'pointer',
+                      fontFamily: "'Inter', sans-serif",
+                      boxShadow: '0 4px 16px rgba(212, 165, 116, 0.3)',
+                      opacity: isDownloading ? 0.7 : 1,
+                    }}
+                  >
+                    {isDownloading ? '下载中...' : '下载 MP3'}
+                  </button>
+                  <button
+                    onClick={() => { setBatchId(null); setVersions([]); setSelectedVersionId(undefined); }}
+                    style={{
+                      padding: '14px 32px', borderRadius: 24,
+                      border: '1px solid #D4A574', background: 'transparent', color: '#D4A574',
+                      fontSize: 15, fontWeight: 600, cursor: 'pointer',
+                      fontFamily: "'Inter', sans-serif",
+                    }}
+                  >
+                    继续创作
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 48, marginBottom: 12 }}>❌</div>
+                <h3 style={{ fontSize: 18, fontWeight: 600, color: '#E53E3E', marginBottom: 8 }}>
+                  生成失败
+                </h3>
+                <p style={{ fontSize: 14, color: '#6B6B6B', marginBottom: 20 }}>
+                  {versions[0]?.error?.message || '请重试或更换提示词'}
+                </p>
+                <button
+                  onClick={() => { setBatchId(null); setVersions([]); }}
+                  style={{
+                    padding: '14px 32px', borderRadius: 24, border: 'none',
+                    background: 'linear-gradient(135deg, #D4A574, #C9A86A)', color: 'white',
+                    fontSize: 15, fontWeight: 700, cursor: 'pointer',
+                    fontFamily: "'Inter', sans-serif",
+                  }}
+                >
+                  重新创作
+                </button>
+              </div>
+            )}
           </div>
         )}
 
         {/* Main Content Grid (creation form) */}
-        {!isGenerating && !selectionConfirmed && (
+        {!isGenerating && !batchId && (
           <div
             style={{
               display: 'grid',
