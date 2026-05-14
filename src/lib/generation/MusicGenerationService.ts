@@ -585,9 +585,11 @@ export class MusicGenerationService {
           lyrics: response.lyrics,
           creditsConsumed,
         };
-      } catch (err) {
-        // 生成失败
-        const errorMessage = err instanceof Error ? err.message : '生成失败';
+      } catch (err: any) {
+        // 生成失败 - 记录详细错误
+        const errorMessage = err?.message || err?.toString?.() || JSON.stringify(err) || '生成失败';
+        const errorDetails = err?.response?.data || err?.cause || '';
+        console.error(`[Generation Failed] Task ${taskId}:`, errorMessage, errorDetails);
         await this.failTask(taskId, {
           code: 'LYRIA_GENERATION_FAILED',
           message: errorMessage,

@@ -26,13 +26,19 @@ export class LyriaProvider implements AIModelProvider {
 
     const contents = this.buildContents(request);
 
-    const response = await this.ai.models.generateContent({
-      model: modelId,
-      contents,
-      config,
-    });
+    try {
+      const response = await this.ai.models.generateContent({
+        model: modelId,
+        contents,
+        config,
+      });
 
-    return this.parseResponse(response as unknown as GeminiRawResponse, modelId);
+      return this.parseResponse(response as unknown as GeminiRawResponse, modelId);
+    } catch (err: any) {
+      const msg = err?.message || err?.toString?.() || 'Unknown Lyria error';
+      console.error(`[LyriaProvider] generatePreview failed:`, msg);
+      throw new Error(`Lyria API 调用失败: ${msg}`);
+    }
   }
 
   /** 调用 Lyria 3 Pro（lyria-3-pro-preview）生成完整歌曲，支持 MP3/WAV */
