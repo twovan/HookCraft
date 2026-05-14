@@ -18,6 +18,7 @@ export async function GET(req: NextRequest) {
     const category = searchParams.get('category') || '';
     const genre = searchParams.get('genre') || '';
     const status = searchParams.get('status') || '';
+    const hasAudio = searchParams.get('hasAudio') || '';
     const includeStats = searchParams.get('includeStats') === 'true';
 
     let query = supabaseAdmin
@@ -36,6 +37,11 @@ export async function GET(req: NextRequest) {
     }
     if (status) {
       query = query.eq('status', status);
+    }
+    if (hasAudio === 'yes') {
+      query = query.not('preview_url', 'is', null);
+    } else if (hasAudio === 'no') {
+      query = query.is('preview_url', null);
     }
 
     // Pagination

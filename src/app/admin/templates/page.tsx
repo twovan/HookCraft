@@ -255,6 +255,15 @@ export default function AdminTemplatesPage() {
         { label: '已拒绝', value: 'rejected' },
       ],
     },
+    {
+      key: 'hasAudio',
+      type: 'select',
+      placeholder: '音频状态',
+      options: [
+        { label: '有音频', value: 'yes' },
+        { label: '无音频', value: 'no' },
+      ],
+    },
   ];
 
   const columns: Column<TemplateItem>[] = [
@@ -311,6 +320,16 @@ export default function AdminTemplatesPage() {
       key: 'sales_count',
       title: '销量',
       render: (row) => <span>{row.sales_count || 0}</span>,
+    },
+    {
+      key: 'audio',
+      title: '音频',
+      render: (row) => (
+        <Tag
+          label={row.preview_url ? '有音频' : '无音频'}
+          color={row.preview_url ? 'green' : 'gray'}
+        />
+      ),
     },
     {
       key: 'status',
