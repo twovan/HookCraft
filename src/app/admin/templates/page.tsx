@@ -235,6 +235,8 @@ export default function AdminTemplatesPage() {
       type: 'select',
       placeholder: '所有分类',
       options: [
+        { label: '免费模板', value: 'free_template' },
+        { label: '付费模板', value: 'paid_template' },
         { label: 'Pop', value: 'Pop' },
         { label: 'Rock', value: 'Rock' },
         { label: 'Electronic', value: 'Electronic' },
@@ -284,14 +286,21 @@ export default function AdminTemplatesPage() {
     {
       key: 'category',
       title: '分类/风格',
-      render: (row) => (
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-          {row.category && <Tag label={row.category} color="blue" />}
-          {(row.genre_tags || []).slice(0, 2).map((t) => (
-            <Tag key={t} label={t} color="purple" />
-          ))}
-        </div>
-      ),
+      render: (row) => {
+        const categoryLabelMap: Record<string, string> = {
+          free_template: '免费模板',
+          paid_template: '付费模板',
+        };
+        const displayCategory = categoryLabelMap[row.category] || row.category;
+        return (
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {row.category && <Tag label={displayCategory} color="blue" />}
+            {(row.genre_tags || []).slice(0, 2).map((t) => (
+              <Tag key={t} label={t} color="purple" />
+            ))}
+          </div>
+        );
+      },
     },
     {
       key: 'price',
