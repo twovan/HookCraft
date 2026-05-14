@@ -325,7 +325,7 @@ export default function StudioPage() {
           <div style={{ marginBottom: '32px' }}>
             <GenerationProgress
               completedCount={completedCount}
-              totalCount={3}
+              totalCount={1}
               isGenerating={true}
             />
           </div>
@@ -526,7 +526,7 @@ export default function StudioPage() {
                 </div>
               )}
 
-              {/* Total Cost Display (3 versions) */}
+              {/* Total Cost Display */}
               <div
                 style={{
                   background: 'linear-gradient(135deg, #FDFBF7 0%, #F5E6D3 100%)',

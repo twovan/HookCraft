@@ -42,9 +42,48 @@ export class CreditService {
       .from('credits')
       .select('*')
       .eq('user_id', userId)
-      .single();
+      .maybeSingle();
 
     if (error) throw toAppError(error, 'credits', 'select');
+    
+    if (!data) {
+      // Auto-create credits record
+      const { data: membershipRow } = await this.supabase
+        .from('memberships')
+        .select('tier')
+        .eq('user_id', userId)
+        .maybeSingle();
+      const userTier = (membershipRow?.tier || 'free') as keyof typeof TIER_CONFIGS;
+      const tierConfig = TIER_CONFIGS[userTier];
+      const now = new Date();
+      const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      
+      const { data: newData, error: insertError } = await this.supabase
+        .from('credits')
+        .insert({
+          user_id: userId,
+          tier: userTier,
+          total: tierConfig.monthlyCredits,
+          used: 0,
+          period_start: now.toISOString(),
+          period_end: periodEnd.toISOString(),
+        } as any)
+        .select()
+        .single();
+      
+      if (insertError) {
+        // Try reading again in case of race condition
+        const { data: retryData } = await this.supabase
+          .from('credits')
+          .select('*')
+          .eq('user_id', userId)
+          .maybeSingle();
+        if (retryData) return toCreditInfo(retryData);
+        throw toAppError(insertError, 'credits', 'insert');
+      }
+      return toCreditInfo(newData);
+    }
+    
     return toCreditInfo(data);
   }
 

@@ -99,7 +99,7 @@ export default function GenerationProgress({
 
       {isGenerating && (
         <p style={hintStyle}>
-          AI 正在为您创作 {totalCount} 个版本，请稍候...
+          AI 正在为您创作音乐，请稍候...
         </p>
       )}
 
