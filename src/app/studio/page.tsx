@@ -88,7 +88,8 @@ export default function StudioPage() {
 
   const fetchTemplates = async () => {
     try {
-      const res = await fetch('/api/templates');
+      // Fetch all templates (pass business tier to get all, frontend handles lock state)
+      const res = await fetch('/api/templates?tier=business');
       if (res.ok) {
         const data = await res.json();
         setTemplates(Array.isArray(data) ? data : data.templates ?? []);

@@ -26,30 +26,46 @@ export async function GET(req: NextRequest) {
     }
 
     const creditService = new CreditService(supabaseAdmin);
-    const credits = await creditService.getCreditsEnhanced(user.id);
-
-    return NextResponse.json({
-      // Enhanced fields
-      userId: credits.userId,
-      tier: credits.tier,
-      monthlyUsed: credits.monthlyUsed,
-      monthlyTotal: credits.monthlyTotal,
-      monthlyRemaining: credits.monthlyRemaining,
-      purchasedBalance: credits.purchasedBalance,
-      totalAvailable: credits.totalAvailable,
-      periodStart: credits.periodStart,
-      periodEnd: credits.periodEnd,
-      // Backward-compatible fields
-      used: credits.monthlyUsed,
-      total: credits.monthlyTotal,
-      remaining: credits.totalAvailable,
-    });
+    
+    try {
+      const credits = await creditService.getCreditsEnhanced(user.id);
+      return NextResponse.json({
+        userId: credits.userId,
+        tier: credits.tier,
+        monthlyUsed: credits.monthlyUsed,
+        monthlyTotal: credits.monthlyTotal,
+        monthlyRemaining: credits.monthlyRemaining,
+        purchasedBalance: credits.purchasedBalance,
+        totalAvailable: credits.totalAvailable,
+        periodStart: credits.periodStart,
+        periodEnd: credits.periodEnd,
+        used: credits.monthlyUsed,
+        total: credits.monthlyTotal,
+        remaining: credits.totalAvailable,
+      });
+    } catch (serviceError) {
+      // If credits service fails, return safe defaults
+      console.error('Credits service error, returning defaults:', serviceError);
+      return NextResponse.json({
+        userId: user.id,
+        tier: 'free',
+        monthlyUsed: 0,
+        monthlyTotal: 0,
+        monthlyRemaining: 0,
+        purchasedBalance: 0,
+        totalAvailable: 0,
+        used: 0,
+        total: 0,
+        remaining: 0,
+      });
+    }
   } catch (error: any) {
     console.error('获取 Credits 信息失败:', error);
-    return NextResponse.json(
-      { error: '获取额度信息失败，请稍后重试' },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      used: 0, total: 0, remaining: 0, tier: 'free',
+      monthlyUsed: 0, monthlyTotal: 0, monthlyRemaining: 0,
+      purchasedBalance: 0, totalAvailable: 0,
+    });
   }
 }
 
