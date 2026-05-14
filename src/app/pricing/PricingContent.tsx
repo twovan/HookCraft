@@ -208,7 +208,7 @@ export default function PricingContent({ tiers }: PricingContentProps) {
       </div>
 
       {/* Credits Pack section */}
-      <section style={{ marginTop: '40px' }}>
+      <section id="credits-pack" style={{ marginTop: '40px', scrollMarginTop: '80px' }}>
         <div style={{ textAlign: 'center', marginBottom: '36px' }}>
           <h2
             style={{
