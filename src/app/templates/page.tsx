@@ -46,6 +46,7 @@ export default function TemplatesPage() {
   const router = useRouter();
   const addItem = useCartStore((s) => s.addItem);
   const [templates, setTemplates] = useState<TemplateItem[]>([]);
+  const [purchasedIds, setPurchasedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
@@ -72,7 +73,18 @@ export default function TemplatesPage() {
         setLoading(false);
       }
     }
+    async function fetchPurchased() {
+      try {
+        const res = await fetch('/api/templates/purchased');
+        if (res.ok) {
+          const data = await res.json();
+          const ids = new Set<string>((data.templates || []).map((t: { id: string }) => t.id));
+          setPurchasedIds(ids);
+        }
+      } catch { /* ignore */ }
+    }
     fetchTemplates();
+    fetchPurchased();
   }, []);
 
   const toggleGenre = (genre: string) => {
@@ -279,6 +291,7 @@ export default function TemplatesPage() {
                     const gradient = getGradient(t.name);
                     const price = t.price ? Math.round(t.price / 100) : 0;
                     const tags = [t.category === 'free_template' ? '免费' : '付费', t.genre].filter(Boolean);
+                    const isPurchased = purchasedIds.has(t.id);
 
                     return (
                       <Link
@@ -324,18 +337,18 @@ export default function TemplatesPage() {
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <div style={{ fontSize: 26, fontWeight: 700, color: '#D4A574', letterSpacing: -0.5 }}>
-                              {t.category === 'paid_template' ? (price > 0 ? `￥${price}` : '待定价') : '免费'}
+                              {isPurchased ? '已购' : t.category === 'paid_template' ? (price > 0 ? `￥${price}` : '待定价') : '免费'}
                             </div>
-                            {t.category === 'paid_template' ? (
+                            {isPurchased || t.category === 'free_template' ? (
+                              <span onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/studio?templateId=${t.id}`); }} style={{
+                                padding: '8px 16px', borderRadius: 24, background: 'linear-gradient(135deg, #D4A574, #C9A86A)',
+                                color: 'white', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                              }}>{isPurchased ? '去创作' : '立即使用'}</span>
+                            ) : (
                               <span onClick={(e) => { e.preventDefault(); e.stopPropagation(); addItem({ template_id: t.id, name: t.name, price: t.price || 0, cover_url: t.coverUrl || null, genre: t.genre, added_at: new Date().toISOString() }); }} style={{
                                 padding: '8px 16px', borderRadius: 24, background: 'linear-gradient(135deg, #D4A574, #C9A86A)',
                                 color: 'white', fontSize: 12, fontWeight: 600, cursor: 'pointer',
                               }}>加入购物车</span>
-                            ) : (
-                              <span onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/studio?templateId=${t.id}`); }} style={{
-                                padding: '8px 16px', borderRadius: 24, background: 'linear-gradient(135deg, #D4A574, #C9A86A)',
-                                color: 'white', fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                              }}>立即使用</span>
                             )}
                           </div>
                         </div>

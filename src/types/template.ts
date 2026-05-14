@@ -13,6 +13,10 @@ export interface Template {
   description: string;
   category: TemplateCategory;
   genre: string;
+  /** 发布状态 */
+  status?: string;
+  /** 价格（分） */
+  price?: number;
   previewUrl?: string;
   coverUrl?: string;
   /** 参考音频文件 URL（管理员上传） */

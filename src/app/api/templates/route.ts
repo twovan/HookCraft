@@ -23,10 +23,10 @@ export async function GET(req: NextRequest) {
     const templateService = new TemplateService(supabaseAdmin);
     const allTemplates = await templateService.getTemplates();
 
-    // 按用户等级过滤可访问的模板
+    // 按用户等级过滤可访问的模板，且只显示已发布的
     const tierFeatures = TIER_CONFIGS[userTier].features;
     const accessibleTemplates = allTemplates.filter((t) =>
-      tierFeatures.includes(t.category)
+      tierFeatures.includes(t.category) && t.status === 'published'
     );
 
     return NextResponse.json(accessibleTemplates);
