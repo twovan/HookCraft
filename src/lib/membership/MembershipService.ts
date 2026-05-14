@@ -37,7 +37,26 @@ export class MembershipService {
       .eq('user_id', userId)
       .single();
 
-    if (error) throw toAppError(error, 'memberships', 'select');
+    if (error) {
+      // If no membership record exists, create a free one
+      if (error.code === 'PGRST116') {
+        const now = new Date();
+        const { data: newData, error: insertError } = await this.supabase
+          .from('memberships')
+          .insert({
+            user_id: userId,
+            tier: 'free',
+            status: 'active',
+            start_date: now.toISOString(),
+          })
+          .select()
+          .single();
+
+        if (insertError) throw toAppError(insertError, 'memberships', 'insert');
+        return toMembershipInfo(newData);
+      }
+      throw toAppError(error, 'memberships', 'select');
+    }
     return toMembershipInfo(data);
   }
 

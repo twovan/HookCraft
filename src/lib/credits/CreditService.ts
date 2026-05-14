@@ -155,7 +155,29 @@ export class CreditService {
       .eq('user_id', userId)
       .single();
 
-    if (creditsError) throw toAppError(creditsError, 'credits', 'select');
+    if (creditsError) {
+      // If no credits record exists, create a default free one
+      if (creditsError.code === 'PGRST116') {
+        const now = new Date();
+        const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        const { data: newCredits, error: insertError } = await this.supabase
+          .from('credits')
+          .insert({
+            user_id: userId,
+            tier: 'free',
+            total: 0,
+            used: 0,
+            period_start: now.toISOString(),
+            period_end: periodEnd.toISOString(),
+          } as any)
+          .select()
+          .single();
+
+        if (insertError) throw toAppError(insertError, 'credits', 'insert');
+        return toCreditInfoEnhanced(newCredits, null);
+      }
+      throw toAppError(creditsError, 'credits', 'select');
+    }
 
     const { data: purchasedRow, error: purchasedError } = await this.supabase
       .from('purchased_credits')
