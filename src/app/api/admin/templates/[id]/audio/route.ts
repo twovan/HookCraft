@@ -4,6 +4,10 @@ import { requireAdmin } from '../../../../../../lib/admin/auth';
 import { uploadTemplateAsset } from '../../../../../../lib/supabase/storage';
 import { TemplateAdminService } from '../../../../../../lib/admin/TemplateAdminService';
 
+// Allow up to 20MB uploads
+export const runtime = 'nodejs';
+export const maxDuration = 60;
+
 /**
  * POST /api/admin/templates/[id]/audio
  * 上传模板参考音频 / 试听音频
