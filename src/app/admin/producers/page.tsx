@@ -54,6 +54,11 @@ export default function AdminProducersPage() {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
 
+  // Add producer modal (direct add)
+  const [addOpen, setAddOpen] = useState(false);
+  const [addForm, setAddForm] = useState({ name: '', email: '', expertiseTags: '', revenueShare: '70', personalNote: '' });
+  const [adding, setAdding] = useState(false);
+
   // Confirm dialog
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; action: 'resend' | 'revoke'; name: string } | null>(null);
@@ -120,6 +125,36 @@ export default function AdminProducersPage() {
       fetchData();
     } finally {
       setInviting(false);
+    }
+  }
+
+  async function handleAddProducer() {
+    if (!addForm.name.trim() || !addForm.email.trim()) {
+      alert('请填写姓名和邮箱');
+      return;
+    }
+    setAdding(true);
+    try {
+      const res = await fetch('/api/admin/producers/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: addForm.name,
+          email: addForm.email,
+          expertiseTags: addForm.expertiseTags.split(',').map((t) => t.trim()).filter(Boolean),
+          revenueShare: parseFloat(addForm.revenueShare) / 100,
+          personalNote: addForm.personalNote,
+        }),
+      });
+      if (!res.ok) throw new Error('添加失败');
+      setAddOpen(false);
+      setAddForm({ name: '', email: '', expertiseTags: '', revenueShare: '70', personalNote: '' });
+      alert('制作人添加成功！');
+      fetchData();
+    } catch {
+      alert('添加失败，请重试');
+    } finally {
+      setAdding(false);
     }
   }
 
@@ -257,7 +292,10 @@ export default function AdminProducersPage() {
       <div style={{ marginBottom: 24 }}>
         <div style={sectionHeaderStyle}>
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: '#1f2937' }}>活跃制作人</h3>
-          <button onClick={() => setInviteOpen(true)} style={inviteBtnStyle}>+ 邀请制作人</button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => setAddOpen(true)} style={addBtnStyle}>+ 直接添加</button>
+            <button onClick={() => setInviteOpen(true)} style={inviteBtnStyle}>📨 邀请制作人</button>
+          </div>
         </div>
         <DataTable
           columns={producerColumns}
@@ -386,6 +424,65 @@ export default function AdminProducersPage() {
         </div>
       </FormModal>
 
+      {/* Add Producer Modal (Direct) */}
+      <FormModal
+        open={addOpen}
+        title="直接添加制作人"
+        onClose={() => setAddOpen(false)}
+        onSubmit={handleAddProducer}
+        submitLabel="确认添加"
+        loading={adding}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div>
+            <label style={labelStyle}>姓名 *</label>
+            <input
+              style={inputStyle}
+              value={addForm.name}
+              onChange={(e) => setAddForm((f) => ({ ...f, name: e.target.value }))}
+              placeholder="制作人姓名"
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>邮箱 *</label>
+            <input
+              style={inputStyle}
+              type="email"
+              value={addForm.email}
+              onChange={(e) => setAddForm((f) => ({ ...f, email: e.target.value }))}
+              placeholder="制作人邮箱"
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>专长标签（逗号分隔）</label>
+            <input
+              style={inputStyle}
+              value={addForm.expertiseTags}
+              onChange={(e) => setAddForm((f) => ({ ...f, expertiseTags: e.target.value }))}
+              placeholder="电子, 流行, 嘻哈"
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>分成比例 (%)</label>
+            <input
+              style={inputStyle}
+              type="number"
+              value={addForm.revenueShare}
+              onChange={(e) => setAddForm((f) => ({ ...f, revenueShare: e.target.value }))}
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>备注</label>
+            <textarea
+              style={{ ...inputStyle, minHeight: 60, resize: 'vertical' }}
+              value={addForm.personalNote}
+              onChange={(e) => setAddForm((f) => ({ ...f, personalNote: e.target.value }))}
+              placeholder="可选备注..."
+            />
+          </div>
+        </div>
+      </FormModal>
+
       {/* Confirm Dialog */}
       <ConfirmDialog
         open={confirmOpen}
@@ -425,6 +522,18 @@ const inviteBtnStyle: React.CSSProperties = {
   border: 'none',
   background: '#D4A574',
   color: '#fff',
+  fontSize: 13,
+  fontWeight: 600,
+  cursor: 'pointer',
+  fontFamily: "'Inter', sans-serif",
+};
+
+const addBtnStyle: React.CSSProperties = {
+  padding: '8px 16px',
+  borderRadius: 8,
+  border: '1px solid #D4A574',
+  background: '#fff',
+  color: '#D4A574',
   fontSize: 13,
   fontWeight: 600,
   cursor: 'pointer',
