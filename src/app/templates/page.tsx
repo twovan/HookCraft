@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useCartStore } from '@/store/cartStore';
 
 interface TemplateItem {
   id: string;
@@ -41,6 +43,8 @@ function getGradient(name: string): string {
 const GENRES = ['Pop', 'Rock', 'EDM', 'Jazz', 'Hip-Hop', 'Classical', 'Lo-Fi'];
 
 export default function TemplatesPage() {
+  const router = useRouter();
+  const addItem = useCartStore((s) => s.addItem);
   const [templates, setTemplates] = useState<TemplateItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -299,10 +303,17 @@ export default function TemplatesPage() {
                             <div style={{ fontSize: 26, fontWeight: 700, color: '#D4A574', letterSpacing: -0.5 }}>
                               {price > 0 ? `￥${price}` : '免费'}
                             </div>
-                            <span onClick={(e) => { e.preventDefault(); e.stopPropagation(); alert('购物车功能即将上线'); }} style={{
-                              padding: '8px 16px', borderRadius: 24, background: 'linear-gradient(135deg, #D4A574, #C9A86A)',
-                              color: 'white', fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                            }}>加入购物车</span>
+                            {price > 0 ? (
+                              <span onClick={(e) => { e.preventDefault(); e.stopPropagation(); addItem({ template_id: t.id, name: t.name, price: t.price || 0, cover_url: t.coverUrl || null, genre: t.genre, added_at: new Date().toISOString() }); }} style={{
+                                padding: '8px 16px', borderRadius: 24, background: 'linear-gradient(135deg, #D4A574, #C9A86A)',
+                                color: 'white', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                              }}>加入购物车</span>
+                            ) : (
+                              <span onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/studio?templateId=${t.id}`); }} style={{
+                                padding: '8px 16px', borderRadius: 24, background: 'linear-gradient(135deg, #D4A574, #C9A86A)',
+                                color: 'white', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                              }}>立即使用</span>
+                            )}
                           </div>
                         </div>
                       </Link>
