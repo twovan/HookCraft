@@ -43,29 +43,55 @@ export async function GET(req: NextRequest) {
         total: credits.monthlyTotal,
         remaining: credits.totalAvailable,
       });
-    } catch (serviceError) {
-      // If credits service fails, return safe defaults
-      console.error('Credits service error, returning defaults:', serviceError);
+    } catch (serviceError: any) {
+      // Log the actual error for debugging
+      console.error('Credits service error:', serviceError?.message || serviceError);
+      
+      // Try a direct query as fallback
+      const { data: directCredits } = await supabaseAdmin
+        .from('credits')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      const { data: directPurchased } = await supabaseAdmin
+        .from('purchased_credits')
+        .select('balance')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      const { data: directMembership } = await supabaseAdmin
+        .from('memberships')
+        .select('tier')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      const tier = directMembership?.tier || 'free';
+      const tierCredits = tier === 'business' ? 300 : tier === 'pro' ? 100 : 0;
+      const monthlyTotal = directCredits?.total || tierCredits;
+      const monthlyUsed = directCredits?.used || 0;
+      const monthlyRemaining = monthlyTotal - monthlyUsed;
+      const purchasedBalance = directPurchased?.balance || 0;
+
       return NextResponse.json({
         userId: user.id,
-        tier: 'free',
-        monthlyUsed: 0,
-        monthlyTotal: 0,
-        monthlyRemaining: 0,
-        purchasedBalance: 0,
-        totalAvailable: 0,
-        used: 0,
-        total: 0,
-        remaining: 0,
+        tier,
+        monthlyUsed,
+        monthlyTotal,
+        monthlyRemaining,
+        purchasedBalance,
+        totalAvailable: monthlyRemaining + purchasedBalance,
+        used: monthlyUsed,
+        total: monthlyTotal,
+        remaining: monthlyRemaining + purchasedBalance,
       });
     }
   } catch (error: any) {
     console.error('获取 Credits 信息失败:', error);
-    return NextResponse.json({
-      used: 0, total: 0, remaining: 0, tier: 'free',
-      monthlyUsed: 0, monthlyTotal: 0, monthlyRemaining: 0,
-      purchasedBalance: 0, totalAvailable: 0,
-    });
+    return NextResponse.json(
+      { error: '获取额度信息失败' },
+      { status: 500 }
+    );
   }
 }
 
