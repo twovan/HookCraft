@@ -307,13 +307,7 @@ export default function TemplateDetailPage() {
               <p style={{ color: '#6B6B6B', lineHeight: 1.8, margin: 0 }}>{template.description}</p>
             </div>
 
-            {/* Analysis Result */}
-            {template.analysisResult && (
-              <div style={{ background: 'white', padding: 24, borderRadius: 16, marginBottom: 24 }}>
-                <h3 style={{ marginBottom: 12, fontSize: 16, fontWeight: 600, color: '#2D2D2D' }}>AI 分析结果</h3>
-                <p style={{ color: '#6B6B6B', lineHeight: 1.8, margin: 0, whiteSpace: 'pre-wrap' }}>{template.analysisResult}</p>
-              </div>
-            )}
+            {/* Analysis Result - hidden from public view */}
 
             {/* Template Info */}
             <div style={{
