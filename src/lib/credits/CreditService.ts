@@ -160,14 +160,23 @@ export class CreditService {
     // If no credits record, create one
     let finalCreditsRow = creditsRow;
     if (!finalCreditsRow) {
+      // Get user's actual membership tier
+      const { data: membershipRow } = await this.supabase
+        .from('memberships')
+        .select('tier')
+        .eq('user_id', userId)
+        .maybeSingle();
+      const userTier = (membershipRow?.tier || 'free') as keyof typeof TIER_CONFIGS;
+      const tierConfig = TIER_CONFIGS[userTier];
+
       const now = new Date();
       const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
       const { data: newCredits, error: insertError } = await this.supabase
         .from('credits')
         .insert({
           user_id: userId,
-          tier: 'free',
-          total: 0,
+          tier: userTier,
+          total: tierConfig.monthlyCredits,
           used: 0,
           period_start: now.toISOString(),
           period_end: periodEnd.toISOString(),
@@ -196,6 +205,23 @@ export class CreditService {
       .maybeSingle();
 
     if (purchasedError) throw toAppError(purchasedError, 'purchased_credits', 'select');
+
+    // Ensure credits.total and tier match the user's membership
+    const { data: membershipCheck } = await this.supabase
+      .from('memberships')
+      .select('tier')
+      .eq('user_id', userId)
+      .maybeSingle();
+    const actualTier = (membershipCheck?.tier || finalCreditsRow.tier || 'free') as keyof typeof TIER_CONFIGS;
+    const tierConfig = TIER_CONFIGS[actualTier];
+    
+    if (tierConfig && (finalCreditsRow.total !== tierConfig.monthlyCredits || finalCreditsRow.tier !== actualTier) && tierConfig.monthlyCredits > 0) {
+      await this.supabase
+        .from('credits')
+        .update({ total: tierConfig.monthlyCredits, tier: actualTier })
+        .eq('user_id', userId);
+      finalCreditsRow = { ...finalCreditsRow, total: tierConfig.monthlyCredits, tier: actualTier };
+    }
 
     return toCreditInfoEnhanced(finalCreditsRow, purchasedRow);
   }
