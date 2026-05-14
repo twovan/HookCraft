@@ -577,11 +577,20 @@ export class MusicGenerationService {
           creditsConsumed,
         });
 
+        // 生成签名 URL 供前端播放
+        let audioUrl: string | undefined;
+        if (audioPath) {
+          const { data: signedData } = await this.supabase.storage
+            .from('audio-files')
+            .createSignedUrl(audioPath, 3600); // 1 hour
+          audioUrl = signedData?.signedUrl;
+        }
+
         return {
           taskId,
           versionNumber,
           status: 'completed',
-          audioUrl: audioPath,
+          audioUrl,
           lyrics: response.lyrics,
           creditsConsumed,
         };

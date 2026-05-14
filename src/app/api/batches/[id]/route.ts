@@ -66,15 +66,25 @@ export async function GET(
       status: batch.status,
     };
 
-    const versions = (tasks ?? []).map((task) => ({
-      taskId: task.id,
-      versionNumber: task.version_number,
-      status: task.status,
-      audioUrl: task.audio_path ?? undefined,
-      lyrics: task.lyrics ?? undefined,
-      durationSeconds: task.duration_seconds ?? undefined,
-      creditsConsumed: task.credits_consumed,
-      createdAt: task.created_at,
+    // Generate signed URLs for audio files
+    const versions = await Promise.all((tasks ?? []).map(async (task) => {
+      let audioUrl: string | undefined;
+      if (task.audio_path) {
+        const { data: signedData } = await supabaseAdmin.storage
+          .from('audio-files')
+          .createSignedUrl(task.audio_path, 3600);
+        audioUrl = signedData?.signedUrl;
+      }
+      return {
+        taskId: task.id,
+        versionNumber: task.version_number,
+        status: task.status,
+        audioUrl,
+        lyrics: task.lyrics ?? undefined,
+        durationSeconds: task.duration_seconds ?? undefined,
+        creditsConsumed: task.credits_consumed,
+        createdAt: task.created_at,
+      };
     }));
 
     return NextResponse.json({
