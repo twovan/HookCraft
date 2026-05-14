@@ -42,6 +42,9 @@ export default function HistoryList({
 }: HistoryListProps) {
   const [playingTaskId, setPlayingTaskId] = useState<string | null>(null);
   const [downloadingTaskId, setDownloadingTaskId] = useState<string | null>(null);
+  const [editingBatchId, setEditingBatchId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [batchNames, setBatchNames] = useState<Record<string, string>>({});
 
   const handleDownload = async (taskId: string) => {
     setDownloadingTaskId(taskId);
@@ -143,17 +146,48 @@ export default function HistoryList({
                   🎵
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{
-                    fontSize: 14,
-                    fontWeight: 600,
-                    color: '#2D2D2D',
-                    marginBottom: 4,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}>
-                    {batch.templateName || batch.promptSummary || '自定义创作'}
-                  </div>
+                  {editingBatchId === batch.batchId ? (
+                    <input
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      onBlur={() => {
+                        if (editName.trim()) setBatchNames((prev) => ({ ...prev, [batch.batchId]: editName.trim() }));
+                        setEditingBatchId(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          if (editName.trim()) setBatchNames((prev) => ({ ...prev, [batch.batchId]: editName.trim() }));
+                          setEditingBatchId(null);
+                        }
+                        if (e.key === 'Escape') setEditingBatchId(null);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      autoFocus
+                      style={{
+                        fontSize: 14, fontWeight: 600, color: '#2D2D2D',
+                        border: '1px solid #D4A574', borderRadius: 6, padding: '2px 8px',
+                        outline: 'none', width: '100%', maxWidth: 300,
+                        fontFamily: "'Inter', sans-serif",
+                      }}
+                    />
+                  ) : (
+                    <div style={{
+                      fontSize: 14, fontWeight: 600, color: '#2D2D2D', marginBottom: 4,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      display: 'flex', alignItems: 'center', gap: 6,
+                    }}>
+                      <span>{batchNames[batch.batchId] || batch.templateName || batch.promptSummary || '自定义创作'}</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingBatchId(batch.batchId);
+                          setEditName(batchNames[batch.batchId] || batch.templateName || batch.promptSummary || '');
+                        }}
+                        style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 12, color: '#999', padding: 0 }}
+                        title="重命名"
+                      >✏️</button>
+                    </div>
+                  )}
                   <div style={{ fontSize: 12, color: '#999' }}>
                     {formatDate(batch.createdAt)} · {batch.generationType === 'preview' ? 'Preview' : 'Full Demo'} · {batch.versionCount} 个版本
                   </div>
@@ -201,80 +235,52 @@ export default function HistoryList({
                       <div
                         key={version.taskId}
                         style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 12,
                           padding: '12px 16px',
                           background: 'white',
                           borderRadius: 12,
                           border: isSelected ? '1px solid #D4A574' : '1px solid #f0ebe4',
                         }}
                       >
-                        {/* Play button */}
-                        {version.audioUrl && (
-                          <AudioPlayerInline
-                            audioUrl={version.audioUrl}
-                            isPlaying={playingTaskId === version.taskId}
-                            onPlay={() => setPlayingTaskId(version.taskId)}
-                            onPause={() => setPlayingTaskId(null)}
-                          />
-                        )}
+                        {/* Version header */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: version.audioUrl ? 8 : 0 }}>
+                          {/* Play button */}
+                          {version.audioUrl && (
+                            <AudioPlayerInline
+                              audioUrl={version.audioUrl}
+                              isPlaying={playingTaskId === version.taskId}
+                              onPlay={() => setPlayingTaskId(version.taskId)}
+                              onPause={() => setPlayingTaskId(null)}
+                            />
+                          )}
 
-                        {/* Version info */}
-                        <div style={{ flex: 1 }}>
-                          <span style={{ fontSize: 13, fontWeight: 600, color: '#2D2D2D' }}>
-                            版本 {version.versionNumber}
-                          </span>
-                          <span style={{ fontSize: 12, color: '#999', marginLeft: 8 }}>
-                            {formatDuration(version.durationSeconds)}
-                          </span>
+                          {/* Version info */}
+                          <div style={{ flex: 1 }}>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: '#2D2D2D' }}>
+                              版本 {version.versionNumber}
+                            </span>
+                            <span style={{ fontSize: 12, color: '#999', marginLeft: 8 }}>
+                              {formatDuration(version.durationSeconds)}
+                            </span>
+                          </div>
+
+                          {/* Status tag */}
+                          {isSelected && (
+                            <span style={{ padding: '3px 8px', background: '#F5E6D3', color: '#D4A574', fontSize: 11, fontWeight: 600, borderRadius: 6 }}>已选中</span>
+                          )}
+                          {isArchived && (
+                            <span style={{ padding: '3px 8px', background: '#F5F5F5', color: '#999', fontSize: 11, fontWeight: 600, borderRadius: 6 }}>未选中</span>
+                          )}
                         </div>
 
-                        {/* Status tag */}
-                        {isSelected && (
-                          <span style={{
-                            padding: '3px 8px',
-                            background: '#F5E6D3',
-                            color: '#D4A574',
-                            fontSize: 11,
-                            fontWeight: 600,
-                            borderRadius: 6,
-                          }}>
-                            已选中
-                          </span>
-                        )}
-                        {isArchived && (
-                          <span style={{
-                            padding: '3px 8px',
-                            background: '#F5F5F5',
-                            color: '#999',
-                            fontSize: 11,
-                            fontWeight: 600,
-                            borderRadius: 6,
-                          }}>
-                            未选中
-                          </span>
-                        )}
-
-                        {/* Download button (only for selected) */}
-                        {isSelected && version.audioUrl && (
-                          <button
-                            onClick={() => handleDownload(version.taskId)}
-                            disabled={downloadingTaskId === version.taskId}
-                            style={{
-                              padding: '6px 12px',
-                              borderRadius: 16,
-                              border: 'none',
-                              background: 'linear-gradient(135deg, #D4A574, #C9A86A)',
-                              color: 'white',
-                              fontSize: 11,
-                              fontWeight: 600,
-                              cursor: downloadingTaskId === version.taskId ? 'not-allowed' : 'pointer',
-                              opacity: downloadingTaskId === version.taskId ? 0.7 : 1,
-                            }}
-                          >
-                            {downloadingTaskId === version.taskId ? '下载中...' : '下载'}
-                          </button>
+                        {/* Audio timeline */}
+                        {version.audioUrl && (
+                          <div style={{ marginTop: 8 }}>
+                            <audio
+                              controls
+                              src={version.audioUrl}
+                              style={{ width: '100%', height: 32, borderRadius: 8 }}
+                            />
+                          </div>
                         )}
                       </div>
                     );
