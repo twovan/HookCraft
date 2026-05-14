@@ -29,19 +29,54 @@ export async function GET(req: NextRequest) {
     
     try {
       const credits = await creditService.getCreditsEnhanced(user.id);
+      
+      // If purchasedBalance is 0, try to recover from payments table
+      let purchasedBalance = credits.purchasedBalance;
+      if (purchasedBalance === 0) {
+        const packPriceMap: Record<number, number> = {
+          9900: 50, 7900: 50,
+          17900: 100, 14300: 100,
+          32900: 200, 26300: 200,
+        };
+        const { data: payments } = await supabaseAdmin
+          .from('payments')
+          .select('amount')
+          .eq('user_id', user.id)
+          .eq('status', 'completed');
+        
+        let totalCreditsFromPayments = 0;
+        for (const p of payments || []) {
+          const c = packPriceMap[p.amount];
+          if (c) totalCreditsFromPayments += c;
+        }
+        if (totalCreditsFromPayments > 0) {
+          purchasedBalance = totalCreditsFromPayments;
+          await supabaseAdmin
+            .from('purchased_credits')
+            .upsert({
+              user_id: user.id,
+              balance: totalCreditsFromPayments,
+              total_purchased: totalCreditsFromPayments,
+              version: 0,
+            } as any, { onConflict: 'user_id' });
+        }
+      }
+      
+      const totalAvailable = credits.monthlyRemaining + purchasedBalance;
+      
       return NextResponse.json({
         userId: credits.userId,
         tier: credits.tier,
         monthlyUsed: credits.monthlyUsed,
         monthlyTotal: credits.monthlyTotal,
         monthlyRemaining: credits.monthlyRemaining,
-        purchasedBalance: credits.purchasedBalance,
-        totalAvailable: credits.totalAvailable,
+        purchasedBalance,
+        totalAvailable,
         periodStart: credits.periodStart,
         periodEnd: credits.periodEnd,
         used: credits.monthlyUsed,
         total: credits.monthlyTotal,
-        remaining: credits.totalAvailable,
+        remaining: totalAvailable,
       });
     } catch (serviceError: any) {
       // Log the actual error for debugging
@@ -71,7 +106,43 @@ export async function GET(req: NextRequest) {
       const monthlyTotal = tierCredits;
       const monthlyUsed = directCredits?.used || 0;
       const monthlyRemaining = Math.max(0, monthlyTotal - monthlyUsed);
-      const purchasedBalance = directPurchased?.balance || 0;
+      
+      // If purchased_credits has no data, calculate from payments table
+      let purchasedBalance = directPurchased?.balance || 0;
+      if (purchasedBalance === 0) {
+        // Map: pack price (in cents) -> credits amount
+        const packPriceMap: Record<number, number> = {
+          9900: 50,    // ¥99 -> 50 credits
+          7900: 50,    // ¥79 (discount) -> 50 credits
+          17900: 100,  // ¥179 -> 100 credits
+          14300: 100,  // ¥143 (discount) -> 100 credits
+          32900: 200,  // ¥329 -> 200 credits
+          26300: 200,  // ¥263 (discount) -> 200 credits
+        };
+        const { data: payments } = await supabaseAdmin
+          .from('payments')
+          .select('amount')
+          .eq('user_id', user.id)
+          .eq('status', 'completed');
+        
+        let totalCreditsFromPayments = 0;
+        for (const p of payments || []) {
+          const credits = packPriceMap[p.amount];
+          if (credits) totalCreditsFromPayments += credits;
+        }
+        if (totalCreditsFromPayments > 0) {
+          purchasedBalance = totalCreditsFromPayments;
+          // Sync back to purchased_credits table
+          await supabaseAdmin
+            .from('purchased_credits')
+            .upsert({
+              user_id: user.id,
+              balance: totalCreditsFromPayments,
+              total_purchased: totalCreditsFromPayments,
+              version: 0,
+            } as any, { onConflict: 'user_id' });
+        }
+      }
 
       return NextResponse.json({
         userId: user.id,
