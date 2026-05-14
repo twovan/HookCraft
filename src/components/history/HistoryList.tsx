@@ -249,46 +249,15 @@ export default function HistoryList({
                           border: isSelected ? '1px solid #D4A574' : '1px solid #f0ebe4',
                         }}
                       >
-                        {/* Version header */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: version.audioUrl ? 8 : 0 }}>
-                          {/* Play button */}
-                          {version.audioUrl && (
-                            <AudioPlayerInline
-                              audioUrl={version.audioUrl}
-                              isPlaying={playingTaskId === version.taskId}
-                              onPlay={() => setPlayingTaskId(version.taskId)}
-                              onPause={() => setPlayingTaskId(null)}
-                            />
-                          )}
-
-                          {/* Version info */}
-                          <div style={{ flex: 1 }}>
-                            <span style={{ fontSize: 13, fontWeight: 600, color: '#2D2D2D' }}>
-                              版本 {version.versionNumber}
-                            </span>
-                            <span style={{ fontSize: 12, color: '#999', marginLeft: 8 }}>
-                              {formatDuration(version.durationSeconds)}
-                            </span>
-                          </div>
-
-                          {/* Status tag */}
-                          {isSelected && (
-                            <span style={{ padding: '3px 8px', background: '#F5E6D3', color: '#D4A574', fontSize: 11, fontWeight: 600, borderRadius: 6 }}>已选中</span>
-                          )}
-                          {isArchived && (
-                            <span style={{ padding: '3px 8px', background: '#F5F5F5', color: '#999', fontSize: 11, fontWeight: 600, borderRadius: 6 }}>未选中</span>
-                          )}
-                        </div>
-
                         {/* Audio timeline */}
-                        {version.audioUrl && (
-                          <div style={{ marginTop: 8 }}>
-                            <audio
-                              controls
-                              src={version.audioUrl}
-                              style={{ width: '100%', height: 32, borderRadius: 8 }}
-                            />
-                          </div>
+                        {version.audioUrl ? (
+                          <audio
+                            controls
+                            src={version.audioUrl}
+                            style={{ width: '100%', height: 32, borderRadius: 8 }}
+                          />
+                        ) : (
+                          <div style={{ fontSize: 13, color: '#999' }}>音频加载中...</div>
                         )}
                       </div>
                     );
