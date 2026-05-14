@@ -23,11 +23,15 @@ export async function PUT(
       return NextResponse.json({ error: '模板名称不能为空' }, { status: 400 });
     }
 
-    const updateData: { name: string; description: string; price: number; genre?: string } = {
+    const updateData: { name: string; description: string; price: number; category?: string; genre?: string } = {
       name: name.trim(),
       description: description || '',
       price: price || 0,
     };
+
+    if (category) {
+      updateData.category = category;
+    }
 
     // genre_tags → 存到 genre 字段（TEXT，逗号分隔）
     if (genre_tags && Array.isArray(genre_tags)) {
