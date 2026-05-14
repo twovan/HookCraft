@@ -99,3 +99,43 @@ export async function GET(
     );
   }
 }
+
+/**
+ * PATCH /api/batches/[id]
+ * 重命名批次
+ */
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const user = await getAuthUser();
+    if (!user) {
+      return NextResponse.json({ error: '未登录' }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const body = await req.json();
+    const { title } = body;
+
+    if (!title || typeof title !== 'string') {
+      return NextResponse.json({ error: '标题不能为空' }, { status: 400 });
+    }
+
+    const { error } = await supabaseAdmin
+      .from('generation_batches')
+      .update({ title: title.trim() } as any)
+      .eq('id', id)
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('rename batch error:', error);
+      return NextResponse.json({ error: '重命名失败' }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error('batch rename error:', error);
+    return NextResponse.json({ error: '重命名失败' }, { status: 500 });
+  }
+}

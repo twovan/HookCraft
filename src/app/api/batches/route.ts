@@ -60,6 +60,7 @@ export async function GET(req: NextRequest) {
     const batches = (data ?? []).map((batch: any) => ({
       batchId: batch.id,
       createdAt: batch.created_at,
+      title: batch.title || null,
       templateName: batch.templates?.name ?? null,
       promptSummary: batch.prompt ? batch.prompt.slice(0, 50) : null,
       generationType: batch.generation_type,

@@ -6,6 +6,7 @@ import AudioPlayerInline from '@/components/studio/AudioPlayerInline';
 interface BatchSummary {
   batchId: string;
   createdAt: string;
+  title?: string;
   templateName?: string;
   promptSummary?: string;
   generationType: 'preview' | 'full_demo';
@@ -45,6 +46,19 @@ export default function HistoryList({
   const [editingBatchId, setEditingBatchId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [batchNames, setBatchNames] = useState<Record<string, string>>({});
+
+  const saveName = async (batchId: string, name: string) => {
+    if (!name.trim()) return;
+    setBatchNames((prev) => ({ ...prev, [batchId]: name.trim() }));
+    setEditingBatchId(null);
+    try {
+      await fetch(`/api/batches/${batchId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: name.trim() }),
+      });
+    } catch { /* silently fail */ }
+  };
 
   const handleDownload = async (taskId: string) => {
     setDownloadingTaskId(taskId);
@@ -150,15 +164,9 @@ export default function HistoryList({
                     <input
                       value={editName}
                       onChange={(e) => setEditName(e.target.value)}
-                      onBlur={() => {
-                        if (editName.trim()) setBatchNames((prev) => ({ ...prev, [batch.batchId]: editName.trim() }));
-                        setEditingBatchId(null);
-                      }}
+                      onBlur={() => saveName(batch.batchId, editName)}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          if (editName.trim()) setBatchNames((prev) => ({ ...prev, [batch.batchId]: editName.trim() }));
-                          setEditingBatchId(null);
-                        }
+                        if (e.key === 'Enter') saveName(batch.batchId, editName);
                         if (e.key === 'Escape') setEditingBatchId(null);
                       }}
                       onClick={(e) => e.stopPropagation()}
@@ -176,12 +184,12 @@ export default function HistoryList({
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                       display: 'flex', alignItems: 'center', gap: 6,
                     }}>
-                      <span>{batchNames[batch.batchId] || batch.templateName || batch.promptSummary || '自定义创作'}</span>
+                      <span>{batchNames[batch.batchId] || batch.title || batch.templateName || batch.promptSummary || '自定义创作'}</span>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           setEditingBatchId(batch.batchId);
-                          setEditName(batchNames[batch.batchId] || batch.templateName || batch.promptSummary || '');
+                          setEditName(batchNames[batch.batchId] || batch.title || batch.templateName || batch.promptSummary || '');
                         }}
                         style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 12, color: '#999', padding: 0 }}
                         title="重命名"
