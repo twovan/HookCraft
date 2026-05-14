@@ -489,13 +489,25 @@ export default function AdminTemplatesPage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
               <label style={labelStyle}>分类</label>
-              <input
-                type="text"
+              <select
                 value={formData.category}
                 onChange={(e) => setFormData((p) => ({ ...p, category: e.target.value }))}
-                placeholder="如: Pop, Rock"
                 style={inputStyle}
-              />
+              >
+                <option value="">请选择分类</option>
+                <option value="free_template">免费模板</option>
+                <option value="paid_template">付费模板</option>
+                <option value="Pop">Pop</option>
+                <option value="Rock">Rock</option>
+                <option value="Electronic">Electronic</option>
+                <option value="Hip-Hop">Hip-Hop</option>
+                <option value="R&B">R&B</option>
+                <option value="Jazz">Jazz</option>
+                <option value="Classical">Classical</option>
+                <option value="Lo-Fi">Lo-Fi</option>
+                <option value="Country">Country</option>
+                <option value="Folk">Folk</option>
+              </select>
             </div>
             <div>
               <label style={labelStyle}>价格（分）</label>
