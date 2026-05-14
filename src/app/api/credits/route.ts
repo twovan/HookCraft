@@ -68,9 +68,9 @@ export async function GET(req: NextRequest) {
 
       const tier = directMembership?.tier || 'free';
       const tierCredits = tier === 'business' ? 300 : tier === 'pro' ? 100 : 0;
-      const monthlyTotal = directCredits?.total || tierCredits;
+      const monthlyTotal = tierCredits;
       const monthlyUsed = directCredits?.used || 0;
-      const monthlyRemaining = monthlyTotal - monthlyUsed;
+      const monthlyRemaining = Math.max(0, monthlyTotal - monthlyUsed);
       const purchasedBalance = directPurchased?.balance || 0;
 
       return NextResponse.json({

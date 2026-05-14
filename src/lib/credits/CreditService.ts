@@ -214,13 +214,14 @@ export class CreditService {
       .maybeSingle();
     const actualTier = (membershipCheck?.tier || finalCreditsRow.tier || 'free') as keyof typeof TIER_CONFIGS;
     const tierConfig = TIER_CONFIGS[actualTier];
+    const correctTotal = tierConfig.monthlyCredits;
     
-    if (tierConfig && (finalCreditsRow.total !== tierConfig.monthlyCredits || finalCreditsRow.tier !== actualTier) && tierConfig.monthlyCredits > 0) {
+    if (finalCreditsRow.total !== correctTotal || finalCreditsRow.tier !== actualTier) {
       await this.supabase
         .from('credits')
-        .update({ total: tierConfig.monthlyCredits, tier: actualTier })
+        .update({ total: correctTotal, tier: actualTier })
         .eq('user_id', userId);
-      finalCreditsRow = { ...finalCreditsRow, total: tierConfig.monthlyCredits, tier: actualTier };
+      finalCreditsRow = { ...finalCreditsRow, total: correctTotal, tier: actualTier };
     }
 
     return toCreditInfoEnhanced(finalCreditsRow, purchasedRow);
