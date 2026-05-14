@@ -33,9 +33,10 @@ export async function PUT(
       updateData.category = category;
     }
 
-    // genre_tags → 存到 genre 字段（TEXT，逗号分隔）
+    // genre_tags → 存到 genre 字段（TEXT，逗号分隔）和 genre_tags 字段（数组）
     if (genre_tags && Array.isArray(genre_tags)) {
-      updateData.genre = genre_tags.join(', ');
+      (updateData as any).genre = genre_tags.join(', ');
+      (updateData as any).genre_tags = genre_tags;
     }
 
     const { data, error } = await supabaseAdmin
