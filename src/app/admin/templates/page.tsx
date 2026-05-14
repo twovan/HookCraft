@@ -22,6 +22,9 @@ interface TemplateItem {
   created_at: string;
   cover_url?: string;
   preview_url?: string;
+  analysis_status?: string;
+  analysis_result?: string;
+  lyria_prompt?: string;
 }
 
 const statusColorMap: Record<string, 'green' | 'blue' | 'orange' | 'red' | 'gray'> = {
@@ -63,6 +66,10 @@ export default function AdminTemplatesPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{ id: string; status: string; name: string } | null>(null);
   const [confirming, setConfirming] = useState(false);
+
+  // Analysis modal
+  const [analysisOpen, setAnalysisOpen] = useState(false);
+  const [analysisTemplate, setAnalysisTemplate] = useState<TemplateItem | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -316,11 +323,24 @@ export default function AdminTemplatesPage() {
       ),
     },
     {
+      key: 'analysis_status',
+      title: '分析',
+      render: (row) => {
+        const s = row.analysis_status || 'pending';
+        const labelMap: Record<string, string> = { completed: '已完成', analyzing: '分析中', failed: '失败', pending: '待分析' };
+        const colorMap: Record<string, 'green' | 'orange' | 'red' | 'gray'> = { completed: 'green', analyzing: 'orange', failed: 'red', pending: 'gray' };
+        return <Tag label={labelMap[s] || s} color={colorMap[s] || 'gray'} />;
+      },
+    },
+    {
       key: 'actions',
       title: '操作',
       render: (row) => (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <button onClick={() => openEditModal(row)} style={actionBtnStyle}>编辑</button>
+          {row.analysis_status === 'completed' && (
+            <button onClick={() => { setAnalysisTemplate(row); setAnalysisOpen(true); }} style={{ ...actionBtnStyle, color: '#7c3aed' }}>分析</button>
+          )}
           {row.status === 'published' && (
             <button onClick={() => openStatusConfirm(row.id, 'unpublished', row.name)} style={actionBtnStyle}>下架</button>
           )}
@@ -512,6 +532,62 @@ export default function AdminTemplatesPage() {
         onCancel={() => { setConfirmOpen(false); setConfirmAction(null); }}
         loading={confirming}
       />
+
+      {/* Analysis Result Modal */}
+      {analysisOpen && analysisTemplate && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.5)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 24,
+        }} onClick={() => setAnalysisOpen(false)}>
+          <div style={{
+            background: '#fff', borderRadius: 16, maxWidth: 640, width: '100%',
+            maxHeight: '80vh', overflow: 'auto', padding: 32,
+            boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+          }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <h2 style={{ fontSize: 18, fontWeight: 700, color: '#1f2937', margin: 0 }}>
+                分析结果 — {analysisTemplate.name}
+              </h2>
+              <button onClick={() => setAnalysisOpen(false)} style={{
+                border: 'none', background: '#f3f4f6', borderRadius: 8,
+                width: 32, height: 32, cursor: 'pointer', fontSize: 16,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>✕</button>
+            </div>
+
+            {analysisTemplate.analysis_result ? (
+              <div style={{ marginBottom: 24 }}>
+                <h3 style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 8 }}>📊 AI 分析</h3>
+                <div style={{
+                  background: '#f9fafb', borderRadius: 10, padding: 16,
+                  fontSize: 13, lineHeight: 1.8, color: '#374151',
+                  whiteSpace: 'pre-wrap', border: '1px solid #e5e7eb',
+                }}>
+                  {analysisTemplate.analysis_result}
+                </div>
+              </div>
+            ) : (
+              <div style={{ color: '#9ca3af', fontSize: 13, marginBottom: 24 }}>暂无分析结果</div>
+            )}
+
+            {analysisTemplate.lyria_prompt && (
+              <div>
+                <h3 style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 8 }}>🎵 Lyria Prompt</h3>
+                <div style={{
+                  background: '#f0fdf4', borderRadius: 10, padding: 16,
+                  fontSize: 13, lineHeight: 1.6, color: '#166534',
+                  fontFamily: 'monospace', border: '1px solid #bbf7d0',
+                  whiteSpace: 'pre-wrap',
+                }}>
+                  {analysisTemplate.lyria_prompt}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
