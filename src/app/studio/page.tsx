@@ -481,31 +481,32 @@ export default function StudioPage() {
                   }}
                 >
                   <div>
-                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#2D2D2D', fontFamily: "'Inter', sans-serif" }}>
-                      高级歌手声模
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: '14px', fontWeight: 600, color: '#9ca3af', fontFamily: "'Inter', sans-serif" }}>
+                        高级歌手声模
+                      </span>
+                      <span style={{ fontSize: '10px', padding: '2px 6px', background: '#f3f4f6', color: '#6b7280', borderRadius: 4, fontWeight: 500 }}>即将上线</span>
                     </div>
-                    <div style={{ fontSize: '12px', color: '#999', marginTop: '2px' }}>
+                    <div style={{ fontSize: '12px', color: '#ccc', marginTop: '2px' }}>
                       额外消耗 {CREDITS_COST.premium_singer} Credits/版本
                     </div>
                   </div>
                   <button
-                    onClick={() => setUsePremiumSinger(!usePremiumSinger)}
-                    disabled={isGenerating}
+                    disabled={true}
                     style={{
                       width: '44px',
                       height: '24px',
                       borderRadius: '12px',
                       border: 'none',
-                      background: usePremiumSinger
-                        ? 'linear-gradient(135deg, #D4A574 0%, #C9A86A 100%)'
-                        : '#E2E8F0',
-                      cursor: isGenerating ? 'not-allowed' : 'pointer',
+                      background: '#E2E8F0',
+                      cursor: 'not-allowed',
                       position: 'relative',
                       transition: 'background 0.2s ease',
+                      opacity: 0.5,
                     }}
                     role="switch"
-                    aria-checked={usePremiumSinger}
-                    aria-label="启用高级歌手声模"
+                    aria-checked={false}
+                    aria-label="高级歌手声模（即将上线）"
                   >
                     <div
                       style={{
