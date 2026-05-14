@@ -20,7 +20,7 @@ import type { VersionResult } from '@/types/generation';
 
 /**
  * AI 创作中心页面
- * - 多版本生成：一次生成 3 个版本
+ * - 单版本生成
  * - 版本选择面板
  * - 下载流程
  */
@@ -127,25 +127,25 @@ export default function StudioPage() {
     }
   };
 
-  // Calculate total cost (3 versions)
+  // Calculate total cost (1 version)
   const singleCost = (() => {
     if (!isPaid) return 0;
     const type = duration === 30 ? 'preview' : 'full_demo_long';
     return calculateGenerationCost(type as 'preview' | 'full_demo_short' | 'full_demo_long', usePremiumSinger);
   })();
 
-  const totalCost = singleCost * 3;
+  const totalCost = singleCost;
 
   // Check if user can generate
   const canGenerate = (() => {
     if (!isPaid) {
-      return previewCount !== null && previewCount.remaining >= 3 && duration === 30;
+      return previewCount !== null && previewCount.remaining >= 1 && duration === 30;
     }
     return credits !== null && credits.totalAvailable >= totalCost;
   })();
 
   const creditsExhaustedPaid = isPaid && isExhausted;
-  const previewsExhaustedFree = !isPaid && previewCount !== null && previewCount.remaining < 3;
+  const previewsExhaustedFree = !isPaid && previewCount !== null && previewCount.remaining < 1;
 
   const showUpgradePrompt = useCallback((feature: string) => {
     setUpgradeFeature(feature);
@@ -307,7 +307,7 @@ export default function StudioPage() {
             AI 创作中心
           </h1>
           <p style={{ fontSize: '15px', color: '#6B6B6B', margin: 0 }}>
-            选择模板或输入提示词，一次生成 3 个版本供您对比选择
+            选择模板或输入提示词，AI 为您生成音乐作品
           </p>
         </div>
 
@@ -535,7 +535,7 @@ export default function StudioPage() {
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
                   <span style={{ fontSize: '14px', fontWeight: 600, color: '#2D2D2D', fontFamily: "'Inter', sans-serif" }}>
-                    预计总消耗（3 个版本）
+                    预计消耗
                   </span>
                   <span
                     style={{
@@ -545,15 +545,14 @@ export default function StudioPage() {
                       fontFamily: "'Playfair Display', serif",
                     }}
                   >
-                    {isPaid ? `${totalCost} Credits` : '3 次预览'}
+                    {isPaid ? `${totalCost} Credits` : '1 次预览'}
                   </span>
                 </div>
 
                 {isPaid && (
                   <div style={{ fontSize: '12px', color: '#6B6B6B', lineHeight: 1.8 }}>
-                    <div>单版本：{duration === 30 ? `Preview ${CREDITS_COST.preview} Credit` : `Full Demo ${CREDITS_COST.full_demo_long} Credits`}</div>
-                    {usePremiumSinger && <div>高级声模：+{CREDITS_COST.premium_singer} Credits/版本</div>}
-                    <div style={{ marginTop: 4, color: '#999' }}>× 3 版本 = {totalCost} Credits</div>
+                    <div>{duration === 30 ? `Preview ${CREDITS_COST.preview} Credit` : `Full Demo ${CREDITS_COST.full_demo_long} Credits`}</div>
+                    {usePremiumSinger && <div>高级声模：+{CREDITS_COST.premium_singer} Credits</div>}
                   </div>
                 )}
               </div>
@@ -585,7 +584,7 @@ export default function StudioPage() {
                   transition: 'all 0.2s ease',
                 }}
               >
-                {isGenerating ? '生成中...' : '开始 AI 创作（生成 3 个版本）'}
+                {isGenerating ? '生成中...' : '开始 AI 创作'}
               </button>
 
               {/* Credits exhausted messages */}

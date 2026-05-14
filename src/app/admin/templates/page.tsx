@@ -559,13 +559,7 @@ export default function AdminTemplatesPage() {
 
             {analysisTemplate.analysis_result ? (
               <div style={{ marginBottom: 24 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <h3 style={{ fontSize: 14, fontWeight: 600, color: '#374151', margin: 0 }}>📊 AI 分析</h3>
-                  <button onClick={() => { navigator.clipboard.writeText(analysisTemplate.analysis_result || ''); }} style={{
-                    border: '1px solid #e5e7eb', background: '#f9fafb', borderRadius: 6,
-                    padding: '4px 10px', fontSize: 11, cursor: 'pointer', color: '#6b7280',
-                  }}>复制</button>
-                </div>
+                <h3 style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 8 }}>📊 AI 分析</h3>
                 <div style={{
                   background: '#f9fafb', borderRadius: 10, padding: 16,
                   fontSize: 13, lineHeight: 1.8, color: '#374151',
@@ -580,13 +574,7 @@ export default function AdminTemplatesPage() {
 
             {analysisTemplate.lyria_prompt && (
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <h3 style={{ fontSize: 14, fontWeight: 600, color: '#374151', margin: 0 }}>🎵 Lyria Prompt</h3>
-                  <button onClick={() => { navigator.clipboard.writeText(analysisTemplate.lyria_prompt || ''); }} style={{
-                    border: '1px solid #bbf7d0', background: '#f0fdf4', borderRadius: 6,
-                    padding: '4px 10px', fontSize: 11, cursor: 'pointer', color: '#166534',
-                  }}>复制</button>
-                </div>
+                <h3 style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 8 }}>🎵 Lyria Prompt</h3>
                 <div style={{
                   background: '#f0fdf4', borderRadius: 10, padding: 16,
                   fontSize: 13, lineHeight: 1.6, color: '#166534',

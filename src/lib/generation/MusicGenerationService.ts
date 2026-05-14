@@ -412,7 +412,7 @@ export class MusicGenerationService {
     userId: string,
     userTier: MembershipTier,
     input: MusicGenerationInput,
-    versionCount = 3,
+    versionCount = 1,
   ): Promise<BatchGenerationResult> {
     const tierConfig = TIER_CONFIGS[userTier];
     const modelId: LyriaModelId = input.generationType === 'preview'
