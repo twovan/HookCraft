@@ -71,7 +71,7 @@ export async function GET(
       let audioUrl: string | undefined;
       if (task.audio_path) {
         const { data: signedData } = await supabaseAdmin.storage
-          .from('audio-files')
+          .from('generations')
           .createSignedUrl(task.audio_path, 3600);
         audioUrl = signedData?.signedUrl;
       }

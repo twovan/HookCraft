@@ -581,7 +581,7 @@ export class MusicGenerationService {
         let audioUrl: string | undefined;
         if (audioPath) {
           const { data: signedData } = await this.supabase.storage
-            .from('audio-files')
+            .from('generations')
             .createSignedUrl(audioPath, 3600); // 1 hour
           audioUrl = signedData?.signedUrl;
         }
