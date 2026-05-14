@@ -17,6 +17,7 @@ export function toTemplate(row: Tables<'templates'>): Template {
     genre: r.genre,
     status: r.status || 'pending',
     price: r.price || 0,
+    producerId: r.producer_id || undefined,
     previewUrl: r.preview_url || undefined,
     coverUrl: r.cover_url || undefined,
     referenceAudioUrl: r.reference_audio_url || undefined,

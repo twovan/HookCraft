@@ -325,12 +325,6 @@ export default function TemplateDetailPage() {
                   <div style={{ fontSize: 14, fontWeight: 600, color: '#2D2D2D' }}>{template.category === 'free_template' ? '免费模板' : '付费模板'}</div>
                 </div>
                 <div style={{ padding: 12, background: '#FDFBF7', borderRadius: 8 }}>
-                  <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>分析状态</div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: template.analysisStatus === 'completed' ? '#22c55e' : '#f59e0b' }}>
-                    {template.analysisStatus === 'completed' ? '已分析' : template.analysisStatus === 'analyzing' ? '分析中' : '待分析'}
-                  </div>
-                </div>
-                <div style={{ padding: 12, background: '#FDFBF7', borderRadius: 8 }}>
                   <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>销量</div>
                   <div style={{ fontSize: 14, fontWeight: 600, color: '#2D2D2D' }}>{template.salesCount || 0}</div>
                 </div>

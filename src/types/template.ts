@@ -17,6 +17,8 @@ export interface Template {
   status?: string;
   /** 价格（分） */
   price?: number;
+  /** 制作人 ID */
+  producerId?: string;
   previewUrl?: string;
   coverUrl?: string;
   /** 参考音频文件 URL（管理员上传） */
