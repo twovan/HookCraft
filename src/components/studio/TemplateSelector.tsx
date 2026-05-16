@@ -65,7 +65,6 @@ export default function TemplateSelector({
 
   const tabs: { key: TemplateCategory | 'purchased'; label: string; icon?: string }[] = [
     { key: 'free_template', label: '免费' },
-    { key: 'paid_template', label: '付费', icon: !isPaid ? '🔒' : undefined },
     { key: 'purchased', label: '已购' },
   ];
 

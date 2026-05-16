@@ -94,8 +94,8 @@ export default function DurationSelector({
                 background: isSelected
                   ? 'linear-gradient(135deg, rgba(117, 54, 213, 0.1) 0%, #0d0d14 100%)'
                   : option.locked
-                    ? '#F7F7F7'
-                    : 'white',
+                    ? '#12121e'
+                    : '#1a1a2e',
                 cursor: isDisabled ? 'not-allowed' : 'pointer',
                 opacity: option.locked ? 0.7 : 1,
                 transition: 'all 0.2s ease',
