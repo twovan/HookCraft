@@ -44,6 +44,8 @@ export interface MusicGenerationInput {
   usePremiumSinger?: boolean;      // 是否使用高级声模
   images?: ImageInput[];           // 图片灵感输入（Pro/Business 限定，最多 10 张）
   customLyrics?: string;           // 自定义歌词
+  instrumentalOnly?: boolean;      // 纯器乐模式（无人声）
+  voiceGender?: 'female' | 'male'; // 人声性别选择
 }
 
 /** 图片输入 */
@@ -145,6 +147,10 @@ export interface GenerateBatchRequest {
   generationType: GenerationType;
   usePremiumSinger?: boolean;
   images?: ImageInput[];
+  instrumentalOnly?: boolean;
+  voiceGender?: 'female' | 'male';
+  customLyrics?: string;
+  versionCount?: number;
 }
 
 /** 批量生成响应 */

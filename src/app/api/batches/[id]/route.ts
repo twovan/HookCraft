@@ -139,3 +139,68 @@ export async function PATCH(
     return NextResponse.json({ error: '重命名失败' }, { status: 500 });
   }
 }
+
+/**
+ * DELETE /api/batches/[id]
+ * 删除批次及关联数据
+ */
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const user = await getAuthUser();
+    if (!user) {
+      return NextResponse.json({ error: '未登录' }, { status: 401 });
+    }
+
+    const { id: batchId } = await params;
+
+    // Verify ownership
+    const { data: batch, error: batchError } = await supabaseAdmin
+      .from('generation_batches')
+      .select('id, user_id')
+      .eq('id', batchId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (batchError || !batch) {
+      return NextResponse.json({ error: '批次不存在或无权操作' }, { status: 404 });
+    }
+
+    // Get tasks to find audio paths for cleanup
+    const { data: tasks } = await supabaseAdmin
+      .from('generation_tasks')
+      .select('id, audio_path')
+      .eq('batch_id', batchId);
+
+    // Cleanup audio files from storage
+    if (tasks && tasks.length > 0) {
+      const audioPaths = tasks
+        .map((t) => t.audio_path)
+        .filter((p): p is string => !!p);
+
+      if (audioPaths.length > 0) {
+        await supabaseAdmin.storage.from('generations').remove(audioPaths);
+      }
+    }
+
+    // Delete generation_tasks by batch_id
+    await supabaseAdmin
+      .from('generation_tasks')
+      .delete()
+      .eq('batch_id', batchId);
+
+    // Delete generation_batches record
+    await supabaseAdmin
+      .from('generation_batches')
+      .delete()
+      .eq('id', batchId)
+      .eq('user_id', user.id);
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error('batch delete error:', error);
+    return NextResponse.json({ error: '删除失败' }, { status: 500 });
+  }
+}

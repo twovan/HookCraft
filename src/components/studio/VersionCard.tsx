@@ -1,7 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import type { VersionResult } from '@/types/generation';
 import AudioPlayerInline from './AudioPlayerInline';
+import SyncedLyrics from './SyncedLyrics';
 
 interface VersionCardProps {
   version: VersionResult;
@@ -22,6 +24,7 @@ export default function VersionCard({
 }: VersionCardProps) {
   const isFailed = version.status === 'failed' || version.status === 'safety_blocked';
   const hasAudio = !!version.audioUrl;
+  const [audioCurrentTime, setAudioCurrentTime] = useState(0);
 
   const cardStyle: React.CSSProperties = {
     position: 'relative',
@@ -179,6 +182,18 @@ export default function VersionCard({
             isPlaying={isPlaying}
             onPlay={onPlay}
             onPause={onPause}
+            onTimeUpdate={setAudioCurrentTime}
+          />
+        </div>
+      )}
+
+      {/* Synced Lyrics */}
+      {hasAudio && !isFailed && version.lyrics && (
+        <div style={{ marginBottom: 12 }}>
+          <SyncedLyrics
+            lyrics={version.lyrics}
+            currentTime={audioCurrentTime}
+            isPlaying={isPlaying}
           />
         </div>
       )}

@@ -35,6 +35,7 @@ export default function CreationsPage() {
   const [range, setRange] = useState<TimeRange>('30d');
   const [expandedBatchId, setExpandedBatchId] = useState<string | undefined>(undefined);
   const [expandedVersions, setExpandedVersions] = useState<VersionDetail[] | undefined>(undefined);
+  const [expandedBatchDetail, setExpandedBatchDetail] = useState<{ templateName?: string; prompt?: string } | undefined>(undefined);
 
   useEffect(() => {
     fetchBatches();
@@ -59,6 +60,7 @@ export default function CreationsPage() {
     if (expandedBatchId === batchId) {
       setExpandedBatchId(undefined);
       setExpandedVersions(undefined);
+      setExpandedBatchDetail(undefined);
       return;
     }
 
@@ -68,9 +70,14 @@ export default function CreationsPage() {
       if (res.ok) {
         const data = await res.json();
         setExpandedVersions(data.versions || []);
+        setExpandedBatchDetail({
+          templateName: data.batch?.templateName,
+          prompt: data.batch?.promptSummary,
+        });
       }
     } catch {
       setExpandedVersions([]);
+      setExpandedBatchDetail(undefined);
     }
   };
 
@@ -161,6 +168,7 @@ export default function CreationsPage() {
             onReCreate={handleReCreate}
             expandedBatchId={expandedBatchId}
             expandedVersions={expandedVersions}
+            expandedBatchDetail={expandedBatchDetail}
           />
         )}
       </div>

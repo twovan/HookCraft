@@ -7,9 +7,10 @@ interface AudioPlayerInlineProps {
   isPlaying: boolean;
   onPlay: () => void;
   onPause: () => void;
+  onTimeUpdate?: (currentTime: number) => void;
 }
 
-export default function AudioPlayerInline({ audioUrl, isPlaying, onPlay, onPause }: AudioPlayerInlineProps) {
+export default function AudioPlayerInline({ audioUrl, isPlaying, onPlay, onPause, onTimeUpdate }: AudioPlayerInlineProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
@@ -27,6 +28,12 @@ export default function AudioPlayerInline({ audioUrl, isPlaying, onPlay, onPause
 
   const handleEnded = () => {
     onPause();
+  };
+
+  const handleTimeUpdate = () => {
+    if (onTimeUpdate && audioRef.current) {
+      onTimeUpdate(audioRef.current.currentTime);
+    }
   };
 
   const buttonStyle: React.CSSProperties = {
@@ -66,6 +73,7 @@ export default function AudioPlayerInline({ audioUrl, isPlaying, onPlay, onPause
         ref={audioRef}
         src={audioUrl}
         onEnded={handleEnded}
+        onTimeUpdate={handleTimeUpdate}
         preload="metadata"
         style={{ display: 'none' }}
       />

@@ -84,7 +84,10 @@ export async function POST(req: NextRequest) {
       generationType: body.generationType,
       usePremiumSinger: body.usePremiumSinger,
       images: body.images,
-    });
+      instrumentalOnly: body.instrumentalOnly,
+      voiceGender: body.voiceGender,
+      customLyrics: body.customLyrics,
+    }, body.versionCount || 1);
 
     const response: GenerateBatchResponse = {
       batchId: result.batchId,

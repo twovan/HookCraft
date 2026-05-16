@@ -9,6 +9,7 @@ export interface ProducerProfile {
   styleTags: string[];
   templateCount: number;
   totalDownloads: number;
+  totalSales?: number;
   joinedAt: string;
 }
 

@@ -1,30 +1,66 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
+import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useMembershipStore } from '@/store/membershipStore';
 import { useCartStore } from '@/store/cartStore';
 
-const navLinkStyle: React.CSSProperties = {
-  fontSize: 14, fontWeight: 500, color: '#9ca3af',
-  textDecoration: 'none', transition: 'color 0.2s',
+const TIER_LABELS: Record<string, string> = {
+  free: '免费版',
+  pro: '专业版',
+  business: '商业版',
 };
 
 export default function Navbar() {
   const pathname = usePathname();
   const { user, loading, signOut } = useAuth();
   const cartCount = useCartStore((s) => s.getCount());
+  const membership = useMembershipStore((s) => s.membership);
+  const currentTier = useMembershipStore((s) => s.currentTier());
+
+  const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Hide navbar on login page and admin routes
   if (pathname === '/login' || pathname.startsWith('/admin')) {
     return null;
   }
 
+  const isActive = (href: string) => {
+    if (href === '/') return pathname === '/';
+    return pathname.startsWith(href);
+  };
+
+  const navLinkStyle = (href: string): React.CSSProperties => ({
+    fontSize: 14,
+    fontWeight: isActive(href) ? 600 : 500,
+    color: isActive(href) ? '#7536d5' : '#9ca3af',
+    textDecoration: 'none',
+    transition: 'color 0.2s',
+    position: 'relative',
+  });
+
   const truncatedEmail = user?.email
     ? user.email.length > 20
       ? user.email.slice(0, 17) + '...'
       : user.email
     : null;
+
+  const avatarInitial = user?.email ? user.email.charAt(0).toUpperCase() : '?';
 
   return (
     <nav style={{
@@ -35,21 +71,23 @@ export default function Navbar() {
       padding: '0 48px',
       boxShadow: '0 2px 20px rgba(117, 54, 213,0.08)',
     }}>
-      <Link href="/" style={{
-        fontSize: 32, fontWeight: 700, color: '#7536d5',
-        fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", letterSpacing: -0.5,
-        textDecoration: 'none',
-      }}>
-        HookCraft
+      <Link href="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
+        <Image
+          src="/logo-nav.svg"
+          alt="HookCraft"
+          width={140}
+          height={36}
+          priority
+        />
       </Link>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-        <Link href="/templates" style={navLinkStyle} onMouseEnter={e => e.currentTarget.style.color = '#7536d5'} onMouseLeave={e => e.currentTarget.style.color = '#9ca3af'}>模板中心</Link>
-        <Link href="/upload" style={navLinkStyle} onMouseEnter={e => e.currentTarget.style.color = '#7536d5'} onMouseLeave={e => e.currentTarget.style.color = '#9ca3af'}>上传模板</Link>
-        <Link href="/studio" style={navLinkStyle} onMouseEnter={e => e.currentTarget.style.color = '#7536d5'} onMouseLeave={e => e.currentTarget.style.color = '#9ca3af'}>AI 创作</Link>
-        <Link href="/pricing" style={navLinkStyle} onMouseEnter={e => e.currentTarget.style.color = '#7536d5'} onMouseLeave={e => e.currentTarget.style.color = '#9ca3af'}>定价</Link>
-        <Link href="/account/creations" style={navLinkStyle} onMouseEnter={e => e.currentTarget.style.color = '#7536d5'} onMouseLeave={e => e.currentTarget.style.color = '#9ca3af'}>我的创作</Link>
-        <Link href="/account" style={navLinkStyle} onMouseEnter={e => e.currentTarget.style.color = '#7536d5'} onMouseLeave={e => e.currentTarget.style.color = '#9ca3af'}>账户</Link>
+        <Link href="/templates" style={navLinkStyle('/templates')} onMouseEnter={e => { if (!isActive('/templates')) e.currentTarget.style.color = '#7536d5'; }} onMouseLeave={e => { if (!isActive('/templates')) e.currentTarget.style.color = '#9ca3af'; }}>模板中心</Link>
+        <Link href="/upload" style={navLinkStyle('/upload')} onMouseEnter={e => { if (!isActive('/upload')) e.currentTarget.style.color = '#7536d5'; }} onMouseLeave={e => { if (!isActive('/upload')) e.currentTarget.style.color = '#9ca3af'; }}>上传模板</Link>
+        <Link href="/studio" style={navLinkStyle('/studio')} onMouseEnter={e => { if (!isActive('/studio')) e.currentTarget.style.color = '#7536d5'; }} onMouseLeave={e => { if (!isActive('/studio')) e.currentTarget.style.color = '#9ca3af'; }}>AI 创作</Link>
+        <Link href="/pricing" style={navLinkStyle('/pricing')} onMouseEnter={e => { if (!isActive('/pricing')) e.currentTarget.style.color = '#7536d5'; }} onMouseLeave={e => { if (!isActive('/pricing')) e.currentTarget.style.color = '#9ca3af'; }}>定价</Link>
+        <Link href="/account/creations" style={navLinkStyle('/account/creations')} onMouseEnter={e => { if (!isActive('/account/creations')) e.currentTarget.style.color = '#7536d5'; }} onMouseLeave={e => { if (!isActive('/account/creations')) e.currentTarget.style.color = '#9ca3af'; }}>我的创作</Link>
+        <Link href="/account" style={navLinkStyle('/account')} onMouseEnter={e => { if (!isActive('/account')) e.currentTarget.style.color = '#7536d5'; }} onMouseLeave={e => { if (!isActive('/account')) e.currentTarget.style.color = '#9ca3af'; }}>账户</Link>
 
         {/* Cart icon with badge */}
         <Link href="/cart" style={{ position: 'relative', textDecoration: 'none', display: 'flex', alignItems: 'center' }}>
@@ -69,23 +107,143 @@ export default function Navbar() {
 
         {!loading && (
           user ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span style={{ fontSize: 13, color: '#9ca3af', fontWeight: 500 }}>
-                {truncatedEmail}
-              </span>
+            <div ref={dropdownRef} style={{ position: 'relative' }}>
+              {/* Avatar button */}
               <button
-                onClick={signOut}
+                onClick={() => setShowDropdown(!showDropdown)}
+                onMouseEnter={() => setShowDropdown(true)}
                 style={{
-                  padding: '6px 16px', borderRadius: 20,
-                  border: '1px solid rgba(117, 54, 213,0.4)',
-                  background: 'transparent', color: '#7536d5',
-                  fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                  width: 36,
+                  height: 36,
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #7536d5, #5a2db8)',
+                  border: '2px solid rgba(117, 54, 213, 0.4)',
+                  color: 'white',
+                  fontSize: 14,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                   transition: 'all 0.2s',
-                  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
                 }}
               >
-                退出
+                {avatarInitial}
               </button>
+
+              {/* Dropdown */}
+              {showDropdown && (
+                <div
+                  onMouseLeave={() => setShowDropdown(false)}
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    right: 0,
+                    marginTop: 8,
+                    background: '#1a1a2e',
+                    border: '1px solid #2a2a40',
+                    borderRadius: 16,
+                    padding: 16,
+                    minWidth: 220,
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+                    zIndex: 1001,
+                  }}
+                >
+                  {/* User info */}
+                  <div style={{ marginBottom: 12, paddingBottom: 12, borderBottom: '1px solid #2a2a40' }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#e8e8f0', marginBottom: 4 }}>
+                      {truncatedEmail}
+                    </div>
+                    <div style={{
+                      display: 'inline-block',
+                      padding: '3px 10px',
+                      borderRadius: 10,
+                      background: currentTier === 'free' ? 'rgba(156, 163, 175, 0.15)' : 'rgba(117, 54, 213, 0.15)',
+                      color: currentTier === 'free' ? '#9ca3af' : '#7536d5',
+                      fontSize: 11,
+                      fontWeight: 600,
+                    }}>
+                      {TIER_LABELS[currentTier] || '免费版'}
+                    </div>
+                  </div>
+
+                  {/* Menu items */}
+                  <Link
+                    href="/account"
+                    onClick={() => setShowDropdown(false)}
+                    style={{
+                      display: 'block',
+                      padding: '8px 12px',
+                      borderRadius: 8,
+                      color: '#e8e8f0',
+                      fontSize: 13,
+                      textDecoration: 'none',
+                      transition: 'background 0.2s',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(117, 54, 213, 0.1)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    账户管理
+                  </Link>
+                  <Link
+                    href="/account/creations"
+                    onClick={() => setShowDropdown(false)}
+                    style={{
+                      display: 'block',
+                      padding: '8px 12px',
+                      borderRadius: 8,
+                      color: '#e8e8f0',
+                      fontSize: 13,
+                      textDecoration: 'none',
+                      transition: 'background 0.2s',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(117, 54, 213, 0.1)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    我的创作
+                  </Link>
+                  <Link
+                    href="/pricing"
+                    onClick={() => setShowDropdown(false)}
+                    style={{
+                      display: 'block',
+                      padding: '8px 12px',
+                      borderRadius: 8,
+                      color: '#e8e8f0',
+                      fontSize: 13,
+                      textDecoration: 'none',
+                      transition: 'background 0.2s',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(117, 54, 213, 0.1)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    升级会员
+                  </Link>
+
+                  <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #2a2a40' }}>
+                    <button
+                      onClick={() => { setShowDropdown(false); signOut(); }}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        borderRadius: 8,
+                        border: 'none',
+                        background: 'transparent',
+                        color: '#9ca3af',
+                        fontSize: 13,
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'all 0.2s',
+                        fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(229, 62, 62, 0.1)'; e.currentTarget.style.color = '#E53E3E'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#9ca3af'; }}
+                    >
+                      退出登录
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <Link href="/login" style={{

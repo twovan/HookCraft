@@ -20,7 +20,7 @@ export async function POST(
     // 查询模板信息和价格
     const { data: template, error: templateError } = await supabaseAdmin
       .from('templates')
-      .select('id, name, price, category')
+      .select('id, name, price, category, producer_id')
       .eq('id', id)
       .single();
 
@@ -83,6 +83,36 @@ export async function POST(
         .from('templates')
         .update({ sales_count: (currentTemplate.sales_count || 0) + 1 })
         .eq('id', id);
+    }
+
+    // 制作人收益分成
+    if (purchasePrice > 0 && (template as any).producer_id) {
+      try {
+        // 查询制作人分成比例
+        const { data: producer } = await (supabaseAdmin as any)
+          .from('producers')
+          .select('id, revenue_share')
+          .eq('id', (template as any).producer_id)
+          .single();
+
+        if (producer) {
+          const revenueShare = (producer as any).revenue_share || 0.7;
+          const earningAmount = Math.round(purchasePrice * revenueShare);
+
+          await (supabaseAdmin as any).from('producer_earnings').insert({
+            producer_id: producer.id,
+            template_id: id,
+            user_id: user.id,
+            order_id: orderId,
+            amount: earningAmount,
+            revenue_share: revenueShare,
+            status: 'pending',
+          });
+        }
+      } catch (earningErr) {
+        // Non-blocking: log but don't fail the purchase
+        console.error('Producer earnings insert error:', earningErr);
+      }
     }
 
     return NextResponse.json({

@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     // Query all templates
     const { data: templates, error: templatesError } = await supabaseAdmin
       .from('templates')
-      .select('id, name, price')
+      .select('id, name, price, producer_id')
       .in('id', templateIds);
 
     if (templatesError || !templates) {
@@ -94,6 +94,37 @@ export async function POST(req: NextRequest) {
         status: 'completed',
         completed_at: new Date().toISOString(),
       });
+    }
+
+    // Insert producer_earnings for each purchased template
+    for (const p of purchased) {
+      const tmpl = templates.find((t) => t.id === p.template_id);
+      if (tmpl && (tmpl as any).producer_id && p.price > 0) {
+        try {
+          const { data: producer } = await (supabaseAdmin as any)
+            .from('producers')
+            .select('id, revenue_share')
+            .eq('id', (tmpl as any).producer_id)
+            .single();
+
+          if (producer) {
+            const revenueShare = (producer as any).revenue_share || 0.7;
+            const earningAmount = Math.round(p.price * revenueShare);
+
+            await (supabaseAdmin as any).from('producer_earnings').insert({
+              producer_id: producer.id,
+              template_id: p.template_id,
+              user_id: user.id,
+              order_id: orderId,
+              amount: earningAmount,
+              revenue_share: revenueShare,
+              status: 'pending',
+            });
+          }
+        } catch (earningErr) {
+          console.error('Producer earnings insert error:', earningErr);
+        }
+      }
     }
 
     return NextResponse.json({

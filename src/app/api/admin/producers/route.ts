@@ -52,6 +52,24 @@ export async function GET(req: NextRequest) {
       ? allAccepted.reduce((sum: number, p: any) => sum + (p.revenue_share || 0.7), 0) / allAccepted.length
       : 0.7;
 
+    // Calculate template count per producer
+    const producerIds = allAccepted.map((p: any) => p.id);
+    let templateStats: Record<string, number> = {};
+    if (producerIds.length > 0) {
+      const { data: templateCounts } = await supabaseAdmin
+        .from('templates')
+        .select('producer_id')
+        .in('producer_id', producerIds);
+
+      if (templateCounts) {
+        for (const t of templateCounts) {
+          if (t.producer_id) {
+            templateStats[t.producer_id] = (templateStats[t.producer_id] || 0) + 1;
+          }
+        }
+      }
+    }
+
     return NextResponse.json({
       data: (producers || []).map((p: any) => ({
         id: p.id,
@@ -60,7 +78,7 @@ export async function GET(req: NextRequest) {
         expertiseTags: p.expertise_tags || [],
         revenueShare: p.revenue_share,
         status: 'active',
-        templateCount: 0,
+        templateCount: templateStats[p.id] || 0,
         totalSales: 0,
         totalEarnings: 0,
         acceptedAt: p.accepted_at,

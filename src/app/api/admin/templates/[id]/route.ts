@@ -17,7 +17,7 @@ export async function PUT(
 
     const { id } = await params;
     const body = await req.json();
-    const { name, description, category, genre_tags, price } = body;
+    const { name, description, category, genre_tags, price, producer_id } = body;
 
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
       return NextResponse.json({ error: '模板名称不能为空' }, { status: 400 });
@@ -37,6 +37,11 @@ export async function PUT(
     if (genre_tags && Array.isArray(genre_tags)) {
       (updateData as any).genre = genre_tags.join(', ');
       (updateData as any).genre_tags = genre_tags;
+    }
+
+    // producer_id → 归属制作人（null 表示公共模板）
+    if (producer_id !== undefined) {
+      (updateData as any).producer_id = producer_id || null;
     }
 
     const { data, error } = await supabaseAdmin

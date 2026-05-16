@@ -76,6 +76,17 @@ export class LyriaProvider implements AIModelProvider {
   parseResponse(response: GeminiRawResponse, modelId: LyriaModelId): GenerationResponse {
     const parts = response?.candidates?.[0]?.content?.parts;
 
+    // Fallback: try SDK .text getter if parts are empty
+    if ((!parts || parts.length === 0) && (response as any)?.text) {
+      const textContent = (response as any).text;
+      return {
+        success: false,
+        lyrics: textContent || undefined,
+        modelId,
+        hasSynthIdWatermark: true,
+      };
+    }
+
     if (!parts || parts.length === 0) {
       return {
         success: false,
@@ -115,6 +126,13 @@ export class LyriaProvider implements AIModelProvider {
       modelId,
       hasSynthIdWatermark: true,
     };
+  }
+
+  /** 提取原始响应数据（用于调试和日志） */
+  extractRawResponse(response: any): { parts: any[]; text?: string } {
+    const parts = response?.candidates?.[0]?.content?.parts || [];
+    const text = (response as any)?.text;
+    return { parts, text };
   }
 
   /** 构建 Lyria 3 API 请求配置 */

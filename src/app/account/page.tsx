@@ -42,6 +42,8 @@ export default function AccountPage() {
   const [purchaseHistory, setPurchaseHistory] = useState<PaymentRecord[]>([]);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [isRetrying, setIsRetrying] = useState(false);
+  const [trendView, setTrendView] = useState<'day' | 'month'>('month');
+  const [dailyData, setDailyData] = useState<Array<{ date: string; count: number }>>([]);
 
   useEffect(() => {
     fetchMembership();
@@ -49,6 +51,8 @@ export default function AccountPage() {
     fetchCreditHistory();
     // Fetch purchase history
     fetchPurchaseHistory();
+    // Fetch daily data
+    fetchDailyData();
   }, []);
 
   // 在 membership 加载完成后，根据等级加载对应的 credits 数据
@@ -80,6 +84,33 @@ export default function AccountPage() {
       if (res.ok) {
         const data = await res.json();
         setPurchaseHistory(data.filter((r: PaymentRecord) => r.status !== 'pending'));
+      }
+    } catch {
+      // Silently fail
+    }
+  };
+
+  const fetchDailyData = async () => {
+    try {
+      const res = await fetchWithAuth('/api/batches?range=30d');
+      if (res.ok) {
+        const data = await res.json();
+        const batches = data.batches || [];
+        // Group by date
+        const dateMap: Record<string, number> = {};
+        for (const batch of batches) {
+          const date = new Date(batch.createdAt).toISOString().slice(0, 10);
+          dateMap[date] = (dateMap[date] || 0) + 1;
+        }
+        // Fill last 14 days
+        const days: Array<{ date: string; count: number }> = [];
+        for (let i = 13; i >= 0; i--) {
+          const d = new Date();
+          d.setDate(d.getDate() - i);
+          const dateStr = d.toISOString().slice(0, 10);
+          days.push({ date: dateStr, count: dateMap[dateStr] || 0 });
+        }
+        setDailyData(days);
       }
     } catch {
       // Silently fail
@@ -412,19 +443,55 @@ export default function AccountPage() {
               boxShadow: '0 4px 20px rgba(117, 54, 213, 0.06)',
             }}
           >
-            <h3
-              style={{
-                fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-                fontSize: '16px',
-                fontWeight: 600,
-                color: '#e8e8f0',
-                margin: '0 0 16px 0',
-              }}
-            >
-              使用趋势
-            </h3>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <h3
+                style={{
+                  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  color: '#e8e8f0',
+                  margin: 0,
+                }}
+              >
+                使用趋势
+              </h3>
+              <div style={{ display: 'flex', gap: 4 }}>
+                <button
+                  onClick={() => setTrendView('day')}
+                  style={{
+                    padding: '4px 12px',
+                    borderRadius: 12,
+                    border: 'none',
+                    background: trendView === 'day' ? 'rgba(117, 54, 213, 0.2)' : 'transparent',
+                    color: trendView === 'day' ? '#7536d5' : '#9ca3af',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+                  }}
+                >
+                  日
+                </button>
+                <button
+                  onClick={() => setTrendView('month')}
+                  style={{
+                    padding: '4px 12px',
+                    borderRadius: 12,
+                    border: 'none',
+                    background: trendView === 'month' ? 'rgba(117, 54, 213, 0.2)' : 'transparent',
+                    color: trendView === 'month' ? '#7536d5' : '#9ca3af',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+                  }}
+                >
+                  月
+                </button>
+              </div>
+            </div>
 
-            {creditHistory.length > 0 ? (
+            {trendView === 'month' && creditHistory.length > 0 ? (
               <div
                 style={{
                   display: 'flex',
@@ -502,6 +569,55 @@ export default function AccountPage() {
                       </div>
                       <span style={{ fontSize: '10px', color: '#999', whiteSpace: 'nowrap' }}>
                         {month.month.slice(5)}月
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : trendView === 'day' && dailyData.length > 0 ? (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-end',
+                  gap: '4px',
+                  height: '120px',
+                  padding: '0 4px',
+                }}
+                role="img"
+                aria-label="每日创作趋势柱状图"
+              >
+                {dailyData.map((day) => {
+                  const maxDaily = Math.max(...dailyData.map(d => d.count), 1);
+                  const height = (day.count / maxDaily) * 100;
+                  return (
+                    <div
+                      key={day.date}
+                      style={{
+                        flex: 1,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '4px',
+                        height: '100%',
+                        justifyContent: 'flex-end',
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: '100%',
+                          maxWidth: '20px',
+                          height: `${Math.max(height, 4)}%`,
+                          minHeight: '4px',
+                          background: day.count > 0
+                            ? 'linear-gradient(180deg, #7536d5 0%, #5a2db8 100%)'
+                            : '#2a2a40',
+                          borderRadius: '3px 3px 0 0',
+                          transition: 'height 0.3s ease',
+                        }}
+                        title={`${day.date}: ${day.count} 次创作`}
+                      />
+                      <span style={{ fontSize: '9px', color: '#999', whiteSpace: 'nowrap' }}>
+                        {day.date.slice(8)}
                       </span>
                     </div>
                   );

@@ -15,6 +15,7 @@ import UpgradeModal from '@/components/membership/UpgradeModal';
 import UpgradeBanner from '@/components/membership/UpgradeBanner';
 import GenerationProgress from '@/components/studio/GenerationProgress';
 import VersionPanel from '@/components/studio/VersionPanel';
+import SyncedLyrics from '@/components/studio/SyncedLyrics';
 import type { Template } from '@/types/template';
 import type { VersionResult } from '@/types/generation';
 
@@ -59,6 +60,9 @@ export default function StudioPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const [upgradeFeature, setUpgradeFeature] = useState('');
+  const [instrumentalOnly, setInstrumentalOnly] = useState(false);
+  const [voiceGender, setVoiceGender] = useState<'female' | 'male'>('female');
+  const [customLyrics, setCustomLyrics] = useState('');
 
   // Multi-version state
   const [batchId, setBatchId] = useState<string | null>(null);
@@ -158,6 +162,10 @@ export default function StudioPage() {
           userPrompt: prompt || undefined,
           generationType: duration === 30 ? 'preview' : 'full_demo',
           usePremiumSinger,
+          instrumentalOnly,
+          voiceGender: instrumentalOnly ? undefined : voiceGender,
+          customLyrics: instrumentalOnly ? undefined : (customLyrics.trim() || undefined),
+          versionCount: 2,
         }),
       });
 
@@ -328,6 +336,15 @@ export default function StudioPage() {
                     <audio controls src={versions[0].audioUrl} style={{ width: '100%', maxWidth: 400 }} />
                   </div>
                 )}
+                {versions[0]?.lyrics && (
+                  <div style={{ marginBottom: 20, maxWidth: 400, margin: '0 auto 20px' }}>
+                    <SyncedLyrics
+                      lyrics={versions[0].lyrics}
+                      currentTime={0}
+                      isPlaying={false}
+                    />
+                  </div>
+                )}
                 <button
                   onClick={() => { setBatchId(null); setVersions([]); setSelectedVersionId(undefined); }}
                   style={{
@@ -439,6 +456,146 @@ export default function StudioPage() {
                   onUpgradePrompt={() => showUpgradePrompt('完整 Demo 生成')}
                   disabled={isGenerating}
                 />
+              </div>
+
+              {/* Vocal Mode Section */}
+              <div
+                style={{
+                  background: '#1a1a2e',
+                  borderRadius: '20px',
+                  padding: '24px',
+                  border: '1px solid #2a2a40',
+                  boxShadow: '0 4px 20px rgba(117, 54, 213, 0.06)',
+                }}
+              >
+                <h3 style={{
+                  fontSize: 15,
+                  fontWeight: 600,
+                  color: '#e8e8f0',
+                  marginBottom: 16,
+                  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+                }}>
+                  人声模式
+                </h3>
+
+                {/* Toggle: 带歌词 / 纯器乐 */}
+                <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                  <button
+                    onClick={() => setInstrumentalOnly(false)}
+                    style={{
+                      flex: 1,
+                      padding: '10px 16px',
+                      borderRadius: 12,
+                      border: !instrumentalOnly ? '2px solid #7536d5' : '1px solid #2a2a40',
+                      background: !instrumentalOnly ? 'rgba(117, 54, 213, 0.1)' : 'transparent',
+                      color: !instrumentalOnly ? '#7536d5' : '#9ca3af',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    🎤 带歌词
+                  </button>
+                  <button
+                    onClick={() => setInstrumentalOnly(true)}
+                    style={{
+                      flex: 1,
+                      padding: '10px 16px',
+                      borderRadius: 12,
+                      border: instrumentalOnly ? '2px solid #7536d5' : '1px solid #2a2a40',
+                      background: instrumentalOnly ? 'rgba(117, 54, 213, 0.1)' : 'transparent',
+                      color: instrumentalOnly ? '#7536d5' : '#9ca3af',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+                      transition: 'all 0.2s',
+                    }}
+                  >
+                    🎹 纯器乐
+                  </button>
+                </div>
+
+                {/* Voice gender selector (only when not instrumental) */}
+                {!instrumentalOnly && (
+                  <>
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                      <button
+                        onClick={() => setVoiceGender('female')}
+                        style={{
+                          flex: 1,
+                          padding: '8px 12px',
+                          borderRadius: 10,
+                          border: voiceGender === 'female' ? '2px solid #7536d5' : '1px solid #2a2a40',
+                          background: voiceGender === 'female' ? 'rgba(117, 54, 213, 0.08)' : 'transparent',
+                          color: voiceGender === 'female' ? '#e8e8f0' : '#9ca3af',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+                          transition: 'all 0.2s',
+                        }}
+                      >
+                        👩 女声
+                      </button>
+                      <button
+                        onClick={() => setVoiceGender('male')}
+                        style={{
+                          flex: 1,
+                          padding: '8px 12px',
+                          borderRadius: 10,
+                          border: voiceGender === 'male' ? '2px solid #7536d5' : '1px solid #2a2a40',
+                          background: voiceGender === 'male' ? 'rgba(117, 54, 213, 0.08)' : 'transparent',
+                          color: voiceGender === 'male' ? '#e8e8f0' : '#9ca3af',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+                          transition: 'all 0.2s',
+                        }}
+                      >
+                        👨 男声
+                      </button>
+                    </div>
+
+                    {/* Custom lyrics textarea */}
+                    <div>
+                      <label style={{
+                        fontSize: 12,
+                        color: '#9ca3af',
+                        marginBottom: 8,
+                        display: 'block',
+                        fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+                      }}>
+                        自定义歌词（可选）
+                      </label>
+                      <textarea
+                        value={customLyrics}
+                        onChange={(e) => setCustomLyrics(e.target.value)}
+                        placeholder="输入歌词，AI 将按照您的歌词生成音乐..."
+                        style={{
+                          width: '100%',
+                          minHeight: 80,
+                          padding: '12px 14px',
+                          borderRadius: 12,
+                          border: '1px solid #2a2a40',
+                          background: '#0d0d14',
+                          color: '#e8e8f0',
+                          fontSize: 13,
+                          lineHeight: 1.6,
+                          resize: 'vertical',
+                          outline: 'none',
+                          fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+                          transition: 'border-color 0.2s',
+                        }}
+                        onFocus={(e) => e.currentTarget.style.borderColor = '#7536d5'}
+                        onBlur={(e) => e.currentTarget.style.borderColor = '#2a2a40'}
+                      />
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Premium Singer Toggle (paid users only) */}

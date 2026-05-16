@@ -32,7 +32,8 @@ export async function GET() {
     const { data: templates, error: templatesError } = await supabaseAdmin
       .from('templates')
       .select('id, name, genre, cover_url, category')
-      .in('id', templateIds);
+      .in('id', templateIds)
+      .eq('status', 'published');
 
     if (templatesError) {
       console.error('Templates query error:', templatesError);

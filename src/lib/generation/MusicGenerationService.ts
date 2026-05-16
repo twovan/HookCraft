@@ -241,6 +241,9 @@ export class MusicGenerationService {
    * - 仅模板：直接使用 cachedLyriaPrompt
    * - 仅用户 Prompt：直接使用 userPrompt（不经过 Gemini LLM）
    * - 缓存缺失/损坏：降级为模板预设默认描述
+   * - instrumentalOnly：追加 instrumental-only 指令
+   * - voiceGender：追加性别指令
+   * - customLyrics：追加自定义歌词
    */
   async buildPrompt(input: MusicGenerationInput): Promise<string> {
     let cachedLyriaPrompt: string | null = null;
@@ -256,23 +259,40 @@ export class MusicGenerationService {
       }
     }
 
+    let basePrompt: string;
+
     if (cachedLyriaPrompt && input.userPrompt) {
       // 模板 + 用户 Prompt
-      return `Based on this reference style: ${cachedLyriaPrompt}\n\nUser's additional instructions: ${input.userPrompt}`;
-    }
-
-    if (cachedLyriaPrompt) {
+      basePrompt = `Based on this reference style: ${cachedLyriaPrompt}\n\nUser's additional instructions: ${input.userPrompt}`;
+    } else if (cachedLyriaPrompt) {
       // 仅模板
-      return cachedLyriaPrompt;
-    }
-
-    if (input.userPrompt) {
+      basePrompt = cachedLyriaPrompt;
+    } else if (input.userPrompt) {
       // 仅用户 Prompt
-      return input.userPrompt;
+      basePrompt = input.userPrompt;
+    } else {
+      // 无模板也无 Prompt（理论上不应到达）
+      basePrompt = DEFAULT_TEMPLATE_DESCRIPTION;
     }
 
-    // 无模板也无 Prompt（理论上不应到达）
-    return DEFAULT_TEMPLATE_DESCRIPTION;
+    // 追加 instrumental-only 指令
+    if (input.instrumentalOnly) {
+      basePrompt += '\n\nThis should be an instrumental-only track with no vocals.';
+    } else {
+      // 追加人声性别指令
+      if (input.voiceGender === 'male') {
+        basePrompt += '\n\nUse a male vocalist voice.';
+      } else if (input.voiceGender === 'female') {
+        basePrompt += '\n\nUse a female vocalist voice.';
+      }
+
+      // 追加自定义歌词
+      if (input.customLyrics && input.customLyrics.trim()) {
+        basePrompt += `\n\nPlease use the following lyrics:\n${input.customLyrics.trim()}`;
+      }
+    }
+
+    return basePrompt;
   }
 
   /** 获取当前 AI 模型提供方 */
@@ -446,11 +466,11 @@ export class MusicGenerationService {
     const singleVersionCost = this.creditService.calculateTotalCost(operations);
 
     if (userTier === 'free') {
-      // Free 用户使用 Preview 次数
+      // Free 用户使用 Preview 次数 - 多版本只消耗 1 次
       const previewInfo = await this.creditService.getPreviewCount(userId);
-      if (previewInfo.remaining < versionCount) {
+      if (previewInfo.remaining < 1) {
         throw new Error(
-          `Preview 次数不足，需要 ${versionCount} 次，剩余 ${previewInfo.remaining} 次`,
+          `Preview 次数不足，剩余 ${previewInfo.remaining} 次`,
         );
       }
     } else {
@@ -870,8 +890,8 @@ export class MusicGenerationService {
     if (input.generationType === 'preview') {
       ops.push('preview');
     } else {
-      // Full Demo 默认使用短版消耗
-      ops.push('full_demo_short');
+      // Full Demo 使用长版消耗
+      ops.push('full_demo_long');
     }
 
     if (input.usePremiumSinger) {

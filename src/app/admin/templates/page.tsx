@@ -41,6 +41,79 @@ const statusLabelMap: Record<string, string> = {
   rejected: '已拒绝',
 };
 
+// Helper: convert File to base64
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      resolve(result.split(',')[1]);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// Helper: call Gemini API directly from browser
+async function callGeminiFromBrowser(
+  apiKey: string,
+  audioFiles: Array<{ base64: string; mimeType: string }>
+): Promise<{ analysisResult: string; lyriaPrompt: string }> {
+  const prompt = audioFiles.length > 1
+    ? `我提供了${audioFiles.length}首参考音乐，请综合分析这些音乐的共同风格特征，用于生成一个 Lyria 3 音乐模板。请用中文输出分析结果，同时在最后附上一段详细的英文 Lyria 3 Prompt。\n\n请综合所有参考音乐，提取它们的共同特征：\n1. 🎵 共同的流派与子流派\n2. ⏱️ BPM 范围\n3. 🎹 常用调性与音阶\n4. 🎸 共同使用的乐器\n5. 🌙 整体情绪与氛围\n6. 📐 典型的歌曲结构\n7. 🔧 共同的制作技巧\n8. ⚡ 整体能量水平\n9. 🎤 人声特征\n\n最后，请用英文输出一段详细的 Lyria 3 音乐生成 prompt（200-400词），格式如下：\n[PROMPT]\nA [detailed genre] track at [BPM] BPM in [key].\nInstrumentation: [details].\nMood: [adjectives].\nStructure:\n[0:00 - 0:XX] Intro: [description]\n...\nVocal style: [description].\nProduction: [details].\n[/PROMPT]`
+    : `请详细分析这段音乐，用于生成一个 Lyria 3 音乐模板。请用中文输出分析结果，同时在最后附上一段详细的英文 Lyria 3 Prompt。\n\n请包含以下内容：\n1. 🎵 流派与子流派\n2. ⏱️ BPM\n3. 🎹 调性与音阶\n4. 🎸 主要乐器\n5. 🌙 情绪与氛围\n6. 📐 歌曲结构\n7. 🔧 制作技巧\n8. ⚡ 能量水平\n9. 🎤 人声特征\n\n最后，请用英文输出一段详细的 Lyria 3 音乐生成 prompt（200-400词），格式如下：\n[PROMPT]\nA [detailed genre] track at [BPM] BPM in [key].\nInstrumentation: [details].\nMood: [adjectives].\nStructure:\n[0:00 - 0:XX] Intro: [description]\n...\nVocal style: [description].\nProduction: [details].\n[/PROMPT]`;
+
+  // Build request parts - use File API for large payloads
+  const parts: any[] = [];
+  const totalSize = audioFiles.reduce((sum, f) => sum + f.base64.length, 0);
+  const totalMB = totalSize / 1024 / 1024;
+
+  if (totalMB > 15 || audioFiles.length > 2) {
+    const filesToUpload = audioFiles.slice(0, 5);
+    for (let i = 0; i < filesToUpload.length; i++) {
+      const file = filesToUpload[i];
+      const binaryData = Uint8Array.from(atob(file.base64), c => c.charCodeAt(0));
+      const startRes = await fetch(`https://generativelanguage.googleapis.com/upload/v1beta/files?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': file.mimeType, 'X-Goog-Upload-Protocol': 'raw', 'X-Goog-Upload-Command': 'upload, finalize' },
+        body: binaryData,
+      });
+      if (!startRes.ok) throw new Error(`文件 ${i + 1} 上传失败`);
+      const fileInfo = await startRes.json();
+      const fileUri = fileInfo?.file?.uri;
+      if (!fileUri) throw new Error(`文件 ${i + 1} 未返回 URI`);
+      if (i < filesToUpload.length - 1) await new Promise(resolve => setTimeout(resolve, 1500));
+      parts.push({ file_data: { mime_type: file.mimeType, file_uri: fileUri } });
+    }
+    await new Promise(resolve => setTimeout(resolve, 3000));
+  } else {
+    for (const file of audioFiles) {
+      parts.push({ inline_data: { mime_type: file.mimeType, data: file.base64 } });
+    }
+  }
+  parts.push({ text: prompt });
+
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ contents: [{ role: 'user', parts }] }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `Gemini API 错误 (${res.status})`);
+  }
+  const data = await res.json();
+  const responseParts = data?.candidates?.[0]?.content?.parts;
+  let fullText = '';
+  if (responseParts) { for (const part of responseParts) { if (part.text) fullText += part.text; } }
+  if (!fullText) throw new Error('Gemini 未返回分析结果');
+  const promptMatch = fullText.match(/\[PROMPT\]([\s\S]*?)\[\/PROMPT\]/);
+  if (promptMatch) {
+    return { analysisResult: fullText.replace(/\[PROMPT\][\s\S]*?\[\/PROMPT\]/, '').trim(), lyriaPrompt: promptMatch[1].trim() };
+  }
+  return { analysisResult: fullText, lyriaPrompt: fullText };
+}
+
 export default function AdminTemplatesPage() {
   const [data, setData] = useState<TemplateItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -61,6 +134,8 @@ export default function AdminTemplatesPage() {
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(null);
+  const [audioFiles, setAudioFiles] = useState<File[]>([]);
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number; status: string } | null>(null);
 
   // Confirm dialog
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -101,6 +176,29 @@ export default function AdminTemplatesPage() {
     fetchData();
   }, [fetchData]);
 
+  // Poll analysis status for templates in 'analyzing' state
+  useEffect(() => {
+    const analyzingTemplates = data.filter(t => t.analysis_status === 'analyzing');
+    if (analyzingTemplates.length === 0) return;
+
+    const interval = setInterval(async () => {
+      for (const t of analyzingTemplates) {
+        try {
+          const res = await fetch(`/api/admin/templates/${t.id}/analysis-status`);
+          if (res.ok) {
+            const result = await res.json();
+            if (result.status && result.status !== 'analyzing') {
+              fetchData();
+              break;
+            }
+          }
+        } catch { /* ignore polling errors */ }
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [data, fetchData]);
+
   function handleFilterChange(key: string, value: string) {
     setFilters((prev) => ({ ...prev, [key]: value }));
     setPage(1);
@@ -113,6 +211,8 @@ export default function AdminTemplatesPage() {
     setCoverPreview(null);
     setAudioFile(null);
     setAudioPreviewUrl(null);
+    setAudioFiles([]);
+    setUploadProgress(null);
     setFormOpen(true);
   }
 
@@ -132,12 +232,15 @@ export default function AdminTemplatesPage() {
     setCoverPreview(template.cover_url || null);
     setAudioFile(null);
     setAudioPreviewUrl(template.preview_url || null);
+    setAudioFiles([]);
+    setUploadProgress(null);
     setFormOpen(true);
   }
 
   async function handleFormSubmit() {
     if (!formData.name.trim()) return;
     setSubmitting(true);
+    setUploadProgress(null);
     try {
       const payload = {
         name: formData.name.trim(),
@@ -168,6 +271,7 @@ export default function AdminTemplatesPage() {
 
       // Upload cover if selected
       if (coverFile && templateId) {
+        setUploadProgress({ current: 0, total: 1, status: '上传封面...' });
         const coverFormData = new FormData();
         coverFormData.append('cover', coverFile);
         const coverRes = await fetch(`/api/admin/templates/${templateId}/cover`, {
@@ -180,26 +284,96 @@ export default function AdminTemplatesPage() {
         }
       }
 
-      // Upload audio if selected
-      if (audioFile && templateId) {
-        const audioFormData = new FormData();
-        audioFormData.append('audio', audioFile);
-        const audioRes = await fetch(`/api/admin/templates/${templateId}/audio`, {
+      // Upload audio files via signed URLs
+      const filesToUpload = audioFiles.length > 0 ? audioFiles : (audioFile ? [audioFile] : []);
+      if (filesToUpload.length > 0 && templateId) {
+        setUploadProgress({ current: 0, total: filesToUpload.length, status: '获取上传链接...' });
+
+        // Get signed URLs
+        const uploadUrlRes = await fetch(`/api/admin/templates/${templateId}/upload-url`, {
           method: 'POST',
-          body: audioFormData,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            files: filesToUpload.map((f, i) => ({
+              filename: f.name,
+              contentType: f.type || 'audio/mpeg',
+              index: i,
+            })),
+          }),
         });
-        if (!audioRes.ok) {
-          const audioErr = await audioRes.json().catch(() => ({ error: '音频上传失败' }));
-          alert(`模板已保存，但音频上传失败: ${audioErr.error}`);
+
+        if (!uploadUrlRes.ok) {
+          const uploadErr = await uploadUrlRes.json().catch(() => ({ error: '获取上传链接失败' }));
+          throw new Error(uploadErr.error || '获取上传链接失败');
+        }
+
+        const { urls } = await uploadUrlRes.json();
+
+        // Upload each file directly to storage via signed URL
+        for (let i = 0; i < filesToUpload.length; i++) {
+          setUploadProgress({ current: i + 1, total: filesToUpload.length, status: `上传音频 ${i + 1}/${filesToUpload.length}...` });
+          const file = filesToUpload[i];
+          const signedUrl = urls[i]?.signedUrl || urls[i]?.url;
+          if (!signedUrl) throw new Error(`文件 ${i + 1} 未获得上传链接`);
+
+          const uploadRes = await fetch(signedUrl, {
+            method: 'PUT',
+            headers: { 'Content-Type': file.type || 'audio/mpeg' },
+            body: file,
+          });
+          if (!uploadRes.ok) {
+            throw new Error(`音频文件 ${i + 1} 上传失败 (${uploadRes.status})`);
+          }
+        }
+
+        // After all uploads, call Gemini for analysis
+        setUploadProgress({ current: filesToUpload.length, total: filesToUpload.length, status: '🤖 AI 分析中...' });
+
+        try {
+          // Get Gemini API key
+          const keyRes = await fetch('/api/admin/gemini-key');
+          if (!keyRes.ok) throw new Error('获取 Gemini Key 失败');
+          const { apiKey } = await keyRes.json();
+
+          // Convert files to base64 for Gemini
+          const audioBase64Files = await Promise.all(
+            filesToUpload.map(async (file) => ({
+              base64: await fileToBase64(file),
+              mimeType: file.type || 'audio/mpeg',
+            }))
+          );
+
+          // Call Gemini from browser
+          const geminiResult = await callGeminiFromBrowser(apiKey, audioBase64Files);
+
+          // Save analysis results
+          setUploadProgress({ current: filesToUpload.length, total: filesToUpload.length, status: '保存分析结果...' });
+          const saveRes = await fetch(`/api/admin/templates/${templateId}/save-analysis`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              analysisResult: geminiResult.analysisResult,
+              lyriaPrompt: geminiResult.lyriaPrompt,
+            }),
+          });
+          if (!saveRes.ok) {
+            console.error('保存分析结果失败');
+          }
+        } catch (geminiErr) {
+          console.error('Gemini 分析失败:', geminiErr);
+          // Don't block the form submission if analysis fails
+          alert(`音频已上传，但 AI 分析失败: ${geminiErr instanceof Error ? geminiErr.message : '未知错误'}`);
         }
       }
 
+      setUploadProgress(null);
       setFormOpen(false);
       fetchData();
     } catch (err) {
       alert(err instanceof Error ? err.message : '操作失败');
     } finally {
       setSubmitting(false);
+      setUploadProgress(null);
     }
   }
 
@@ -490,27 +664,92 @@ export default function AdminTemplatesPage() {
               style={{ ...inputStyle, minHeight: 60, resize: 'vertical' }}
             />
           </div>
-          {/* Audio Upload - moved up for visibility */}
+          {/* Audio Upload - multi-file with progress */}
           <div>
-            <label style={labelStyle}>试听音频</label>
+            <label style={labelStyle}>试听音频（可多选）</label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <input
                 type="file"
                 accept="audio/mpeg,audio/wav,audio/ogg,audio/flac,.mp3,.wav,.ogg,.flac"
+                multiple
                 onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    setAudioFile(file);
-                    setAudioPreviewUrl(URL.createObjectURL(file));
+                  const files = Array.from(e.target.files || []);
+                  if (files.length > 0) {
+                    setAudioFiles(prev => [...prev, ...files]);
+                    // Also set single audioFile for backward compat
+                    if (!audioFile) {
+                      setAudioFile(files[0]);
+                      setAudioPreviewUrl(URL.createObjectURL(files[0]));
+                    }
                   }
                 }}
                 style={{ fontSize: 12, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" }}
               />
               <div style={{ fontSize: 11, color: '#9ca3af' }}>
-                支持 MP3、WAV、OGG、FLAC，最大 20MB
+                支持 MP3、WAV、OGG、FLAC，最大 20MB/文件，可选多个参考音频
               </div>
-              {audioPreviewUrl && (
+              {/* File list with players and delete buttons */}
+              {audioFiles.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
+                  {audioFiles.map((file, idx) => (
+                    <div key={`${file.name}-${idx}`} style={{
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      padding: '6px 10px', borderRadius: 8,
+                      background: '#f9fafb', border: '1px solid #e5e7eb',
+                    }}>
+                      <span style={{ fontSize: 12, color: '#374151', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        🎵 {file.name} <span style={{ color: '#9ca3af' }}>({(file.size / 1024 / 1024).toFixed(1)}MB)</span>
+                      </span>
+                      <audio
+                        controls
+                        src={URL.createObjectURL(file)}
+                        style={{ height: 28, maxWidth: 180 }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAudioFiles(prev => prev.filter((_, i) => i !== idx));
+                          if (audioFiles.length === 1) {
+                            setAudioFile(null);
+                            setAudioPreviewUrl(null);
+                          }
+                        }}
+                        style={{
+                          border: 'none', background: '#fee2e2', color: '#dc2626',
+                          borderRadius: 6, width: 24, height: 24, cursor: 'pointer',
+                          fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          flexShrink: 0,
+                        }}
+                      >✕</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {/* Existing audio preview for edit mode */}
+              {audioFiles.length === 0 && audioPreviewUrl && (
                 <audio controls src={audioPreviewUrl} style={{ width: '100%', height: 36, marginTop: 4 }} />
+              )}
+              {/* Upload progress bar */}
+              {uploadProgress && (
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ fontSize: 12, color: '#D4A574', fontWeight: 500, marginBottom: 4 }}>
+                    {uploadProgress.status}
+                  </div>
+                  <div style={{
+                    width: '100%', height: 6, borderRadius: 3,
+                    background: '#f3f4f6', overflow: 'hidden',
+                  }}>
+                    <div style={{
+                      width: `${uploadProgress.total > 0 ? (uploadProgress.current / uploadProgress.total) * 100 : 0}%`,
+                      height: '100%', borderRadius: 3,
+                      background: 'linear-gradient(90deg, #D4A574, #C9A86A)',
+                      transition: 'width 0.3s ease',
+                    }} />
+                  </div>
+                  <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>
+                    {uploadProgress.current}/{uploadProgress.total}
+                  </div>
+                </div>
               )}
             </div>
           </div>

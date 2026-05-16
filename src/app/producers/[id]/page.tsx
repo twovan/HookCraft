@@ -130,15 +130,32 @@ export default function ProducerProfilePage() {
 
           {/* Info */}
           <div style={{ flex: 1 }}>
-            <h1 style={{
-              fontSize: 28,
-              fontWeight: 700,
-              color: '#e8e8f0',
-              marginBottom: 8,
-              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-            }}>
-              {producer.displayName}
-            </h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+              <h1 style={{
+                fontSize: 28,
+                fontWeight: 700,
+                color: '#e8e8f0',
+                margin: 0,
+                fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+              }}>
+                {producer.displayName}
+              </h1>
+              {/* 认证制作人 badge */}
+              <span style={{
+                padding: '4px 12px',
+                background: 'rgba(117, 54, 213, 0.15)',
+                color: '#7536d5',
+                fontSize: 11,
+                fontWeight: 700,
+                borderRadius: 12,
+                border: '1px solid rgba(117, 54, 213, 0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+              }}>
+                ✓ 认证制作人
+              </span>
+            </div>
 
             {producer.bio && (
               <p style={{ fontSize: 14, color: '#9ca3af', lineHeight: 1.6, marginBottom: 12 }}>
@@ -162,8 +179,8 @@ export default function ProducerProfilePage() {
               ))}
             </div>
 
-            {/* Stats */}
-            <div style={{ display: 'flex', gap: 24 }}>
+            {/* Stats row - 4 items */}
+            <div style={{ display: 'flex', gap: 32 }}>
               <div>
                 <div style={{ fontSize: 20, fontWeight: 700, color: '#7536d5' }}>{producer.templateCount}</div>
                 <div style={{ fontSize: 12, color: '#999' }}>模板</div>
@@ -171,6 +188,10 @@ export default function ProducerProfilePage() {
               <div>
                 <div style={{ fontSize: 20, fontWeight: 700, color: '#7536d5' }}>{producer.totalDownloads}</div>
                 <div style={{ fontSize: 12, color: '#999' }}>下载量</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: '#7536d5' }}>{producer.totalSales || 0}</div>
+                <div style={{ fontSize: 12, color: '#999' }}>销量</div>
               </div>
               <div>
                 <div style={{ fontSize: 14, fontWeight: 600, color: '#e8e8f0' }}>{formatDate(producer.joinedAt)}</div>
@@ -266,7 +287,7 @@ export default function ProducerProfilePage() {
                 <p style={{ fontSize: 14 }}>暂无模板</p>
               </div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 20 }}>
                 {templates.map((t) => (
                   <Link
                     key={t.id}
