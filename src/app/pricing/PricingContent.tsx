@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchWithAuth } from '@/lib/fetchWithAuth';
@@ -32,6 +32,13 @@ export default function PricingContent({ tiers }: PricingContentProps) {
   const fetchCredits = useCreditStore((s) => s.fetchCredits);
   const fetchMembership = useMembershipStore((s) => s.fetchMembership);
   const isBusiness = currentTier === 'business';
+
+  // Fetch membership on mount to ensure correct tier is displayed
+  useEffect(() => {
+    if (user) {
+      fetchMembership();
+    }
+  }, [user]);
 
   const handleSubscribe = async (tier: MembershipTier, cycle: BillingCycle) => {
     if (tier === 'free') return;
