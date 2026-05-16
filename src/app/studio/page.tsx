@@ -72,6 +72,8 @@ export default function StudioPage() {
   const [isConfirming, setIsConfirming] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [selectionConfirmed, setSelectionConfirmed] = useState(false);
+  const [resultAudioTime, setResultAudioTime] = useState(0);
+  const [resultPlaying, setResultPlaying] = useState(false);
 
   // Fetch initial data
   useEffect(() => {
@@ -317,37 +319,62 @@ export default function StudioPage() {
             border: '1px solid #2a2a40',
             boxShadow: '0 4px 20px rgba(117, 54, 213, 0.06)',
           }}>
-            {versions[0]?.status === 'completed' ? (
-              <div style={{ textAlign: 'center' }}>
+            {versions.some(v => v.status === 'completed') ? (
+              <div>
                 <h3 style={{
-                  fontSize: 18, fontWeight: 600, color: '#e8e8f0', marginBottom: 16,
-                  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-                }}>生成完成</h3>
-                {versions[0]?.audioUrl && (
-                  <div style={{ marginBottom: 20 }}>
-                    <audio controls src={versions[0].audioUrl} style={{ width: '100%', maxWidth: 400 }} />
+                  fontSize: 18, fontWeight: 600, color: '#e8e8f0', marginBottom: 20,
+                  fontFamily: "'Inter', sans-serif", textAlign: 'center',
+                }}>生成完成 · {versions.filter(v => v.status === 'completed').length} 个版本</h3>
+
+                {versions.filter(v => v.status === 'completed').length === 0 && versions.some(v => v.status === 'safety_blocked') && (
+                  <div style={{ textAlign: 'center', padding: 16, color: '#9ca3af', fontSize: 13, marginBottom: 16 }}>
+                    所有版本被安全过滤器拦截，请修改歌词或提示词后重试
                   </div>
                 )}
-                {versions[0]?.lyrics && (
-                  <div style={{ marginBottom: 20, maxWidth: 400, margin: '0 auto 20px' }}>
-                    <SyncedLyrics
-                      lyrics={versions[0].lyrics}
-                      currentTime={0}
-                      isPlaying={false}
-                    />
-                  </div>
-                )}
-                <button
-                  onClick={() => { setBatchId(null); setVersions([]); setSelectedVersionId(undefined); }}
-                  style={{
-                    padding: '14px 32px', borderRadius: 24,
-                    border: '1px solid #7536d5', background: 'transparent', color: '#7536d5',
-                    fontSize: 15, fontWeight: 600, cursor: 'pointer',
-                    fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-                  }}
-                >
-                  继续创作
-                </button>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 20 }}>
+                  {versions.filter(v => v.status === 'completed').map((version, idx) => (
+                    <div key={version.taskId} style={{
+                      padding: 16, background: '#12121e', borderRadius: 14,
+                      border: '1px solid #2a2a40',
+                    }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#c0a7fc', marginBottom: 10 }}>
+                        版本 {idx + 1}
+                      </div>
+                      {version.audioUrl && (
+                        <audio
+                          controls
+                          src={version.audioUrl}
+                          style={{ width: '100%', height: 36, marginBottom: 10 }}
+                          onTimeUpdate={(e) => { setResultAudioTime((e.target as HTMLAudioElement).currentTime); setSelectedVersionId(version.taskId); }}
+                          onPlay={() => { setResultPlaying(true); setSelectedVersionId(version.taskId); }}
+                          onPause={() => setResultPlaying(false)}
+                        />
+                      )}
+                      {version.lyrics && (
+                        <SyncedLyrics
+                          lyrics={version.lyrics}
+                          currentTime={selectedVersionId === version.taskId ? resultAudioTime : 0}
+                          isPlaying={resultPlaying && selectedVersionId === version.taskId}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ textAlign: 'center' }}>
+                  <button
+                    onClick={() => { setBatchId(null); setVersions([]); setSelectedVersionId(undefined); }}
+                    style={{
+                      padding: '14px 32px', borderRadius: 24,
+                      border: '1px solid #7536d5', background: 'transparent', color: '#7536d5',
+                      fontSize: 15, fontWeight: 600, cursor: 'pointer',
+                      fontFamily: "'Inter', sans-serif",
+                    }}
+                  >
+                    继续创作
+                  </button>
+                </div>
               </div>
             ) : (
               <div style={{ textAlign: 'center' }}>
