@@ -296,14 +296,6 @@ export default function StudioPage() {
           </p>
         </div>
 
-        {/* Usage Dashboard */}
-        <div style={{ marginBottom: '32px' }}>
-          <UsageDashboard
-            onUpgrade={() => showUpgradePrompt('更多创作额度')}
-            onBuyCredits={() => window.open('/pricing#credits-pack', '_blank')}
-          />
-        </div>
-
         {/* Generation Progress */}
         {isGenerating && (
           <div style={{ marginBottom: '32px' }}>
@@ -601,39 +593,6 @@ export default function StudioPage() {
               {/* Premium Singer Toggle (paid users only) */}
               {/* Premium Singer - hidden, coming soon */}
 
-              {/* Total Cost Display */}
-              <div
-                style={{
-                  background: 'linear-gradient(135deg, #0d0d14 0%, rgba(117, 54, 213, 0.15) 100%)',
-                  borderRadius: '20px',
-                  padding: '20px 24px',
-                  border: '1px solid #2a2a40',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                  <span style={{ fontSize: '14px', fontWeight: 600, color: '#e8e8f0', fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" }}>
-                    预计消耗
-                  </span>
-                  <span
-                    style={{
-                      fontSize: '22px',
-                      fontWeight: 700,
-                      color: '#7536d5',
-                      fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-                    }}
-                  >
-                    {isPaid ? `${totalCost} Credits` : '1 次预览'}
-                  </span>
-                </div>
-
-                {isPaid && (
-                  <div style={{ fontSize: '12px', color: '#9ca3af', lineHeight: 1.8 }}>
-                    <div>{duration === 30 ? `Preview ${CREDITS_COST.preview} Credit` : `Full Demo ${CREDITS_COST.full_demo_long} Credits`}</div>
-                    {usePremiumSinger && <div>高级声模：+{CREDITS_COST.premium_singer} Credits</div>}
-                  </div>
-                )}
-              </div>
-
               {/* Generate Button */}
               <button
                 onClick={handleGenerate}
@@ -645,23 +604,33 @@ export default function StudioPage() {
                   border: 'none',
                   background: canGenerate && !isGenerating && (selectedTemplate || prompt.trim())
                     ? 'linear-gradient(135deg, #7536d5 0%, #5a2db8 100%)'
-                    : '#E2E8F0',
+                    : '#2a2a40',
                   color: canGenerate && !isGenerating && (selectedTemplate || prompt.trim())
                     ? 'white'
-                    : '#A0AEC0',
+                    : '#6b7280',
                   fontSize: '16px',
                   fontWeight: 700,
                   cursor: canGenerate && !isGenerating && (selectedTemplate || prompt.trim())
                     ? 'pointer'
                     : 'not-allowed',
-                  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+                  fontFamily: "'Inter', sans-serif",
                   boxShadow: canGenerate && !isGenerating && (selectedTemplate || prompt.trim())
                     ? '0 4px 16px rgba(117, 54, 213, 0.3)'
                     : 'none',
                   transition: 'all 0.2s ease',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 4,
                 }}
               >
-                {isGenerating ? '生成中...' : '开始 AI 创作'}
+                <span>{isGenerating ? '生成中...' : '开始 AI 创作'}</span>
+                <span style={{ fontSize: 12, fontWeight: 500, opacity: 0.9 }}>
+                  {isPaid
+                    ? `消耗 ${totalCost} Credits（2版本）· 剩余 ${credits?.totalAvailable ?? 0}`
+                    : `消耗 1 次预览（生成2版本）· 剩余 ${previewCount?.remaining ?? 0} 次`
+                  }
+                </span>
               </button>
 
               {/* Credits exhausted messages */}
