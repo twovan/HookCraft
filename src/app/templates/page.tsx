@@ -191,11 +191,13 @@ export default function TemplatesPage() {
                 <input type="number" placeholder="60" style={{
                   width: '100%', padding: '8px 12px', border: '1px solid #2a2a40', borderRadius: 8,
                   fontSize: 13, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", outline: 'none',
+                  background: '#12121e', color: '#e8e8f0',
                 }} />
                 <span style={{ color: '#999' }}>-</span>
                 <input type="number" placeholder="200" style={{
                   width: '100%', padding: '8px 12px', border: '1px solid #2a2a40', borderRadius: 8,
                   fontSize: 13, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", outline: 'none',
+                  background: '#12121e', color: '#e8e8f0',
                 }} />
               </div>
             </div>
@@ -207,11 +209,13 @@ export default function TemplatesPage() {
                 <input type="number" placeholder="¥0" style={{
                   width: '100%', padding: '8px 12px', border: '1px solid #2a2a40', borderRadius: 8,
                   fontSize: 13, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", outline: 'none',
+                  background: '#12121e', color: '#e8e8f0',
                 }} />
                 <span style={{ color: '#999' }}>-</span>
                 <input type="number" placeholder="¥500" style={{
                   width: '100%', padding: '8px 12px', border: '1px solid #2a2a40', borderRadius: 8,
                   fontSize: 13, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", outline: 'none',
+                  background: '#12121e', color: '#e8e8f0',
                 }} />
               </div>
             </div>
@@ -224,7 +228,7 @@ export default function TemplatesPage() {
                 onChange={(e) => { setSortBy(e.target.value); setCurrentPage(1); }}
                 style={{
                   width: '100%', padding: '10px 12px', border: '1px solid #2a2a40', borderRadius: 8,
-                  fontSize: 13, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", background: '#1a1a2e', cursor: 'pointer', outline: 'none',
+                  fontSize: 13, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", background: '#12121e', color: '#e8e8f0', cursor: 'pointer', outline: 'none',
                 }}
               >
                 <option value="newest">最新上架</option>
