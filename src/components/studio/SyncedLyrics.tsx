@@ -179,7 +179,7 @@ export default function SyncedLyrics({ lyrics, currentTime, isPlaying }: SyncedL
 
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 600, color: '#7536d5', marginBottom: 8 }}>?? ���</div>
+      <div style={{ fontSize: 11, fontWeight: 600, color: '#c0a7fc', marginBottom: 8 }}>Lyrics</div>
       <div
         ref={containerRef}
         style={{
