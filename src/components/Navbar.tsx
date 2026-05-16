@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMembershipStore } from '@/store/membershipStore';
+import { useCreditStore } from '@/store/creditStore';
 import { useCartStore } from '@/store/cartStore';
 
 const TIER_LABELS: Record<string, string> = {
@@ -20,9 +21,23 @@ export default function Navbar() {
   const cartCount = useCartStore((s) => s.getCount());
   const membership = useMembershipStore((s) => s.membership);
   const currentTier = useMembershipStore((s) => s.currentTier());
+  const isPaid = useMembershipStore((s) => s.isPaid());
+  const fetchMembership = useMembershipStore((s) => s.fetchMembership);
+  const credits = useCreditStore((s) => s.credits);
+  const previewCount = useCreditStore((s) => s.previewCount);
+  const fetchCredits = useCreditStore((s) => s.fetchCredits);
+  const fetchPreviewCount = useCreditStore((s) => s.fetchPreviewCount);
 
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Fetch membership and credits when user is logged in
+  useEffect(() => {
+    if (user) {
+      fetchMembership();
+      if (isPaid) { fetchCredits(); } else { fetchPreviewCount(); }
+    }
+  }, [user]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -163,6 +178,31 @@ export default function Navbar() {
                       fontWeight: 600,
                     }}>
                       {TIER_LABELS[currentTier] || '免费版'}
+                    </div>
+
+                    {/* Credits progress */}
+                    <div style={{ marginTop: 10 }}>
+                      <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>
+                        {isPaid && credits
+                          ? `Credits: ${credits.totalAvailable} 可用`
+                          : previewCount
+                            ? `预览次数: ${previewCount.remaining}/${previewCount.total} 剩余`
+                            : ''
+                        }
+                      </div>
+                      <div style={{ height: 4, borderRadius: 2, background: '#2a2a40', overflow: 'hidden' }}>
+                        <div style={{
+                          height: '100%', borderRadius: 2,
+                          background: 'linear-gradient(90deg, #7536d5, #957afd)',
+                          width: `${isPaid && credits
+                            ? Math.min((credits.totalAvailable / Math.max(credits.monthlyTotal + (credits.purchasedBalance || 0), 1)) * 100, 100)
+                            : previewCount
+                              ? (previewCount.remaining / previewCount.total) * 100
+                              : 0
+                          }%`,
+                          transition: 'width 0.3s',
+                        }} />
+                      </div>
                     </div>
                   </div>
 
