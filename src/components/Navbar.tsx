@@ -182,27 +182,43 @@ export default function Navbar() {
 
                     {/* Credits progress */}
                     <div style={{ marginTop: 10 }}>
-                      <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>
-                        {isPaid && credits
-                          ? `Credits: ${credits.totalAvailable} 可用`
-                          : previewCount
-                            ? `预览次数: ${previewCount.remaining}/${previewCount.total} 剩余`
-                            : ''
-                        }
-                      </div>
-                      <div style={{ height: 4, borderRadius: 2, background: '#2a2a40', overflow: 'hidden' }}>
-                        <div style={{
-                          height: '100%', borderRadius: 2,
-                          background: 'linear-gradient(90deg, #7536d5, #957afd)',
-                          width: `${isPaid && credits
-                            ? Math.min((credits.totalAvailable / Math.max(credits.monthlyTotal + (credits.purchasedBalance || 0), 1)) * 100, 100)
-                            : previewCount
-                              ? (previewCount.remaining / previewCount.total) * 100
-                              : 0
-                          }%`,
-                          transition: 'width 0.3s',
-                        }} />
-                      </div>
+                      {isPaid && credits ? (
+                        <>
+                          <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>
+                            月度: {credits.monthlyUsed}/{credits.monthlyTotal} 已用 · 剩余 {credits.monthlyRemaining}
+                          </div>
+                          <div style={{ height: 4, borderRadius: 2, background: '#2a2a40', overflow: 'hidden', marginBottom: 6 }}>
+                            <div style={{
+                              height: '100%', borderRadius: 2,
+                              background: 'linear-gradient(90deg, #7536d5, #957afd)',
+                              width: `${credits.monthlyTotal > 0 ? (credits.monthlyUsed / credits.monthlyTotal) * 100 : 0}%`,
+                              transition: 'width 0.3s',
+                            }} />
+                          </div>
+                          {credits.purchasedBalance > 0 && (
+                            <div style={{ fontSize: 11, color: '#957afd', marginBottom: 2 }}>
+                              购买余额: {credits.purchasedBalance} Credits
+                            </div>
+                          )}
+                          <div style={{ fontSize: 11, color: '#e8e8f0', fontWeight: 600 }}>
+                            总可用: {credits.totalAvailable} Credits
+                          </div>
+                        </>
+                      ) : previewCount ? (
+                        <>
+                          <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>
+                            预览次数: {previewCount.remaining}/{previewCount.total} 剩余
+                          </div>
+                          <div style={{ height: 4, borderRadius: 2, background: '#2a2a40', overflow: 'hidden' }}>
+                            <div style={{
+                              height: '100%', borderRadius: 2,
+                              background: 'linear-gradient(90deg, #7536d5, #957afd)',
+                              width: `${(previewCount.remaining / previewCount.total) * 100}%`,
+                              transition: 'width 0.3s',
+                            }} />
+                          </div>
+                        </>
+                      ) : null}
                     </div>
                   </div>
 
