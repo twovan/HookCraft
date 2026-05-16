@@ -133,9 +133,9 @@ export default function UploadPage() {
             ) : (
               <div
                 onClick={() => audioInputRef.current?.click()}
-                style={{ border: '2px dashed #E5E5E5', borderRadius: 16, padding: '40px 24px', textAlign: 'center', cursor: 'pointer', transition: 'border-color 0.2s' }}
+                style={{ border: '2px dashed #2a2a40', borderRadius: 16, padding: '40px 24px', textAlign: 'center', cursor: 'pointer', transition: 'border-color 0.2s' }}
                 onMouseEnter={(e) => e.currentTarget.style.borderColor = '#7536d5'}
-                onMouseLeave={(e) => e.currentTarget.style.borderColor = '#E5E5E5'}
+                onMouseLeave={(e) => e.currentTarget.style.borderColor = '#2a2a40'}
               >
                 <div style={{ fontSize: 40, marginBottom: 12 }}>🎶</div>
                 <div style={{ fontSize: 15, fontWeight: 600, color: '#e8e8f0', marginBottom: 4 }}>点击上传音频文件</div>
@@ -193,7 +193,7 @@ export default function UploadPage() {
           <div style={cardStyle}>
             <h3 style={sectionTitleStyle}>🖼️ 封面图片（可选）</h3>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-              <div style={{ width: 100, height: 100, borderRadius: 12, overflow: 'hidden', flexShrink: 0, border: '2px dashed #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', background: coverPreview ? undefined : '#fafafa' }}>
+              <div style={{ width: 100, height: 100, borderRadius: 12, overflow: 'hidden', flexShrink: 0, border: '2px dashed #2a2a40', display: 'flex', alignItems: 'center', justifyContent: 'center', background: coverPreview ? undefined : '#1a1a2e' }}>
                 {coverPreview ? (
                   <img src={coverPreview} alt="封面" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
@@ -231,6 +231,6 @@ const cardStyle: React.CSSProperties = {
 };
 const sectionTitleStyle: React.CSSProperties = { fontSize: 16, fontWeight: 600, color: '#e8e8f0', marginBottom: 16 };
 const labelStyle: React.CSSProperties = { display: 'block', fontSize: 13, fontWeight: 600, color: '#e8e8f0', marginBottom: 6 };
-const inputStyle: React.CSSProperties = { width: '100%', padding: '12px 14px', borderRadius: 12, border: '1px solid #E5E5E5', fontSize: 14, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", outline: 'none', boxSizing: 'border-box' };
+const inputStyle: React.CSSProperties = { width: '100%', padding: '12px 14px', borderRadius: 12, border: '1px solid #2a2a40', fontSize: 14, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", outline: 'none', boxSizing: 'border-box' };
 const primaryBtnStyle: React.CSSProperties = { padding: '12px 28px', borderRadius: 24, border: 'none', background: 'linear-gradient(135deg, #7536d5, #5a2db8)', color: 'white', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", boxShadow: '0 6px 20px rgba(117, 54, 213,0.3)' };
-const secondaryBtnStyle: React.CSSProperties = { padding: '12px 28px', borderRadius: 24, border: '1px solid #E5E5E5', background: 'transparent', color: '#9ca3af', fontSize: 14, fontWeight: 600, cursor: 'pointer' };
+const secondaryBtnStyle: React.CSSProperties = { padding: '12px 28px', borderRadius: 24, border: '1px solid #2a2a40', background: 'transparent', color: '#9ca3af', fontSize: 14, fontWeight: 600, cursor: 'pointer' };

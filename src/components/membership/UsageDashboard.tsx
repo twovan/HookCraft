@@ -32,14 +32,14 @@ export default function UsageDashboard({ onUpgrade, onBuyCredits }: UsageDashboa
     <div
       style={{
         background: isExhausted
-          ? 'linear-gradient(135deg, #FFF5F5 0%, #FFF0F0 100%)'
+          ? 'linear-gradient(135deg, rgba(229, 57, 53, 0.1) 0%, #FFF0F0 100%)'
           : isLow
             ? 'linear-gradient(135deg, #FFFBF0 0%, #FFF8E6 100%)'
             : 'white',
         borderRadius: '16px',
         padding: '20px 24px',
         border: isExhausted
-          ? '1px solid #FED7D7'
+          ? '1px solid rgba(229, 57, 53, 0.3)'
           : isLow
             ? '1px solid #F6E05E'
             : '1px solid #2a2a40',
@@ -200,7 +200,7 @@ export default function UsageDashboard({ onUpgrade, onBuyCredits }: UsageDashboa
           {isExhausted && (
             <div
               style={{
-                background: '#FED7D7',
+                background: 'rgba(229, 57, 53, 0.3)',
                 borderRadius: '8px',
                 padding: '10px 14px',
                 fontSize: '13px',
@@ -306,7 +306,7 @@ export default function UsageDashboard({ onUpgrade, onBuyCredits }: UsageDashboa
             <>
               <div
                 style={{
-                  background: '#FED7D7',
+                  background: 'rgba(229, 57, 53, 0.3)',
                   borderRadius: '8px',
                   padding: '10px 14px',
                   fontSize: '13px',

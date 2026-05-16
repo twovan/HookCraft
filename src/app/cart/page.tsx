@@ -90,7 +90,7 @@ export default function CartPage() {
                       onClick={() => handleRemove(item.template_id, item.name)}
                       style={{
                         marginTop: 12, padding: '6px 16px', borderRadius: 24,
-                        border: '1px solid #E5E5E5', background: 'transparent',
+                        border: '1px solid #2a2a40', background: 'transparent',
                         color: '#9ca3af', fontSize: 12, fontWeight: 600,
                         cursor: 'pointer', fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
                       }}
@@ -133,7 +133,7 @@ export default function CartPage() {
 
               <Link href="/templates" style={{
                 display: 'block', width: '100%', padding: 12, borderRadius: 24, marginTop: 12,
-                border: '1px solid #E5E5E5', background: 'transparent',
+                border: '1px solid #2a2a40', background: 'transparent',
                 color: '#9ca3af', fontSize: 14, fontWeight: 600, textDecoration: 'none', textAlign: 'center',
               }}>
                 继续购物

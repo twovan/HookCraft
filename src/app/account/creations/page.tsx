@@ -139,7 +139,7 @@ export default function CreationsPage() {
               style={{
                 padding: '8px 16px',
                 borderRadius: 20,
-                border: range === opt.value ? 'none' : '1px solid #E5E5E5',
+                border: range === opt.value ? 'none' : '1px solid #2a2a40',
                 background: range === opt.value
                   ? 'linear-gradient(135deg, #7536d5, #5a2db8)'
                   : 'white',

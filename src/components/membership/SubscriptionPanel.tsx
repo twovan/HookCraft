@@ -252,7 +252,7 @@ export default function SubscriptionPanel({
             style={{
               padding: '10px 20px',
               borderRadius: '20px',
-              border: '1px solid #E5E5E5',
+              border: '1px solid #2a2a40',
               background: 'transparent',
               color: '#9ca3af',
               fontSize: '13px',
@@ -272,7 +272,7 @@ export default function SubscriptionPanel({
             style={{
               padding: '10px 20px',
               borderRadius: '20px',
-              border: '1px solid #FED7D7',
+              border: '1px solid rgba(229, 57, 53, 0.3)',
               background: 'transparent',
               color: '#E53E3E',
               fontSize: '13px',
@@ -310,10 +310,10 @@ export default function SubscriptionPanel({
       {showDowngradeWarning && downgradeTarget && (
         <div
           style={{
-            background: '#FFF5F5',
+            background: 'rgba(229, 57, 53, 0.1)',
             borderRadius: '12px',
             padding: '20px',
-            border: '1px solid #FED7D7',
+            border: '1px solid rgba(229, 57, 53, 0.3)',
             marginBottom: '24px',
           }}
           role="alert"
@@ -364,7 +364,7 @@ export default function SubscriptionPanel({
               style={{
                 padding: '8px 16px',
                 borderRadius: '16px',
-                border: '1px solid #E5E5E5',
+                border: '1px solid #2a2a40',
                 background: '#1a1a2e',
                 color: '#9ca3af',
                 fontSize: '13px',
@@ -437,7 +437,7 @@ export default function SubscriptionPanel({
               style={{
                 padding: '8px 16px',
                 borderRadius: '16px',
-                border: '1px solid #E5E5E5',
+                border: '1px solid #2a2a40',
                 background: '#1a1a2e',
                 color: '#9ca3af',
                 fontSize: '13px',
@@ -587,7 +587,7 @@ function CreditsPurchaseList({ records }: { records: PaymentRecord[] }) {
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page <= 1}
             style={{
-              padding: '6px 12px', borderRadius: 8, border: '1px solid #e5e7eb',
+              padding: '6px 12px', borderRadius: 8, border: '1px solid #2a2a40',
               background: '#1a1a2e', fontSize: 12, cursor: page <= 1 ? 'not-allowed' : 'pointer',
               opacity: page <= 1 ? 0.4 : 1, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
             }}
@@ -601,7 +601,7 @@ function CreditsPurchaseList({ records }: { records: PaymentRecord[] }) {
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page >= totalPages}
             style={{
-              padding: '6px 12px', borderRadius: 8, border: '1px solid #e5e7eb',
+              padding: '6px 12px', borderRadius: 8, border: '1px solid #2a2a40',
               background: '#1a1a2e', fontSize: 12, cursor: page >= totalPages ? 'not-allowed' : 'pointer',
               opacity: page >= totalPages ? 0.4 : 1, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
             }}

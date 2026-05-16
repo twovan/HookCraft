@@ -151,7 +151,7 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
   };
 
   const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '14px 16px', border: '2px solid #E5E5E5', borderRadius: 12,
+    width: '100%', padding: '14px 16px', border: '2px solid #2a2a40', borderRadius: 12,
     fontSize: 15, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", transition: 'all 0.3s',
     outline: 'none', boxSizing: 'border-box',
   };
@@ -210,7 +210,7 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
           disabled={loading}
           style={{
             width: '100%', padding: 16, borderRadius: 24, border: 'none',
-            background: loading ? '#ccc' : 'linear-gradient(135deg, #7536d5, #5a2db8)', color: 'white',
+            background: loading ? '#2a2a40' : 'linear-gradient(135deg, #7536d5, #5a2db8)', color: 'white',
             fontSize: 16, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', marginTop: 8,
             fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
             boxShadow: loading ? 'none' : '0 6px 20px rgba(117, 54, 213,0.3)',
@@ -234,7 +234,7 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
       {/* Social Login */}
       <div style={{ marginTop: 32 }}>
         <div style={{ position: 'relative', textAlign: 'center', marginBottom: 24 }}>
-          <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 1, background: '#E5E5E5' }} />
+          <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 1, background: '#2a2a40' }} />
           <span style={{ position: 'relative', background: '#1a1a2e', padding: '0 16px', color: '#9ca3af', fontSize: 14 }}>或使用以下方式登录</span>
         </div>
 
@@ -243,7 +243,7 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
             type="button"
             onClick={() => handleOAuthLogin('wechat')}
             style={{
-              padding: 12, border: '2px solid #E5E5E5', borderRadius: 12, background: '#1a1a2e',
+              padding: 12, border: '2px solid #2a2a40', borderRadius: 12, background: '#1a1a2e',
               cursor: 'pointer', fontSize: 14, fontWeight: 600, transition: 'all 0.3s',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             }}
@@ -254,7 +254,7 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
             type="button"
             onClick={() => handleOAuthLogin('qq')}
             style={{
-              padding: 12, border: '2px solid #E5E5E5', borderRadius: 12, background: '#1a1a2e',
+              padding: 12, border: '2px solid #2a2a40', borderRadius: 12, background: '#1a1a2e',
               cursor: 'pointer', fontSize: 14, fontWeight: 600, transition: 'all 0.3s',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             }}
@@ -325,7 +325,7 @@ function RegisterForm({ onSwitch }: { onSwitch: () => void }) {
   };
 
   const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '14px 16px', border: '2px solid #E5E5E5', borderRadius: 12,
+    width: '100%', padding: '14px 16px', border: '2px solid #2a2a40', borderRadius: 12,
     fontSize: 15, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", transition: 'all 0.3s',
     outline: 'none', boxSizing: 'border-box',
   };
@@ -438,7 +438,7 @@ function RegisterForm({ onSwitch }: { onSwitch: () => void }) {
           disabled={loading}
           style={{
             width: '100%', padding: 16, borderRadius: 24, border: 'none',
-            background: loading ? '#ccc' : 'linear-gradient(135deg, #7536d5, #5a2db8)', color: 'white',
+            background: loading ? '#2a2a40' : 'linear-gradient(135deg, #7536d5, #5a2db8)', color: 'white',
             fontSize: 16, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', marginTop: 8,
             fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
             boxShadow: loading ? 'none' : '0 6px 20px rgba(117, 54, 213,0.3)',

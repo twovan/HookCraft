@@ -216,7 +216,7 @@ export default function UpgradeModal({
               flex: 1,
               padding: '12px 20px',
               borderRadius: '20px',
-              border: '1px solid #E5E5E5',
+              border: '1px solid #2a2a40',
               background: 'transparent',
               fontSize: '14px',
               fontWeight: 500,

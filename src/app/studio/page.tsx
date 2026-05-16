@@ -637,10 +637,10 @@ export default function StudioPage() {
               {creditsExhaustedPaid && (
                 <div
                   style={{
-                    background: '#FFF5F5',
+                    background: 'rgba(229, 57, 53, 0.1)',
                     borderRadius: '12px',
                     padding: '16px 20px',
-                    border: '1px solid #FED7D7',
+                    border: '1px solid rgba(229, 57, 53, 0.3)',
                     fontSize: '13px',
                     color: '#C53030',
                     lineHeight: 1.6,
@@ -657,10 +657,10 @@ export default function StudioPage() {
               {previewsExhaustedFree && (
                 <div
                   style={{
-                    background: '#FFF5F5',
+                    background: 'rgba(229, 57, 53, 0.1)',
                     borderRadius: '12px',
                     padding: '16px 20px',
-                    border: '1px solid #FED7D7',
+                    border: '1px solid rgba(229, 57, 53, 0.3)',
                     fontSize: '13px',
                     color: '#C53030',
                     lineHeight: 1.6,

@@ -189,12 +189,12 @@ export default function TemplatesPage() {
               <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 14, color: '#e8e8f0', letterSpacing: 0.3, textTransform: 'uppercase' }}>BPM 范围</h3>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <input type="number" placeholder="60" style={{
-                  width: '100%', padding: '8px 12px', border: '1px solid #E5E5E5', borderRadius: 8,
+                  width: '100%', padding: '8px 12px', border: '1px solid #2a2a40', borderRadius: 8,
                   fontSize: 13, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", outline: 'none',
                 }} />
                 <span style={{ color: '#999' }}>-</span>
                 <input type="number" placeholder="200" style={{
-                  width: '100%', padding: '8px 12px', border: '1px solid #E5E5E5', borderRadius: 8,
+                  width: '100%', padding: '8px 12px', border: '1px solid #2a2a40', borderRadius: 8,
                   fontSize: 13, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", outline: 'none',
                 }} />
               </div>
@@ -205,12 +205,12 @@ export default function TemplatesPage() {
               <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 14, color: '#e8e8f0', letterSpacing: 0.3, textTransform: 'uppercase' }}>价格范围</h3>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <input type="number" placeholder="¥0" style={{
-                  width: '100%', padding: '8px 12px', border: '1px solid #E5E5E5', borderRadius: 8,
+                  width: '100%', padding: '8px 12px', border: '1px solid #2a2a40', borderRadius: 8,
                   fontSize: 13, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", outline: 'none',
                 }} />
                 <span style={{ color: '#999' }}>-</span>
                 <input type="number" placeholder="¥500" style={{
-                  width: '100%', padding: '8px 12px', border: '1px solid #E5E5E5', borderRadius: 8,
+                  width: '100%', padding: '8px 12px', border: '1px solid #2a2a40', borderRadius: 8,
                   fontSize: 13, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", outline: 'none',
                 }} />
               </div>
@@ -223,7 +223,7 @@ export default function TemplatesPage() {
                 value={sortBy}
                 onChange={(e) => { setSortBy(e.target.value); setCurrentPage(1); }}
                 style={{
-                  width: '100%', padding: '10px 12px', border: '1px solid #E5E5E5', borderRadius: 8,
+                  width: '100%', padding: '10px 12px', border: '1px solid #2a2a40', borderRadius: 8,
                   fontSize: 13, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", background: '#1a1a2e', cursor: 'pointer', outline: 'none',
                 }}
               >
@@ -237,7 +237,7 @@ export default function TemplatesPage() {
             <button
               onClick={() => { setSelectedGenres([]); setCategoryFilter('all'); setCurrentPage(1); }}
               style={{
-                width: '100%', padding: '12px 28px', border: '1px solid #E5E5E5', borderRadius: 24,
+                width: '100%', padding: '12px 28px', border: '1px solid #2a2a40', borderRadius: 24,
                 background: 'transparent', color: '#9ca3af', fontSize: 14, fontWeight: 600,
                 cursor: 'pointer', fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
               }}
@@ -366,7 +366,7 @@ export default function TemplatesPage() {
                         onClick={() => setCurrentPage(page)}
                         style={{
                           width: 40, height: 40, borderRadius: 12, border: 'none',
-                          background: safePage === page ? 'linear-gradient(135deg, #7536d5, #5a2db8)' : 'white',
+                          background: safePage === page ? 'linear-gradient(135deg, #7536d5, #5a2db8)' : '#1e1e30',
                           color: safePage === page ? 'white' : '#9ca3af',
                           fontSize: 14, fontWeight: 600, cursor: 'pointer',
                           boxShadow: '0 2px 8px rgba(0,0,0,0.06)',

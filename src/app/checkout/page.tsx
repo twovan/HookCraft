@@ -240,9 +240,9 @@ export default function CheckoutPage() {
                   style={{
                     width: '100%', padding: 16, borderRadius: 24, border: 'none',
                     background: paying
-                      ? '#ccc'
+                      ? '#2a2a40'
                       : 'linear-gradient(135deg, #7536d5, #5a2db8)',
-                    color: 'white',
+                    color: paying ? '#6b7280' : 'white',
                     fontSize: 16, fontWeight: 600,
                     cursor: paying ? 'not-allowed' : 'pointer',
                     fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",

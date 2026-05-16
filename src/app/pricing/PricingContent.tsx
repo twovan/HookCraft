@@ -177,8 +177,8 @@ export default function PricingContent({ tiers }: PricingContentProps) {
       {upgrading && (
         <div style={{
           maxWidth: 600, margin: '0 auto 32px', padding: '16px 24px', borderRadius: 16,
-          background: '#fffbeb', border: '1px solid #fde68a', textAlign: 'center',
-          color: '#92400e', fontSize: 14, fontWeight: 500,
+          background: 'rgba(117, 54, 213, 0.1)', border: '1px solid rgba(117, 54, 213, 0.3)', textAlign: 'center',
+          color: '#a78bfa', fontSize: 14, fontWeight: 500,
         }}>
           正在升级中...
         </div>

@@ -250,8 +250,8 @@ export default function ProducerProfilePage() {
                 style={{
                   padding: '6px 14px',
                   borderRadius: 16,
-                  border: !selectedGenre ? 'none' : '1px solid #E5E5E5',
-                  background: !selectedGenre ? 'rgba(117, 54, 213, 0.15)' : 'white',
+                  border: !selectedGenre ? 'none' : '1px solid #2a2a40',
+                  background: !selectedGenre ? 'rgba(117, 54, 213, 0.15)' : '#1a1a2e',
                   color: !selectedGenre ? '#7536d5' : '#9ca3af',
                   fontSize: 12,
                   fontWeight: 600,
@@ -267,8 +267,8 @@ export default function ProducerProfilePage() {
                   style={{
                     padding: '6px 14px',
                     borderRadius: 16,
-                    border: selectedGenre === tag ? 'none' : '1px solid #E5E5E5',
-                    background: selectedGenre === tag ? 'rgba(117, 54, 213, 0.15)' : 'white',
+                    border: selectedGenre === tag ? 'none' : '1px solid #2a2a40',
+                    background: selectedGenre === tag ? 'rgba(117, 54, 213, 0.15)' : '#1a1a2e',
                     color: selectedGenre === tag ? '#7536d5' : '#9ca3af',
                     fontSize: 12,
                     fontWeight: 600,
