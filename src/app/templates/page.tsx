@@ -290,7 +290,7 @@ export default function TemplatesPage() {
               </div>
             ) : (
               <>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24, marginBottom: 48 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 20, marginBottom: 48 }}>
                   {paginatedTemplates.map((t) => {
                     const gradient = getGradient(t.name);
                     const price = t.price ? Math.round(t.price / 100) : 0;
