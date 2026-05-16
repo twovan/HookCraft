@@ -83,7 +83,6 @@ export default function Navbar() {
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
         <Link href="/templates" style={navLinkStyle('/templates')} onMouseEnter={e => { if (!isActive('/templates')) e.currentTarget.style.color = '#7536d5'; }} onMouseLeave={e => { if (!isActive('/templates')) e.currentTarget.style.color = '#9ca3af'; }}>模板中心</Link>
-        <Link href="/upload" style={navLinkStyle('/upload')} onMouseEnter={e => { if (!isActive('/upload')) e.currentTarget.style.color = '#7536d5'; }} onMouseLeave={e => { if (!isActive('/upload')) e.currentTarget.style.color = '#9ca3af'; }}>上传模板</Link>
         <Link href="/studio" style={navLinkStyle('/studio')} onMouseEnter={e => { if (!isActive('/studio')) e.currentTarget.style.color = '#7536d5'; }} onMouseLeave={e => { if (!isActive('/studio')) e.currentTarget.style.color = '#9ca3af'; }}>AI 创作</Link>
         <Link href="/pricing" style={navLinkStyle('/pricing')} onMouseEnter={e => { if (!isActive('/pricing')) e.currentTarget.style.color = '#7536d5'; }} onMouseLeave={e => { if (!isActive('/pricing')) e.currentTarget.style.color = '#9ca3af'; }}>定价</Link>
         <Link href="/account/creations" style={navLinkStyle('/account/creations')} onMouseEnter={e => { if (!isActive('/account/creations')) e.currentTarget.style.color = '#7536d5'; }} onMouseLeave={e => { if (!isActive('/account/creations')) e.currentTarget.style.color = '#9ca3af'; }}>我的创作</Link>

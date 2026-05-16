@@ -99,7 +99,7 @@ export default function PricingContent({ tiers }: PricingContentProps) {
             background:
               billingCycle === 'monthly'
                 ? 'linear-gradient(135deg, #7536d5 0%, #5a2db8 100%)'
-                : '#f5f0ea',
+                : '#1a1a2e',
             color: billingCycle === 'monthly' ? 'white' : '#9ca3af',
             boxShadow:
               billingCycle === 'monthly'
@@ -124,7 +124,7 @@ export default function PricingContent({ tiers }: PricingContentProps) {
             background:
               billingCycle === 'yearly'
                 ? 'linear-gradient(135deg, #7536d5 0%, #5a2db8 100%)'
-                : '#f5f0ea',
+                : '#1a1a2e',
             color: billingCycle === 'yearly' ? 'white' : '#9ca3af',
             boxShadow:
               billingCycle === 'yearly'

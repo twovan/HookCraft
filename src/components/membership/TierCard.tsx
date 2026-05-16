@@ -291,7 +291,7 @@ export default function TierCard({
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: '12px',
-                background: feature.included ? '#2a2a40' : '#f5f5f5',
+                background: feature.included ? '#2a2a40' : '#1a1a2e',
                 color: feature.included ? '#7536d5' : '#ccc',
                 marginTop: '1px',
               }}
@@ -321,9 +321,9 @@ export default function TierCard({
           fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
           letterSpacing: '0.3px',
           background: isCurrentTier
-            ? '#f0f0f0'
+            ? '#2a2a40'
             : 'linear-gradient(135deg, #7536d5 0%, #5a2db8 100%)',
-          color: isCurrentTier ? '#999' : 'white',
+          color: isCurrentTier ? '#6b7280' : 'white',
           boxShadow: isCurrentTier
             ? 'none'
             : '0 4px 12px rgba(117, 54, 213, 0.3)',
