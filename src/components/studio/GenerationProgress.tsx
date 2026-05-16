@@ -14,11 +14,11 @@ export default function GenerationProgress({
   const progress = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
 
   const containerStyle: React.CSSProperties = {
-    background: 'white',
+    background: '#1a1a2e',
     borderRadius: 20,
     padding: 24,
-    border: '1px solid #f0ebe4',
-    boxShadow: '0 4px 20px rgba(212, 165, 116, 0.06)',
+    border: '1px solid #2a2a40',
+    boxShadow: '0 4px 20px rgba(117, 54, 213, 0.06)',
   };
 
   const headerStyle: React.CSSProperties = {
@@ -31,21 +31,21 @@ export default function GenerationProgress({
   const titleStyle: React.CSSProperties = {
     fontSize: 16,
     fontWeight: 600,
-    color: '#2D2D2D',
-    fontFamily: "'Inter', sans-serif",
+    color: '#e8e8f0',
+    fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
   };
 
   const countStyle: React.CSSProperties = {
     fontSize: 14,
-    color: '#D4A574',
+    color: '#7536d5',
     fontWeight: 600,
-    fontFamily: "'Inter', sans-serif",
+    fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
   };
 
   const barContainerStyle: React.CSSProperties = {
     width: '100%',
     height: 8,
-    background: '#F5E6D3',
+    background: 'rgba(117, 54, 213, 0.15)',
     borderRadius: 4,
     overflow: 'hidden',
     position: 'relative',
@@ -53,7 +53,7 @@ export default function GenerationProgress({
 
   const barFillStyle: React.CSSProperties = {
     height: '100%',
-    background: 'linear-gradient(90deg, #D4A574, #C9A86A)',
+    background: 'linear-gradient(90deg, #7536d5, #5a2db8)',
     borderRadius: 4,
     width: `${progress}%`,
     transition: 'width 0.5s ease',
@@ -77,7 +77,7 @@ export default function GenerationProgress({
     color: '#999',
     marginTop: 12,
     textAlign: 'center',
-    fontFamily: "'Inter', sans-serif",
+    fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
   };
 
   return (

@@ -334,7 +334,7 @@ const actionBtnStyle: React.CSSProperties = {
   background: '#fff',
   fontSize: 12,
   cursor: 'pointer',
-  fontFamily: "'Inter', sans-serif",
+  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
   whiteSpace: 'nowrap',
 };
 
@@ -347,7 +347,7 @@ const exportBtnStyle: React.CSSProperties = {
   fontSize: 13,
   fontWeight: 600,
   cursor: 'pointer',
-  fontFamily: "'Inter', sans-serif",
+  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
   whiteSpace: 'nowrap',
 };
 

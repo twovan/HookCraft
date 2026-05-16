@@ -25,14 +25,14 @@ export default function VersionCard({
 
   const cardStyle: React.CSSProperties = {
     position: 'relative',
-    background: 'white',
+    background: '#1a1a2e',
     borderRadius: 16,
     padding: 20,
     border: isSelected
-      ? '2px solid #D4A574'
-      : '1px solid #f0ebe4',
+      ? '2px solid #7536d5'
+      : '1px solid #2a2a40',
     boxShadow: isSelected
-      ? '0 4px 20px rgba(212, 165, 116, 0.2)'
+      ? '0 4px 20px rgba(117, 54, 213, 0.2)'
       : '0 2px 12px rgba(0, 0, 0, 0.04)',
     transition: 'all 0.2s ease',
     opacity: isFailed ? 0.6 : 1,
@@ -62,19 +62,19 @@ export default function VersionCard({
   const versionLabelStyle: React.CSSProperties = {
     fontSize: 14,
     fontWeight: 700,
-    color: '#2D2D2D',
-    fontFamily: "'Inter', sans-serif",
+    color: '#e8e8f0',
+    fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
   };
 
   const durationStyle: React.CSSProperties = {
     fontSize: 12,
     color: '#999',
-    fontFamily: "'Inter', sans-serif",
+    fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
   };
 
   const wavePreviewStyle: React.CSSProperties = {
     height: 40,
-    background: '#F5E6D3',
+    background: 'rgba(117, 54, 213, 0.15)',
     borderRadius: 8,
     marginBottom: 12,
     display: 'flex',
@@ -89,15 +89,15 @@ export default function VersionCard({
     width: '100%',
     padding: '10px 16px',
     borderRadius: 20,
-    border: isSelected ? 'none' : '1px solid #D4A574',
+    border: isSelected ? 'none' : '1px solid #7536d5',
     background: isSelected
-      ? 'linear-gradient(135deg, #D4A574, #C9A86A)'
+      ? 'linear-gradient(135deg, #7536d5, #5a2db8)'
       : 'transparent',
-    color: isSelected ? 'white' : '#D4A574',
+    color: isSelected ? 'white' : '#7536d5',
     fontSize: 13,
     fontWeight: 600,
     cursor: isFailed ? 'not-allowed' : 'pointer',
-    fontFamily: "'Inter', sans-serif",
+    fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
     transition: 'all 0.2s ease',
     display: 'flex',
     alignItems: 'center',
@@ -137,7 +137,7 @@ export default function VersionCard({
               width: 18,
               height: 18,
               borderRadius: '50%',
-              background: '#D4A574',
+              background: '#7536d5',
               color: 'white',
               fontSize: 10,
               display: 'flex',
@@ -161,8 +161,8 @@ export default function VersionCard({
               height: 30,
               borderRadius: 2,
               background: isPlaying
-                ? 'linear-gradient(180deg, #D4A574 0%, #C9A86A 100%)'
-                : 'rgba(212, 165, 116, 0.4)',
+                ? 'linear-gradient(180deg, #7536d5 0%, #5a2db8 100%)'
+                : 'rgba(117, 54, 213, 0.4)',
               transform: `scaleY(${0.3 + Math.random() * 0.7})`,
               transformOrigin: 'bottom center',
               transition: 'transform 0.3s ease',

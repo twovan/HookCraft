@@ -162,6 +162,6 @@ const exportBtnStyle: React.CSSProperties = {
   fontSize: 13,
   fontWeight: 600,
   cursor: 'pointer',
-  fontFamily: "'Inter', sans-serif",
+  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
   whiteSpace: 'nowrap',
 };

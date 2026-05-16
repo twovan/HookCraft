@@ -331,7 +331,7 @@ const tabButtonStyle: React.CSSProperties = {
   fontSize: 12,
   fontWeight: 500,
   cursor: 'pointer',
-  fontFamily: "'Inter', sans-serif",
+  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
 };
 
 const thStyle: React.CSSProperties = {

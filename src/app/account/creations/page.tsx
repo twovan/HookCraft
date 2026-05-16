@@ -92,12 +92,12 @@ export default function CreationsPage() {
   ];
 
   return (
-    <div style={{ minHeight: '100vh', background: '#FDFBF7' }}>
+    <div style={{ minHeight: '100vh', background: '#0d0d14' }}>
       {/* Background */}
       <div style={{
         position: 'fixed',
         top: 0, left: 0, right: 0, bottom: 0,
-        background: 'radial-gradient(circle at 20% 50%, rgba(212,165,116,0.03) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(212,165,116,0.03) 0%, transparent 50%)',
+        background: 'radial-gradient(circle at 20% 50%, rgba(117, 54, 213,0.03) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(117, 54, 213,0.03) 0%, transparent 50%)',
         pointerEvents: 'none',
         zIndex: 0,
       }} />
@@ -106,15 +106,15 @@ export default function CreationsPage() {
         {/* Header */}
         <div style={{ marginBottom: 32 }}>
           <h1 style={{
-            fontFamily: "'Playfair Display', serif",
+            fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
             fontSize: 32,
             fontWeight: 700,
-            color: '#2D2D2D',
+            color: '#e8e8f0',
             marginBottom: 8,
           }}>
             我的创作
           </h1>
-          <p style={{ fontSize: 14, color: '#6B6B6B', margin: 0 }}>
+          <p style={{ fontSize: 14, color: '#9ca3af', margin: 0 }}>
             查看您的所有 AI 音乐创作记录
           </p>
         </div>
@@ -134,13 +134,13 @@ export default function CreationsPage() {
                 borderRadius: 20,
                 border: range === opt.value ? 'none' : '1px solid #E5E5E5',
                 background: range === opt.value
-                  ? 'linear-gradient(135deg, #D4A574, #C9A86A)'
+                  ? 'linear-gradient(135deg, #7536d5, #5a2db8)'
                   : 'white',
-                color: range === opt.value ? 'white' : '#6B6B6B',
+                color: range === opt.value ? 'white' : '#9ca3af',
                 fontSize: 13,
                 fontWeight: 600,
                 cursor: 'pointer',
-                fontFamily: "'Inter', sans-serif",
+                fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
                 transition: 'all 0.2s',
               }}
             >

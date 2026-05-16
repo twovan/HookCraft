@@ -124,15 +124,15 @@ export default function TierCard({
     <div
       style={{
         position: 'relative',
-        background: 'white',
+        background: '#1a1a2e',
         borderRadius: '20px',
         padding: isRecommended ? '40px 32px' : '36px 28px',
         boxShadow: isRecommended
-          ? '0 12px 40px rgba(212, 165, 116, 0.2)'
+          ? '0 12px 40px rgba(117, 54, 213, 0.2)'
           : '0 4px 20px rgba(0, 0, 0, 0.06)',
         border: isRecommended
-          ? '2px solid #D4A574'
-          : '1px solid #f0ebe4',
+          ? '2px solid #7536d5'
+          : '1px solid #2a2a40',
         transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
         transform: isRecommended ? 'scale(1.03)' : 'scale(1)',
         display: 'flex',
@@ -149,7 +149,7 @@ export default function TierCard({
             top: '-14px',
             left: '50%',
             transform: 'translateX(-50%)',
-            background: 'linear-gradient(135deg, #D4A574 0%, #C9A86A 100%)',
+            background: 'linear-gradient(135deg, #7536d5 0%, #5a2db8 100%)',
             color: 'white',
             padding: '6px 20px',
             borderRadius: '20px',
@@ -170,8 +170,8 @@ export default function TierCard({
             position: 'absolute',
             top: '16px',
             right: '16px',
-            background: '#f0ebe4',
-            color: '#D4A574',
+            background: '#2a2a40',
+            color: '#7536d5',
             padding: '4px 12px',
             borderRadius: '12px',
             fontSize: '12px',
@@ -185,10 +185,10 @@ export default function TierCard({
       {/* 等级名称 */}
       <h3
         style={{
-          fontFamily: "'Playfair Display', serif",
+          fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
           fontSize: '24px',
           fontWeight: 700,
-          color: '#2D2D2D',
+          color: '#e8e8f0',
           marginBottom: '8px',
           marginTop: isRecommended ? '8px' : '0',
         }}
@@ -202,8 +202,8 @@ export default function TierCard({
           style={{
             fontSize: '42px',
             fontWeight: 700,
-            color: '#D4A574',
-            fontFamily: "'Playfair Display', serif",
+            color: '#7536d5',
+            fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
             lineHeight: 1.1,
           }}
         >
@@ -213,7 +213,7 @@ export default function TierCard({
           <span
             style={{
               fontSize: '16px',
-              color: '#6B6B6B',
+              color: '#9ca3af',
               marginLeft: '4px',
             }}
           >
@@ -240,16 +240,16 @@ export default function TierCard({
       {config.tier !== 'free' && (
         <div
           style={{
-            background: '#FDFBF7',
+            background: '#0d0d14',
             borderRadius: '12px',
             padding: '12px 16px',
             marginBottom: '20px',
             fontSize: '13px',
-            color: '#6B6B6B',
+            color: '#9ca3af',
             lineHeight: 1.8,
           }}
         >
-          <div style={{ fontWeight: 600, color: '#2D2D2D', marginBottom: '4px' }}>
+          <div style={{ fontWeight: 600, color: '#e8e8f0', marginBottom: '4px' }}>
             Credits 消耗
           </div>
           <div>Preview（30s）= 1 Credit</div>
@@ -277,7 +277,7 @@ export default function TierCard({
               gap: '10px',
               padding: '8px 0',
               fontSize: '14px',
-              color: feature.included ? '#2D2D2D' : '#ccc',
+              color: feature.included ? '#e8e8f0' : '#ccc',
               lineHeight: 1.5,
             }}
           >
@@ -291,8 +291,8 @@ export default function TierCard({
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: '12px',
-                background: feature.included ? '#f0ebe4' : '#f5f5f5',
-                color: feature.included ? '#D4A574' : '#ccc',
+                background: feature.included ? '#2a2a40' : '#f5f5f5',
+                color: feature.included ? '#7536d5' : '#ccc',
                 marginTop: '1px',
               }}
             >
@@ -318,15 +318,15 @@ export default function TierCard({
           fontWeight: 600,
           cursor: isCurrentTier ? 'default' : 'pointer',
           transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
-          fontFamily: "'Inter', sans-serif",
+          fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
           letterSpacing: '0.3px',
           background: isCurrentTier
             ? '#f0f0f0'
-            : 'linear-gradient(135deg, #D4A574 0%, #C9A86A 100%)',
+            : 'linear-gradient(135deg, #7536d5 0%, #5a2db8 100%)',
           color: isCurrentTier ? '#999' : 'white',
           boxShadow: isCurrentTier
             ? 'none'
-            : '0 4px 12px rgba(212, 165, 116, 0.3)',
+            : '0 4px 12px rgba(117, 54, 213, 0.3)',
         }}
         aria-label={
           isCurrentTier

@@ -36,9 +36,9 @@ export default function MembershipBadge({
     pro: {
       icon: '⭐',
       label: 'Pro',
-      color: '#D4A574',
-      bgColor: 'linear-gradient(135deg, #F5E6D3 0%, #FDF8F3 100%)',
-      borderColor: '#D4A574',
+      color: '#7536d5',
+      bgColor: 'linear-gradient(135deg, rgba(117, 54, 213, 0.15) 0%, rgba(117, 54, 213, 0.1) 100%)',
+      borderColor: '#7536d5',
     },
     business: {
       icon: '💎',
@@ -87,7 +87,7 @@ export default function MembershipBadge({
             fontSize: '12px',
             fontWeight: 600,
             color: config.color,
-            fontFamily: "'Inter', sans-serif",
+            fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
           }}
         >
           {config.label}
@@ -101,12 +101,12 @@ export default function MembershipBadge({
             position: 'absolute',
             top: 'calc(100% + 8px)',
             right: 0,
-            background: 'white',
+            background: '#1a1a2e',
             borderRadius: '12px',
             padding: '16px',
             minWidth: '200px',
             boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
-            border: '1px solid #f0ebe4',
+            border: '1px solid #2a2a40',
             zIndex: 1000,
             animation: 'tooltipFadeIn 0.15s ease',
           }}
@@ -126,8 +126,8 @@ export default function MembershipBadge({
               style={{
                 fontSize: '15px',
                 fontWeight: 700,
-                color: '#2D2D2D',
-                fontFamily: "'Playfair Display', serif",
+                color: '#e8e8f0',
+                fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
               }}
             >
               {tierName}
@@ -145,7 +145,7 @@ export default function MembershipBadge({
               }}
             >
               <span style={{ color: '#999' }}>到期日期</span>
-              <span style={{ color: '#2D2D2D', fontWeight: 500 }}>
+              <span style={{ color: '#e8e8f0', fontWeight: 500 }}>
                 {formatDate(expiresAt)}
               </span>
             </div>
@@ -160,7 +160,7 @@ export default function MembershipBadge({
                 }}
               >
                 <span style={{ color: '#999' }}>剩余 Credits</span>
-                <span style={{ color: '#D4A574', fontWeight: 600 }}>
+                <span style={{ color: '#7536d5', fontWeight: 600 }}>
                   {creditsRemaining}/{creditsTotal}
                 </span>
               </div>
@@ -176,7 +176,7 @@ export default function MembershipBadge({
                 }}
               >
                 <span style={{ color: '#999' }}>剩余预览</span>
-                <span style={{ color: '#D4A574', fontWeight: 600 }}>
+                <span style={{ color: '#7536d5', fontWeight: 600 }}>
                   {previewsRemaining}/{previewsTotal}
                 </span>
               </div>

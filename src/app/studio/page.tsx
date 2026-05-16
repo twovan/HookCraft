@@ -239,7 +239,7 @@ export default function StudioPage() {
 
   if (authLoading || !user) {
     return (
-      <div style={{ minHeight: '100vh', background: '#FDFBF7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ minHeight: '100vh', background: '#0d0d14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ fontSize: '14px', color: '#999' }}>加载中...</div>
       </div>
     );
@@ -249,7 +249,7 @@ export default function StudioPage() {
     <div
       style={{
         minHeight: '100vh',
-        background: '#FDFBF7',
+        background: '#0d0d14',
         position: 'relative',
         paddingBottom: '80px',
       }}
@@ -263,7 +263,7 @@ export default function StudioPage() {
           right: 0,
           bottom: 0,
           background:
-            'radial-gradient(circle at 20% 50%, rgba(212, 165, 116, 0.03) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(212, 165, 116, 0.03) 0%, transparent 50%)',
+            'radial-gradient(circle at 20% 50%, rgba(117, 54, 213, 0.03) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(117, 54, 213, 0.03) 0%, transparent 50%)',
           pointerEvents: 'none',
           zIndex: 0,
         }}
@@ -274,16 +274,16 @@ export default function StudioPage() {
         <div style={{ marginBottom: '32px' }}>
           <h1
             style={{
-              fontFamily: "'Playfair Display', serif",
+              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
               fontSize: '36px',
               fontWeight: 700,
-              color: '#2D2D2D',
+              color: '#e8e8f0',
               marginBottom: '8px',
             }}
           >
             AI 创作中心
           </h1>
-          <p style={{ fontSize: '15px', color: '#6B6B6B', margin: 0 }}>
+          <p style={{ fontSize: '15px', color: '#9ca3af', margin: 0 }}>
             选择模板或输入提示词，AI 为您生成音乐作品
           </p>
         </div>
@@ -311,17 +311,17 @@ export default function StudioPage() {
         {batchId && versions.length > 0 && !isGenerating && (
           <div style={{
             marginBottom: '32px',
-            background: 'white',
+            background: '#1a1a2e',
             borderRadius: 20,
             padding: 24,
-            border: '1px solid #f0ebe4',
-            boxShadow: '0 4px 20px rgba(212, 165, 116, 0.06)',
+            border: '1px solid #2a2a40',
+            boxShadow: '0 4px 20px rgba(117, 54, 213, 0.06)',
           }}>
             {versions[0]?.status === 'completed' ? (
               <div style={{ textAlign: 'center' }}>
                 <h3 style={{
-                  fontSize: 18, fontWeight: 600, color: '#2D2D2D', marginBottom: 16,
-                  fontFamily: "'Playfair Display', serif",
+                  fontSize: 18, fontWeight: 600, color: '#e8e8f0', marginBottom: 16,
+                  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
                 }}>生成完成</h3>
                 {versions[0]?.audioUrl && (
                   <div style={{ marginBottom: 20 }}>
@@ -332,9 +332,9 @@ export default function StudioPage() {
                   onClick={() => { setBatchId(null); setVersions([]); setSelectedVersionId(undefined); }}
                   style={{
                     padding: '14px 32px', borderRadius: 24,
-                    border: '1px solid #D4A574', background: 'transparent', color: '#D4A574',
+                    border: '1px solid #7536d5', background: 'transparent', color: '#7536d5',
                     fontSize: 15, fontWeight: 600, cursor: 'pointer',
-                    fontFamily: "'Inter', sans-serif",
+                    fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
                   }}
                 >
                   继续创作
@@ -346,16 +346,16 @@ export default function StudioPage() {
                 <h3 style={{ fontSize: 18, fontWeight: 600, color: '#E53E3E', marginBottom: 8 }}>
                   生成失败
                 </h3>
-                <p style={{ fontSize: 14, color: '#6B6B6B', marginBottom: 20 }}>
+                <p style={{ fontSize: 14, color: '#9ca3af', marginBottom: 20 }}>
                   {versions[0]?.error?.message || '请重试或更换提示词'}
                 </p>
                 <button
                   onClick={() => { setBatchId(null); setVersions([]); }}
                   style={{
                     padding: '14px 32px', borderRadius: 24, border: 'none',
-                    background: 'linear-gradient(135deg, #D4A574, #C9A86A)', color: 'white',
+                    background: 'linear-gradient(135deg, #7536d5, #5a2db8)', color: 'white',
                     fontSize: 15, fontWeight: 700, cursor: 'pointer',
-                    fontFamily: "'Inter', sans-serif",
+                    fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
                   }}
                 >
                   重新创作
@@ -377,21 +377,21 @@ export default function StudioPage() {
             {/* Left Column: Template Selection */}
             <div
               style={{
-                background: 'white',
+                background: '#1a1a2e',
                 borderRadius: '20px',
                 padding: '24px',
-                border: '1px solid #f0ebe4',
-                boxShadow: '0 4px 20px rgba(212, 165, 116, 0.06)',
+                border: '1px solid #2a2a40',
+                boxShadow: '0 4px 20px rgba(117, 54, 213, 0.06)',
                 minWidth: 0,
                 overflow: 'hidden',
               }}
             >
               <h2
                 style={{
-                  fontFamily: "'Playfair Display', serif",
+                  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
                   fontSize: '18px',
                   fontWeight: 600,
-                  color: '#2D2D2D',
+                  color: '#e8e8f0',
                   margin: '0 0 20px 0',
                 }}
               >
@@ -409,11 +409,11 @@ export default function StudioPage() {
               {/* Prompt Input */}
               <div
                 style={{
-                  background: 'white',
+                  background: '#1a1a2e',
                   borderRadius: '20px',
                   padding: '24px',
-                  border: '1px solid #f0ebe4',
-                  boxShadow: '0 4px 20px rgba(212, 165, 116, 0.06)',
+                  border: '1px solid #2a2a40',
+                  boxShadow: '0 4px 20px rgba(117, 54, 213, 0.06)',
                 }}
               >
                 <PromptInput
@@ -426,11 +426,11 @@ export default function StudioPage() {
               {/* Duration Selector */}
               <div
                 style={{
-                  background: 'white',
+                  background: '#1a1a2e',
                   borderRadius: '20px',
                   padding: '24px',
-                  border: '1px solid #f0ebe4',
-                  boxShadow: '0 4px 20px rgba(212, 165, 116, 0.06)',
+                  border: '1px solid #2a2a40',
+                  boxShadow: '0 4px 20px rgba(117, 54, 213, 0.06)',
                 }}
               >
                 <DurationSelector
@@ -447,22 +447,22 @@ export default function StudioPage() {
               {/* Total Cost Display */}
               <div
                 style={{
-                  background: 'linear-gradient(135deg, #FDFBF7 0%, #F5E6D3 100%)',
+                  background: 'linear-gradient(135deg, #0d0d14 0%, rgba(117, 54, 213, 0.15) 100%)',
                   borderRadius: '20px',
                   padding: '20px 24px',
-                  border: '1px solid #f0ebe4',
+                  border: '1px solid #2a2a40',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                  <span style={{ fontSize: '14px', fontWeight: 600, color: '#2D2D2D', fontFamily: "'Inter', sans-serif" }}>
+                  <span style={{ fontSize: '14px', fontWeight: 600, color: '#e8e8f0', fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" }}>
                     预计消耗
                   </span>
                   <span
                     style={{
                       fontSize: '22px',
                       fontWeight: 700,
-                      color: '#D4A574',
-                      fontFamily: "'Playfair Display', serif",
+                      color: '#7536d5',
+                      fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
                     }}
                   >
                     {isPaid ? `${totalCost} Credits` : '1 次预览'}
@@ -470,7 +470,7 @@ export default function StudioPage() {
                 </div>
 
                 {isPaid && (
-                  <div style={{ fontSize: '12px', color: '#6B6B6B', lineHeight: 1.8 }}>
+                  <div style={{ fontSize: '12px', color: '#9ca3af', lineHeight: 1.8 }}>
                     <div>{duration === 30 ? `Preview ${CREDITS_COST.preview} Credit` : `Full Demo ${CREDITS_COST.full_demo_long} Credits`}</div>
                     {usePremiumSinger && <div>高级声模：+{CREDITS_COST.premium_singer} Credits</div>}
                   </div>
@@ -487,7 +487,7 @@ export default function StudioPage() {
                   borderRadius: '24px',
                   border: 'none',
                   background: canGenerate && !isGenerating && (selectedTemplate || prompt.trim())
-                    ? 'linear-gradient(135deg, #D4A574 0%, #C9A86A 100%)'
+                    ? 'linear-gradient(135deg, #7536d5 0%, #5a2db8 100%)'
                     : '#E2E8F0',
                   color: canGenerate && !isGenerating && (selectedTemplate || prompt.trim())
                     ? 'white'
@@ -497,9 +497,9 @@ export default function StudioPage() {
                   cursor: canGenerate && !isGenerating && (selectedTemplate || prompt.trim())
                     ? 'pointer'
                     : 'not-allowed',
-                  fontFamily: "'Inter', sans-serif",
+                  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
                   boxShadow: canGenerate && !isGenerating && (selectedTemplate || prompt.trim())
-                    ? '0 4px 16px rgba(212, 165, 116, 0.3)'
+                    ? '0 4px 16px rgba(117, 54, 213, 0.3)'
                     : 'none',
                   transition: 'all 0.2s ease',
                 }}

@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase/client';
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#FDFBF7' }}>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0d0d14' }}>
         <div style={{ fontSize: '14px', color: '#999' }}>加载中...</div>
       </div>
     }>
@@ -22,31 +22,31 @@ function LoginPageContent() {
   return (
     <div style={{
       minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      padding: 48, background: 'linear-gradient(135deg, #F5E6D3 0%, #FDFBF7 100%)',
+      padding: 48, background: 'linear-gradient(135deg, rgba(117, 54, 213, 0.15) 0%, #0d0d14 100%)',
       position: 'relative', overflow: 'hidden',
     }}>
       {/* Background decorations */}
       <div style={{
         position: 'absolute', top: '-10%', left: '-10%', width: '40%', height: '40%',
-        background: 'radial-gradient(circle, rgba(212,165,116,0.15) 0%, transparent 70%)',
+        background: 'radial-gradient(circle, rgba(117, 54, 213,0.15) 0%, transparent 70%)',
         borderRadius: '50%', filter: 'blur(60px)',
       }} />
       <div style={{
         position: 'absolute', bottom: '-10%', right: '-10%', width: '40%', height: '40%',
-        background: 'radial-gradient(circle, rgba(212,165,116,0.15) 0%, transparent 70%)',
+        background: 'radial-gradient(circle, rgba(117, 54, 213,0.15) 0%, transparent 70%)',
         borderRadius: '50%', filter: 'blur(60px)',
       }} />
 
       <div style={{
         width: '100%', maxWidth: 1000,
         display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0,
-        background: 'white', borderRadius: 32, overflow: 'hidden',
+        background: '#1a1a2e', borderRadius: 32, overflow: 'hidden',
         boxShadow: '0 20px 60px rgba(0,0,0,0.1)',
         position: 'relative', zIndex: 1,
       }}>
         {/* Left - Brand Panel */}
         <div style={{
-          background: 'linear-gradient(135deg, #D4A574 0%, #C9A86A 100%)',
+          background: 'linear-gradient(135deg, #7536d5 0%, #5a2db8 100%)',
           padding: 60, display: 'flex', flexDirection: 'column',
           justifyContent: 'center', alignItems: 'center', textAlign: 'center',
           position: 'relative', overflow: 'hidden',
@@ -59,7 +59,7 @@ function LoginPageContent() {
           <div style={{ position: 'relative', zIndex: 1 }}>
             <h1 style={{
               fontSize: 48, fontWeight: 700, color: 'white', marginBottom: 20,
-              fontFamily: "'Playfair Display', serif", letterSpacing: -1,
+              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", letterSpacing: -1,
             }}>
               HookCraft
             </h1>
@@ -152,16 +152,16 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
 
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '14px 16px', border: '2px solid #E5E5E5', borderRadius: 12,
-    fontSize: 15, fontFamily: "'Inter', sans-serif", transition: 'all 0.3s',
+    fontSize: 15, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", transition: 'all 0.3s',
     outline: 'none', boxSizing: 'border-box',
   };
 
   return (
     <div>
-      <h2 style={{ fontSize: 32, fontWeight: 700, marginBottom: 12, fontFamily: "'Playfair Display', serif", color: '#2D2D2D' }}>
+      <h2 style={{ fontSize: 32, fontWeight: 700, marginBottom: 12, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", color: '#e8e8f0' }}>
         欢迎回来
       </h2>
-      <p style={{ color: '#6B6B6B', marginBottom: 36 }}>登录您的账户继续购物</p>
+      <p style={{ color: '#9ca3af', marginBottom: 36 }}>登录您的账户继续购物</p>
 
       {error && (
         <div style={{
@@ -174,7 +174,7 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
 
       <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         <div>
-          <label style={{ display: 'block', fontWeight: 600, marginBottom: 8, color: '#2D2D2D', fontSize: 14 }}>邮箱</label>
+          <label style={{ display: 'block', fontWeight: 600, marginBottom: 8, color: '#e8e8f0', fontSize: 14 }}>邮箱</label>
           <input
             type="email"
             placeholder="输入邮箱地址"
@@ -186,7 +186,7 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
         </div>
 
         <div>
-          <label style={{ display: 'block', fontWeight: 600, marginBottom: 8, color: '#2D2D2D', fontSize: 14 }}>密码</label>
+          <label style={{ display: 'block', fontWeight: 600, marginBottom: 8, color: '#e8e8f0', fontSize: 14 }}>密码</label>
           <input
             type="password"
             placeholder="输入密码"
@@ -200,9 +200,9 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
             <input type="checkbox" style={{ width: 18, height: 18, cursor: 'pointer' }} />
-            <span style={{ fontSize: 14, color: '#6B6B6B' }}>记住我</span>
+            <span style={{ fontSize: 14, color: '#9ca3af' }}>记住我</span>
           </label>
-          <a href="#" onClick={(e) => { e.preventDefault(); alert('忘记密码功能即将上线'); }} style={{ fontSize: 14, color: '#D4A574', textDecoration: 'none', fontWeight: 600 }}>忘记密码？</a>
+          <a href="#" onClick={(e) => { e.preventDefault(); alert('忘记密码功能即将上线'); }} style={{ fontSize: 14, color: '#7536d5', textDecoration: 'none', fontWeight: 600 }}>忘记密码？</a>
         </div>
 
         <button
@@ -210,21 +210,21 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
           disabled={loading}
           style={{
             width: '100%', padding: 16, borderRadius: 24, border: 'none',
-            background: loading ? '#ccc' : 'linear-gradient(135deg, #D4A574, #C9A86A)', color: 'white',
+            background: loading ? '#ccc' : 'linear-gradient(135deg, #7536d5, #5a2db8)', color: 'white',
             fontSize: 16, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', marginTop: 8,
-            fontFamily: "'Inter', sans-serif",
-            boxShadow: loading ? 'none' : '0 6px 20px rgba(212,165,116,0.3)',
+            fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+            boxShadow: loading ? 'none' : '0 6px 20px rgba(117, 54, 213,0.3)',
           }}
         >
           {loading ? '登录中...' : '登录'}
         </button>
 
         <div style={{ textAlign: 'center', marginTop: 8 }}>
-          <span style={{ color: '#6B6B6B', fontSize: 14 }}>还没有账户？</span>
+          <span style={{ color: '#9ca3af', fontSize: 14 }}>还没有账户？</span>
           <button
             type="button"
             onClick={onSwitch}
-            style={{ color: '#D4A574', background: 'none', border: 'none', fontWeight: 600, marginLeft: 4, cursor: 'pointer', fontSize: 14 }}
+            style={{ color: '#7536d5', background: 'none', border: 'none', fontWeight: 600, marginLeft: 4, cursor: 'pointer', fontSize: 14 }}
           >
             立即注册
           </button>
@@ -235,7 +235,7 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
       <div style={{ marginTop: 32 }}>
         <div style={{ position: 'relative', textAlign: 'center', marginBottom: 24 }}>
           <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 1, background: '#E5E5E5' }} />
-          <span style={{ position: 'relative', background: 'white', padding: '0 16px', color: '#6B6B6B', fontSize: 14 }}>或使用以下方式登录</span>
+          <span style={{ position: 'relative', background: '#1a1a2e', padding: '0 16px', color: '#9ca3af', fontSize: 14 }}>或使用以下方式登录</span>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -243,7 +243,7 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
             type="button"
             onClick={() => handleOAuthLogin('wechat')}
             style={{
-              padding: 12, border: '2px solid #E5E5E5', borderRadius: 12, background: 'white',
+              padding: 12, border: '2px solid #E5E5E5', borderRadius: 12, background: '#1a1a2e',
               cursor: 'pointer', fontSize: 14, fontWeight: 600, transition: 'all 0.3s',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             }}
@@ -254,7 +254,7 @@ function LoginForm({ onSwitch }: { onSwitch: () => void }) {
             type="button"
             onClick={() => handleOAuthLogin('qq')}
             style={{
-              padding: 12, border: '2px solid #E5E5E5', borderRadius: 12, background: 'white',
+              padding: 12, border: '2px solid #E5E5E5', borderRadius: 12, background: '#1a1a2e',
               cursor: 'pointer', fontSize: 14, fontWeight: 600, transition: 'all 0.3s',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             }}
@@ -326,27 +326,27 @@ function RegisterForm({ onSwitch }: { onSwitch: () => void }) {
 
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '14px 16px', border: '2px solid #E5E5E5', borderRadius: 12,
-    fontSize: 15, fontFamily: "'Inter', sans-serif", transition: 'all 0.3s',
+    fontSize: 15, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", transition: 'all 0.3s',
     outline: 'none', boxSizing: 'border-box',
   };
 
   if (success) {
     return (
       <div>
-        <h2 style={{ fontSize: 32, fontWeight: 700, marginBottom: 12, fontFamily: "'Playfair Display', serif", color: '#2D2D2D' }}>
+        <h2 style={{ fontSize: 32, fontWeight: 700, marginBottom: 12, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", color: '#e8e8f0' }}>
           注册成功 🎉
         </h2>
-        <p style={{ color: '#6B6B6B', marginBottom: 24, lineHeight: 1.6 }}>
+        <p style={{ color: '#9ca3af', marginBottom: 24, lineHeight: 1.6 }}>
           我们已向 <strong>{email}</strong> 发送了一封验证邮件，请查收并点击链接完成验证。
         </p>
         <button
           onClick={onSwitch}
           style={{
             width: '100%', padding: 16, borderRadius: 24, border: 'none',
-            background: 'linear-gradient(135deg, #D4A574, #C9A86A)', color: 'white',
+            background: 'linear-gradient(135deg, #7536d5, #5a2db8)', color: 'white',
             fontSize: 16, fontWeight: 600, cursor: 'pointer',
-            fontFamily: "'Inter', sans-serif",
-            boxShadow: '0 6px 20px rgba(212,165,116,0.3)',
+            fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+            boxShadow: '0 6px 20px rgba(117, 54, 213,0.3)',
           }}
         >
           返回登录
@@ -357,10 +357,10 @@ function RegisterForm({ onSwitch }: { onSwitch: () => void }) {
 
   return (
     <div>
-      <h2 style={{ fontSize: 32, fontWeight: 700, marginBottom: 12, fontFamily: "'Playfair Display', serif", color: '#2D2D2D' }}>
+      <h2 style={{ fontSize: 32, fontWeight: 700, marginBottom: 12, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", color: '#e8e8f0' }}>
         创建账户
       </h2>
-      <p style={{ color: '#6B6B6B', marginBottom: 36 }}>加入我们，开始您的音乐之旅</p>
+      <p style={{ color: '#9ca3af', marginBottom: 36 }}>加入我们，开始您的音乐之旅</p>
 
       {error && (
         <div style={{
@@ -373,7 +373,7 @@ function RegisterForm({ onSwitch }: { onSwitch: () => void }) {
 
       <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         <div>
-          <label style={{ display: 'block', fontWeight: 600, marginBottom: 8, color: '#2D2D2D', fontSize: 14 }}>用户名</label>
+          <label style={{ display: 'block', fontWeight: 600, marginBottom: 8, color: '#e8e8f0', fontSize: 14 }}>用户名</label>
           <input
             type="text"
             placeholder="输入用户名"
@@ -385,7 +385,7 @@ function RegisterForm({ onSwitch }: { onSwitch: () => void }) {
         </div>
 
         <div>
-          <label style={{ display: 'block', fontWeight: 600, marginBottom: 8, color: '#2D2D2D', fontSize: 14 }}>邮箱</label>
+          <label style={{ display: 'block', fontWeight: 600, marginBottom: 8, color: '#e8e8f0', fontSize: 14 }}>邮箱</label>
           <input
             type="email"
             placeholder="输入邮箱地址"
@@ -397,7 +397,7 @@ function RegisterForm({ onSwitch }: { onSwitch: () => void }) {
         </div>
 
         <div>
-          <label style={{ display: 'block', fontWeight: 600, marginBottom: 8, color: '#2D2D2D', fontSize: 14 }}>密码</label>
+          <label style={{ display: 'block', fontWeight: 600, marginBottom: 8, color: '#e8e8f0', fontSize: 14 }}>密码</label>
           <input
             type="password"
             placeholder="设置密码（至少8位）"
@@ -410,7 +410,7 @@ function RegisterForm({ onSwitch }: { onSwitch: () => void }) {
         </div>
 
         <div>
-          <label style={{ display: 'block', fontWeight: 600, marginBottom: 8, color: '#2D2D2D', fontSize: 14 }}>确认密码</label>
+          <label style={{ display: 'block', fontWeight: 600, marginBottom: 8, color: '#e8e8f0', fontSize: 14 }}>确认密码</label>
           <input
             type="password"
             placeholder="再次输入密码"
@@ -428,8 +428,8 @@ function RegisterForm({ onSwitch }: { onSwitch: () => void }) {
             onChange={(e) => setAgreed(e.target.checked)}
             style={{ width: 18, height: 18, cursor: 'pointer', marginTop: 2 }}
           />
-          <span style={{ fontSize: 14, color: '#6B6B6B', lineHeight: 1.5 }}>
-            我已阅读并同意 <a href="#" style={{ color: '#D4A574', textDecoration: 'none', fontWeight: 600 }}>用户协议</a> 和 <a href="#" style={{ color: '#D4A574', textDecoration: 'none', fontWeight: 600 }}>隐私政策</a>
+          <span style={{ fontSize: 14, color: '#9ca3af', lineHeight: 1.5 }}>
+            我已阅读并同意 <a href="#" style={{ color: '#7536d5', textDecoration: 'none', fontWeight: 600 }}>用户协议</a> 和 <a href="#" style={{ color: '#7536d5', textDecoration: 'none', fontWeight: 600 }}>隐私政策</a>
           </span>
         </label>
 
@@ -438,21 +438,21 @@ function RegisterForm({ onSwitch }: { onSwitch: () => void }) {
           disabled={loading}
           style={{
             width: '100%', padding: 16, borderRadius: 24, border: 'none',
-            background: loading ? '#ccc' : 'linear-gradient(135deg, #D4A574, #C9A86A)', color: 'white',
+            background: loading ? '#ccc' : 'linear-gradient(135deg, #7536d5, #5a2db8)', color: 'white',
             fontSize: 16, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', marginTop: 8,
-            fontFamily: "'Inter', sans-serif",
-            boxShadow: loading ? 'none' : '0 6px 20px rgba(212,165,116,0.3)',
+            fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+            boxShadow: loading ? 'none' : '0 6px 20px rgba(117, 54, 213,0.3)',
           }}
         >
           {loading ? '注册中...' : '注册'}
         </button>
 
         <div style={{ textAlign: 'center', marginTop: 8 }}>
-          <span style={{ color: '#6B6B6B', fontSize: 14 }}>已有账户？</span>
+          <span style={{ color: '#9ca3af', fontSize: 14 }}>已有账户？</span>
           <button
             type="button"
             onClick={onSwitch}
-            style={{ color: '#D4A574', background: 'none', border: 'none', fontWeight: 600, marginLeft: 4, cursor: 'pointer', fontSize: 14 }}
+            style={{ color: '#7536d5', background: 'none', border: 'none', fontWeight: 600, marginLeft: 4, cursor: 'pointer', fontSize: 14 }}
           >
             立即登录
           </button>

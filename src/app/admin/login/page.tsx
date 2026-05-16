@@ -253,7 +253,7 @@ const inputStyle: React.CSSProperties = {
   outline: 'none',
   padding: '12px 0',
   fontSize: 14,
-  fontFamily: "'Inter', sans-serif",
+  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
   color: '#333',
   background: 'transparent',
 };
@@ -289,7 +289,7 @@ const btnStyle: React.CSSProperties = {
   fontSize: 15,
   fontWeight: 600,
   cursor: 'pointer',
-  fontFamily: "'Inter', sans-serif",
+  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
   transition: 'all 0.2s',
 };
 

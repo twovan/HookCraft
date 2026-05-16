@@ -50,9 +50,9 @@ export default function DurationSelector({
           display: 'block',
           fontSize: '14px',
           fontWeight: 600,
-          color: '#2D2D2D',
+          color: '#e8e8f0',
           marginBottom: '10px',
-          fontFamily: "'Inter', sans-serif",
+          fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
         }}
       >
         生成时长
@@ -89,17 +89,17 @@ export default function DurationSelector({
                 padding: '16px 12px',
                 borderRadius: '12px',
                 border: isSelected
-                  ? '2px solid #D4A574'
-                  : '1px solid #f0ebe4',
+                  ? '2px solid #7536d5'
+                  : '1px solid #2a2a40',
                 background: isSelected
-                  ? 'linear-gradient(135deg, #FDF8F3 0%, #FDFBF7 100%)'
+                  ? 'linear-gradient(135deg, rgba(117, 54, 213, 0.1) 0%, #0d0d14 100%)'
                   : option.locked
                     ? '#F7F7F7'
                     : 'white',
                 cursor: isDisabled ? 'not-allowed' : 'pointer',
                 opacity: option.locked ? 0.7 : 1,
                 transition: 'all 0.2s ease',
-                fontFamily: "'Inter', sans-serif",
+                fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
                 textAlign: 'center',
               }}
             >
@@ -108,9 +108,9 @@ export default function DurationSelector({
                 style={{
                   fontSize: '18px',
                   fontWeight: 700,
-                  color: isSelected ? '#D4A574' : option.locked ? '#999' : '#2D2D2D',
+                  color: isSelected ? '#7536d5' : option.locked ? '#999' : '#e8e8f0',
                   marginBottom: '4px',
-                  fontFamily: "'Playfair Display', serif",
+                  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
                 }}
               >
                 {option.label}
@@ -120,12 +120,12 @@ export default function DurationSelector({
               <div
                 style={{
                   fontSize: '12px',
-                  color: isSelected ? '#D4A574' : '#999',
+                  color: isSelected ? '#7536d5' : '#999',
                   fontWeight: 500,
                 }}
               >
                 {option.locked ? (
-                  <span style={{ color: '#D4A574' }}>需升级 Pro</span>
+                  <span style={{ color: '#7536d5' }}>需升级 Pro</span>
                 ) : isPaid ? (
                   `${option.credits} Credit${option.credits > 1 ? 's' : ''}`
                 ) : (
@@ -157,7 +157,7 @@ export default function DurationSelector({
                     width: '16px',
                     height: '16px',
                     borderRadius: '50%',
-                    background: '#D4A574',
+                    background: '#7536d5',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',

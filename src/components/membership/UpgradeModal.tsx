@@ -88,7 +88,7 @@ export default function UpgradeModal({
         tabIndex={-1}
         style={{
           position: 'relative',
-          background: 'white',
+          background: '#1a1a2e',
           borderRadius: '20px',
           padding: '32px',
           maxWidth: '420px',
@@ -115,7 +115,7 @@ export default function UpgradeModal({
             alignItems: 'center',
             justifyContent: 'center',
             fontSize: '16px',
-            color: '#6B6B6B',
+            color: '#9ca3af',
             transition: 'background 0.2s',
           }}
         >
@@ -128,7 +128,7 @@ export default function UpgradeModal({
             width: '56px',
             height: '56px',
             borderRadius: '50%',
-            background: 'linear-gradient(135deg, #F5E6D3 0%, #FDFBF7 100%)',
+            background: 'linear-gradient(135deg, rgba(117, 54, 213, 0.15) 0%, #0d0d14 100%)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -143,10 +143,10 @@ export default function UpgradeModal({
         <h2
           id="upgrade-modal-title"
           style={{
-            fontFamily: "'Playfair Display', serif",
+            fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
             fontSize: '22px',
             fontWeight: 700,
-            color: '#2D2D2D',
+            color: '#e8e8f0',
             margin: '0 0 8px 0',
           }}
         >
@@ -157,7 +157,7 @@ export default function UpgradeModal({
         <p
           style={{
             fontSize: '14px',
-            color: '#6B6B6B',
+            color: '#9ca3af',
             lineHeight: 1.6,
             margin: '0 0 20px 0',
           }}
@@ -168,10 +168,10 @@ export default function UpgradeModal({
         {/* Recommended tier card */}
         <div
           style={{
-            background: '#FDFBF7',
+            background: '#0d0d14',
             borderRadius: '12px',
             padding: '16px',
-            border: '1px solid #f0ebe4',
+            border: '1px solid #2a2a40',
             marginBottom: '24px',
           }}
         >
@@ -187,7 +187,7 @@ export default function UpgradeModal({
               style={{
                 fontSize: '15px',
                 fontWeight: 600,
-                color: '#2D2D2D',
+                color: '#e8e8f0',
               }}
             >
               推荐：{recommendedConfig.name}
@@ -196,14 +196,14 @@ export default function UpgradeModal({
               style={{
                 fontSize: '18px',
                 fontWeight: 700,
-                color: '#D4A574',
-                fontFamily: "'Playfair Display', serif",
+                color: '#7536d5',
+                fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
               }}
             >
               ¥{(recommendedConfig.monthlyPrice / 100).toFixed(0)}/月
             </span>
           </div>
-          <div style={{ fontSize: '13px', color: '#6B6B6B', lineHeight: 1.6 }}>
+          <div style={{ fontSize: '13px', color: '#9ca3af', lineHeight: 1.6 }}>
             {recommendedConfig.monthlyCredits} Credits/月 · 完整 Demo 生成 · 高级声模
           </div>
         </div>
@@ -220,9 +220,9 @@ export default function UpgradeModal({
               background: 'transparent',
               fontSize: '14px',
               fontWeight: 500,
-              color: '#6B6B6B',
+              color: '#9ca3af',
               cursor: 'pointer',
-              fontFamily: "'Inter', sans-serif",
+              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
               transition: 'all 0.2s',
             }}
           >
@@ -235,13 +235,13 @@ export default function UpgradeModal({
               padding: '12px 20px',
               borderRadius: '20px',
               border: 'none',
-              background: 'linear-gradient(135deg, #D4A574 0%, #C9A86A 100%)',
+              background: 'linear-gradient(135deg, #7536d5 0%, #5a2db8 100%)',
               fontSize: '14px',
               fontWeight: 600,
               color: 'white',
               cursor: 'pointer',
-              fontFamily: "'Inter', sans-serif",
-              boxShadow: '0 4px 12px rgba(212, 165, 116, 0.3)',
+              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+              boxShadow: '0 4px 12px rgba(117, 54, 213, 0.3)',
               transition: 'all 0.2s',
             }}
           >

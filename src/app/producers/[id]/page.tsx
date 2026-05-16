@@ -72,7 +72,7 @@ export default function ProducerProfilePage() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', background: '#FDFBF7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ minHeight: '100vh', background: '#0d0d14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <span style={{ color: '#999', fontSize: 14 }}>加载中...</span>
       </div>
     );
@@ -80,31 +80,31 @@ export default function ProducerProfilePage() {
 
   if (error || !producer) {
     return (
-      <div style={{ minHeight: '100vh', background: '#FDFBF7', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+      <div style={{ minHeight: '100vh', background: '#0d0d14', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
         <span style={{ fontSize: 48 }}>🎵</span>
         <span style={{ color: '#999', fontSize: 16 }}>{error || '制作人不存在'}</span>
-        <Link href="/" style={{ color: '#D4A574', textDecoration: 'none', fontWeight: 600 }}>← 返回首页</Link>
+        <Link href="/" style={{ color: '#7536d5', textDecoration: 'none', fontWeight: 600 }}>← 返回首页</Link>
       </div>
     );
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#FDFBF7' }}>
+    <div style={{ minHeight: '100vh', background: '#0d0d14' }}>
       {/* Background */}
       <div style={{
         position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-        background: 'radial-gradient(circle at 20% 50%, rgba(212,165,116,0.03) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(212,165,116,0.03) 0%, transparent 50%)',
+        background: 'radial-gradient(circle at 20% 50%, rgba(117, 54, 213,0.03) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(117, 54, 213,0.03) 0%, transparent 50%)',
         pointerEvents: 'none', zIndex: 0,
       }} />
 
       <div style={{ position: 'relative', zIndex: 1, maxWidth: 1200, margin: '0 auto', padding: '48px 24px' }}>
         {/* Producer Header */}
         <div style={{
-          background: 'white',
+          background: '#1a1a2e',
           borderRadius: 24,
           padding: 32,
-          border: '1px solid #f0ebe4',
-          boxShadow: '0 4px 20px rgba(212, 165, 116, 0.06)',
+          border: '1px solid #2a2a40',
+          boxShadow: '0 4px 20px rgba(117, 54, 213, 0.06)',
           marginBottom: 32,
           display: 'flex',
           gap: 24,
@@ -117,7 +117,7 @@ export default function ProducerProfilePage() {
             borderRadius: '50%',
             background: producer.avatarUrl
               ? `url(${producer.avatarUrl}) center/cover`
-              : 'linear-gradient(135deg, #D4A574, #C9A86A)',
+              : 'linear-gradient(135deg, #7536d5, #5a2db8)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -133,15 +133,15 @@ export default function ProducerProfilePage() {
             <h1 style={{
               fontSize: 28,
               fontWeight: 700,
-              color: '#2D2D2D',
+              color: '#e8e8f0',
               marginBottom: 8,
-              fontFamily: "'Playfair Display', serif",
+              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
             }}>
               {producer.displayName}
             </h1>
 
             {producer.bio && (
-              <p style={{ fontSize: 14, color: '#6B6B6B', lineHeight: 1.6, marginBottom: 12 }}>
+              <p style={{ fontSize: 14, color: '#9ca3af', lineHeight: 1.6, marginBottom: 12 }}>
                 {producer.bio}
               </p>
             )}
@@ -151,8 +151,8 @@ export default function ProducerProfilePage() {
               {producer.styleTags.map((tag) => (
                 <span key={tag} style={{
                   padding: '5px 14px',
-                  background: '#F5E6D3',
-                  color: '#D4A574',
+                  background: 'rgba(117, 54, 213, 0.15)',
+                  color: '#7536d5',
                   fontSize: 12,
                   fontWeight: 600,
                   borderRadius: 12,
@@ -165,15 +165,15 @@ export default function ProducerProfilePage() {
             {/* Stats */}
             <div style={{ display: 'flex', gap: 24 }}>
               <div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: '#D4A574' }}>{producer.templateCount}</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: '#7536d5' }}>{producer.templateCount}</div>
                 <div style={{ fontSize: 12, color: '#999' }}>模板</div>
               </div>
               <div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: '#D4A574' }}>{producer.totalDownloads}</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: '#7536d5' }}>{producer.totalDownloads}</div>
                 <div style={{ fontSize: 12, color: '#999' }}>下载量</div>
               </div>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: '#2D2D2D' }}>{formatDate(producer.joinedAt)}</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#e8e8f0' }}>{formatDate(producer.joinedAt)}</div>
                 <div style={{ fontSize: 12, color: '#999' }}>入驻时间</div>
               </div>
             </div>
@@ -189,13 +189,13 @@ export default function ProducerProfilePage() {
               borderRadius: 20,
               border: 'none',
               background: activeTab === 'templates'
-                ? 'linear-gradient(135deg, #D4A574, #C9A86A)'
+                ? 'linear-gradient(135deg, #7536d5, #5a2db8)'
                 : 'white',
-              color: activeTab === 'templates' ? 'white' : '#6B6B6B',
+              color: activeTab === 'templates' ? 'white' : '#9ca3af',
               fontSize: 14,
               fontWeight: 600,
               cursor: 'pointer',
-              fontFamily: "'Inter', sans-serif",
+              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
             }}
           >
             模板作品
@@ -207,13 +207,13 @@ export default function ProducerProfilePage() {
               borderRadius: 20,
               border: 'none',
               background: activeTab === 'other'
-                ? 'linear-gradient(135deg, #D4A574, #C9A86A)'
+                ? 'linear-gradient(135deg, #7536d5, #5a2db8)'
                 : 'white',
-              color: activeTab === 'other' ? 'white' : '#6B6B6B',
+              color: activeTab === 'other' ? 'white' : '#9ca3af',
               fontSize: 14,
               fontWeight: 600,
               cursor: 'pointer',
-              fontFamily: "'Inter', sans-serif",
+              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
             }}
           >
             其他内容
@@ -230,8 +230,8 @@ export default function ProducerProfilePage() {
                   padding: '6px 14px',
                   borderRadius: 16,
                   border: !selectedGenre ? 'none' : '1px solid #E5E5E5',
-                  background: !selectedGenre ? '#F5E6D3' : 'white',
-                  color: !selectedGenre ? '#D4A574' : '#6B6B6B',
+                  background: !selectedGenre ? 'rgba(117, 54, 213, 0.15)' : 'white',
+                  color: !selectedGenre ? '#7536d5' : '#9ca3af',
                   fontSize: 12,
                   fontWeight: 600,
                   cursor: 'pointer',
@@ -247,8 +247,8 @@ export default function ProducerProfilePage() {
                     padding: '6px 14px',
                     borderRadius: 16,
                     border: selectedGenre === tag ? 'none' : '1px solid #E5E5E5',
-                    background: selectedGenre === tag ? '#F5E6D3' : 'white',
-                    color: selectedGenre === tag ? '#D4A574' : '#6B6B6B',
+                    background: selectedGenre === tag ? 'rgba(117, 54, 213, 0.15)' : 'white',
+                    color: selectedGenre === tag ? '#7536d5' : '#9ca3af',
                     fontSize: 12,
                     fontWeight: 600,
                     cursor: 'pointer',
@@ -272,11 +272,11 @@ export default function ProducerProfilePage() {
                     key={t.id}
                     href={`/templates/${t.id}`}
                     style={{
-                      background: 'white',
+                      background: '#1a1a2e',
                       borderRadius: 16,
                       overflow: 'hidden',
                       boxShadow: hoveredCard === t.id
-                        ? '0 8px 30px rgba(212,165,116,0.2)'
+                        ? '0 8px 30px rgba(117, 54, 213,0.2)'
                         : '0 2px 12px rgba(0,0,0,0.04)',
                       transition: 'all 0.3s ease',
                       transform: hoveredCard === t.id ? 'translateY(-4px)' : 'none',
@@ -289,7 +289,7 @@ export default function ProducerProfilePage() {
                   >
                     <div style={{
                       height: 120,
-                      background: 'linear-gradient(135deg, #F5E6D3, #FDFBF7)',
+                      background: 'linear-gradient(135deg, rgba(117, 54, 213, 0.15), #0d0d14)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -298,14 +298,14 @@ export default function ProducerProfilePage() {
                       🎵
                     </div>
                     <div style={{ padding: 16 }}>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: '#2D2D2D', marginBottom: 6 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: '#e8e8f0', marginBottom: 6 }}>
                         {t.name}
                       </div>
                       <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
                         <span style={{
                           padding: '3px 8px',
-                          background: '#F5E6D3',
-                          color: '#D4A574',
+                          background: 'rgba(117, 54, 213, 0.15)',
+                          color: '#7536d5',
                           fontSize: 10,
                           fontWeight: 600,
                           borderRadius: 8,
@@ -313,7 +313,7 @@ export default function ProducerProfilePage() {
                           {t.genre}
                         </span>
                       </div>
-                      <div style={{ fontSize: 18, fontWeight: 700, color: '#D4A574' }}>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: '#7536d5' }}>
                         {t.price && t.price > 0 ? `￥${Math.round(t.price / 100)}` : '免费'}
                       </div>
                     </div>
@@ -328,9 +328,9 @@ export default function ProducerProfilePage() {
           <div style={{
             textAlign: 'center',
             padding: '80px 20px',
-            background: 'white',
+            background: '#1a1a2e',
             borderRadius: 20,
-            border: '1px solid #f0ebe4',
+            border: '1px solid #2a2a40',
           }}>
             <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.4 }}>📝</div>
             <p style={{ fontSize: 15, color: '#999' }}>暂无其他内容</p>

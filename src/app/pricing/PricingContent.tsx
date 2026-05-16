@@ -95,15 +95,15 @@ export default function PricingContent({ tiers }: PricingContentProps) {
             fontWeight: 600,
             cursor: 'pointer',
             transition: 'all 0.2s',
-            fontFamily: "'Inter', sans-serif",
+            fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
             background:
               billingCycle === 'monthly'
-                ? 'linear-gradient(135deg, #D4A574 0%, #C9A86A 100%)'
+                ? 'linear-gradient(135deg, #7536d5 0%, #5a2db8 100%)'
                 : '#f5f0ea',
-            color: billingCycle === 'monthly' ? 'white' : '#6B6B6B',
+            color: billingCycle === 'monthly' ? 'white' : '#9ca3af',
             boxShadow:
               billingCycle === 'monthly'
-                ? '0 4px 12px rgba(212, 165, 116, 0.3)'
+                ? '0 4px 12px rgba(117, 54, 213, 0.3)'
                 : 'none',
           }}
           aria-pressed={billingCycle === 'monthly'}
@@ -120,15 +120,15 @@ export default function PricingContent({ tiers }: PricingContentProps) {
             fontWeight: 600,
             cursor: 'pointer',
             transition: 'all 0.2s',
-            fontFamily: "'Inter', sans-serif",
+            fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
             background:
               billingCycle === 'yearly'
-                ? 'linear-gradient(135deg, #D4A574 0%, #C9A86A 100%)'
+                ? 'linear-gradient(135deg, #7536d5 0%, #5a2db8 100%)'
                 : '#f5f0ea',
-            color: billingCycle === 'yearly' ? 'white' : '#6B6B6B',
+            color: billingCycle === 'yearly' ? 'white' : '#9ca3af',
             boxShadow:
               billingCycle === 'yearly'
-                ? '0 4px 12px rgba(212, 165, 116, 0.3)'
+                ? '0 4px 12px rgba(117, 54, 213, 0.3)'
                 : 'none',
           }}
           aria-pressed={billingCycle === 'yearly'}
@@ -137,7 +137,7 @@ export default function PricingContent({ tiers }: PricingContentProps) {
           <span
             style={{
               marginLeft: '6px',
-              background: billingCycle === 'yearly' ? 'rgba(255,255,255,0.25)' : '#D4A574',
+              background: billingCycle === 'yearly' ? 'rgba(255,255,255,0.25)' : '#7536d5',
               color: billingCycle === 'yearly' ? 'white' : 'white',
               padding: '2px 8px',
               borderRadius: '10px',
@@ -212,16 +212,16 @@ export default function PricingContent({ tiers }: PricingContentProps) {
         <div style={{ textAlign: 'center', marginBottom: '36px' }}>
           <h2
             style={{
-              fontFamily: "'Playfair Display', serif",
+              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
               fontSize: '32px',
               fontWeight: 700,
-              color: '#2D2D2D',
+              color: '#e8e8f0',
               marginBottom: '12px',
             }}
           >
             Credits 充值包
           </h2>
-          <p style={{ fontSize: '16px', color: '#6B6B6B', lineHeight: 1.6 }}>
+          <p style={{ fontSize: '16px', color: '#9ca3af', lineHeight: 1.6 }}>
             月度配额用尽？随时补充额外 Credits，灵活创作不中断
           </p>
           {isBusiness && (
@@ -229,7 +229,7 @@ export default function PricingContent({ tiers }: PricingContentProps) {
               style={{
                 display: 'inline-block',
                 marginTop: '12px',
-                background: 'linear-gradient(135deg, #D4A574 0%, #C9A86A 100%)',
+                background: 'linear-gradient(135deg, #7536d5 0%, #5a2db8 100%)',
                 color: 'white',
                 padding: '6px 16px',
                 borderRadius: '16px',
@@ -256,11 +256,11 @@ export default function PricingContent({ tiers }: PricingContentProps) {
               key={pack.id}
               className="credits-pack-card"
               style={{
-                background: 'white',
+                background: '#1a1a2e',
                 borderRadius: '16px',
                 padding: '28px 24px',
                 textAlign: 'center',
-                border: '1px solid #f0ebe4',
+                border: '1px solid #2a2a40',
                 boxShadow: '0 2px 12px rgba(0, 0, 0, 0.04)',
                 transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
               }}
@@ -269,7 +269,7 @@ export default function PricingContent({ tiers }: PricingContentProps) {
                 style={{
                   fontSize: '16px',
                   fontWeight: 600,
-                  color: '#2D2D2D',
+                  color: '#e8e8f0',
                   marginBottom: '8px',
                 }}
               >
@@ -282,8 +282,8 @@ export default function PricingContent({ tiers }: PricingContentProps) {
                       style={{
                         fontSize: '28px',
                         fontWeight: 700,
-                        color: '#D4A574',
-                        fontFamily: "'Playfair Display', serif",
+                        color: '#7536d5',
+                        fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
                       }}
                     >
                       ¥{(pack.discountPrice / 100).toFixed(0)}
@@ -304,8 +304,8 @@ export default function PricingContent({ tiers }: PricingContentProps) {
                     style={{
                       fontSize: '28px',
                       fontWeight: 700,
-                      color: '#D4A574',
-                      fontFamily: "'Playfair Display', serif",
+                      color: '#7536d5',
+                      fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
                     }}
                   >
                     ¥{(pack.price / 100).toFixed(0)}
@@ -343,15 +343,15 @@ export default function PricingContent({ tiers }: PricingContentProps) {
                 style={{
                   width: '100%',
                   padding: '12px 20px',
-                  border: '1px solid #D4A574',
+                  border: '1px solid #7536d5',
                   borderRadius: '20px',
                   fontSize: '14px',
                   fontWeight: 600,
                   cursor: 'pointer',
                   transition: 'all 0.2s',
-                  fontFamily: "'Inter', sans-serif",
+                  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
                   background: 'transparent',
-                  color: '#D4A574',
+                  color: '#7536d5',
                 }}
                 aria-label={`购买 ${pack.label}`}
               >
@@ -366,12 +366,12 @@ export default function PricingContent({ tiers }: PricingContentProps) {
       <style>{`
         .tier-card:hover {
           transform: translateY(-8px) !important;
-          box-shadow: 0 16px 48px rgba(212, 165, 116, 0.18) !important;
+          box-shadow: 0 16px 48px rgba(117, 54, 213, 0.18) !important;
         }
         .credits-pack-card:hover {
           transform: translateY(-4px);
-          box-shadow: 0 8px 24px rgba(212, 165, 116, 0.12) !important;
-          border-color: #D4A574 !important;
+          box-shadow: 0 8px 24px rgba(117, 54, 213, 0.12) !important;
+          border-color: #7536d5 !important;
         }
         @media (max-width: 768px) {
           .tier-card:hover {

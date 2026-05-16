@@ -81,7 +81,7 @@ const searchInputStyle: React.CSSProperties = {
   background: 'transparent',
   fontSize: 13,
   width: 180,
-  fontFamily: "'Inter', sans-serif",
+  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
   color: '#374151',
 };
 

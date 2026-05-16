@@ -2,3 +2,8 @@
   0%, 100% { transform: scaleY(0.3); }
   50% { transform: scaleY(1); }
 }
+
+body {
+  background: #0d0d14;
+  color: #e8e8f0;
+}

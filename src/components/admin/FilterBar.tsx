@@ -95,7 +95,7 @@ const searchInputStyle: React.CSSProperties = {
   fontSize: 13,
   outline: 'none',
   minWidth: 200,
-  fontFamily: "'Inter', sans-serif",
+  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
 };
 
 const selectStyle: React.CSSProperties = {
@@ -106,7 +106,7 @@ const selectStyle: React.CSSProperties = {
   outline: 'none',
   background: '#fff',
   cursor: 'pointer',
-  fontFamily: "'Inter', sans-serif",
+  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
 };
 
 const dateInputStyle: React.CSSProperties = {
@@ -115,5 +115,5 @@ const dateInputStyle: React.CSSProperties = {
   border: '1px solid #e5e7eb',
   fontSize: 13,
   outline: 'none',
-  fontFamily: "'Inter', sans-serif",
+  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
 };

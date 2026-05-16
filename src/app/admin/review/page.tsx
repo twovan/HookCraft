@@ -224,7 +224,7 @@ const tabStyle: React.CSSProperties = {
   fontSize: 13,
   fontWeight: 500,
   cursor: 'pointer',
-  fontFamily: "'Inter', sans-serif",
+  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
 };
 
 const activeTabStyle: React.CSSProperties = {
@@ -239,6 +239,6 @@ const actionBtnStyle: React.CSSProperties = {
   background: '#fff',
   fontSize: 12,
   cursor: 'pointer',
-  fontFamily: "'Inter', sans-serif",
+  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
   whiteSpace: 'nowrap',
 };

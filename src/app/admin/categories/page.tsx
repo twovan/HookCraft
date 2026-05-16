@@ -357,7 +357,7 @@ const addBtnStyle: React.CSSProperties = {
   fontSize: 12,
   fontWeight: 600,
   cursor: 'pointer',
-  fontFamily: "'Inter', sans-serif",
+  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
 };
 
 const actionBtnStyle: React.CSSProperties = {
@@ -368,7 +368,7 @@ const actionBtnStyle: React.CSSProperties = {
   color: '#374151',
   fontSize: 12,
   cursor: 'pointer',
-  fontFamily: "'Inter', sans-serif",
+  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
 };
 
 const retryBtnStyle: React.CSSProperties = {
@@ -397,6 +397,6 @@ const inputStyle: React.CSSProperties = {
   border: '1px solid #e5e7eb',
   fontSize: 13,
   outline: 'none',
-  fontFamily: "'Inter', sans-serif",
+  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
   boxSizing: 'border-box',
 };

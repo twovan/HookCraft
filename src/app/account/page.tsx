@@ -161,7 +161,7 @@ export default function AccountPage() {
 
   if (authLoading || !user) {
     return (
-      <div style={{ minHeight: '100vh', background: '#FDFBF7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ minHeight: '100vh', background: '#0d0d14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ fontSize: '14px', color: '#999' }}>加载中...</div>
       </div>
     );
@@ -169,7 +169,7 @@ export default function AccountPage() {
 
   if (!membership) {
     return (
-      <div style={{ minHeight: '100vh', background: '#FDFBF7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ minHeight: '100vh', background: '#0d0d14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ fontSize: '14px', color: '#999' }}>加载中...</div>
       </div>
     );
@@ -179,7 +179,7 @@ export default function AccountPage() {
     <div
       style={{
         minHeight: '100vh',
-        background: '#FDFBF7',
+        background: '#0d0d14',
         padding: '48px 24px',
       }}
     >
@@ -189,16 +189,16 @@ export default function AccountPage() {
           <div>
             <h1
               style={{
-                fontFamily: "'Playfair Display', serif",
+                fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
                 fontSize: '36px',
                 fontWeight: 700,
-                color: '#2D2D2D',
+                color: '#e8e8f0',
                 marginBottom: '8px',
               }}
             >
               账户管理
             </h1>
-            <p style={{ fontSize: '15px', color: '#6B6B6B', margin: 0 }}>
+            <p style={{ fontSize: '15px', color: '#9ca3af', margin: 0 }}>
               {user.email} · 管理你的会员订阅和创作额度
             </p>
           </div>
@@ -208,12 +208,12 @@ export default function AccountPage() {
               padding: '8px 16px',
               borderRadius: '16px',
               border: '1px solid #E2E8F0',
-              background: 'white',
-              color: '#6B6B6B',
+              background: '#1a1a2e',
+              color: '#9ca3af',
               fontSize: '13px',
               fontWeight: 500,
               cursor: 'pointer',
-              fontFamily: "'Inter', sans-serif",
+              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
               transition: 'all 0.2s',
             }}
           >
@@ -256,7 +256,7 @@ export default function AccountPage() {
                 fontWeight: 600,
                 cursor: isRetrying ? 'not-allowed' : 'pointer',
                 opacity: isRetrying ? 0.6 : 1,
-                fontFamily: "'Inter', sans-serif",
+                fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
                 whiteSpace: 'nowrap',
               }}
             >
@@ -277,19 +277,19 @@ export default function AccountPage() {
           {/* Monthly Credits Usage */}
           <div
             style={{
-              background: 'white',
+              background: '#1a1a2e',
               borderRadius: '20px',
               padding: '24px',
-              border: '1px solid #f0ebe4',
-              boxShadow: '0 4px 20px rgba(212, 165, 116, 0.06)',
+              border: '1px solid #2a2a40',
+              boxShadow: '0 4px 20px rgba(117, 54, 213, 0.06)',
             }}
           >
             <h3
               style={{
-                fontFamily: "'Playfair Display', serif",
+                fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
                 fontSize: '16px',
                 fontWeight: 600,
-                color: '#2D2D2D',
+                color: '#e8e8f0',
                 margin: '0 0 16px 0',
               }}
             >
@@ -305,20 +305,20 @@ export default function AccountPage() {
                       style={{
                         fontSize: '32px',
                         fontWeight: 700,
-                        color: '#D4A574',
-                        fontFamily: "'Playfair Display', serif",
+                        color: '#7536d5',
+                        fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
                       }}
                     >
                       {credits.monthlyUsed}
                     </span>
-                    <span style={{ fontSize: '14px', color: '#6B6B6B' }}>
+                    <span style={{ fontSize: '14px', color: '#9ca3af' }}>
                       / {credits.monthlyTotal} Credits 已消耗
                     </span>
                   </div>
                   {/* Progress bar */}
                   <div
                     style={{
-                      background: '#f0ebe4',
+                      background: '#2a2a40',
                       borderRadius: '6px',
                       height: '8px',
                       overflow: 'hidden',
@@ -329,7 +329,7 @@ export default function AccountPage() {
                         height: '100%',
                         borderRadius: '6px',
                         width: `${credits.monthlyTotal > 0 ? (credits.monthlyUsed / credits.monthlyTotal) * 100 : 0}%`,
-                        background: 'linear-gradient(90deg, #D4A574, #C9A86A)',
+                        background: 'linear-gradient(90deg, #7536d5, #5a2db8)',
                         transition: 'width 0.3s ease',
                       }}
                     />
@@ -344,7 +344,7 @@ export default function AccountPage() {
                       </span>
                     )}
                   </div>
-                  <div style={{ fontSize: '12px', color: '#6B6B6B', marginTop: '4px' }}>
+                  <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '4px' }}>
                     总可用 {credits.totalAvailable} Credits
                   </div>
                 </div>
@@ -358,13 +358,13 @@ export default function AccountPage() {
                       style={{
                         fontSize: '32px',
                         fontWeight: 700,
-                        color: '#D4A574',
-                        fontFamily: "'Playfair Display', serif",
+                        color: '#7536d5',
+                        fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
                       }}
                     >
                       {previewCount.used}
                     </span>
-                    <span style={{ fontSize: '14px', color: '#6B6B6B' }}>
+                    <span style={{ fontSize: '14px', color: '#9ca3af' }}>
                       / {previewCount.total} 次预览已使用
                     </span>
                   </div>
@@ -379,7 +379,7 @@ export default function AccountPage() {
                           borderRadius: '50%',
                           background: i < previewCount.used
                             ? '#E2E8F0'
-                            : 'linear-gradient(135deg, #D4A574 0%, #C9A86A 100%)',
+                            : 'linear-gradient(135deg, #7536d5 0%, #5a2db8 100%)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -405,19 +405,19 @@ export default function AccountPage() {
           {/* Historical Usage Trend (Bar Chart Placeholder) */}
           <div
             style={{
-              background: 'white',
+              background: '#1a1a2e',
               borderRadius: '20px',
               padding: '24px',
-              border: '1px solid #f0ebe4',
-              boxShadow: '0 4px 20px rgba(212, 165, 116, 0.06)',
+              border: '1px solid #2a2a40',
+              boxShadow: '0 4px 20px rgba(117, 54, 213, 0.06)',
             }}
           >
             <h3
               style={{
-                fontFamily: "'Playfair Display', serif",
+                fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
                 fontSize: '16px',
                 fontWeight: 600,
-                color: '#2D2D2D',
+                color: '#e8e8f0',
                 margin: '0 0 16px 0',
               }}
             >
@@ -482,7 +482,7 @@ export default function AccountPage() {
                             style={{
                               width: '100%',
                               flex: monthlyHeight,
-                              background: 'linear-gradient(180deg, #D4A574 0%, #E8C9A8 100%)',
+                              background: 'linear-gradient(180deg, #7536d5 0%, #E8C9A8 100%)',
                               borderRadius: purchasedHeight > 0 ? '0 0 0 0' : '4px 4px 0 0',
                               transition: 'flex 0.3s ease',
                             }}
@@ -494,7 +494,7 @@ export default function AccountPage() {
                             style={{
                               width: '100%',
                               flex: 1,
-                              background: 'linear-gradient(180deg, #D4A574 0%, #E8C9A8 100%)',
+                              background: 'linear-gradient(180deg, #7536d5 0%, #E8C9A8 100%)',
                               borderRadius: '4px 4px 0 0',
                             }}
                           />

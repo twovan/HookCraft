@@ -26,9 +26,9 @@ export default function PromptInput({
           display: 'block',
           fontSize: '14px',
           fontWeight: 600,
-          color: '#2D2D2D',
+          color: '#e8e8f0',
           marginBottom: '8px',
-          fontFamily: "'Inter', sans-serif",
+          fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
         }}
       >
         创作提示词
@@ -45,11 +45,11 @@ export default function PromptInput({
           minHeight: '100px',
           padding: '14px 16px',
           borderRadius: '12px',
-          border: '1px solid #f0ebe4',
-          background: disabled ? '#F7F7F7' : '#FDFBF7',
+          border: '1px solid #2a2a40',
+          background: disabled ? '#F7F7F7' : '#0d0d14',
           fontSize: '14px',
-          fontFamily: "'Inter', sans-serif",
-          color: '#2D2D2D',
+          fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+          color: '#e8e8f0',
           lineHeight: 1.6,
           resize: 'vertical',
           outline: 'none',
@@ -60,11 +60,11 @@ export default function PromptInput({
         }}
         onFocus={(e) => {
           if (!disabled) {
-            e.currentTarget.style.borderColor = '#D4A574';
+            e.currentTarget.style.borderColor = '#7536d5';
           }
         }}
         onBlur={(e) => {
-          e.currentTarget.style.borderColor = '#f0ebe4';
+          e.currentTarget.style.borderColor = '#2a2a40';
         }}
         aria-label="创作提示词输入"
       />

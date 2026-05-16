@@ -67,7 +67,7 @@ export default function UploadPage() {
 
   if (authLoading || !user) {
     return (
-      <div style={{ minHeight: '100vh', background: '#FDFBF7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ minHeight: '100vh', background: '#0d0d14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <span style={{ color: '#999', fontSize: 14 }}>加载中...</span>
       </div>
     );
@@ -75,13 +75,13 @@ export default function UploadPage() {
 
   if (success) {
     return (
-      <div style={{ minHeight: '100vh', background: '#FDFBF7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ minHeight: '100vh', background: '#0d0d14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ textAlign: 'center', maxWidth: 480 }}>
           <div style={{ fontSize: 64, marginBottom: 24 }}>🎉</div>
-          <h1 style={{ fontSize: 28, fontWeight: 700, color: '#2D2D2D', marginBottom: 12, fontFamily: "'Playfair Display', serif" }}>
+          <h1 style={{ fontSize: 28, fontWeight: 700, color: '#e8e8f0', marginBottom: 12, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" }}>
             模板提交成功
           </h1>
-          <p style={{ color: '#6B6B6B', fontSize: 15, marginBottom: 32, lineHeight: 1.6 }}>
+          <p style={{ color: '#9ca3af', fontSize: 15, marginBottom: 32, lineHeight: 1.6 }}>
             你的模板已提交，管理员审核通过后将在平台上架。审核通常需要 1-3 个工作日。
           </p>
           <div style={{ display: 'flex', gap: 16, justifyContent: 'center' }}>
@@ -101,14 +101,14 @@ export default function UploadPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#FDFBF7' }}>
-      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'radial-gradient(circle at 20% 50%, rgba(212,165,116,0.03) 0%, transparent 50%)', pointerEvents: 'none', zIndex: 0 }} />
+    <div style={{ minHeight: '100vh', background: '#0d0d14' }}>
+      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'radial-gradient(circle at 20% 50%, rgba(117, 54, 213,0.03) 0%, transparent 50%)', pointerEvents: 'none', zIndex: 0 }} />
 
       <main style={{ maxWidth: 720, margin: '0 auto', padding: '48px 24px', position: 'relative', zIndex: 1 }}>
-        <h1 style={{ fontSize: 36, fontWeight: 700, color: '#2D2D2D', marginBottom: 8, fontFamily: "'Playfair Display', serif" }}>
+        <h1 style={{ fontSize: 36, fontWeight: 700, color: '#e8e8f0', marginBottom: 8, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" }}>
           上传模板
         </h1>
-        <p style={{ color: '#6B6B6B', fontSize: 15, marginBottom: 40 }}>
+        <p style={{ color: '#9ca3af', fontSize: 15, marginBottom: 40 }}>
           分享你的音乐作品，审核通过后将在平台展示
         </p>
 
@@ -124,8 +124,8 @@ export default function UploadPage() {
             <h3 style={sectionTitleStyle}>🎵 音频文件 *</h3>
             {audioFile ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: '#F5E6D3', borderRadius: 12 }}>
-                  <span style={{ fontSize: 14, color: '#2D2D2D', fontWeight: 500 }}>🎵 {audioFile.name}</span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'rgba(117, 54, 213, 0.15)', borderRadius: 12 }}>
+                  <span style={{ fontSize: 14, color: '#e8e8f0', fontWeight: 500 }}>🎵 {audioFile.name}</span>
                   <button type="button" onClick={() => { setAudioFile(null); setAudioPreview(null); if (audioInputRef.current) audioInputRef.current.value = ''; }} style={{ background: 'none', border: 'none', color: '#999', cursor: 'pointer', fontSize: 16 }}>✕</button>
                 </div>
                 {audioPreview && <audio controls src={audioPreview} style={{ width: '100%', height: 40 }} />}
@@ -134,11 +134,11 @@ export default function UploadPage() {
               <div
                 onClick={() => audioInputRef.current?.click()}
                 style={{ border: '2px dashed #E5E5E5', borderRadius: 16, padding: '40px 24px', textAlign: 'center', cursor: 'pointer', transition: 'border-color 0.2s' }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#D4A574'}
+                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#7536d5'}
                 onMouseLeave={(e) => e.currentTarget.style.borderColor = '#E5E5E5'}
               >
                 <div style={{ fontSize: 40, marginBottom: 12 }}>🎶</div>
-                <div style={{ fontSize: 15, fontWeight: 600, color: '#2D2D2D', marginBottom: 4 }}>点击上传音频文件</div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: '#e8e8f0', marginBottom: 4 }}>点击上传音频文件</div>
                 <div style={{ fontSize: 13, color: '#999' }}>支持 MP3、WAV、OGG、FLAC，最大 20MB</div>
               </div>
             )}
@@ -226,11 +226,11 @@ export default function UploadPage() {
 }
 
 const cardStyle: React.CSSProperties = {
-  background: 'white', padding: 28, borderRadius: 20, marginBottom: 20,
-  boxShadow: '0 4px 20px rgba(0,0,0,0.04)', border: '1px solid rgba(212,165,116,0.1)',
+  background: '#1a1a2e', padding: 28, borderRadius: 20, marginBottom: 20,
+  boxShadow: '0 4px 20px rgba(0,0,0,0.04)', border: '1px solid rgba(117, 54, 213,0.1)',
 };
-const sectionTitleStyle: React.CSSProperties = { fontSize: 16, fontWeight: 600, color: '#2D2D2D', marginBottom: 16 };
-const labelStyle: React.CSSProperties = { display: 'block', fontSize: 13, fontWeight: 600, color: '#2D2D2D', marginBottom: 6 };
-const inputStyle: React.CSSProperties = { width: '100%', padding: '12px 14px', borderRadius: 12, border: '1px solid #E5E5E5', fontSize: 14, fontFamily: "'Inter', sans-serif", outline: 'none', boxSizing: 'border-box' };
-const primaryBtnStyle: React.CSSProperties = { padding: '12px 28px', borderRadius: 24, border: 'none', background: 'linear-gradient(135deg, #D4A574, #C9A86A)', color: 'white', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: "'Inter', sans-serif", boxShadow: '0 6px 20px rgba(212,165,116,0.3)' };
-const secondaryBtnStyle: React.CSSProperties = { padding: '12px 28px', borderRadius: 24, border: '1px solid #E5E5E5', background: 'transparent', color: '#6B6B6B', fontSize: 14, fontWeight: 600, cursor: 'pointer' };
+const sectionTitleStyle: React.CSSProperties = { fontSize: 16, fontWeight: 600, color: '#e8e8f0', marginBottom: 16 };
+const labelStyle: React.CSSProperties = { display: 'block', fontSize: 13, fontWeight: 600, color: '#e8e8f0', marginBottom: 6 };
+const inputStyle: React.CSSProperties = { width: '100%', padding: '12px 14px', borderRadius: 12, border: '1px solid #E5E5E5', fontSize: 14, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", outline: 'none', boxSizing: 'border-box' };
+const primaryBtnStyle: React.CSSProperties = { padding: '12px 28px', borderRadius: 24, border: 'none', background: 'linear-gradient(135deg, #7536d5, #5a2db8)', color: 'white', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", boxShadow: '0 6px 20px rgba(117, 54, 213,0.3)' };
+const secondaryBtnStyle: React.CSSProperties = { padding: '12px 28px', borderRadius: 24, border: '1px solid #E5E5E5', background: 'transparent', color: '#9ca3af', fontSize: 14, fontWeight: 600, cursor: 'pointer' };

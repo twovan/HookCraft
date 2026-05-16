@@ -358,7 +358,7 @@ export default function AdminProducersPage() {
                       setAvatarPreview(URL.createObjectURL(file));
                     }
                   }}
-                  style={{ fontSize: 12, fontFamily: "'Inter', sans-serif" }}
+                  style={{ fontSize: 12, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" }}
                 />
                 <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>支持 JPG、PNG、WebP</div>
               </div>
@@ -525,7 +525,7 @@ const inviteBtnStyle: React.CSSProperties = {
   fontSize: 13,
   fontWeight: 600,
   cursor: 'pointer',
-  fontFamily: "'Inter', sans-serif",
+  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
 };
 
 const addBtnStyle: React.CSSProperties = {
@@ -537,7 +537,7 @@ const addBtnStyle: React.CSSProperties = {
   fontSize: 13,
   fontWeight: 600,
   cursor: 'pointer',
-  fontFamily: "'Inter', sans-serif",
+  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
 };
 
 const actionBtnStyle: React.CSSProperties = {
@@ -547,7 +547,7 @@ const actionBtnStyle: React.CSSProperties = {
   background: '#fff',
   fontSize: 12,
   cursor: 'pointer',
-  fontFamily: "'Inter', sans-serif",
+  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
   whiteSpace: 'nowrap',
 };
 
@@ -566,6 +566,6 @@ const inputStyle: React.CSSProperties = {
   border: '1px solid #e5e7eb',
   fontSize: 13,
   outline: 'none',
-  fontFamily: "'Inter', sans-serif",
+  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
   boxSizing: 'border-box',
 };

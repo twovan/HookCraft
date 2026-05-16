@@ -35,9 +35,9 @@ export default function AudioPlayerInline({ audioUrl, isPlaying, onPlay, onPause
     borderRadius: '50%',
     border: 'none',
     background: isPlaying
-      ? 'linear-gradient(135deg, #D4A574, #C9A86A)'
-      : '#F5E6D3',
-    color: isPlaying ? 'white' : '#D4A574',
+      ? 'linear-gradient(135deg, #7536d5, #5a2db8)'
+      : 'rgba(117, 54, 213, 0.15)',
+    color: isPlaying ? 'white' : '#7536d5',
     fontSize: 14,
     cursor: 'pointer',
     display: 'flex',

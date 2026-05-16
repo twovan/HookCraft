@@ -14,7 +14,7 @@ export default function PricingPage() {
     <div
       style={{
         minHeight: '100vh',
-        background: '#FDFBF7',
+        background: '#0d0d14',
         position: 'relative',
       }}
     >
@@ -27,7 +27,7 @@ export default function PricingPage() {
           right: 0,
           bottom: 0,
           background:
-            'radial-gradient(circle at 20% 50%, rgba(212, 165, 116, 0.03) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(212, 165, 116, 0.03) 0%, transparent 50%)',
+            'radial-gradient(circle at 20% 50%, rgba(117, 54, 213, 0.03) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(117, 54, 213, 0.03) 0%, transparent 50%)',
           pointerEvents: 'none',
           zIndex: 0,
         }}
@@ -43,10 +43,10 @@ export default function PricingPage() {
         >
           <h1
             style={{
-              fontFamily: "'Playfair Display', serif",
+              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
               fontSize: '48px',
               fontWeight: 700,
-              color: '#2D2D2D',
+              color: '#e8e8f0',
               marginBottom: '16px',
               letterSpacing: '-0.5px',
             }}
@@ -56,7 +56,7 @@ export default function PricingPage() {
           <p
             style={{
               fontSize: '18px',
-              color: '#6B6B6B',
+              color: '#9ca3af',
               maxWidth: '600px',
               margin: '0 auto',
               lineHeight: 1.6,

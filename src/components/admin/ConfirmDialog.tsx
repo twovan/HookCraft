@@ -112,7 +112,7 @@ const cancelButtonStyle: React.CSSProperties = {
   fontSize: 14,
   fontWeight: 500,
   cursor: 'pointer',
-  fontFamily: "'Inter', sans-serif",
+  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
 };
 
 const confirmButtonStyle: React.CSSProperties = {
@@ -123,5 +123,5 @@ const confirmButtonStyle: React.CSSProperties = {
   fontSize: 14,
   fontWeight: 600,
   cursor: 'pointer',
-  fontFamily: "'Inter', sans-serif",
+  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
 };

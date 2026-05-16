@@ -463,7 +463,7 @@ export default function AdminTemplatesPage() {
                       setCoverPreview(URL.createObjectURL(file));
                     }
                   }}
-                  style={{ fontSize: 12, fontFamily: "'Inter', sans-serif" }}
+                  style={{ fontSize: 12, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" }}
                 />
                 <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
                   支持 JPG、PNG、WebP，最大 5MB
@@ -504,7 +504,7 @@ export default function AdminTemplatesPage() {
                     setAudioPreviewUrl(URL.createObjectURL(file));
                   }
                 }}
-                style={{ fontSize: 12, fontFamily: "'Inter', sans-serif" }}
+                style={{ fontSize: 12, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" }}
               />
               <div style={{ fontSize: 11, color: '#9ca3af' }}>
                 支持 MP3、WAV、OGG、FLAC，最大 20MB
@@ -648,7 +648,7 @@ const primaryBtnStyle: React.CSSProperties = {
   fontSize: 13,
   fontWeight: 600,
   cursor: 'pointer',
-  fontFamily: "'Inter', sans-serif",
+  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
   whiteSpace: 'nowrap',
 };
 
@@ -660,7 +660,7 @@ const actionBtnStyle: React.CSSProperties = {
   color: '#374151',
   fontSize: 12,
   cursor: 'pointer',
-  fontFamily: "'Inter', sans-serif",
+  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
   whiteSpace: 'nowrap',
 };
 
@@ -679,6 +679,6 @@ const inputStyle: React.CSSProperties = {
   border: '1px solid #e5e7eb',
   fontSize: 13,
   outline: 'none',
-  fontFamily: "'Inter', sans-serif",
+  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
   boxSizing: 'border-box',
 };

@@ -21,12 +21,12 @@ export default function Footer() {
 
   return (
     <footer style={{
-      background: '#2D2D2D', color: 'white', padding: '60px 48px 32px',
+      background: '#e8e8f0', color: 'white', padding: '60px 48px 32px',
     }}>
       <div style={{ maxWidth: 1400, margin: '0 auto' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: 48, marginBottom: 48 }}>
           <div>
-            <div style={{ fontSize: 28, fontWeight: 700, fontFamily: "'Playfair Display', serif", color: '#D4A574', marginBottom: 16 }}>HookCraft</div>
+            <div style={{ fontSize: 28, fontWeight: 700, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", color: '#7536d5', marginBottom: 16 }}>HookCraft</div>
             <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, lineHeight: 1.8, maxWidth: 320 }}>
               高质量音乐模板交易平台，连接优秀制作人与创作者，让每一段旋律都能找到归属。
             </p>

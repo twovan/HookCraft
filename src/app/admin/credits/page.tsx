@@ -229,7 +229,7 @@ const actionBtnStyle: React.CSSProperties = {
   background: '#fff',
   fontSize: 12,
   cursor: 'pointer',
-  fontFamily: "'Inter', sans-serif",
+  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
   color: '#D4A574',
   whiteSpace: 'nowrap',
 };

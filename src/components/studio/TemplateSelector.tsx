@@ -77,7 +77,7 @@ export default function TemplateSelector({
           display: 'flex',
           gap: '0',
           marginBottom: '20px',
-          borderBottom: '1px solid #f0ebe4',
+          borderBottom: '1px solid #2a2a40',
         }}
       >
         {tabs.map((tab) => (
@@ -90,10 +90,10 @@ export default function TemplateSelector({
               background: 'transparent',
               fontSize: '14px',
               fontWeight: activeTab === tab.key ? 600 : 400,
-              color: activeTab === tab.key ? '#D4A574' : '#6B6B6B',
-              borderBottom: activeTab === tab.key ? '2px solid #D4A574' : '2px solid transparent',
+              color: activeTab === tab.key ? '#7536d5' : '#9ca3af',
+              borderBottom: activeTab === tab.key ? '2px solid #7536d5' : '2px solid transparent',
               cursor: 'pointer',
-              fontFamily: "'Inter', sans-serif",
+              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
               transition: 'all 0.2s ease',
             }}
             aria-selected={activeTab === tab.key}
@@ -137,18 +137,18 @@ export default function TemplateSelector({
                 aspectRatio: '2 / 3',
                 borderRadius: '12px',
                 border: isSelected
-                  ? '2px solid #D4A574'
-                  : '1px solid #f0ebe4',
+                  ? '2px solid #7536d5'
+                  : '1px solid #2a2a40',
                 background: template.coverUrl
                   ? `url(${template.coverUrl}) center/cover`
-                  : 'linear-gradient(135deg, #F5E6D3 0%, #FDFBF7 100%)',
+                  : 'linear-gradient(135deg, rgba(117, 54, 213, 0.15) 0%, #0d0d14 100%)',
                 cursor: isLocked ? 'not-allowed' : 'pointer',
                 overflow: 'hidden',
                 padding: 0,
                 transition: 'all 0.2s ease',
                 opacity: isLocked ? 0.6 : 1,
                 boxShadow: isSelected
-                  ? '0 4px 12px rgba(212, 165, 116, 0.3)'
+                  ? '0 4px 12px rgba(117, 54, 213, 0.3)'
                   : '0 2px 8px rgba(0, 0, 0, 0.04)',
               }}
             >
@@ -171,7 +171,7 @@ export default function TemplateSelector({
                   <span
                     style={{
                       fontSize: '11px',
-                      color: '#6B6B6B',
+                      color: '#9ca3af',
                       fontWeight: 500,
                     }}
                   >
@@ -224,7 +224,7 @@ export default function TemplateSelector({
                     width: '20px',
                     height: '20px',
                     borderRadius: '50%',
-                    background: '#D4A574',
+                    background: '#7536d5',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',

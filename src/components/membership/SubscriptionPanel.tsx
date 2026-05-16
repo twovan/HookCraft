@@ -115,20 +115,20 @@ export default function SubscriptionPanel({
   return (
     <div
       style={{
-        background: 'white',
+        background: '#1a1a2e',
         borderRadius: '20px',
         padding: '32px',
-        border: '1px solid #f0ebe4',
-        boxShadow: '0 4px 20px rgba(212, 165, 116, 0.06)',
+        border: '1px solid #2a2a40',
+        boxShadow: '0 4px 20px rgba(117, 54, 213, 0.06)',
       }}
     >
       {/* Header */}
       <h2
         style={{
-          fontFamily: "'Playfair Display', serif",
+          fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
           fontSize: '22px',
           fontWeight: 700,
-          color: '#2D2D2D',
+          color: '#e8e8f0',
           margin: '0 0 24px 0',
         }}
       >
@@ -138,10 +138,10 @@ export default function SubscriptionPanel({
       {/* Current Plan Info */}
       <div
         style={{
-          background: '#FDFBF7',
+          background: '#0d0d14',
           borderRadius: '16px',
           padding: '20px 24px',
-          border: '1px solid #f0ebe4',
+          border: '1px solid #2a2a40',
           marginBottom: '24px',
         }}
       >
@@ -151,8 +151,8 @@ export default function SubscriptionPanel({
               style={{
                 fontSize: '20px',
                 fontWeight: 700,
-                color: '#D4A574',
-                fontFamily: "'Playfair Display', serif",
+                color: '#7536d5',
+                fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
               }}
             >
               {currentConfig.name}
@@ -187,7 +187,7 @@ export default function SubscriptionPanel({
             </span>
           </div>
           {membership.tier !== 'free' && (
-            <span style={{ fontSize: '18px', fontWeight: 700, color: '#2D2D2D', fontFamily: "'Playfair Display', serif" }}>
+            <span style={{ fontSize: '18px', fontWeight: 700, color: '#e8e8f0', fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" }}>
               {formatAmount(currentConfig.monthlyPrice)}/月
             </span>
           )}
@@ -197,25 +197,25 @@ export default function SubscriptionPanel({
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div>
             <div style={{ fontSize: '12px', color: '#999', marginBottom: '4px' }}>到期日期</div>
-            <div style={{ fontSize: '14px', color: '#2D2D2D', fontWeight: 500 }}>
+            <div style={{ fontSize: '14px', color: '#e8e8f0', fontWeight: 500 }}>
               {membership.tier === 'free' ? '永久免费' : formatDate(membership.expiresAt)}
             </div>
           </div>
           <div>
             <div style={{ fontSize: '12px', color: '#999', marginBottom: '4px' }}>自动续费</div>
-            <div style={{ fontSize: '14px', color: '#2D2D2D', fontWeight: 500 }}>
+            <div style={{ fontSize: '14px', color: '#e8e8f0', fontWeight: 500 }}>
               {membership.tier === 'free' ? '—' : membership.autoRenew ? '已开启' : '已关闭'}
             </div>
           </div>
           <div>
             <div style={{ fontSize: '12px', color: '#999', marginBottom: '4px' }}>月度 Credits</div>
-            <div style={{ fontSize: '14px', color: '#2D2D2D', fontWeight: 500 }}>
+            <div style={{ fontSize: '14px', color: '#e8e8f0', fontWeight: 500 }}>
               {currentConfig.monthlyCredits > 0 ? `${currentConfig.monthlyCredits} Credits` : `${currentConfig.monthlyPreviews} 次预览`}
             </div>
           </div>
           <div>
             <div style={{ fontSize: '12px', color: '#999', marginBottom: '4px' }}>计费周期</div>
-            <div style={{ fontSize: '14px', color: '#2D2D2D', fontWeight: 500 }}>
+            <div style={{ fontSize: '14px', color: '#e8e8f0', fontWeight: 500 }}>
               {membership.billingCycle === 'monthly' ? '月付' : membership.billingCycle === 'yearly' ? '年付' : '—'}
             </div>
           </div>
@@ -232,13 +232,13 @@ export default function SubscriptionPanel({
               padding: '10px 20px',
               borderRadius: '20px',
               border: 'none',
-              background: 'linear-gradient(135deg, #D4A574 0%, #C9A86A 100%)',
+              background: 'linear-gradient(135deg, #7536d5 0%, #5a2db8 100%)',
               color: 'white',
               fontSize: '13px',
               fontWeight: 600,
               cursor: 'pointer',
-              fontFamily: "'Inter', sans-serif",
-              boxShadow: '0 2px 8px rgba(212, 165, 116, 0.3)',
+              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+              boxShadow: '0 2px 8px rgba(117, 54, 213, 0.3)',
             }}
           >
             升级到{TIER_CONFIGS[membership.tier === 'free' ? 'pro' : 'business'].name}
@@ -254,11 +254,11 @@ export default function SubscriptionPanel({
               borderRadius: '20px',
               border: '1px solid #E5E5E5',
               background: 'transparent',
-              color: '#6B6B6B',
+              color: '#9ca3af',
               fontSize: '13px',
               fontWeight: 500,
               cursor: 'pointer',
-              fontFamily: "'Inter', sans-serif",
+              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
             }}
           >
             降级
@@ -278,7 +278,7 @@ export default function SubscriptionPanel({
               fontSize: '13px',
               fontWeight: 500,
               cursor: 'pointer',
-              fontFamily: "'Inter', sans-serif",
+              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
             }}
           >
             取消订阅
@@ -292,13 +292,13 @@ export default function SubscriptionPanel({
             style={{
               padding: '10px 20px',
               borderRadius: '20px',
-              border: '1px solid #f0ebe4',
-              background: '#FDFBF7',
-              color: '#D4A574',
+              border: '1px solid #2a2a40',
+              background: '#0d0d14',
+              color: '#7536d5',
               fontSize: '13px',
               fontWeight: 600,
               cursor: 'pointer',
-              fontFamily: "'Inter', sans-serif",
+              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
             }}
           >
             购买 Credits 充值包
@@ -324,7 +324,7 @@ export default function SubscriptionPanel({
               fontWeight: 600,
               color: '#C53030',
               margin: '0 0 12px 0',
-              fontFamily: "'Inter', sans-serif",
+              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
             }}
           >
             ⚠️ 降级后将失去以下功能
@@ -354,7 +354,7 @@ export default function SubscriptionPanel({
                 fontSize: '13px',
                 fontWeight: 600,
                 cursor: 'pointer',
-                fontFamily: "'Inter', sans-serif",
+                fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
               }}
             >
               确认降级
@@ -365,12 +365,12 @@ export default function SubscriptionPanel({
                 padding: '8px 16px',
                 borderRadius: '16px',
                 border: '1px solid #E5E5E5',
-                background: 'white',
-                color: '#6B6B6B',
+                background: '#1a1a2e',
+                color: '#9ca3af',
                 fontSize: '13px',
                 fontWeight: 500,
                 cursor: 'pointer',
-                fontFamily: "'Inter', sans-serif",
+                fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
               }}
             >
               取消
@@ -396,7 +396,7 @@ export default function SubscriptionPanel({
               fontWeight: 600,
               color: '#276749',
               margin: '0 0 12px 0',
-              fontFamily: "'Inter', sans-serif",
+              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
             }}
           >
             ✨ 升级到{TIER_CONFIGS[upgradeTarget].name}
@@ -409,7 +409,7 @@ export default function SubscriptionPanel({
               fontSize: '24px',
               fontWeight: 700,
               color: '#276749',
-              fontFamily: "'Playfair Display', serif",
+              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
               marginBottom: '16px',
             }}
           >
@@ -422,12 +422,12 @@ export default function SubscriptionPanel({
                 padding: '8px 16px',
                 borderRadius: '16px',
                 border: 'none',
-                background: 'linear-gradient(135deg, #D4A574 0%, #C9A86A 100%)',
+                background: 'linear-gradient(135deg, #7536d5 0%, #5a2db8 100%)',
                 color: 'white',
                 fontSize: '13px',
                 fontWeight: 600,
                 cursor: 'pointer',
-                fontFamily: "'Inter', sans-serif",
+                fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
               }}
             >
               确认升级
@@ -438,12 +438,12 @@ export default function SubscriptionPanel({
                 padding: '8px 16px',
                 borderRadius: '16px',
                 border: '1px solid #E5E5E5',
-                background: 'white',
-                color: '#6B6B6B',
+                background: '#1a1a2e',
+                color: '#9ca3af',
                 fontSize: '13px',
                 fontWeight: 500,
                 cursor: 'pointer',
-                fontFamily: "'Inter', sans-serif",
+                fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
               }}
             >
               取消
@@ -456,10 +456,10 @@ export default function SubscriptionPanel({
       <div>
         <h3
           style={{
-            fontFamily: "'Playfair Display', serif",
+            fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
             fontSize: '16px',
             fontWeight: 600,
-            color: '#2D2D2D',
+            color: '#e8e8f0',
             margin: '0 0 16px 0',
           }}
         >
@@ -472,9 +472,9 @@ export default function SubscriptionPanel({
               padding: '24px',
               color: '#999',
               fontSize: '13px',
-              background: '#FDFBF7',
+              background: '#0d0d14',
               borderRadius: '12px',
-              border: '1px solid #f0ebe4',
+              border: '1px solid #2a2a40',
             }}
           >
             暂无充值记录
@@ -541,15 +541,15 @@ function CreditsPurchaseList({ records }: { records: PaymentRecord[] }) {
                 justifyContent: 'space-between',
                 padding: '12px 16px',
                 borderRadius: '10px',
-                background: '#FDFBF7',
-                border: '1px solid #f0ebe4',
+                background: '#0d0d14',
+                border: '1px solid #2a2a40',
               }}
             >
               <div>
-                <div style={{ fontSize: '13px', fontWeight: 500, color: '#2D2D2D' }}>
+                <div style={{ fontSize: '13px', fontWeight: 500, color: '#e8e8f0' }}>
                   Credits 充值包
                   {creditsAmount && (
-                    <span style={{ marginLeft: 8, fontSize: 12, color: '#D4A574', fontWeight: 600 }}>
+                    <span style={{ marginLeft: 8, fontSize: 12, color: '#7536d5', fontWeight: 600 }}>
                       +{creditsAmount} Credits
                     </span>
                   )}
@@ -559,7 +559,7 @@ function CreditsPurchaseList({ records }: { records: PaymentRecord[] }) {
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '14px', fontWeight: 600, color: '#D4A574' }}>
+                <div style={{ fontSize: '14px', fontWeight: 600, color: '#7536d5' }}>
                   {fmtAmount(record.amount)}
                 </div>
                 <div
@@ -588,13 +588,13 @@ function CreditsPurchaseList({ records }: { records: PaymentRecord[] }) {
             disabled={page <= 1}
             style={{
               padding: '6px 12px', borderRadius: 8, border: '1px solid #e5e7eb',
-              background: 'white', fontSize: 12, cursor: page <= 1 ? 'not-allowed' : 'pointer',
-              opacity: page <= 1 ? 0.4 : 1, fontFamily: "'Inter', sans-serif",
+              background: '#1a1a2e', fontSize: 12, cursor: page <= 1 ? 'not-allowed' : 'pointer',
+              opacity: page <= 1 ? 0.4 : 1, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
             }}
           >
             上一页
           </button>
-          <span style={{ fontSize: 12, color: '#6B6B6B' }}>
+          <span style={{ fontSize: 12, color: '#9ca3af' }}>
             {page} / {totalPages}
           </span>
           <button
@@ -602,8 +602,8 @@ function CreditsPurchaseList({ records }: { records: PaymentRecord[] }) {
             disabled={page >= totalPages}
             style={{
               padding: '6px 12px', borderRadius: 8, border: '1px solid #e5e7eb',
-              background: 'white', fontSize: 12, cursor: page >= totalPages ? 'not-allowed' : 'pointer',
-              opacity: page >= totalPages ? 0.4 : 1, fontFamily: "'Inter', sans-serif",
+              background: '#1a1a2e', fontSize: 12, cursor: page >= totalPages ? 'not-allowed' : 'pointer',
+              opacity: page >= totalPages ? 0.4 : 1, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
             }}
           >
             下一页

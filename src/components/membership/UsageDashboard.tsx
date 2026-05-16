@@ -42,8 +42,8 @@ export default function UsageDashboard({ onUpgrade, onBuyCredits }: UsageDashboa
           ? '1px solid #FED7D7'
           : isLow
             ? '1px solid #F6E05E'
-            : '1px solid #f0ebe4',
-        boxShadow: '0 2px 12px rgba(212, 165, 116, 0.08)',
+            : '1px solid #2a2a40',
+        boxShadow: '0 2px 12px rgba(117, 54, 213, 0.08)',
       }}
       role="region"
       aria-label="用量面板"
@@ -59,10 +59,10 @@ export default function UsageDashboard({ onUpgrade, onBuyCredits }: UsageDashboa
       >
         <h3
           style={{
-            fontFamily: "'Playfair Display', serif",
+            fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
             fontSize: '16px',
             fontWeight: 600,
-            color: '#2D2D2D',
+            color: '#e8e8f0',
             margin: 0,
           }}
         >
@@ -94,7 +94,7 @@ export default function UsageDashboard({ onUpgrade, onBuyCredits }: UsageDashboa
                 marginBottom: '6px',
               }}
             >
-              <span style={{ fontSize: '12px', color: '#6B6B6B', fontWeight: 500 }}>
+              <span style={{ fontSize: '12px', color: '#9ca3af', fontWeight: 500 }}>
                 月度 Credits
               </span>
               <span style={{ fontSize: '12px', color: '#999' }}>
@@ -103,7 +103,7 @@ export default function UsageDashboard({ onUpgrade, onBuyCredits }: UsageDashboa
             </div>
             <div
               style={{
-                background: '#f0ebe4',
+                background: '#2a2a40',
                 borderRadius: '8px',
                 height: '8px',
                 overflow: 'hidden',
@@ -116,7 +116,7 @@ export default function UsageDashboard({ onUpgrade, onBuyCredits }: UsageDashboa
                   width: `${credits.monthlyTotal > 0 ? (credits.monthlyUsed / credits.monthlyTotal) * 100 : 0}%`,
                   background: isMonthlyExhausted
                     ? '#D69E2E'
-                    : 'linear-gradient(90deg, #D4A574, #C9A86A)',
+                    : 'linear-gradient(90deg, #7536d5, #5a2db8)',
                   transition: 'width 0.3s ease',
                 }}
               />
@@ -132,7 +132,7 @@ export default function UsageDashboard({ onUpgrade, onBuyCredits }: UsageDashboa
               marginBottom: '12px',
             }}
           >
-            <span style={{ fontSize: '12px', color: '#6B6B6B', fontWeight: 500 }}>
+            <span style={{ fontSize: '12px', color: '#9ca3af', fontWeight: 500 }}>
               购买 Credits
             </span>
             <span
@@ -162,13 +162,13 @@ export default function UsageDashboard({ onUpgrade, onBuyCredits }: UsageDashboa
               style={{
                 fontSize: '28px',
                 fontWeight: 700,
-                color: isExhausted ? '#E53E3E' : isLow ? '#D69E2E' : '#D4A574',
-                fontFamily: "'Playfair Display', serif",
+                color: isExhausted ? '#E53E3E' : isLow ? '#D69E2E' : '#7536d5',
+                fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
               }}
             >
               {credits.totalAvailable}
             </span>
-            <span style={{ fontSize: '14px', color: '#6B6B6B' }}>
+            <span style={{ fontSize: '14px', color: '#9ca3af' }}>
               可用 Credits
             </span>
           </div>
@@ -243,9 +243,9 @@ export default function UsageDashboard({ onUpgrade, onBuyCredits }: UsageDashboa
                 fontSize: '13px',
                 fontWeight: 600,
                 cursor: 'pointer',
-                background: 'linear-gradient(135deg, #D4A574 0%, #C9A86A 100%)',
+                background: 'linear-gradient(135deg, #7536d5 0%, #5a2db8 100%)',
                 color: 'white',
-                fontFamily: "'Inter', sans-serif",
+                fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
               }}
             >
               购买 Credits 充值包
@@ -274,7 +274,7 @@ export default function UsageDashboard({ onUpgrade, onBuyCredits }: UsageDashboa
                   borderRadius: '50%',
                   background: i < previewCount.used
                     ? '#E2E8F0'
-                    : 'linear-gradient(135deg, #D4A574 0%, #C9A86A 100%)',
+                    : 'linear-gradient(135deg, #7536d5 0%, #5a2db8 100%)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -293,7 +293,7 @@ export default function UsageDashboard({ onUpgrade, onBuyCredits }: UsageDashboa
           <div
             style={{
               fontSize: '14px',
-              color: isFreeExhausted ? '#E53E3E' : '#2D2D2D',
+              color: isFreeExhausted ? '#E53E3E' : '#e8e8f0',
               fontWeight: 500,
               marginBottom: '12px',
             }}
@@ -329,9 +329,9 @@ export default function UsageDashboard({ onUpgrade, onBuyCredits }: UsageDashboa
                     fontSize: '13px',
                     fontWeight: 600,
                     cursor: 'pointer',
-                    background: 'linear-gradient(135deg, #D4A574 0%, #C9A86A 100%)',
+                    background: 'linear-gradient(135deg, #7536d5 0%, #5a2db8 100%)',
                     color: 'white',
-                    fontFamily: "'Inter', sans-serif",
+                    fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
                   }}
                 >
                   升级到专业版

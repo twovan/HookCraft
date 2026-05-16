@@ -136,10 +136,10 @@ export default function TemplatesPage() {
   const paginatedTemplates = filteredTemplates.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   return (
-    <div style={{ minHeight: '100vh', background: '#FDFBF7' }}>
+    <div style={{ minHeight: '100vh', background: '#0d0d14' }}>
       <div style={{
         position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-        background: 'radial-gradient(circle at 20% 50%, rgba(212,165,116,0.03) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(212,165,116,0.03) 0%, transparent 50%)',
+        background: 'radial-gradient(circle at 20% 50%, rgba(117, 54, 213,0.03) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(117, 54, 213,0.03) 0%, transparent 50%)',
         pointerEvents: 'none', zIndex: 0,
       }} />
 
@@ -147,13 +147,13 @@ export default function TemplatesPage() {
         <div style={{ display: 'grid', gridTemplateColumns: '250px 1fr', gap: 32 }}>
           {/* Filter Sidebar */}
           <aside style={{
-            background: 'white', padding: 28, borderRadius: 20, height: 'fit-content',
+            background: '#1a1a2e', padding: 28, borderRadius: 20, height: 'fit-content',
             position: 'sticky', top: 140,
-            boxShadow: '0 4px 20px rgba(0,0,0,0.04)', border: '1px solid rgba(212,165,116,0.1)',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.04)', border: '1px solid rgba(117, 54, 213,0.1)',
           }}>
             {/* Category */}
             <div style={{ marginBottom: 24 }}>
-              <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 14, color: '#2D2D2D', letterSpacing: 0.3, textTransform: 'uppercase' }}>类型</h3>
+              <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 14, color: '#e8e8f0', letterSpacing: 0.3, textTransform: 'uppercase' }}>类型</h3>
               {[{ key: 'all', label: '全部' }, { key: 'free', label: '免费模板' }, { key: 'paid', label: '付费模板' }].map((opt) => (
                 <label key={opt.key} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, cursor: 'pointer' }}>
                   <input
@@ -163,14 +163,14 @@ export default function TemplatesPage() {
                     onChange={() => { setCategoryFilter(opt.key); setCurrentPage(1); }}
                     style={{ cursor: 'pointer' }}
                   />
-                  <span style={{ fontSize: 14, fontWeight: 500, color: categoryFilter === opt.key ? '#D4A574' : '#2D2D2D' }}>{opt.label}</span>
+                  <span style={{ fontSize: 14, fontWeight: 500, color: categoryFilter === opt.key ? '#7536d5' : '#e8e8f0' }}>{opt.label}</span>
                 </label>
               ))}
             </div>
 
             {/* Genre */}
             <div style={{ marginBottom: 24 }}>
-              <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 14, color: '#2D2D2D', letterSpacing: 0.3, textTransform: 'uppercase' }}>风格</h3>
+              <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 14, color: '#e8e8f0', letterSpacing: 0.3, textTransform: 'uppercase' }}>风格</h3>
               {GENRES.map((genre) => (
                 <label key={genre} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, cursor: 'pointer' }}>
                   <input
@@ -179,52 +179,52 @@ export default function TemplatesPage() {
                     onChange={() => toggleGenre(genre)}
                     style={{ cursor: 'pointer' }}
                   />
-                  <span style={{ fontSize: 14, fontWeight: 500, color: selectedGenres.includes(genre) ? '#D4A574' : '#2D2D2D', letterSpacing: 0.1 }}>{genre}</span>
+                  <span style={{ fontSize: 14, fontWeight: 500, color: selectedGenres.includes(genre) ? '#7536d5' : '#e8e8f0', letterSpacing: 0.1 }}>{genre}</span>
                 </label>
               ))}
             </div>
 
             {/* BPM Range */}
             <div style={{ marginBottom: 24 }}>
-              <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 14, color: '#2D2D2D', letterSpacing: 0.3, textTransform: 'uppercase' }}>BPM 范围</h3>
+              <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 14, color: '#e8e8f0', letterSpacing: 0.3, textTransform: 'uppercase' }}>BPM 范围</h3>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <input type="number" placeholder="60" style={{
                   width: '100%', padding: '8px 12px', border: '1px solid #E5E5E5', borderRadius: 8,
-                  fontSize: 13, fontFamily: "'Inter', sans-serif", outline: 'none',
+                  fontSize: 13, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", outline: 'none',
                 }} />
                 <span style={{ color: '#999' }}>-</span>
                 <input type="number" placeholder="200" style={{
                   width: '100%', padding: '8px 12px', border: '1px solid #E5E5E5', borderRadius: 8,
-                  fontSize: 13, fontFamily: "'Inter', sans-serif", outline: 'none',
+                  fontSize: 13, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", outline: 'none',
                 }} />
               </div>
             </div>
 
             {/* Price Range */}
             <div style={{ marginBottom: 24 }}>
-              <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 14, color: '#2D2D2D', letterSpacing: 0.3, textTransform: 'uppercase' }}>价格范围</h3>
+              <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 14, color: '#e8e8f0', letterSpacing: 0.3, textTransform: 'uppercase' }}>价格范围</h3>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <input type="number" placeholder="¥0" style={{
                   width: '100%', padding: '8px 12px', border: '1px solid #E5E5E5', borderRadius: 8,
-                  fontSize: 13, fontFamily: "'Inter', sans-serif", outline: 'none',
+                  fontSize: 13, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", outline: 'none',
                 }} />
                 <span style={{ color: '#999' }}>-</span>
                 <input type="number" placeholder="¥500" style={{
                   width: '100%', padding: '8px 12px', border: '1px solid #E5E5E5', borderRadius: 8,
-                  fontSize: 13, fontFamily: "'Inter', sans-serif", outline: 'none',
+                  fontSize: 13, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", outline: 'none',
                 }} />
               </div>
             </div>
 
             {/* Sort */}
             <div style={{ marginBottom: 24 }}>
-              <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 14, color: '#2D2D2D', letterSpacing: 0.3, textTransform: 'uppercase' }}>排序</h3>
+              <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 14, color: '#e8e8f0', letterSpacing: 0.3, textTransform: 'uppercase' }}>排序</h3>
               <select
                 value={sortBy}
                 onChange={(e) => { setSortBy(e.target.value); setCurrentPage(1); }}
                 style={{
                   width: '100%', padding: '10px 12px', border: '1px solid #E5E5E5', borderRadius: 8,
-                  fontSize: 13, fontFamily: "'Inter', sans-serif", background: 'white', cursor: 'pointer', outline: 'none',
+                  fontSize: 13, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", background: '#1a1a2e', cursor: 'pointer', outline: 'none',
                 }}
               >
                 <option value="newest">最新上架</option>
@@ -238,8 +238,8 @@ export default function TemplatesPage() {
               onClick={() => { setSelectedGenres([]); setCategoryFilter('all'); setCurrentPage(1); }}
               style={{
                 width: '100%', padding: '12px 28px', border: '1px solid #E5E5E5', borderRadius: 24,
-                background: 'transparent', color: '#6B6B6B', fontSize: 14, fontWeight: 600,
-                cursor: 'pointer', fontFamily: "'Inter', sans-serif",
+                background: 'transparent', color: '#9ca3af', fontSize: 14, fontWeight: 600,
+                cursor: 'pointer', fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
               }}
             >
               清除筛选
@@ -249,14 +249,14 @@ export default function TemplatesPage() {
           {/* Template Grid */}
           <div>
             <h2 style={{
-              fontSize: 36, fontWeight: 700, marginBottom: 48, color: '#2D2D2D',
-              fontFamily: "'Playfair Display', serif", letterSpacing: -0.5,
+              fontSize: 36, fontWeight: 700, marginBottom: 48, color: '#e8e8f0',
+              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", letterSpacing: -0.5,
               position: 'relative', display: 'inline-block',
             }}>
               所有模板
               <span style={{
                 position: 'absolute', bottom: -12, left: 0, width: 60, height: 3,
-                background: 'linear-gradient(90deg, #D4A574, transparent)', borderRadius: 2,
+                background: 'linear-gradient(90deg, #7536d5, transparent)', borderRadius: 2,
               }} />
             </h2>
 
@@ -272,7 +272,7 @@ export default function TemplatesPage() {
                   onClick={() => window.location.reload()}
                   style={{
                     padding: '10px 24px', borderRadius: 24, border: 'none',
-                    background: 'linear-gradient(135deg, #D4A574, #C9A86A)', color: 'white',
+                    background: 'linear-gradient(135deg, #7536d5, #5a2db8)', color: 'white',
                     fontSize: 14, fontWeight: 600, cursor: 'pointer',
                   }}
                 >
@@ -298,8 +298,8 @@ export default function TemplatesPage() {
                         key={t.id}
                         href={`/templates/${t.id}`}
                         style={{
-                          background: 'white', borderRadius: 20, overflow: 'hidden',
-                          boxShadow: hoveredCard === t.id ? '0 12px 40px rgba(212,165,116,0.25)' : '0 4px 20px rgba(0,0,0,0.06)',
+                          background: '#1a1a2e', borderRadius: 20, overflow: 'hidden',
+                          boxShadow: hoveredCard === t.id ? '0 12px 40px rgba(117, 54, 213,0.25)' : '0 4px 20px rgba(0,0,0,0.06)',
                           transition: 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
                           cursor: 'pointer', textDecoration: 'none', color: 'inherit',
                           transform: hoveredCard === t.id ? 'translateY(-8px) scale(1.02)' : 'none',
@@ -320,33 +320,33 @@ export default function TemplatesPage() {
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             opacity: hoveredCard === t.id ? 1 : 0, transition: 'opacity 0.3s',
                           }}>
-                            <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>▶</div>
+                            <div style={{ width: 60, height: 60, borderRadius: '50%', background: '#1a1a2e', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>▶</div>
                           </div>
                         </div>
                         <div style={{ padding: 20 }}>
-                          <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 10, color: '#2D2D2D' }}>{t.name}</div>
+                          <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 10, color: '#e8e8f0' }}>{t.name}</div>
                           {t.producerName && (
-                            <div style={{ fontSize: 12, color: '#6B6B6B', marginBottom: 8 }}>
-                              by <span style={{ color: '#D4A574', fontWeight: 500 }}>{t.producerName}</span>
+                            <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 8 }}>
+                              by <span style={{ color: '#7536d5', fontWeight: 500 }}>{t.producerName}</span>
                             </div>
                           )}
                           <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
                             {tags.map((tag) => (
-                              <span key={tag} style={{ padding: '5px 14px', background: '#F5E6D3', color: '#D4A574', fontSize: 11, fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase', borderRadius: 12 }}>{tag}</span>
+                              <span key={tag} style={{ padding: '5px 14px', background: 'rgba(117, 54, 213, 0.15)', color: '#7536d5', fontSize: 11, fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase', borderRadius: 12 }}>{tag}</span>
                             ))}
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div style={{ fontSize: 26, fontWeight: 700, color: '#D4A574', letterSpacing: -0.5 }}>
+                            <div style={{ fontSize: 26, fontWeight: 700, color: '#7536d5', letterSpacing: -0.5 }}>
                               {isPurchased ? '已购' : t.category === 'paid_template' ? (price > 0 ? `￥${price}` : '待定价') : '免费'}
                             </div>
                             {isPurchased || t.category === 'free_template' ? (
                               <span onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/studio?templateId=${t.id}`); }} style={{
-                                padding: '8px 16px', borderRadius: 24, background: 'linear-gradient(135deg, #D4A574, #C9A86A)',
+                                padding: '8px 16px', borderRadius: 24, background: 'linear-gradient(135deg, #7536d5, #5a2db8)',
                                 color: 'white', fontSize: 12, fontWeight: 600, cursor: 'pointer',
                               }}>{isPurchased ? '去创作' : '立即使用'}</span>
                             ) : (
                               <span onClick={(e) => { e.preventDefault(); e.stopPropagation(); addItem({ template_id: t.id, name: t.name, price: t.price || 0, cover_url: t.coverUrl || null, genre: t.genre, added_at: new Date().toISOString() }); }} style={{
-                                padding: '8px 16px', borderRadius: 24, background: 'linear-gradient(135deg, #D4A574, #C9A86A)',
+                                padding: '8px 16px', borderRadius: 24, background: 'linear-gradient(135deg, #7536d5, #5a2db8)',
                                 color: 'white', fontSize: 12, fontWeight: 600, cursor: 'pointer',
                               }}>加入购物车</span>
                             )}
@@ -366,11 +366,11 @@ export default function TemplatesPage() {
                         onClick={() => setCurrentPage(page)}
                         style={{
                           width: 40, height: 40, borderRadius: 12, border: 'none',
-                          background: safePage === page ? 'linear-gradient(135deg, #D4A574, #C9A86A)' : 'white',
-                          color: safePage === page ? 'white' : '#6B6B6B',
+                          background: safePage === page ? 'linear-gradient(135deg, #7536d5, #5a2db8)' : 'white',
+                          color: safePage === page ? 'white' : '#9ca3af',
                           fontSize: 14, fontWeight: 600, cursor: 'pointer',
                           boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-                          fontFamily: "'Inter', sans-serif",
+                          fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
                         }}
                       >
                         {page}
