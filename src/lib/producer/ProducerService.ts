@@ -54,6 +54,14 @@ export class ProducerService {
 
     if (countError) throw toAppError(countError, 'templates', 'select');
 
+    // Sum sales_count for all published templates
+    const { data: salesData } = await this.supabase
+      .from('templates')
+      .select('sales_count')
+      .eq('producer_id', producerId)
+      .eq('status', 'published');
+    const totalSales = (salesData || []).reduce((sum: number, t: any) => sum + (t.sales_count || 0), 0);
+
     return {
       id: producer.id,
       displayName: producer.display_name,
@@ -62,6 +70,7 @@ export class ProducerService {
       styleTags: producer.style_tags ?? [],
       templateCount: templateCount ?? 0,
       totalDownloads: producer.total_downloads,
+      totalSales,
       joinedAt: producer.joined_at,
     };
   }

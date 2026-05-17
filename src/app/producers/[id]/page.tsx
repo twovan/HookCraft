@@ -9,9 +9,12 @@ interface TemplateItem {
   id: string;
   name: string;
   genre: string;
+  genreTags?: string[];
   category: string;
+  coverUrl?: string;
   previewUrl?: string;
   price?: number;
+  salesCount?: number;
 }
 
 export default function ProducerProfilePage() {
@@ -179,15 +182,11 @@ export default function ProducerProfilePage() {
               ))}
             </div>
 
-            {/* Stats row - 4 items */}
+            {/* Stats row */}
             <div style={{ display: 'flex', gap: 32 }}>
               <div>
                 <div style={{ fontSize: 20, fontWeight: 700, color: '#7536d5' }}>{producer.templateCount}</div>
                 <div style={{ fontSize: 12, color: '#999' }}>模板</div>
-              </div>
-              <div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: '#7536d5' }}>{producer.totalDownloads}</div>
-                <div style={{ fontSize: 12, color: '#999' }}>下载量</div>
               </div>
               <div>
                 <div style={{ fontSize: 20, fontWeight: 700, color: '#7536d5' }}>{producer.totalSales || 0}</div>
@@ -310,32 +309,43 @@ export default function ProducerProfilePage() {
                   >
                     <div style={{
                       height: 120,
-                      background: 'linear-gradient(135deg, rgba(117, 54, 213, 0.15), #0d0d14)',
+                      background: t.coverUrl
+                        ? `url(${t.coverUrl}) center/cover`
+                        : 'linear-gradient(135deg, rgba(117, 54, 213, 0.15), #0d0d14)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       fontSize: 32,
                     }}>
-                      🎵
+                      {!t.coverUrl && '🎵'}
                     </div>
                     <div style={{ padding: 16 }}>
                       <div style={{ fontSize: 14, fontWeight: 600, color: '#e8e8f0', marginBottom: 6 }}>
                         {t.name}
                       </div>
                       <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                        <span style={{
-                          padding: '3px 8px',
-                          background: 'rgba(117, 54, 213, 0.15)',
-                          color: '#7536d5',
-                          fontSize: 10,
-                          fontWeight: 600,
-                          borderRadius: 8,
-                        }}>
-                          {t.genre}
-                        </span>
+                        {(t.genreTags || [t.genre]).filter(Boolean).slice(0, 2).map((tag) => (
+                          <span key={tag} style={{
+                            padding: '3px 8px',
+                            background: 'rgba(117, 54, 213, 0.15)',
+                            color: '#7536d5',
+                            fontSize: 10,
+                            fontWeight: 600,
+                            borderRadius: 8,
+                          }}>
+                            {tag}
+                          </span>
+                        ))}
                       </div>
-                      <div style={{ fontSize: 18, fontWeight: 700, color: '#7536d5' }}>
-                        {t.price && t.price > 0 ? `￥${Math.round(t.price / 100)}` : '免费'}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ fontSize: 18, fontWeight: 700, color: '#7536d5' }}>
+                          {t.price && t.price > 0 ? `￥${Math.round(t.price / 100)}` : '免费'}
+                        </div>
+                        {(t.salesCount || 0) > 0 && (
+                          <div style={{ fontSize: 11, color: '#9ca3af' }}>
+                            销量 {t.salesCount}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </Link>
