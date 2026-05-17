@@ -33,7 +33,18 @@ export class LyriaProvider implements AIModelProvider {
         config,
       });
 
-      return this.parseResponse(response as unknown as GeminiRawResponse, modelId);
+      // Try SDK .text getter for lyrics (some SDK versions expose it differently)
+      let sdkText: string | undefined;
+      try { sdkText = typeof (response as any).text === 'string' ? (response as any).text : undefined; } catch {}
+
+      const result = this.parseResponse(response as unknown as GeminiRawResponse, modelId);
+
+      // Fallback: if no lyrics found in parts but SDK .text has content
+      if (!result.lyrics && sdkText && sdkText.trim() && sdkText !== '<instrumental>') {
+        result.lyrics = sdkText;
+      }
+
+      return result;
     } catch (err: any) {
       const msg = err?.message || err?.toString?.() || 'Unknown Lyria error';
       console.error(`[LyriaProvider] generatePreview failed:`, msg);
@@ -54,7 +65,17 @@ export class LyriaProvider implements AIModelProvider {
       config,
     });
 
-    return this.parseResponse(response as unknown as GeminiRawResponse, modelId);
+    // Try SDK .text getter for lyrics
+    let sdkText: string | undefined;
+    try { sdkText = typeof (response as any).text === 'string' ? (response as any).text : undefined; } catch {}
+
+    const result = this.parseResponse(response as unknown as GeminiRawResponse, modelId);
+
+    if (!result.lyrics && sdkText && sdkText.trim() && sdkText !== '<instrumental>') {
+      result.lyrics = sdkText;
+    }
+
+    return result;
   }
 
   /** 构建请求内容（prompt + 可选图片） */

@@ -281,9 +281,11 @@ export class MusicGenerationService {
     } else {
       // 追加人声性别指令
       if (input.voiceGender === 'male') {
-        basePrompt += '\n\nUse a male vocalist voice.';
+        basePrompt += '\n\nInclude male vocals with lyrics. Generate and return the full lyrics text.';
       } else if (input.voiceGender === 'female') {
-        basePrompt += '\n\nUse a female vocalist voice.';
+        basePrompt += '\n\nInclude female vocals with lyrics. Generate and return the full lyrics text.';
+      } else {
+        basePrompt += '\n\nInclude vocals with lyrics. Generate and return the full lyrics text.';
       }
 
       // 追加自定义歌词
