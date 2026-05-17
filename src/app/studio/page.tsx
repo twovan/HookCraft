@@ -173,11 +173,6 @@ export default function StudioPage() {
 
       if (res.ok) {
         const data = await res.json();
-        setBatchId(data.batchId);
-        setVersions(data.versions || []);
-        setCompletedCount(
-          (data.versions || []).filter((v: VersionResult) => v.status === 'completed').length
-        );
 
         // Refresh credits after generation
         if (isPaid) {
@@ -185,6 +180,10 @@ export default function StudioPage() {
         } else {
           fetchPreviewCount();
         }
+
+        // 直接跳转到我的创作页面，展开对应批次
+        router.push(`/account/creations?expand=${data.batchId}`);
+        return;
       }
     } catch {
       // Handle error

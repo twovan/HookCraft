@@ -30,6 +30,12 @@ type TimeRange = '7d' | '30d' | 'all';
 
 export default function CreationsPage() {
   const router = useRouter();
+  const [expandParam] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return new URLSearchParams(window.location.search).get('expand');
+    }
+    return null;
+  });
   const [batches, setBatches] = useState<BatchSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<TimeRange>('30d');
@@ -40,6 +46,13 @@ export default function CreationsPage() {
   useEffect(() => {
     fetchBatches();
   }, [range]);
+
+  // Auto-expand batch from URL param (after generation redirect)
+  useEffect(() => {
+    if (expandParam && batches.length > 0 && !expandedBatchId) {
+      handleExpand(expandParam);
+    }
+  }, [expandParam, batches]);
 
   const fetchBatches = async () => {
     setLoading(true);
