@@ -89,46 +89,47 @@ export default function HomePage() {
       }} />
 
       <div style={{ position: 'relative', zIndex: 1 }}>
-        {/* Hero */}
+        {/* Hero Banner */}
         <section style={{
-          textAlign: 'center', padding: '100px 24px 120px',
-          background: 'linear-gradient(135deg, rgba(117, 54, 213, 0.15) 0%, #0d0d14 100%)',
+          textAlign: 'center', padding: '80px 24px 90px',
           position: 'relative', overflow: 'hidden',
+          backgroundImage: 'url(/banner_bg.png)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
         }}>
+          {/* Dark overlay for text readability */}
           <div style={{
-            position: 'absolute', top: '-50%', left: '-50%', width: '200%', height: '200%',
-            background: 'radial-gradient(circle, rgba(117, 54, 213,0.1) 0%, transparent 70%)',
+            position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0, 0, 0, 0.3)',
           }} />
           <div style={{ position: 'relative', zIndex: 1 }}>
+            {/* Logo icon */}
+            <div style={{ marginBottom: 20 }}>
+              <img src="/logo.svg" alt="" style={{ height: 48, opacity: 0.9 }} />
+            </div>
             <h1 style={{
-              fontSize: 64, fontWeight: 700, color: '#e8e8f0', marginBottom: 20,
-              fontFamily: "'Playfair Display', serif", letterSpacing: -1, lineHeight: 1.1,
+              fontSize: 48, fontWeight: 700, color: '#ffffff', marginBottom: 12,
+              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", letterSpacing: 1, lineHeight: 1.2,
             }}>
-              Discover Premium Music
+              华语流行音乐的
+              <br />
+              AI Demo 创作与发布平台
             </h1>
             <p style={{
-              fontSize: 20, color: '#9ca3af', marginBottom: 36, letterSpacing: 0.2,
-              maxWidth: 600, margin: '0 auto 36px',
+              fontSize: 16, color: 'rgba(255,255,255,0.7)', marginBottom: 36,
+              maxWidth: 500, margin: '0 auto 36px',
             }}>
-              高质量音乐模板交易平台，连接优秀制作人与创作者
+              AI 驱动创作灵感 · 释放无限音乐可能
             </p>
-            <div style={{ display: 'flex', gap: 16, justifyContent: 'center' }}>
-              <Link href="/studio" style={{
-                padding: '14px 36px', borderRadius: 24, border: 'none',
-                background: 'linear-gradient(135deg, #7536d5, #5a2db8)', color: 'white',
-                fontSize: 16, fontWeight: 600, textDecoration: 'none',
-                boxShadow: '0 6px 20px rgba(117, 54, 213,0.3)',
-              }}>
-                开始创作
-              </Link>
-              <Link href="/templates" style={{
-                padding: '14px 36px', borderRadius: 24,
-                border: '1px solid #2a2a40', background: 'transparent',
-                color: '#9ca3af', fontSize: 16, fontWeight: 600, textDecoration: 'none',
-              }}>
-                浏览模板
-              </Link>
-            </div>
+            <Link href="/studio" style={{
+              padding: '14px 36px', borderRadius: 24, border: 'none',
+              background: 'rgba(117, 54, 213, 0.85)', color: 'white',
+              fontSize: 16, fontWeight: 600, textDecoration: 'none',
+              boxShadow: '0 6px 24px rgba(117, 54, 213, 0.4)',
+              backdropFilter: 'blur(8px)',
+            }}>
+              ✦ 开始创作
+            </Link>
           </div>
         </section>
 
