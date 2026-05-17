@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1', 10);
     const pageSize = parseInt(searchParams.get('pageSize') || '20', 10);
     const category = searchParams.get('category') as SensitiveWordCategory | null;
+    const search = searchParams.get('search') || '';
 
     // 参数校验
     if (isNaN(page) || page < 1) {
@@ -36,6 +37,7 @@ export async function GET(request: NextRequest) {
       page,
       pageSize,
       category: category || undefined,
+      search: search || undefined,
     });
 
     return NextResponse.json({

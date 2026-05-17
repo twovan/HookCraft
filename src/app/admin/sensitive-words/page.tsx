@@ -25,6 +25,9 @@ export default function AdminSensitiveWordsPage() {
   // 筛选与分页
   const [currentCategory, setCurrentCategory] = useState<SensitiveWordCategory | 'all'>('all');
   const [page, setPage] = useState(1);
+  const [jumpPage, setJumpPage] = useState('');
+  const [searchText, setSearchText] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const pageSize = 20;
 
   // 新增/编辑弹窗
@@ -62,6 +65,9 @@ export default function AdminSensitiveWordsPage() {
       if (currentCategory !== 'all') {
         params.set('category', currentCategory);
       }
+      if (searchText) {
+        params.set('search', searchText);
+      }
       const res = await fetch(`/api/admin/sensitive-words?${params.toString()}`);
       if (!res.ok) throw new Error('请求失败');
       const data = await res.json();
@@ -72,7 +78,7 @@ export default function AdminSensitiveWordsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, currentCategory]);
+  }, [page, currentCategory, searchText]);
 
   useEffect(() => {
     fetchWords();
@@ -270,8 +276,21 @@ export default function AdminSensitiveWordsPage() {
               </button>
             ))}
           </div>
-          {/* 操作按钮 */}
-          <div style={{ display: 'flex', gap: 8 }}>
+          {/* 搜索 + 操作按钮 */}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <form onSubmit={(e) => { e.preventDefault(); setSearchText(searchInput); setPage(1); }} style={{ display: 'flex', gap: 4 }}>
+              <input
+                type="text"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="搜索敏感词..."
+                style={{ ...inputStyle, width: 160, padding: '6px 12px', fontSize: 12 }}
+              />
+              <button type="submit" style={secondaryBtnStyle}>搜索</button>
+              {searchText && (
+                <button type="button" onClick={() => { setSearchInput(''); setSearchText(''); setPage(1); }} style={{ ...secondaryBtnStyle, color: '#9ca3af' }}>清除</button>
+              )}
+            </form>
             <button onClick={openBatchModal} style={secondaryBtnStyle}>批量导入</button>
             <button onClick={openCreateModal} style={addBtnStyle}>+ 新增敏感词</button>
           </div>
@@ -396,29 +415,79 @@ export default function AdminSensitiveWordsPage() {
             <span style={{ fontSize: 13, color: '#6b7280' }}>
               共 {total} 条，第 {page}/{totalPages} 页
             </span>
-            <div style={{ display: 'flex', gap: 4 }}>
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+              <button
+                onClick={() => setPage(1)}
+                disabled={page <= 1}
+                style={{ ...pageBtnStyle, opacity: page <= 1 ? 0.4 : 1, cursor: page <= 1 ? 'not-allowed' : 'pointer' }}
+              >
+                首页
+              </button>
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
-                style={{
-                  ...pageBtnStyle,
-                  opacity: page <= 1 ? 0.4 : 1,
-                  cursor: page <= 1 ? 'not-allowed' : 'pointer',
-                }}
+                style={{ ...pageBtnStyle, opacity: page <= 1 ? 0.4 : 1, cursor: page <= 1 ? 'not-allowed' : 'pointer' }}
               >
                 上一页
               </button>
+              {/* 页码按钮 */}
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum: number;
+                if (totalPages <= 5) { pageNum = i + 1; }
+                else if (page <= 3) { pageNum = i + 1; }
+                else if (page >= totalPages - 2) { pageNum = totalPages - 4 + i; }
+                else { pageNum = page - 2 + i; }
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setPage(pageNum)}
+                    style={{
+                      ...pageBtnStyle,
+                      background: pageNum === page ? '#D4A574' : '#fff',
+                      color: pageNum === page ? '#fff' : '#374151',
+                      borderColor: pageNum === page ? '#D4A574' : '#e5e7eb',
+                    }}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
               <button
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
-                style={{
-                  ...pageBtnStyle,
-                  opacity: page >= totalPages ? 0.4 : 1,
-                  cursor: page >= totalPages ? 'not-allowed' : 'pointer',
-                }}
+                style={{ ...pageBtnStyle, opacity: page >= totalPages ? 0.4 : 1, cursor: page >= totalPages ? 'not-allowed' : 'pointer' }}
               >
                 下一页
               </button>
+              <button
+                onClick={() => setPage(totalPages)}
+                disabled={page >= totalPages}
+                style={{ ...pageBtnStyle, opacity: page >= totalPages ? 0.4 : 1, cursor: page >= totalPages ? 'not-allowed' : 'pointer' }}
+              >
+                末页
+              </button>
+              {/* 跳转 */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const target = parseInt(jumpPage, 10);
+                  if (!isNaN(target) && target >= 1 && target <= totalPages) {
+                    setPage(target);
+                  }
+                  setJumpPage('');
+                }}
+                style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 8 }}
+              >
+                <span style={{ fontSize: 12, color: '#6b7280' }}>跳至</span>
+                <input
+                  type="text"
+                  value={jumpPage}
+                  onChange={(e) => setJumpPage(e.target.value)}
+                  style={{ width: 40, padding: '4px 6px', borderRadius: 4, border: '1px solid #e5e7eb', fontSize: 12, textAlign: 'center' }}
+                />
+                <span style={{ fontSize: 12, color: '#6b7280' }}>页</span>
+                <button type="submit" style={{ ...pageBtnStyle, fontSize: 11 }}>GO</button>
+              </form>
             </div>
           </div>
         )}

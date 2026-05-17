@@ -12,6 +12,7 @@ export interface WordListParams {
   page?: number;
   pageSize?: number;
   category?: SensitiveWordCategory;
+  search?: string;
 }
 
 /** 新增敏感词输入 */
@@ -58,7 +59,7 @@ export class SensitiveWordAdminService {
    * Requirements: 8.1
    */
   async list(params: WordListParams = {}): Promise<{ words: SensitiveWordEntry[]; total: number }> {
-    const { page = 1, pageSize = 20, category } = params;
+    const { page = 1, pageSize = 20, category, search } = params;
     const offset = (page - 1) * pageSize;
 
     // 构建查询 - 获取总数
@@ -68,6 +69,9 @@ export class SensitiveWordAdminService {
 
     if (category) {
       countQuery = countQuery.eq('category', category);
+    }
+    if (search) {
+      countQuery = countQuery.ilike('word', `%${search}%`);
     }
 
     const { count, error: countError } = await countQuery;
@@ -85,6 +89,9 @@ export class SensitiveWordAdminService {
 
     if (category) {
       dataQuery = dataQuery.eq('category', category);
+    }
+    if (search) {
+      dataQuery = dataQuery.ilike('word', `%${search}%`);
     }
 
     const { data, error: dataError } = await dataQuery;
