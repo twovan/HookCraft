@@ -248,7 +248,7 @@ export class SensitivityFilterService {
           type: 'rewrite',
           detectedWords,
           rewrittenPrompt: cached.rewrittenPrompt,
-          rewrittenPromptCn: cached.rewrittenPromptCn || cached.rewrittenPrompt,
+          rewrittenPromptCn: (cached.rewrittenPromptCn && /[\u4e00-\u9fff]/.test(cached.rewrittenPromptCn)) ? cached.rewrittenPromptCn : null,
           styleTags: cached.styleTags,
           styleTagsCn: cached.styleTagsCn,
         };

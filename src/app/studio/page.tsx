@@ -295,7 +295,11 @@ export default function StudioPage() {
     // Use the rewritten English prompt for Lyria 3, Chinese version for display
     const rewrittenPrompt = sensitivityResult?.rewrittenPrompt;
     const rewrittenPromptCn = sensitivityResult?.rewrittenPromptCn;
-    proceedWithGeneration(rewrittenPrompt || prompt || undefined, rewrittenPromptCn || undefined);
+    // 如果中文改写版存在且确实是中文，用它作为显示；否则用用户原始输入
+    const displayPromptToUse = rewrittenPromptCn && /[\u4e00-\u9fff]/.test(rewrittenPromptCn)
+      ? rewrittenPromptCn
+      : prompt; // 用户原始中文输入
+    proceedWithGeneration(rewrittenPrompt || prompt || undefined, displayPromptToUse || undefined);
     resetSensitivity();
   };
 
