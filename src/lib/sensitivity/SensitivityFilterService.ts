@@ -267,9 +267,9 @@ export class SensitivityFilterService {
           source: 'local' as const,
         }));
 
-        // 保存改写结果到缓存（异步，不阻塞返回�?
+        // 保存改写结果到缓存（异步，不阻塞返回）— 所有匹配到的词条都更新缓存
         const wordIdsToCache = localResult.words
-          .filter((w) => w.id && !w.cachedRewrite)
+          .filter((w) => w.id)
           .map((w) => w.id!);
         if (wordIdsToCache.length > 0) {
           this.saveRewriteCache(wordIdsToCache, {
