@@ -628,9 +628,11 @@ export default function StudioPage() {
             <button
               onClick={handleGenerate}
               disabled={!canGenerate || isGenerating || (!selectedTemplate && !prompt.trim())}
+              onMouseEnter={(e) => { if (canGenerate && !isGenerating && (selectedTemplate || prompt.trim())) e.currentTarget.style.transform = 'translateY(-3px)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; }}
               style={{
                 width: '100%',
-                padding: '18px 24px',
+                padding: '14px 24px',
                 borderRadius: '24px',
                 border: 'none',
                 background: canGenerate && !isGenerating && (selectedTemplate || prompt.trim())
@@ -639,7 +641,7 @@ export default function StudioPage() {
                 color: canGenerate && !isGenerating && (selectedTemplate || prompt.trim())
                   ? 'white'
                   : '#6b7280',
-                fontSize: '16px',
+                fontSize: '15px',
                 fontWeight: 700,
                 cursor: canGenerate && !isGenerating && (selectedTemplate || prompt.trim())
                   ? 'pointer'
@@ -648,18 +650,18 @@ export default function StudioPage() {
                 boxShadow: canGenerate && !isGenerating && (selectedTemplate || prompt.trim())
                   ? '0 4px 20px rgba(117, 54, 213, 0.4)'
                   : 'none',
-                transition: 'all 0.2s ease',
+                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                 display: 'flex',
-                flexDirection: 'column',
                 alignItems: 'center',
-                gap: 4,
+                justifyContent: 'center',
+                gap: 12,
               }}
             >
               <span>{isGenerating ? '生成中...' : '开始 AI 创作'}</span>
-              <span style={{ fontSize: 12, fontWeight: 500, opacity: 0.9 }}>
+              <span style={{ fontSize: 12, fontWeight: 500, opacity: 0.8 }}>
                 {isPaid
                   ? `消耗 ${totalCost} Credits（2版本）· 剩余 ${credits?.totalAvailable ?? 0}`
-                  : `消耗 1 次预览（生成2版本）· 剩余 ${previewCount?.remaining ?? 0} 次`
+                  : `消耗 1 次预览（2版本）· 剩余 ${previewCount?.remaining ?? 0} 次`
                 }
               </span>
             </button>
