@@ -535,6 +535,7 @@ Respond with JSON only: {"title": "中文歌名", "styleTags": ["tag1", "tag2"]}
     userTier: MembershipTier,
     input: MusicGenerationInput,
     versionCount = 1,
+    displayPrompt?: string,
   ): Promise<BatchGenerationResult> {
     const tierConfig = TIER_CONFIGS[userTier];
     const modelId: LyriaModelId = input.generationType === 'preview'
@@ -600,7 +601,7 @@ Respond with JSON only: {"title": "中文歌名", "styleTags": ["tag1", "tag2"]}
         id: batchId,
         user_id: userId,
         template_id: input.templateId ?? null,
-        prompt: input.userPrompt ?? null,
+        prompt: displayPrompt || input.userPrompt || null,
         generation_type: input.generationType,
         use_premium_singer: input.usePremiumSinger ?? false,
         version_count: versionCount,

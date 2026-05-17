@@ -78,6 +78,7 @@ export async function POST(req: NextRequest) {
     });
 
     // Call generateBatch
+    const displayPrompt = (body as any).displayPrompt;
     const result = await service.generateBatch(user.id, userTier, {
       templateId: body.templateId,
       userPrompt: body.userPrompt,
@@ -87,7 +88,7 @@ export async function POST(req: NextRequest) {
       instrumentalOnly: body.instrumentalOnly,
       voiceGender: body.voiceGender,
       customLyrics: body.customLyrics,
-    }, body.versionCount || 1);
+    }, body.versionCount || 1, displayPrompt);
 
     const response: GenerateBatchResponse = {
       batchId: result.batchId,

@@ -217,7 +217,7 @@ export default function StudioPage() {
   const [generationError, setGenerationError] = useState<string | null>(null);
 
   /** Proceed with the actual generation API call */
-  const proceedWithGeneration = async (userPrompt: string | undefined) => {
+  const proceedWithGeneration = async (userPrompt: string | undefined, displayPrompt?: string) => {
     setIsGenerating(true);
     setGenerationError(null);
     setCompletedCount(0);
@@ -233,6 +233,7 @@ export default function StudioPage() {
         body: JSON.stringify({
           templateId: selectedTemplate?.id,
           userPrompt: userPrompt || undefined,
+          displayPrompt: displayPrompt || undefined,
           generationType: duration === 30 ? 'preview' : 'full_demo',
           usePremiumSinger,
           instrumentalOnly,
@@ -291,9 +292,10 @@ export default function StudioPage() {
   /** Handle user confirming rewrite in SensitivityConfirmDialog */
   const handleSensitivityConfirm = () => {
     setShowConfirmDialog(false);
-    // Use the rewritten prompt from sensitivity check result
+    // Use the rewritten English prompt for Lyria 3, Chinese version for display
     const rewrittenPrompt = sensitivityResult?.rewrittenPrompt;
-    proceedWithGeneration(rewrittenPrompt || prompt || undefined);
+    const rewrittenPromptCn = sensitivityResult?.rewrittenPromptCn;
+    proceedWithGeneration(rewrittenPrompt || prompt || undefined, rewrittenPromptCn || undefined);
     resetSensitivity();
   };
 
