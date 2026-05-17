@@ -620,48 +620,6 @@ export default function StudioPage() {
               {/* Premium Singer Toggle (paid users only) */}
               {/* Premium Singer - hidden, coming soon */}
 
-              {/* Generate Button - sticky at bottom */}
-              <div style={{ position: 'sticky', bottom: 24, zIndex: 10 }}>
-                <button
-                  onClick={handleGenerate}
-                  disabled={!canGenerate || isGenerating || (!selectedTemplate && !prompt.trim())}
-                  style={{
-                    width: '100%',
-                    padding: '16px 24px',
-                    borderRadius: '24px',
-                    border: 'none',
-                    background: canGenerate && !isGenerating && (selectedTemplate || prompt.trim())
-                      ? 'linear-gradient(135deg, #7536d5 0%, #5a2db8 100%)'
-                      : '#2a2a40',
-                    color: canGenerate && !isGenerating && (selectedTemplate || prompt.trim())
-                      ? 'white'
-                      : '#6b7280',
-                    fontSize: '16px',
-                    fontWeight: 700,
-                    cursor: canGenerate && !isGenerating && (selectedTemplate || prompt.trim())
-                      ? 'pointer'
-                      : 'not-allowed',
-                    fontFamily: "'Inter', sans-serif",
-                    boxShadow: canGenerate && !isGenerating && (selectedTemplate || prompt.trim())
-                      ? '0 4px 20px rgba(117, 54, 213, 0.4)'
-                      : 'none',
-                    transition: 'all 0.2s ease',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: 4,
-                  }}
-                >
-                  <span>{isGenerating ? '生成中...' : '开始 AI 创作'}</span>
-                  <span style={{ fontSize: 12, fontWeight: 500, opacity: 0.9 }}>
-                    {isPaid
-                      ? `消耗 ${totalCost} Credits（2版本）· 剩余 ${credits?.totalAvailable ?? 0}`
-                      : `消耗 1 次预览（生成2版本）· 剩余 ${previewCount?.remaining ?? 0} 次`
-                    }
-                  </span>
-                </button>
-              </div>
-
               {/* Credits exhausted messages */}
               {creditsExhaustedPaid && (
                 <div
@@ -703,6 +661,48 @@ export default function StudioPage() {
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Generate Button - full width, sticky at bottom */}
+          <div style={{ position: 'sticky', bottom: 24, zIndex: 10, marginTop: 24 }}>
+            <button
+              onClick={handleGenerate}
+              disabled={!canGenerate || isGenerating || (!selectedTemplate && !prompt.trim())}
+              style={{
+                width: '100%',
+                padding: '18px 24px',
+                borderRadius: '24px',
+                border: 'none',
+                background: canGenerate && !isGenerating && (selectedTemplate || prompt.trim())
+                  ? 'linear-gradient(135deg, #7536d5 0%, #5a2db8 100%)'
+                  : '#2a2a40',
+                color: canGenerate && !isGenerating && (selectedTemplate || prompt.trim())
+                  ? 'white'
+                  : '#6b7280',
+                fontSize: '16px',
+                fontWeight: 700,
+                cursor: canGenerate && !isGenerating && (selectedTemplate || prompt.trim())
+                  ? 'pointer'
+                  : 'not-allowed',
+                fontFamily: "'Inter', sans-serif",
+                boxShadow: canGenerate && !isGenerating && (selectedTemplate || prompt.trim())
+                  ? '0 4px 20px rgba(117, 54, 213, 0.4)'
+                  : 'none',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 4,
+              }}
+            >
+              <span>{isGenerating ? '生成中...' : '开始 AI 创作'}</span>
+              <span style={{ fontSize: 12, fontWeight: 500, opacity: 0.9 }}>
+                {isPaid
+                  ? `消耗 ${totalCost} Credits（2版本）· 剩余 ${credits?.totalAvailable ?? 0}`
+                  : `消耗 1 次预览（生成2版本）· 剩余 ${previewCount?.remaining ?? 0} 次`
+                }
+              </span>
+            </button>
           </div>
         )}
       </div>
