@@ -173,11 +173,16 @@ export default function SyncedLyrics({ lyrics, currentTime, isPlaying }: SyncedL
     const container = containerRef.current;
     const lineEl = container.children[currentLineIndex] as HTMLElement | undefined;
     if (lineEl) {
+      const containerTop = container.scrollTop;
       const containerHeight = container.clientHeight;
-      const lineTop = lineEl.offsetTop;
-      const lineHeight = lineEl.offsetHeight;
-      const targetScroll = lineTop - containerHeight / 2 + lineHeight / 2;
-      container.scrollTo({ top: targetScroll, behavior: 'smooth' });
+      const lineTop = lineEl.offsetTop - container.offsetTop;
+      const lineBottom = lineTop + lineEl.offsetHeight;
+
+      // Only scroll if the current line is outside the visible area
+      if (lineTop < containerTop + 20 || lineBottom > containerTop + containerHeight - 20) {
+        const targetScroll = lineTop - containerHeight / 3;
+        container.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' });
+      }
     }
   }, [currentLineIndex]);
 
