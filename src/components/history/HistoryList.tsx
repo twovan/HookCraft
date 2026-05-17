@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import AudioPlayerInline from '@/components/studio/AudioPlayerInline';
 import SyncedLyrics from '@/components/studio/SyncedLyrics';
 
@@ -47,6 +47,18 @@ export default function HistoryList({
   expandedBatchDetail,
 }: HistoryListProps) {
   const [playingTaskId, setPlayingTaskId] = useState<string | null>(null);
+  const audioRefs = useRef<Record<string, HTMLAudioElement>>({});
+
+  // Pause all other audio when one starts playing
+  const handleAudioPlay = (taskId: string) => {
+    // Pause all other audio elements
+    Object.entries(audioRefs.current).forEach(([id, el]) => {
+      if (id !== taskId && el && !el.paused) {
+        el.pause();
+      }
+    });
+    setPlayingTaskId(taskId);
+  };
   const [downloadingTaskId, setDownloadingTaskId] = useState<string | null>(null);
   const [editingBatchId, setEditingBatchId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
@@ -357,6 +369,7 @@ export default function HistoryList({
                           {/* Audio player */}
                           {version.audioUrl ? (
                             <audio
+                              ref={(el) => { if (el) audioRefs.current[version.taskId] = el; }}
                               controls
                               src={version.audioUrl}
                               onTimeUpdate={(e) =>
@@ -365,7 +378,7 @@ export default function HistoryList({
                                   [version.taskId]: (e.target as HTMLAudioElement).currentTime,
                                 }))
                               }
-                              onPlay={() => setPlayingTaskId(version.taskId)}
+                              onPlay={() => handleAudioPlay(version.taskId)}
                               onPause={() => {
                                 if (playingTaskId === version.taskId) setPlayingTaskId(null);
                               }}
