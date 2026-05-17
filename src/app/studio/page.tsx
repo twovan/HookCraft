@@ -293,29 +293,22 @@ export default function StudioPage() {
           >
             AI 创作中心
           </h1>
-          <p style={{ fontSize: '15px', color: '#9ca3af', margin: 0 }}>
-            选择模板或输入提示词，AI 为您生成音乐作品
+          <p style={{ fontSize: '15px', color: '#9ca3af', margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>选择模板或输入提示词，AI 为您生成音乐作品</span>
+            <button
+              onClick={() => setCopyrightModalOpen(true)}
+              style={{
+                background: 'none', border: 'none', padding: 0,
+                color: '#9ca3af', fontSize: 12, cursor: 'pointer',
+                textDecoration: 'underline', fontFamily: "'Inter', sans-serif",
+                transition: 'color 0.2s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.color = '#c0a7fc'}
+              onMouseLeave={e => e.currentTarget.style.color = '#9ca3af'}
+            >
+              © HookCraft 创作安全与版权说明
+            </button>
           </p>
-          {/* Copyright notice link */}
-          <button
-            onClick={() => setCopyrightModalOpen(true)}
-            style={{
-              marginTop: 12,
-              padding: '6px 14px',
-              borderRadius: 20,
-              border: '1px solid #2a2a40',
-              background: 'transparent',
-              color: '#9ca3af',
-              fontSize: 12,
-              cursor: 'pointer',
-              fontFamily: "'Inter', sans-serif",
-              transition: 'all 0.2s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = '#7536d5'; e.currentTarget.style.color = '#c0a7fc'; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = '#2a2a40'; e.currentTarget.style.color = '#9ca3af'; }}
-          >
-            © HookCraft 创作安全与版权说明
-          </button>
         </div>
 
         {/* Generation Progress */}
