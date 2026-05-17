@@ -610,6 +610,40 @@ export default function StudioPage() {
                         fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
                       }}>
                         自定义歌词（可选）
+                        <span
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                            width: 14, height: 14, borderRadius: '50%', marginLeft: 6,
+                            background: '#2a2a40', color: '#9ca3af', fontSize: 9, fontWeight: 700,
+                            cursor: 'help', transition: 'all 0.2s', position: 'relative',
+                          }}
+                          onMouseEnter={e => {
+                            e.currentTarget.style.background = '#7536d5';
+                            e.currentTarget.style.color = 'white';
+                            const tip = e.currentTarget.querySelector('[data-tip]') as HTMLElement;
+                            if (tip) tip.style.display = 'block';
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.background = '#2a2a40';
+                            e.currentTarget.style.color = '#9ca3af';
+                            const tip = e.currentTarget.querySelector('[data-tip]') as HTMLElement;
+                            if (tip) tip.style.display = 'none';
+                          }}
+                        >
+                          !
+                          <div data-tip style={{
+                            display: 'none', position: 'absolute', top: '100%', left: '50%',
+                            transform: 'translateX(-50%)', marginTop: 8,
+                            background: '#1a1a2e', border: '1px solid #2a2a40', borderRadius: 10,
+                            padding: '10px 14px', width: 240, fontSize: 11, lineHeight: 1.6,
+                            color: '#e8e8f0', boxShadow: '0 8px 24px rgba(0,0,0,0.4)', zIndex: 100,
+                            whiteSpace: 'normal', fontWeight: 400,
+                          }}>
+                            请勿输入：<br/>
+                            1. 未经授权的现实公众人物名称<br/>
+                            2. 暴力、仇恨、歧视、色情等违反社区准则的词汇
+                          </div>
+                        </span>
                       </label>
                       <textarea
                         value={customLyrics}
