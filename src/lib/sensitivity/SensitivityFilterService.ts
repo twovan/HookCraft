@@ -208,7 +208,7 @@ export class SensitivityFilterService {
       } catch (error) {
         // Gemini 改写失败：本地已命中但无法改写
         // 根据设计文档：本地词库命中但 Gemini 改写失败 → 返回错误，提示用户手动修改
-        console.error('[SensitivityFilter] Gemini 改写失败:', error);
+        console.error('[SensitivityFilter] Gemini 改写失败:', error instanceof Error ? error.message : error);
 
         const detectedWords: DetectedWord[] = localResult.words.map((w) => ({
           word: w.word,

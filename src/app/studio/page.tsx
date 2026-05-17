@@ -192,8 +192,14 @@ export default function StudioPage() {
         }
 
         if (checkResult.resultType === 'rewrite') {
-          // Show confirm dialog with style tags - user decides whether to proceed
-          setShowConfirmDialog(true);
+          // Check if rewrite was successful (has rewrittenPrompt and styleTags)
+          if (checkResult.rewrittenPrompt && checkResult.styleTags && checkResult.styleTags.length > 0) {
+            // Show confirm dialog with style tags - user decides whether to proceed
+            setShowConfirmDialog(true);
+          } else {
+            // Gemini rewrite failed — show error, ask user to modify manually
+            setGenerationError('检测到您的描述中包含版权相关内容，但自动改写服务暂时不可用。请手动修改描述，移除明星名字或歌曲名称后重试。');
+          }
           return;
         }
 

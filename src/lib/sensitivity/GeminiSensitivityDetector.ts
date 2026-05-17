@@ -10,7 +10,7 @@ import type {
 } from '@/types/sensitivity';
 
 /** Gemini Flash 调用超时时间（毫秒） */
-const TIMEOUT_MS = 3000;
+const TIMEOUT_MS = 10000;
 
 /** Gemini Flash 模型 ID */
 const MODEL_ID = 'gemini-2.0-flash';
@@ -169,7 +169,7 @@ export class GeminiSensitivityDetector {
         }),
         new Promise<never>((_, reject) => {
           controller.signal.addEventListener('abort', () => {
-            reject(new Error('Gemini Flash 调用超时（3s）'));
+            reject(new Error('Gemini Flash 调用超时（10s）'));
           });
         }),
       ]);

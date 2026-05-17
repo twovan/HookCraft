@@ -62,6 +62,14 @@ export async function POST(req: NextRequest) {
 
     const result = await filterService.check(input);
 
+    // Debug logging for troubleshooting
+    console.log('[sensitivity-check] Result:', JSON.stringify({
+      resultType: result.resultType,
+      hasRewrittenPrompt: !!result.rewrittenPrompt,
+      styleTags: result.styleTags,
+      durationMs: result.durationMs,
+    }));
+
     // 7. 记录检测日志（异步，不阻塞响应）
     const allDetectedWords: DetectedWord[] = [
       ...(result.descriptionResult?.detectedWords ?? []),
