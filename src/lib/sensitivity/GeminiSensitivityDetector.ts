@@ -13,7 +13,7 @@ import type {
 const TIMEOUT_MS = 10000;
 
 /** Gemini Flash 模型 ID */
-const MODEL_ID = 'gemini-2.0-flash';
+const MODEL_ID = 'gemini-2.0-flash-lite';
 
 /**
  * 检测+改写的 Gemini Prompt 模板
@@ -159,10 +159,16 @@ export class GeminiSensitivityDetector {
     const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
     try {
+      console.log('[GeminiDetector] Calling Gemini model:', MODEL_ID);
       const response = await Promise.race([
         this.ai.models.generateContent({
           model: MODEL_ID,
-          contents: prompt,
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: prompt }],
+            },
+          ],
           config: {
             responseMimeType: 'application/json',
           },
@@ -173,6 +179,8 @@ export class GeminiSensitivityDetector {
           });
         }),
       ]);
+
+      console.log('[GeminiDetector] Gemini response received');
 
       // 提取文本响应
       const parts = response.candidates?.[0]?.content?.parts;
