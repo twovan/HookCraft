@@ -167,19 +167,23 @@ export default function SyncedLyrics({ lyrics, currentTime, isPlaying }: SyncedL
     [parsedLines, currentTime]
   );
 
-  // Auto-scroll to current line
+  // Auto-scroll within container only (don't affect page scroll)
   useEffect(() => {
     if (currentLineIndex < 0 || !containerRef.current) return;
     const container = containerRef.current;
     const lineEl = container.children[currentLineIndex] as HTMLElement | undefined;
     if (lineEl) {
-      lineEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const containerHeight = container.clientHeight;
+      const lineTop = lineEl.offsetTop;
+      const lineHeight = lineEl.offsetHeight;
+      const targetScroll = lineTop - containerHeight / 2 + lineHeight / 2;
+      container.scrollTo({ top: targetScroll, behavior: 'smooth' });
     }
   }, [currentLineIndex]);
 
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 600, color: '#c0a7fc', marginBottom: 8 }}>Lyrics</div>
+      <div style={{ fontSize: 11, fontWeight: 600, color: '#c0a7fc', marginBottom: 8 }}>歌词</div>
       <div
         ref={containerRef}
         style={{
