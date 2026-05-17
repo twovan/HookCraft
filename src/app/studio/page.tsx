@@ -596,7 +596,9 @@ export default function StudioPage() {
                         placeholder="输入歌词，AI 将按照您的歌词生成音乐..."
                         style={{
                           width: '100%',
+                          boxSizing: 'border-box',
                           minHeight: 80,
+                          maxWidth: '100%',
                           padding: '12px 14px',
                           borderRadius: 12,
                           border: '1px solid #2a2a40',
