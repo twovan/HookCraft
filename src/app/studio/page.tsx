@@ -607,18 +607,18 @@ export default function StudioPage() {
                           style={{
                             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                             width: 14, height: 14, borderRadius: '50%', marginLeft: 6,
-                            background: '#2a2a40', color: '#9ca3af', fontSize: 9, fontWeight: 700,
+                            background: '#7536d5', color: 'white', fontSize: 9, fontWeight: 700,
                             cursor: 'help', transition: 'all 0.2s', position: 'relative',
                           }}
                           onMouseEnter={e => {
-                            e.currentTarget.style.background = '#7536d5';
-                            e.currentTarget.style.color = 'white';
+                            e.currentTarget.style.background = '#2a2a40';
+                            e.currentTarget.style.color = '#9ca3af';
                             const tip = e.currentTarget.querySelector('[data-tip]') as HTMLElement;
                             if (tip) tip.style.display = 'block';
                           }}
                           onMouseLeave={e => {
-                            e.currentTarget.style.background = '#2a2a40';
-                            e.currentTarget.style.color = '#9ca3af';
+                            e.currentTarget.style.background = '#7536d5';
+                            e.currentTarget.style.color = 'white';
                             const tip = e.currentTarget.querySelector('[data-tip]') as HTMLElement;
                             if (tip) tip.style.display = 'none';
                           }}
