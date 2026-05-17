@@ -155,6 +155,7 @@ export default function StudioPage() {
 
   const handleGenerate = async () => {
     if (!canGenerate) return;
+    setGenerationError(null);
 
     if (duration === 120 && !fullDemoPermission.hasPermission) {
       showUpgradePrompt('完整 Demo 生成');
@@ -206,9 +207,13 @@ export default function StudioPage() {
     await proceedWithGeneration(prompt || undefined);
   };
 
+  // Generation error state
+  const [generationError, setGenerationError] = useState<string | null>(null);
+
   /** Proceed with the actual generation API call */
   const proceedWithGeneration = async (userPrompt: string | undefined) => {
     setIsGenerating(true);
+    setGenerationError(null);
     setCompletedCount(0);
     setBatchId(null);
     setVersions([]);
@@ -241,12 +246,37 @@ export default function StudioPage() {
           fetchPreviewCount();
         }
 
-        // 直接跳转到我的创作页面，展开对应批次
+        // Check if all versions failed or were safety blocked
+        const allVersions = data.versions || [];
+        const failedVersions = allVersions.filter(
+          (v: any) => v.status === 'failed' || v.status === 'safety_blocked'
+        );
+
+        if (failedVersions.length > 0 && failedVersions.length === allVersions.length) {
+          // All versions failed — stay on studio page and show error
+          const firstError = failedVersions[0]?.error;
+          let errorMessage = '生成失败，请修改提示词或歌词后重试';
+
+          if (failedVersions[0]?.status === 'safety_blocked') {
+            errorMessage = '您的内容被安全过滤器拦截，请修改提示词或歌词中的敏感内容后重试';
+          } else if (firstError?.message) {
+            errorMessage = firstError.message;
+          }
+
+          setGenerationError(errorMessage);
+          return;
+        }
+
+        // At least one version succeeded — navigate to creations page
         router.push(`/account/creations?expand=${data.batchId}`);
         return;
+      } else {
+        // API returned error status
+        const errorData = await res.json().catch(() => ({ error: '生成失败，请重试' }));
+        setGenerationError(errorData.error || '生成失败，请重试');
       }
     } catch {
-      // Handle error
+      setGenerationError('网络异常，请检查网络连接后重试');
     } finally {
       setIsGenerating(false);
     }
@@ -429,6 +459,80 @@ export default function StudioPage() {
                 isGenerating={true}
               />
             )}
+          </div>
+        )}
+
+        {/* Generation Error Display */}
+        {generationError && !isGenerating && !isSensitivityLoading && (
+          <div style={{
+            marginBottom: '32px',
+            background: '#1a1a2e',
+            borderRadius: 20,
+            padding: '32px 24px',
+            border: '1px solid rgba(239, 68, 68, 0.3)',
+            boxShadow: '0 4px 20px rgba(239, 68, 68, 0.06)',
+            textAlign: 'center',
+          }}>
+            <div style={{
+              width: 56,
+              height: 56,
+              margin: '0 auto 16px',
+              borderRadius: '50%',
+              background: 'rgba(239, 68, 68, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 28,
+            }}>
+              ❌
+            </div>
+            <h3 style={{
+              fontSize: 18,
+              fontWeight: 600,
+              color: '#e8e8f0',
+              marginBottom: 12,
+              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+            }}>
+              生成失败
+            </h3>
+            <p style={{
+              fontSize: 14,
+              color: '#9ca3af',
+              lineHeight: 1.7,
+              margin: '0 0 24px 0',
+              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+              maxWidth: 360,
+              marginLeft: 'auto',
+              marginRight: 'auto',
+            }}>
+              {generationError}
+            </p>
+            <button
+              onClick={() => setGenerationError(null)}
+              style={{
+                padding: '12px 32px',
+                borderRadius: 24,
+                border: 'none',
+                background: 'linear-gradient(135deg, #7536d5, #5a2db8)',
+                color: 'white',
+                fontSize: 15,
+                fontWeight: 600,
+                cursor: 'pointer',
+                fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+                boxShadow: '0 4px 16px rgba(117, 54, 213, 0.3)',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.boxShadow = '0 6px 20px rgba(117, 54, 213, 0.5)';
+                e.currentTarget.style.transform = 'translateY(-1px)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.boxShadow = '0 4px 16px rgba(117, 54, 213, 0.3)';
+                e.currentTarget.style.transform = 'translateY(0)';
+              }}
+            >
+              返回修改
+            </button>
           </div>
         )}
 
