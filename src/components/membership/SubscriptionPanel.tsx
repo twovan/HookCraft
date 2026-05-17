@@ -582,28 +582,34 @@ function CreditsPurchaseList({ records }: { records: PaymentRecord[] }) {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, marginTop: 16 }}>
           <button
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page <= 1}
             style={{
-              padding: '6px 12px', borderRadius: 8, border: '1px solid #2a2a40',
-              background: '#1a1a2e', fontSize: 12, cursor: page <= 1 ? 'not-allowed' : 'pointer',
-              opacity: page <= 1 ? 0.4 : 1, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+              padding: '8px 16px', borderRadius: 10, border: '1px solid #2a2a40',
+              background: page <= 1 ? '#12121e' : '#1a1a2e', fontSize: 12,
+              color: page <= 1 ? '#4a4a5a' : '#c0a7fc', fontWeight: 500,
+              cursor: page <= 1 ? 'not-allowed' : 'pointer',
+              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+              transition: 'all 0.2s',
             }}
           >
             上一页
           </button>
-          <span style={{ fontSize: 12, color: '#9ca3af' }}>
+          <span style={{ fontSize: 13, color: '#e8e8f0', fontWeight: 600 }}>
             {page} / {totalPages}
           </span>
           <button
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page >= totalPages}
             style={{
-              padding: '6px 12px', borderRadius: 8, border: '1px solid #2a2a40',
-              background: '#1a1a2e', fontSize: 12, cursor: page >= totalPages ? 'not-allowed' : 'pointer',
-              opacity: page >= totalPages ? 0.4 : 1, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+              padding: '8px 16px', borderRadius: 10, border: '1px solid #2a2a40',
+              background: page >= totalPages ? '#12121e' : '#1a1a2e', fontSize: 12,
+              color: page >= totalPages ? '#4a4a5a' : '#c0a7fc', fontWeight: 500,
+              cursor: page >= totalPages ? 'not-allowed' : 'pointer',
+              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+              transition: 'all 0.2s',
             }}
           >
             下一页
