@@ -245,49 +245,6 @@ export default function TemplateDetailPage() {
               )}
             </div>
 
-            {/* Audio Player */}
-            <div style={{
-              background: '#1a1a2e', padding: 28, borderRadius: 20,
-              boxShadow: '0 4px 20px rgba(0,0,0,0.04)', border: '1px solid rgba(117, 54, 213,0.1)',
-            }}>
-              <h3 style={{ marginBottom: 16, fontSize: 16, fontWeight: 600, color: '#e8e8f0' }}>试听播放器</h3>
-              {template.previewUrl ? (
-                <>
-                  <div style={{
-                    background: 'rgba(117, 54, 213, 0.15)', height: 80, borderRadius: 12,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3,
-                    padding: '0 20px', marginBottom: 16, overflow: 'hidden',
-                  }}>
-                    {Array.from({ length: 40 }).map((_, i) => (
-                      <div key={i} style={{
-                        width: 4, height: 60, borderRadius: 2,
-                        background: 'linear-gradient(180deg, #7536d5 0%, #5a2db8 100%)',
-                        transformOrigin: 'bottom center',
-                        animation: isPlaying ? `wave 1.2s ease-in-out ${i * 0.1}s infinite` : 'none',
-                        transform: isPlaying ? undefined : `scaleY(${0.2 + Math.random() * 0.8})`,
-                      }} />
-                    ))}
-                  </div>
-                  <audio
-                    controls
-                    src={template.previewUrl}
-                    onPlay={() => setIsPlaying(true)}
-                    onPause={() => setIsPlaying(false)}
-                    onEnded={() => setIsPlaying(false)}
-                    style={{ width: '100%', height: 40 }}
-                  />
-                </>
-              ) : (
-                <div style={{
-                  background: 'rgba(117, 54, 213, 0.15)', height: 120, borderRadius: 12,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  flexDirection: 'column', gap: 8,
-                }}>
-                  <span style={{ fontSize: 32, opacity: 0.5 }}>🎵</span>
-                  <span style={{ fontSize: 13, color: '#999' }}>暂无试听音频</span>
-                </div>
-              )}
-            </div>
           </div>
 
           {/* Right - Details */}
