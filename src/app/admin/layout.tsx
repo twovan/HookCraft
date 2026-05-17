@@ -17,8 +17,10 @@ const pageTitles: Record<string, { title: string; breadcrumb: string }> = {
   '/admin/revenue': { title: '收入结算', breadcrumb: '首页 / 交易管理 / 收入结算' },
   '/admin/ai-tasks': { title: 'AI 任务监控', breadcrumb: '首页 / AI 管理 / AI 任务' },
   '/admin/credits': { title: 'Credits 管理', breadcrumb: '首页 / AI 管理 / Credits' },
+  '/admin/sensitive-words': { title: '敏感词管理', breadcrumb: '首页 / 内容管理 / 敏感词管理' },
   '/admin/settings': { title: '系统设置', breadcrumb: '首页 / 系统 / 系统设置' },
   '/admin/logs': { title: '操作日志', breadcrumb: '首页 / 系统 / 操作日志' },
+  '/admin/sensitivity-logs': { title: '敏感词检测日志', breadcrumb: '首页 / 系统 / 敏感词检测日志' },
 };
 
 export default function AdminLayout({ children }: { children: ReactNode }) {

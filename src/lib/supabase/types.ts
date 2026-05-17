@@ -959,6 +959,89 @@ export interface Database {
         };
         Relationships: [];
       };
+
+      sensitive_words: {
+        Row: {
+          id: string;
+          word: string;
+          category: string;
+          variants: string[];
+          note: string;
+          hit_count: number;
+          last_hit_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          word: string;
+          category: string;
+          variants?: string[];
+          note?: string;
+          hit_count?: number;
+          last_hit_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          word?: string;
+          category?: string;
+          variants?: string[];
+          note?: string;
+          hit_count?: number;
+          last_hit_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+
+      sensitivity_logs: {
+        Row: {
+          id: string;
+          user_id: string | null;
+          input_description: string;
+          input_lyrics: string | null;
+          result_type: string;
+          detected_words: Record<string, unknown>[];
+          rewritten_prompt: string | null;
+          style_tags: string[];
+          user_confirmed: boolean | null;
+          detection_source: string | null;
+          duration_ms: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string | null;
+          input_description: string;
+          input_lyrics?: string | null;
+          result_type: string;
+          detected_words?: Record<string, unknown>[];
+          rewritten_prompt?: string | null;
+          style_tags?: string[];
+          user_confirmed?: boolean | null;
+          detection_source?: string | null;
+          duration_ms?: number | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string | null;
+          input_description?: string;
+          input_lyrics?: string | null;
+          result_type?: string;
+          detected_words?: Record<string, unknown>[];
+          rewritten_prompt?: string | null;
+          style_tags?: string[];
+          user_confirmed?: boolean | null;
+          detection_source?: string | null;
+          duration_ms?: number | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
 
     Views: {

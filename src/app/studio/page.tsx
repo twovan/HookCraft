@@ -16,8 +16,12 @@ import UpgradeBanner from '@/components/membership/UpgradeBanner';
 import GenerationProgress from '@/components/studio/GenerationProgress';
 import VersionPanel from '@/components/studio/VersionPanel';
 import SyncedLyrics from '@/components/studio/SyncedLyrics';
+import SensitivityConfirmDialog from '@/components/studio/SensitivityConfirmDialog';
+import SensitivityBlockDialog from '@/components/studio/SensitivityBlockDialog';
+import { useSensitivityCheck } from '@/hooks/useSensitivityCheck';
 import type { Template } from '@/types/template';
 import type { VersionResult } from '@/types/generation';
+import type { SensitivityCheckResult } from '@/types/sensitivity';
 
 /**
  * AI 创作中心页面
@@ -75,6 +79,19 @@ export default function StudioPage() {
   const [resultAudioTime, setResultAudioTime] = useState(0);
   const [resultPlaying, setResultPlaying] = useState(false);
   const [copyrightModalOpen, setCopyrightModalOpen] = useState(false);
+
+  // Sensitivity check state
+  const {
+    check: sensitivityCheck,
+    status: sensitivityStatus,
+    result: sensitivityResult,
+    loadingMessage: sensitivityLoadingMessage,
+    reset: resetSensitivity,
+  } = useSensitivityCheck();
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [showBlockDialog, setShowBlockDialog] = useState(false);
+  const [blockSource, setBlockSource] = useState<'description' | 'lyrics'>('description');
+  const isSensitivityLoading = sensitivityStatus === 'loading';
 
   // Fetch initial data
   useEffect(() => {
@@ -149,6 +166,48 @@ export default function StudioPage() {
       return;
     }
 
+    // Step 1: Run sensitivity check before generation
+    const description = prompt.trim();
+    const lyrics = (!instrumentalOnly && customLyrics.trim()) ? customLyrics.trim() : undefined;
+
+    // Only run sensitivity check if there's user-provided text to check
+    if (description || lyrics) {
+      const checkResult = await sensitivityCheck({
+        description: description || '',
+        lyrics,
+      });
+
+      // Handle sensitivity check result
+      if (checkResult) {
+        if (checkResult.resultType === 'block') {
+          // Determine block source: lyrics or description
+          if (checkResult.lyricsResult && checkResult.lyricsResult.type === 'block') {
+            setBlockSource('lyrics');
+          } else {
+            setBlockSource('description');
+          }
+          setShowBlockDialog(true);
+          return;
+        }
+
+        if (checkResult.resultType === 'rewrite') {
+          // Show confirm dialog with style tags - user decides whether to proceed
+          setShowConfirmDialog(true);
+          return;
+        }
+
+        // resultType === 'pass' → proceed directly to generation
+      }
+
+      // checkResult === null means error (degradation) → proceed to generation anyway
+    }
+
+    // Proceed with generation
+    await proceedWithGeneration(prompt || undefined);
+  };
+
+  /** Proceed with the actual generation API call */
+  const proceedWithGeneration = async (userPrompt: string | undefined) => {
     setIsGenerating(true);
     setCompletedCount(0);
     setBatchId(null);
@@ -162,7 +221,7 @@ export default function StudioPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           templateId: selectedTemplate?.id,
-          userPrompt: prompt || undefined,
+          userPrompt: userPrompt || undefined,
           generationType: duration === 30 ? 'preview' : 'full_demo',
           usePremiumSinger,
           instrumentalOnly,
@@ -191,6 +250,27 @@ export default function StudioPage() {
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  /** Handle user confirming rewrite in SensitivityConfirmDialog */
+  const handleSensitivityConfirm = () => {
+    setShowConfirmDialog(false);
+    // Use the rewritten prompt from sensitivity check result
+    const rewrittenPrompt = sensitivityResult?.rewrittenPrompt;
+    proceedWithGeneration(rewrittenPrompt || prompt || undefined);
+    resetSensitivity();
+  };
+
+  /** Handle user canceling in SensitivityConfirmDialog */
+  const handleSensitivityCancel = () => {
+    setShowConfirmDialog(false);
+    resetSensitivity();
+  };
+
+  /** Handle user closing SensitivityBlockDialog */
+  const handleBlockClose = () => {
+    setShowBlockDialog(false);
+    resetSensitivity();
   };
 
   const handleSelectVersion = (taskId: string) => {
@@ -312,13 +392,43 @@ export default function StudioPage() {
         </div>
 
         {/* Generation Progress */}
-        {isGenerating && (
+        {(isGenerating || isSensitivityLoading) && (
           <div style={{ marginBottom: '32px' }}>
-            <GenerationProgress
-              completedCount={completedCount}
-              totalCount={1}
-              isGenerating={true}
-            />
+            {isSensitivityLoading ? (
+              <div style={{
+                background: '#1a1a2e',
+                borderRadius: 20,
+                padding: '32px 24px',
+                border: '1px solid #2a2a40',
+                boxShadow: '0 4px 20px rgba(117, 54, 213, 0.06)',
+                textAlign: 'center',
+              }}>
+                <div style={{
+                  width: 40,
+                  height: 40,
+                  margin: '0 auto 16px',
+                  border: '3px solid #2a2a40',
+                  borderTopColor: '#7536d5',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite',
+                }} />
+                <p style={{
+                  fontSize: 14,
+                  color: '#e8e8f0',
+                  margin: 0,
+                  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+                }}>
+                  {sensitivityLoadingMessage}
+                </p>
+                <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+              </div>
+            ) : (
+              <GenerationProgress
+                completedCount={completedCount}
+                totalCount={1}
+                isGenerating={true}
+              />
+            )}
           </div>
         )}
 
@@ -415,7 +525,7 @@ export default function StudioPage() {
         )}
 
         {/* Main Content Grid (creation form) */}
-        {!isGenerating && !batchId && (
+        {!isGenerating && !batchId && !isSensitivityLoading && (
           <>
           <div
             style={{
@@ -676,27 +786,27 @@ export default function StudioPage() {
           <div style={{ position: 'sticky', bottom: 24, zIndex: 10, marginTop: 24 }}>
             <button
               onClick={handleGenerate}
-              disabled={!canGenerate || isGenerating || (!selectedTemplate && !prompt.trim())}
-              onMouseEnter={(e) => { if (canGenerate && !isGenerating && (selectedTemplate || prompt.trim())) e.currentTarget.style.transform = 'translateY(-3px)'; }}
+              disabled={!canGenerate || isGenerating || isSensitivityLoading || (!selectedTemplate && !prompt.trim())}
+              onMouseEnter={(e) => { if (canGenerate && !isGenerating && !isSensitivityLoading && (selectedTemplate || prompt.trim())) e.currentTarget.style.transform = 'translateY(-3px)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; }}
               style={{
                 width: '100%',
                 padding: '14px 24px',
                 borderRadius: '24px',
                 border: 'none',
-                background: canGenerate && !isGenerating && (selectedTemplate || prompt.trim())
+                background: canGenerate && !isGenerating && !isSensitivityLoading && (selectedTemplate || prompt.trim())
                   ? 'linear-gradient(135deg, #7536d5 0%, #5a2db8 100%)'
                   : '#2a2a40',
-                color: canGenerate && !isGenerating && (selectedTemplate || prompt.trim())
+                color: canGenerate && !isGenerating && !isSensitivityLoading && (selectedTemplate || prompt.trim())
                   ? 'white'
                   : '#6b7280',
                 fontSize: '15px',
                 fontWeight: 700,
-                cursor: canGenerate && !isGenerating && (selectedTemplate || prompt.trim())
+                cursor: canGenerate && !isGenerating && !isSensitivityLoading && (selectedTemplate || prompt.trim())
                   ? 'pointer'
                   : 'not-allowed',
                 fontFamily: "'Inter', sans-serif",
-                boxShadow: canGenerate && !isGenerating && (selectedTemplate || prompt.trim())
+                boxShadow: canGenerate && !isGenerating && !isSensitivityLoading && (selectedTemplate || prompt.trim())
                   ? '0 4px 20px rgba(117, 54, 213, 0.4)'
                   : 'none',
                 transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -706,7 +816,7 @@ export default function StudioPage() {
                 gap: 12,
               }}
             >
-              <span>{isGenerating ? '生成中...' : '开始 AI 创作'}</span>
+              <span>{isGenerating ? '生成中...' : isSensitivityLoading ? '检测中...' : '开始 AI 创作'}</span>
               <span style={{ fontSize: 12, fontWeight: 500, opacity: 0.8 }}>
                 {isPaid
                   ? `消耗 ${totalCost} Credits（2版本）· 剩余 ${credits?.totalAvailable ?? 0}`
@@ -801,6 +911,22 @@ export default function StudioPage() {
           </div>
         </div>
       )}
+
+      {/* Sensitivity Confirm Dialog (rewrite type) */}
+      <SensitivityConfirmDialog
+        open={showConfirmDialog}
+        styleTags={sensitivityResult?.styleTags ?? []}
+        onConfirm={handleSensitivityConfirm}
+        onCancel={handleSensitivityCancel}
+      />
+
+      {/* Sensitivity Block Dialog (block type) */}
+      <SensitivityBlockDialog
+        open={showBlockDialog}
+        blockedWords={sensitivityResult?.blockedWords ?? []}
+        source={blockSource}
+        onClose={handleBlockClose}
+      />
 
       {/* Upgrade Modal */}
       <UpgradeModal

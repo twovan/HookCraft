@@ -29,6 +29,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: '模板管理', icon: '🎵', href: '/admin/templates' },
       { label: '内容审核', icon: '✅', href: '/admin/review' },
       { label: '分类管理', icon: '📁', href: '/admin/categories' },
+      { label: '敏感词管理', icon: '🚫', href: '/admin/sensitive-words' },
     ],
   },
   {
@@ -58,6 +59,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { label: '系统设置', icon: '⚙️', href: '/admin/settings' },
       { label: '操作日志', icon: '📝', href: '/admin/logs' },
+      { label: '敏感词检测日志', icon: '🛡️', href: '/admin/sensitivity-logs' },
     ],
   },
 ];
