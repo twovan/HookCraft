@@ -157,11 +157,11 @@ export class SensitivityFilterService {
 
     // 本地未命中 → 调用 Gemini 语义检测歌词
     try {
-      const geminiResult = await this.geminiDetector.detectAndRewrite({
-        description: lyrics,
-      });
+      console.log('[checkLyrics] 本地未命中，调用 Gemini 检测歌词...');
+      const geminiResult = await this.geminiDetector.detectLyrics(lyrics);
 
       if (geminiResult.hasSensitiveContent && geminiResult.detectedWords.length > 0) {
+        console.log('[checkLyrics] Gemini 检测到歌词敏感词:', geminiResult.detectedWords.map(w => w.word));
         const detectedWords: DetectedWord[] = geminiResult.detectedWords.map((w) => ({
           word: w.word,
           category: w.category,
@@ -183,9 +183,10 @@ export class SensitivityFilterService {
           detectedWords,
         };
       }
+      console.log('[checkLyrics] Gemini 未检测到歌词敏感词');
     } catch (error) {
       // Gemini 失败时降级：仅依赖本地结果（已通过），放行
-      console.error('[checkLyrics] Gemini 歌词检测失败，降级放行:', error);
+      console.error('[checkLyrics] Gemini 歌词检测失败，降级放行:', error instanceof Error ? error.message : error);
     }
 
     return {

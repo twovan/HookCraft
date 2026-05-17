@@ -154,6 +154,48 @@ export class GeminiSensitivityDetector {
     return this.parseRewriteOnlyResponse(responseText);
   }
 
+  /**
+   * 歌词敏感词检测（仅检测，不改写）
+   * 专门用于歌词文本的敏感词检测，使用更直接的 prompt
+   */
+  async detectLyrics(lyrics: string): Promise<{ hasSensitiveContent: boolean; detectedWords: Array<{ word: string; category: SensitiveWordCategory }> }> {
+    const prompt = `You are a content safety checker for a music platform. Check if the following song lyrics contain any:
+1. Celebrity names (singers, musicians, bands - any language, including nicknames, English names, pinyin)
+2. Specific song titles
+3. Forbidden content (profanity, hate speech, violence, illegal content)
+
+## Lyrics to check:
+${lyrics}
+
+## Output
+Respond with JSON only (no markdown):
+{"hasSensitiveContent": true/false, "detectedWords": [{"word": "detected word", "category": "celebrity" | "song_name" | "forbidden"}]}
+
+IMPORTANT: If you find ANY celebrity name, song title, or forbidden word in the lyrics, set hasSensitiveContent to true. Be thorough - check for Chinese names, English names, nicknames, and transliterations.`;
+
+    try {
+      const responseText = await this.callGeminiWithTimeout(prompt);
+      const cleaned = this.cleanJsonResponse(responseText);
+      const parsed = JSON.parse(cleaned);
+
+      const hasSensitiveContent = Boolean(parsed.hasSensitiveContent);
+      const detectedWords: Array<{ word: string; category: SensitiveWordCategory }> = [];
+
+      if (Array.isArray(parsed.detectedWords)) {
+        for (const item of parsed.detectedWords) {
+          if (item && typeof item.word === 'string' && this.isValidCategory(item.category)) {
+            detectedWords.push({ word: item.word, category: item.category as SensitiveWordCategory });
+          }
+        }
+      }
+
+      return { hasSensitiveContent, detectedWords };
+    } catch (error) {
+      console.error('[detectLyrics] Gemini 歌词检测失败:', error);
+      throw error;
+    }
+  }
+
   // ─── 内部方法 ───────────────────────────────────────────
 
   /**
