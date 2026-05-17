@@ -59,7 +59,7 @@ export class SensitivityFilterService {
     let lyricsResult: LyricsCheckResult | null = null;
 
     if (input.lyrics && input.lyrics.trim().length > 0) {
-      lyricsResult = this.checkLyrics(input.lyrics);
+      lyricsResult = await this.checkLyrics(input.lyrics);
 
       // 歌词命中敏感�?�?直接 block，短路不再检测描�?
       if (lyricsResult.type === 'block') {
@@ -138,7 +138,8 @@ export class SensitivityFilterService {
    * 检测歌词中的敏感词
    * 歌词中所有类型的敏感词（celebrity、song_name、forbidden）都直接 block
    */
-  private checkLyrics(lyrics: string): LyricsCheckResult {
+  private async checkLyrics(lyrics: string): Promise<LyricsCheckResult> {
+    // 先本地词库匹配
     const localResult = this.localMatcher.match(lyrics);
 
     if (localResult.matched) {
@@ -152,6 +153,39 @@ export class SensitivityFilterService {
         type: 'block',
         detectedWords,
       };
+    }
+
+    // 本地未命中 → 调用 Gemini 语义检测歌词
+    try {
+      const geminiResult = await this.geminiDetector.detectAndRewrite({
+        description: lyrics,
+      });
+
+      if (geminiResult.hasSensitiveContent && geminiResult.detectedWords.length > 0) {
+        const detectedWords: DetectedWord[] = geminiResult.detectedWords.map((w) => ({
+          word: w.word,
+          category: w.category,
+          source: 'gemini' as const,
+        }));
+
+        // 自动保存检测到的敏感词到本地词库
+        this.autoSaveDetectedWords(geminiResult.detectedWords, {
+          rewrittenPrompt: '',
+          rewrittenPromptCn: '',
+          styleTags: [],
+          styleTagsCn: [],
+        }).catch((err) => {
+          console.error('[checkLyrics] 自动保存敏感词失败:', err);
+        });
+
+        return {
+          type: 'block',
+          detectedWords,
+        };
+      }
+    } catch (error) {
+      // Gemini 失败时降级：仅依赖本地结果（已通过），放行
+      console.error('[checkLyrics] Gemini 歌词检测失败，降级放行:', error);
     }
 
     return {
