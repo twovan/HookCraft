@@ -74,6 +74,7 @@ export default function StudioPage() {
   const [selectionConfirmed, setSelectionConfirmed] = useState(false);
   const [resultAudioTime, setResultAudioTime] = useState(0);
   const [resultPlaying, setResultPlaying] = useState(false);
+  const [copyrightModalOpen, setCopyrightModalOpen] = useState(false);
 
   // Fetch initial data
   useEffect(() => {
@@ -295,6 +296,26 @@ export default function StudioPage() {
           <p style={{ fontSize: '15px', color: '#9ca3af', margin: 0 }}>
             选择模板或输入提示词，AI 为您生成音乐作品
           </p>
+          {/* Copyright notice link */}
+          <button
+            onClick={() => setCopyrightModalOpen(true)}
+            style={{
+              marginTop: 12,
+              padding: '6px 14px',
+              borderRadius: 20,
+              border: '1px solid #2a2a40',
+              background: 'transparent',
+              color: '#9ca3af',
+              fontSize: 12,
+              cursor: 'pointer',
+              fontFamily: "'Inter', sans-serif",
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = '#7536d5'; e.currentTarget.style.color = '#c0a7fc'; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = '#2a2a40'; e.currentTarget.style.color = '#9ca3af'; }}
+          >
+            © HookCraft 创作安全与版权说明
+          </button>
         </div>
 
         {/* Generation Progress */}
@@ -684,6 +705,75 @@ export default function StudioPage() {
         </>
         )}
       </div>
+
+      {/* Copyright & Safety Modal */}
+      {copyrightModalOpen && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 9999, padding: 24,
+        }} onClick={() => setCopyrightModalOpen(false)}>
+          <div style={{
+            background: '#1a1a2e', borderRadius: 20, maxWidth: 480, width: '100%',
+            padding: 32, border: '1px solid #2a2a40', position: 'relative',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+          }} onClick={e => e.stopPropagation()}>
+            <button onClick={() => setCopyrightModalOpen(false)} style={{
+              position: 'absolute', top: 16, right: 16, border: 'none',
+              background: '#2a2a40', borderRadius: 8, width: 28, height: 28,
+              color: '#9ca3af', fontSize: 14, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>✕</button>
+
+            <h2 style={{ fontSize: 20, fontWeight: 700, color: '#e8e8f0', marginBottom: 8, fontFamily: "'Inter', sans-serif" }}>
+              HookCraft
+            </h2>
+            <h3 style={{ fontSize: 16, fontWeight: 600, color: '#c0a7fc', marginBottom: 20 }}>
+              创作安全与版权说明
+            </h3>
+
+            <p style={{ fontSize: 14, color: '#9ca3af', lineHeight: 1.8, marginBottom: 16 }}>
+              欢迎使用 HookCraft AI 创作工具
+            </p>
+            <p style={{ fontSize: 14, color: '#e8e8f0', lineHeight: 1.8, marginBottom: 20 }}>
+              为了保护音乐创作者的合法权益并遵守平台安全规范，AI 创作中心无法处理包含以下意图的提示词：
+            </p>
+
+            <div style={{ marginBottom: 20 }}>
+              <p style={{ fontSize: 14, color: '#e8e8f0', fontWeight: 600, marginBottom: 8 }}>
+                1. 未与本平台签约的现实公众人物与版权导向：
+              </p>
+              <p style={{ fontSize: 13, color: '#9ca3af', lineHeight: 1.8, paddingLeft: 16 }}>
+                包含具体歌手、知名乐队名称，或明确要求模仿特定受版权保护的曲目。
+              </p>
+            </div>
+
+            <div style={{ marginBottom: 24 }}>
+              <p style={{ fontSize: 14, color: '#e8e8f0', fontWeight: 600, marginBottom: 8 }}>
+                2. 不当内容：
+              </p>
+              <p style={{ fontSize: 13, color: '#9ca3af', lineHeight: 1.8, paddingLeft: 16 }}>
+                包含暴力、仇恨言论、歧视、色情及其他违反社区准则的词汇。
+              </p>
+            </div>
+
+            <div style={{ textAlign: 'center' }}>
+              <button
+                onClick={() => setCopyrightModalOpen(false)}
+                style={{
+                  padding: '12px 32px', borderRadius: 24, border: 'none',
+                  background: 'linear-gradient(135deg, #7536d5, #5a2db8)',
+                  color: 'white', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                  fontFamily: "'Inter', sans-serif",
+                  boxShadow: '0 4px 16px rgba(117, 54, 213, 0.3)',
+                }}
+              >
+                我知道了
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Upgrade Modal */}
       <UpgradeModal
