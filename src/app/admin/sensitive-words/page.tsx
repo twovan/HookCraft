@@ -47,6 +47,9 @@ export default function AdminSensitiveWordsPage() {
   const [batchCategory, setBatchCategory] = useState<SensitiveWordCategory>('celebrity');
   const [batchSubmitting, setBatchSubmitting] = useState(false);
 
+  // 展开查看缓存改写
+  const [expandedCacheId, setExpandedCacheId] = useState<string | null>(null);
+
   /** 获取敏感词列表 */
   const fetchWords = useCallback(async () => {
     setLoading(true);
@@ -281,6 +284,7 @@ export default function AdminSensitiveWordsPage() {
               <th style={thStyle}>敏感词</th>
               <th style={thStyle}>分类</th>
               <th style={thStyle}>变体词</th>
+              <th style={thStyle}>缓存改写</th>
               <th style={thStyle}>命中次数</th>
               <th style={thStyle}>最近命中时间</th>
               <th style={thStyle}>操作</th>
@@ -289,7 +293,7 @@ export default function AdminSensitiveWordsPage() {
           <tbody>
             {words.length === 0 ? (
               <tr>
-                <td colSpan={6} style={{ ...tdStyle, textAlign: 'center', color: '#9ca3af', padding: '40px 16px' }}>
+                <td colSpan={7} style={{ ...tdStyle, textAlign: 'center', color: '#9ca3af', padding: '40px 16px' }}>
                   暂无敏感词数据
                 </td>
               </tr>
@@ -312,6 +316,59 @@ export default function AdminSensitiveWordsPage() {
                     <span style={{ color: '#6b7280', fontSize: 12 }}>
                       {item.variants.length > 0 ? item.variants.join(', ') : '-'}
                     </span>
+                  </td>
+                  <td style={tdStyle}>
+                    {item.cachedRewrite ? (
+                      <div>
+                        <button
+                          onClick={() => setExpandedCacheId(expandedCacheId === item.id ? null : item.id)}
+                          style={{
+                            ...categoryBadgeStyle,
+                            background: '#f0fdf4',
+                            color: '#16a34a',
+                            cursor: 'pointer',
+                            border: 'none',
+                            fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+                          }}
+                        >
+                          已缓存 {expandedCacheId === item.id ? '▲' : '▼'}
+                        </button>
+                        {expandedCacheId === item.id && (
+                          <div style={{
+                            marginTop: 8,
+                            padding: '8px 10px',
+                            background: '#f9fafb',
+                            borderRadius: 6,
+                            border: '1px solid #e5e7eb',
+                            fontSize: 11,
+                            lineHeight: 1.6,
+                          }}>
+                            <div style={{ marginBottom: 4 }}>
+                              <strong>改写提示词:</strong>{' '}
+                              <span style={{ color: '#6b7280' }}>
+                                {item.cachedRewrite.rewrittenPrompt.length > 80
+                                  ? item.cachedRewrite.rewrittenPrompt.slice(0, 80) + '...'
+                                  : item.cachedRewrite.rewrittenPrompt}
+                              </span>
+                            </div>
+                            {item.cachedRewrite.styleTags && item.cachedRewrite.styleTags.length > 0 && (
+                              <div style={{ marginBottom: 4 }}>
+                                <strong>Style Tags:</strong>{' '}
+                                <span style={{ color: '#6b7280' }}>{item.cachedRewrite.styleTags.join(', ')}</span>
+                              </div>
+                            )}
+                            {item.cachedRewrite.styleTagsCn && item.cachedRewrite.styleTagsCn.length > 0 && (
+                              <div>
+                                <strong>中文标签:</strong>{' '}
+                                <span style={{ color: '#6b7280' }}>{item.cachedRewrite.styleTagsCn.join(', ')}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <span style={{ color: '#9ca3af', fontSize: 12 }}>-</span>
+                    )}
                   </td>
                   <td style={tdStyle}>
                     <span style={{ fontWeight: 500 }}>{item.hitCount}</span>

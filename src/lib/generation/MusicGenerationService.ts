@@ -288,6 +288,14 @@ export class MusicGenerationService {
         basePrompt += '\n\nInclude vocals with lyrics. Generate and return the full lyrics text.';
       }
 
+      // 默认生成中文歌词（除非用户明确指定其他语言）
+      const languageKeywords = ['english', '英文', '日文', 'japanese', 'korean', '韩文', '法文', 'french', 'spanish', '西班牙文', '粤语', 'cantonese'];
+      const userText = (input.userPrompt || '').toLowerCase();
+      const hasLanguageRequest = languageKeywords.some((kw) => userText.includes(kw));
+      if (!hasLanguageRequest) {
+        basePrompt += '\n\nIMPORTANT: Generate lyrics in Chinese (中文). The vocal performance should be in Mandarin Chinese unless the user explicitly requests another language in their prompt.';
+      }
+
       // 追加自定义歌词
       if (input.customLyrics && input.customLyrics.trim()) {
         basePrompt += `\n\nPlease use the following lyrics:\n${input.customLyrics.trim()}`;
@@ -295,6 +303,98 @@ export class MusicGenerationService {
     }
 
     return basePrompt;
+  }
+
+  /**
+   * 生成歌曲元数据（标题、风格标签）
+   * 使用 Gemini 根据 prompt 和歌词生成创意中文歌名和英文风格标签
+   * 同时从用户 profile 获取 author_name
+   */
+  async generateSongMetadata(
+    taskId: string,
+    prompt: string | null,
+    lyrics: string | undefined,
+    userId: string,
+  ): Promise<void> {
+    try {
+      // 获取用户 display_name 作为 author_name
+      let authorName = '未知作者';
+      try {
+        const { data: { user: authUser } } = await this.supabase.auth.admin.getUserById(userId);
+        if (authUser) {
+          authorName = authUser.user_metadata?.display_name || authUser.user_metadata?.name || authUser.email || '未知作者';
+        }
+      } catch {
+        // fallback: use default
+      }
+
+      // 调用 Gemini 生成标题和风格标签
+      const geminiPrompt = `Based on this music description and lyrics, generate:
+1. A creative Chinese song title (2-6 characters, catchy and poetic)
+2. 2-4 English music style tags (like "pop", "ballad", "electronic", "folk", "r&b", "hip-hop")
+
+Music description: ${prompt || 'no description'}
+Lyrics: ${lyrics || 'instrumental'}
+
+Respond with JSON only: {"title": "中文歌名", "styleTags": ["tag1", "tag2"]}`;
+
+      const apiKey = process.env.GEMINI_API_KEY || '';
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: geminiPrompt }] }],
+            generationConfig: {
+              temperature: 0.8,
+              maxOutputTokens: 200,
+            },
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        console.error('[generateSongMetadata] Gemini API error:', response.status);
+        // Still update author_name even if Gemini fails
+        await this.supabase
+          .from('generation_tasks')
+          .update({ author_name: authorName } as any)
+          .eq('id', taskId);
+        return;
+      }
+
+      const data = await response.json();
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+      // Parse JSON from response (handle markdown code blocks)
+      let title = '未命名';
+      let styleTags: string[] = [];
+
+      try {
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          title = parsed.title || '未命名';
+          styleTags = Array.isArray(parsed.styleTags) ? parsed.styleTags : [];
+        }
+      } catch {
+        console.error('[generateSongMetadata] Failed to parse Gemini response:', text);
+      }
+
+      // Update the generation_tasks row
+      await this.supabase
+        .from('generation_tasks')
+        .update({
+          title,
+          author_name: authorName,
+          style_tags: styleTags,
+        } as any)
+        .eq('id', taskId);
+    } catch (error) {
+      console.error('[generateSongMetadata] Error:', error);
+      // Non-critical: don't throw, just log
+    }
   }
 
   /** 获取当前 AI 模型提供方 */
@@ -597,6 +697,11 @@ export class MusicGenerationService {
           lyrics: response.lyrics,
           songStructure: response.songStructureDescription,
           creditsConsumed,
+        });
+
+        // 异步生成歌曲元数据（标题、风格标签、作者）
+        this.generateSongMetadata(taskId, input.userPrompt ?? null, response.lyrics, userId).catch((err) => {
+          console.error('[generateVersion] generateSongMetadata failed:', err);
         });
 
         // 生成签名 URL 供前端播放

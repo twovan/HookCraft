@@ -25,6 +25,9 @@ interface VersionDetail {
   durationSeconds?: number;
   creditsConsumed: number;
   createdAt: string;
+  title?: string | null;
+  authorName?: string | null;
+  styleTags?: string[];
 }
 
 interface HistoryListProps {
@@ -343,26 +346,58 @@ export default function HistoryList({
                             border: isSelected ? '1px solid #7536d5' : '1px solid #2a2a40',
                           }}
                         >
-                          {/* Version label */}
+                          {/* Version label with title and metadata */}
                           <div style={{
                             fontSize: 11,
                             color: '#6b7280',
                             marginBottom: 8,
                             fontWeight: 500,
                           }}>
-                            版本 {version.versionNumber}
-                            {isSelected && (
-                              <span style={{
-                                marginLeft: 8,
-                                padding: '2px 6px',
-                                background: 'rgba(34, 197, 94, 0.1)',
-                                color: '#22c55e',
-                                fontSize: 10,
-                                fontWeight: 600,
-                                borderRadius: 4,
-                              }}>
-                                已选中
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                              <span>
+                                {version.title ? (
+                                  <span style={{ fontSize: 13, fontWeight: 600, color: '#e8e8f0' }}>{version.title}</span>
+                                ) : (
+                                  <>版本 {version.versionNumber}</>
+                                )}
+                                {isSelected && (
+                                  <span style={{
+                                    marginLeft: 8,
+                                    padding: '2px 6px',
+                                    background: 'rgba(34, 197, 94, 0.1)',
+                                    color: '#22c55e',
+                                    fontSize: 10,
+                                    fontWeight: 600,
+                                    borderRadius: 4,
+                                  }}>
+                                    已选中
+                                  </span>
+                                )}
                               </span>
+                              <span style={{ fontSize: 11, color: '#6b7280' }}>
+                                {formatDate(version.createdAt)}
+                              </span>
+                            </div>
+                            {version.authorName && (
+                              <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>
+                                作者: {version.authorName}
+                              </div>
+                            )}
+                            {version.styleTags && version.styleTags.length > 0 && (
+                              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 4 }}>
+                                {version.styleTags.map((tag, idx) => (
+                                  <span key={idx} style={{
+                                    padding: '1px 6px',
+                                    background: 'rgba(117, 54, 213, 0.12)',
+                                    color: '#c0a7fc',
+                                    fontSize: 10,
+                                    fontWeight: 500,
+                                    borderRadius: 4,
+                                  }}>
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
                             )}
                           </div>
 

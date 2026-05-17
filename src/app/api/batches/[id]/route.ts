@@ -84,6 +84,9 @@ export async function GET(
         durationSeconds: task.duration_seconds ?? undefined,
         creditsConsumed: task.credits_consumed,
         createdAt: task.created_at,
+        title: (task as any).title ?? null,
+        authorName: (task as any).author_name ?? null,
+        styleTags: (task as any).style_tags ?? [],
       };
     }));
 
