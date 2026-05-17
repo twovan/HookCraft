@@ -1,0 +1,798 @@
+'use client';
+
+import { useState, useCallback, useEffect, useRef } from 'react';
+import AudioUploader from './AudioUploader';
+import WaveformVisualizer from './WaveformVisualizer';
+import ArrangementParamsEditor from './ArrangementParamsEditor';
+import { buildArrangementPrompt } from '@/lib/audio/buildArrangementPrompt';
+import { validateLyricsStructure } from '@/lib/audio/validateLyricsStructure';
+import { terminateWorker } from '@/lib/audio/fileToBase64';
+import { CREDITS_COST } from '@/config/creditsCost';
+import { useCreditStore } from '@/store/creditStore';
+import type {
+  ArrangementParams,
+  UploadStatus,
+  PreprocessStatus,
+  GenerationStatus,
+  ArrangementGenerationResult,
+} from '@/types/arrangement';
+
+/** Default arrangement params */
+const DEFAULT_PARAMS: ArrangementParams = {
+  duration: 60,
+  bpm: 120,
+  musicalKey: 'C',
+  scale: 'major',
+  instruments: [],
+  prompt: '',
+  lyrics: '',
+  isInstrumental: false,
+  outputFormat: 'mp3',
+};
+
+/**
+ * AudioUploadTab - Tab container component for the audio upload arrangement workflow.
+ *
+ * Implements:
+ * - Task 8.1: Left/right split layout, state machine, preprocess + generate logic
+ * - Task 8.2: Generation result player, regenerate, error display
+ * - Task 8.3: Error recovery, retry mechanism, network detection
+ *
+ * Requirements: 3.x, 5.x, 6.x, 7.x, 9.3, 11.x, 12.x
+ */
+export default function AudioUploadTab() {
+  // --- State ---
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [audioBase64, setAudioBase64] = useState<string | null>(null);
+  const [audioDuration, setAudioDuration] = useState<number | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<UploadStatus>('idle');
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const [preprocessStatus, setPreprocessStatus] = useState<PreprocessStatus>('idle');
+  const [coverFeatureId, setCoverFeatureId] = useState<string | null>(null);
+  const [extractedLyrics, setExtractedLyrics] = useState<string | null>(null);
+  const [structureResult, setStructureResult] = useState<string | null>(null);
+  const [preprocessError, setPreprocessError] = useState<string | null>(null);
+  const [preprocessRetryCount, setPreprocessRetryCount] = useState(0);
+
+  const [params, setParams] = useState<ArrangementParams>(DEFAULT_PARAMS);
+
+  const [generationStatus, setGenerationStatus] = useState<GenerationStatus>('idle');
+  const [generationResult, setGenerationResult] = useState<ArrangementGenerationResult | null>(null);
+  const [generationError, setGenerationError] = useState<string | null>(null);
+
+  // Sensitivity rewrite state
+  const [rewrittenPrompt, setRewrittenPrompt] = useState<string | null>(null);
+  const [showRewriteConfirm, setShowRewriteConfirm] = useState(false);
+
+  // Network state
+  const [isOnline, setIsOnline] = useState(true);
+
+  // Credits store
+  const credits = useCreditStore((s) => s.credits);
+  const fetchCredits = useCreditStore((s) => s.fetchCredits);
+
+  // Refs
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  // --- Web Worker lifecycle cleanup (Task 12.1: Requirements 13.3, 13.5) ---
+  useEffect(() => {
+    return () => {
+      terminateWorker();
+    };
+  }, []);
+
+  // --- Network detection (Task 8.3) ---
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    setIsOnline(navigator.onLine);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // --- Check for pending tasks on mount (Task 8.3: Requirement 12.2) ---
+  useEffect(() => {
+    const checkPendingTasks = async () => {
+      try {
+        const res = await fetch('/api/minimax/generate?checkPending=true');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.task && data.task.status === 'completed' && data.task.audioUrl) {
+            setGenerationStatus('completed');
+            setGenerationResult({
+              success: true,
+              audioUrl: data.task.audioUrl,
+              taskId: data.task.id,
+            });
+          }
+        }
+      } catch {
+        // Silently fail - not critical
+      }
+    };
+    checkPendingTasks();
+  }, []);
+
+  // --- File selection handler ---
+  const handleFileSelected = useCallback((file: File, base64: string, duration: number) => {
+    setAudioFile(file);
+    setAudioBase64(base64);
+    setAudioDuration(duration);
+    setUploadStatus('ready');
+    setUploadError(null);
+    // Reset downstream states
+    setPreprocessStatus('idle');
+    setCoverFeatureId(null);
+    setExtractedLyrics(null);
+    setStructureResult(null);
+    setPreprocessError(null);
+    setPreprocessRetryCount(0);
+    setGenerationStatus('idle');
+    setGenerationResult(null);
+    setGenerationError(null);
+  }, []);
+
+  const handleFileError = useCallback((error: string) => {
+    setUploadStatus('error');
+    setUploadError(error);
+  }, []);
+
+  const handleFileRemove = useCallback(() => {
+    setAudioFile(null);
+    setAudioBase64(null);
+    setAudioDuration(null);
+    setUploadStatus('idle');
+    setUploadError(null);
+    setPreprocessStatus('idle');
+    setCoverFeatureId(null);
+    setExtractedLyrics(null);
+    setStructureResult(null);
+    setPreprocessError(null);
+    setPreprocessRetryCount(0);
+    setGenerationStatus('idle');
+    setGenerationResult(null);
+    setGenerationError(null);
+  }, []);
+
+  // --- Preprocess handler (Task 8.1: Requirement 3.1-3.6) ---
+  const handlePreprocess = useCallback(async () => {
+    if (!audioBase64 || preprocessStatus === 'processing') return;
+
+    setPreprocessStatus('processing');
+    setPreprocessError(null);
+
+    try {
+      const mimeType = audioFile?.type || 'audio/mpeg';
+      const res = await fetch('/api/minimax/preprocess', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ audioBase64, mimeType }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: '音频分析失败，请重试' }));
+        throw new Error(errorData.error || '音频分析失败，请重试');
+      }
+
+      const data = await res.json();
+      setCoverFeatureId(data.coverFeatureId);
+      setExtractedLyrics(data.formattedLyrics || data.lyrics || null);
+      setStructureResult(data.structureResult || null);
+      setPreprocessStatus('completed');
+      setPreprocessRetryCount(0);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '音频分析失败，请重试';
+      setPreprocessError(message);
+      setPreprocessStatus('error');
+      // Task 8.3: Requirement 12.4 - return to ready state
+      setUploadStatus('ready');
+    }
+  }, [audioBase64, audioFile, preprocessStatus]);
+
+  // --- Generate handler (Task 8.1: Requirements 5.x, 6.x, 7.x) ---
+  const handleGenerate = useCallback(async () => {
+    if (!coverFeatureId || generationStatus === 'generating') return;
+
+    // Validate lyrics structure for non-instrumental mode (Requirement 5.4, 5.5)
+    if (!params.isInstrumental && params.lyrics.trim()) {
+      if (!validateLyricsStructure(params.lyrics)) {
+        setGenerationError('歌词需要包含至少一个结构标签（如 [verse]、[chorus]、[bridge]、[intro]、[outro]）');
+        return;
+      }
+    }
+
+    // Check credits (Requirement 6.1, 6.2)
+    const cost = CREDITS_COST.arrangement_generation;
+    if (credits && credits.totalAvailable < cost) {
+      setGenerationError(`Credits 余额不足（需要 ${cost} Credits）`);
+      return;
+    }
+
+    // Check network
+    if (!isOnline) {
+      setGenerationError('网络连接中断，请检查网络后重试');
+      return;
+    }
+
+    setGenerationStatus('generating');
+    setGenerationError(null);
+    setRewrittenPrompt(null);
+    setShowRewriteConfirm(false);
+
+    try {
+      // Build prompt (Requirement 5.1-5.3)
+      const builtPrompt = buildArrangementPrompt(params);
+
+      const res = await fetch('/api/minimax/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          coverFeatureId,
+          lyrics: params.isInstrumental ? '' : params.lyrics,
+          prompt: builtPrompt,
+          isInstrumental: params.isInstrumental,
+          audioSetting: {
+            sampleRate: 44100,
+            bitrate: 256000,
+            format: params.outputFormat,
+          },
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        // Handle specific error codes
+        const errorCode = data.code || data.error?.code || '';
+        const errorMessage = data.error || data.message || '生成失败，请重试';
+
+        if (errorCode === 'SENSITIVITY_BLOCKED' || errorCode === 'sensitivity_blocked') {
+          // Requirement 7.3: blocked words
+          setGenerationError(`内容包含敏感词被拦截：${data.blockedWords?.join('、') || errorMessage}`);
+          setGenerationStatus('error');
+          return;
+        }
+
+        if (errorCode === 'SENSITIVITY_REWRITE' || errorCode === 'sensitivity_rewrite') {
+          // Requirement 7.4: rewrite suggestion
+          setRewrittenPrompt(data.rewrittenPrompt || null);
+          setShowRewriteConfirm(true);
+          setGenerationStatus('error');
+          return;
+        }
+
+        if (errorCode === 'INSUFFICIENT_CREDITS' || errorCode === 'insufficient_credits') {
+          // Requirement 6.2: credits insufficient
+          setGenerationError('Credits 余额不足');
+          setGenerationStatus('error');
+          return;
+        }
+
+        throw new Error(errorMessage);
+      }
+
+      // Success
+      setGenerationResult(data);
+      setGenerationStatus('completed');
+      // Refresh credits
+      fetchCredits();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '生成失败，请重试';
+
+      // Check if network went offline during generation
+      if (!navigator.onLine) {
+        setGenerationError('网络连接中断');
+      } else {
+        setGenerationError(message);
+      }
+
+      // Task 8.3: Requirement 12.5 - return to preprocessing-completed state
+      setGenerationStatus('error');
+    }
+  }, [coverFeatureId, generationStatus, params, credits, isOnline, fetchCredits]);
+
+  // --- Regenerate handler (Task 8.2: Requirement 11.3) ---
+  const handleRegenerate = useCallback(() => {
+    setGenerationStatus('idle');
+    setGenerationResult(null);
+    setGenerationError(null);
+    // Keep params and coverFeatureId - no need to re-upload or re-preprocess
+  }, []);
+
+  // --- Accept rewritten prompt and retry ---
+  const handleAcceptRewrite = useCallback(() => {
+    if (rewrittenPrompt) {
+      setParams((prev) => ({ ...prev, prompt: rewrittenPrompt }));
+    }
+    setShowRewriteConfirm(false);
+    setRewrittenPrompt(null);
+    setGenerationStatus('idle');
+    setGenerationError(null);
+  }, [rewrittenPrompt]);
+
+  const handleRejectRewrite = useCallback(() => {
+    setShowRewriteConfirm(false);
+    setRewrittenPrompt(null);
+    setGenerationStatus('idle');
+    setGenerationError(null);
+  }, []);
+
+  // --- Derived state ---
+  const isPreprocessing = preprocessStatus === 'processing';
+  const isPreprocessed = preprocessStatus === 'completed';
+  const isGenerating = generationStatus === 'generating';
+  const isCompleted = generationStatus === 'completed';
+  const canPreprocess = uploadStatus === 'ready' && !isPreprocessing && preprocessStatus !== 'completed';
+  const canRetryPreprocess = preprocessStatus === 'error' && preprocessRetryCount < 3;
+  const paramsDisabled = !isPreprocessed || isGenerating;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      {/* Network offline banner */}
+      {!isOnline && (
+        <div style={{
+          padding: '12px 16px',
+          background: 'rgba(245, 158, 11, 0.1)',
+          border: '1px solid rgba(245, 158, 11, 0.3)',
+          borderRadius: 12,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+        }}>
+          <span style={{ fontSize: 16 }}>&#9888;</span>
+          <span style={{
+            fontSize: 13,
+            color: '#f59e0b',
+            fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+          }}>
+            网络连接中断，部分功能暂时不可用
+          </span>
+        </div>
+      )}
+
+      {/* Main two-column layout (Requirement 9.3) */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: 32,
+        alignItems: 'start',
+      }}>
+        {/* Left Column: Audio Upload + Waveform + Analyze Button */}
+        <div style={{
+          background: '#1a1a2e',
+          borderRadius: 20,
+          padding: 24,
+          border: '1px solid #2a2a40',
+          boxShadow: '0 4px 20px rgba(117, 54, 213, 0.06)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 16,
+        }}>
+          <h2 style={{
+            fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+            fontSize: 18,
+            fontWeight: 600,
+            color: '#e8e8f0',
+            margin: 0,
+          }}>
+            上传参考音频
+          </h2>
+
+          {/* AudioUploader */}
+          <AudioUploader
+            onFileSelected={handleFileSelected}
+            onError={handleFileError}
+            onRemove={handleFileRemove}
+            audioFile={audioFile}
+            status={uploadStatus}
+            error={uploadError}
+          />
+
+          {/* WaveformVisualizer */}
+          {uploadStatus === 'ready' && audioFile && (
+            <WaveformVisualizer file={audioFile} />
+          )}
+
+          {/* Preprocess button / status */}
+          {uploadStatus === 'ready' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {/* Preprocess error message (Task 8.3) */}
+              {preprocessStatus === 'error' && preprocessError && (
+                <div style={{
+                  padding: '10px 14px',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.2)',
+                  borderRadius: 8,
+                  fontSize: 13,
+                  color: '#ef4444',
+                  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+                }}>
+                  {preprocessError}
+                </div>
+              )}
+
+              {/* Analyze / Retry button */}
+              {(canPreprocess || canRetryPreprocess) && (
+                <button
+                  onClick={() => {
+                    if (canRetryPreprocess) {
+                      setPreprocessRetryCount((c) => c + 1);
+                    }
+                    handlePreprocess();
+                  }}
+                  disabled={isPreprocessing || (!canPreprocess && !canRetryPreprocess)}
+                  style={{
+                    width: '100%',
+                    padding: '12px 20px',
+                    borderRadius: 12,
+                    border: 'none',
+                    background: isPreprocessing
+                      ? '#2a2a40'
+                      : 'linear-gradient(135deg, #7536d5 0%, #9b59b6 100%)',
+                    color: isPreprocessing ? '#666' : '#fff',
+                    fontSize: 15,
+                    fontWeight: 600,
+                    cursor: isPreprocessing ? 'not-allowed' : 'pointer',
+                    fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+                    boxShadow: isPreprocessing ? 'none' : '0 4px 16px rgba(117, 54, 213, 0.3)',
+                    transition: 'all 0.3s ease',
+                  }}
+                >
+                  {isPreprocessing
+                    ? '正在分析...'
+                    : canRetryPreprocess
+                      ? `重新分析 (${preprocessRetryCount}/3)`
+                      : '分析音频'}
+                </button>
+              )}
+
+              {/* Max retries reached */}
+              {preprocessStatus === 'error' && preprocessRetryCount >= 3 && (
+                <p style={{
+                  fontSize: 12,
+                  color: '#ef4444',
+                  margin: 0,
+                  textAlign: 'center',
+                  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+                }}>
+                  已达最大重试次数，请重新上传文件或稍后再试
+                </p>
+              )}
+
+              {/* Processing indicator */}
+              {isPreprocessing && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  padding: '8px 0',
+                }}>
+                  <div style={{
+                    width: 16,
+                    height: 16,
+                    border: '2px solid #7536d5',
+                    borderTopColor: 'transparent',
+                    borderRadius: '50%',
+                    animation: 'audioTabSpin 0.8s linear infinite',
+                  }} />
+                  <span style={{
+                    fontSize: 13,
+                    color: '#9ca3af',
+                    fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+                  }}>
+                    正在提取音频特征和歌词...
+                  </span>
+                </div>
+              )}
+
+              {/* Preprocess completed indicator */}
+              {isPreprocessed && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '10px 14px',
+                  background: 'rgba(34, 197, 94, 0.1)',
+                  border: '1px solid rgba(34, 197, 94, 0.2)',
+                  borderRadius: 8,
+                }}>
+                  <span style={{ fontSize: 16 }}>&#10003;</span>
+                  <span style={{
+                    fontSize: 13,
+                    color: '#22c55e',
+                    fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+                  }}>
+                    音频分析完成，可以编辑参数并生成编曲
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Right Column: Params Editor */}
+        <div style={{
+          background: '#1a1a2e',
+          borderRadius: 20,
+          padding: 24,
+          border: '1px solid #2a2a40',
+          boxShadow: '0 4px 20px rgba(117, 54, 213, 0.06)',
+        }}>
+          <h2 style={{
+            fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+            fontSize: 18,
+            fontWeight: 600,
+            color: '#e8e8f0',
+            margin: '0 0 20px 0',
+          }}>
+            编曲参数
+          </h2>
+
+          <ArrangementParamsEditor
+            params={params}
+            onChange={setParams}
+            extractedLyrics={extractedLyrics}
+            onGenerate={handleGenerate}
+            isGenerating={isGenerating}
+            disabled={paramsDisabled}
+          />
+
+          {/* Generation error below params (Task 8.2: Requirement 11.4) */}
+          {generationStatus === 'error' && generationError && !showRewriteConfirm && (
+            <div style={{
+              marginTop: 16,
+              padding: '14px 16px',
+              background: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid rgba(239, 68, 68, 0.2)',
+              borderRadius: 10,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+            }}>
+              <span style={{
+                fontSize: 13,
+                color: '#ef4444',
+                fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+                lineHeight: 1.5,
+              }}>
+                {generationError}
+              </span>
+              {/* Credits insufficient - show recharge link */}
+              {generationError.includes('Credits 余额不足') && (
+                <a
+                  href="/account"
+                  style={{
+                    fontSize: 13,
+                    color: '#7536d5',
+                    textDecoration: 'underline',
+                    fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+                  }}
+                >
+                  前往充值 &rarr;
+                </a>
+              )}
+            </div>
+          )}
+
+          {/* Sensitivity rewrite confirmation (Requirement 7.4) */}
+          {showRewriteConfirm && rewrittenPrompt && (
+            <div style={{
+              marginTop: 16,
+              padding: '16px',
+              background: 'rgba(245, 158, 11, 0.08)',
+              border: '1px solid rgba(245, 158, 11, 0.3)',
+              borderRadius: 10,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+            }}>
+              <p style={{
+                fontSize: 13,
+                color: '#f59e0b',
+                margin: 0,
+                fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+              }}>
+                检测到敏感内容，已为您改写风格描述：
+              </p>
+              <p style={{
+                fontSize: 13,
+                color: '#e8e8f0',
+                margin: 0,
+                padding: '8px 12px',
+                background: '#12121e',
+                borderRadius: 6,
+                fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+                lineHeight: 1.5,
+              }}>
+                {rewrittenPrompt}
+              </p>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={handleAcceptRewrite}
+                  style={{
+                    flex: 1,
+                    padding: '8px 16px',
+                    borderRadius: 8,
+                    border: 'none',
+                    background: '#7536d5',
+                    color: '#fff',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+                  }}
+                >
+                  接受改写
+                </button>
+                <button
+                  onClick={handleRejectRewrite}
+                  style={{
+                    flex: 1,
+                    padding: '8px 16px',
+                    borderRadius: 8,
+                    border: '1px solid #2a2a40',
+                    background: 'transparent',
+                    color: '#9ca3af',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+                  }}
+                >
+                  手动修改
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Generation Progress (Task 8.1) */}
+      {isGenerating && (
+        <div style={{
+          background: '#1a1a2e',
+          borderRadius: 20,
+          padding: '32px 24px',
+          border: '1px solid #2a2a40',
+          boxShadow: '0 4px 20px rgba(117, 54, 213, 0.06)',
+          textAlign: 'center',
+        }}>
+          <div style={{
+            width: 40,
+            height: 40,
+            margin: '0 auto 16px',
+            border: '3px solid #2a2a40',
+            borderTopColor: '#7536d5',
+            borderRadius: '50%',
+            animation: 'audioTabSpin 1s linear infinite',
+          }} />
+          <p style={{
+            fontSize: 14,
+            color: '#e8e8f0',
+            margin: 0,
+            fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+          }}>
+            正在生成编曲，请稍候...
+          </p>
+          <p style={{
+            fontSize: 12,
+            color: '#9ca3af',
+            margin: '8px 0 0 0',
+            fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+          }}>
+            生成可能需要 30 秒到 2 分钟
+          </p>
+        </div>
+      )}
+
+      {/* Generation Result (Task 8.2: Requirements 11.1-11.4) */}
+      {isCompleted && generationResult?.audioUrl && (
+        <div style={{
+          background: '#1a1a2e',
+          borderRadius: 20,
+          padding: 24,
+          border: '1px solid #2a2a40',
+          boxShadow: '0 4px 20px rgba(117, 54, 213, 0.06)',
+        }}>
+          <h3 style={{
+            fontSize: 18,
+            fontWeight: 600,
+            color: '#e8e8f0',
+            marginBottom: 20,
+            fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+            textAlign: 'center',
+          }}>
+            &#127925; 生成完成
+          </h3>
+
+          {/* Audio Player (Requirement 11.1) */}
+          <div style={{
+            padding: 16,
+            background: '#12121e',
+            borderRadius: 14,
+            border: '1px solid #2a2a40',
+            marginBottom: 16,
+          }}>
+            <audio
+              ref={audioRef}
+              controls
+              src={generationResult.audioUrl}
+              style={{ width: '100%', height: 40 }}
+            />
+          </div>
+
+          {/* Lyrics display for non-instrumental (Requirement 11.2) */}
+          {!params.isInstrumental && params.lyrics && (
+            <div style={{
+              padding: 16,
+              background: '#12121e',
+              borderRadius: 14,
+              border: '1px solid #2a2a40',
+              marginBottom: 16,
+              maxHeight: 200,
+              overflowY: 'auto',
+            }}>
+              <h4 style={{
+                fontSize: 14,
+                fontWeight: 600,
+                color: '#c0a7fc',
+                marginBottom: 8,
+                fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+              }}>
+                歌词
+              </h4>
+              <pre style={{
+                fontSize: 13,
+                color: '#e8e8f0',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                margin: 0,
+                lineHeight: 1.6,
+                fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+              }}>
+                {params.lyrics}
+              </pre>
+            </div>
+          )}
+
+          {/* Regenerate button (Requirement 11.3) */}
+          <div style={{ textAlign: 'center' }}>
+            <button
+              onClick={handleRegenerate}
+              style={{
+                padding: '12px 32px',
+                borderRadius: 24,
+                border: '1px solid #7536d5',
+                background: 'transparent',
+                color: '#7536d5',
+                fontSize: 15,
+                fontWeight: 600,
+                cursor: 'pointer',
+                fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+                transition: 'all 0.2s ease',
+              }}
+            >
+              重新生成
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* CSS Animations */}
+      <style>{`
+        @keyframes audioTabSpin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+    </div>
+  );
+}

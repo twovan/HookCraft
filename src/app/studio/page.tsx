@@ -18,10 +18,14 @@ import VersionPanel from '@/components/studio/VersionPanel';
 import SyncedLyrics from '@/components/studio/SyncedLyrics';
 import SensitivityConfirmDialog from '@/components/studio/SensitivityConfirmDialog';
 import SensitivityBlockDialog from '@/components/studio/SensitivityBlockDialog';
+import AudioUploadTab from '@/components/studio/AudioUploadTab';
 import { useSensitivityCheck } from '@/hooks/useSensitivityCheck';
 import type { Template } from '@/types/template';
 import type { VersionResult } from '@/types/generation';
 import type { SensitivityCheckResult } from '@/types/sensitivity';
+
+/** Tab 类型定义 */
+type StudioTab = 'template' | 'upload';
 
 /**
  * AI 创作中心页面
@@ -54,6 +58,9 @@ export default function StudioPage() {
   // Permission checks
   const fullDemoPermission = useMembershipPermission('full_demo');
   const premiumSingerPermission = useMembershipPermission('premium_singer');
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<StudioTab>('template');
 
   // Local state
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -432,6 +439,75 @@ export default function StudioPage() {
             </button>
           </p>
         </div>
+
+        {/* Tab Navigation */}
+        <div
+          style={{
+            display: 'flex',
+            gap: '4px',
+            marginBottom: '32px',
+            background: '#12121e',
+            borderRadius: '14px',
+            padding: '4px',
+            border: '1px solid #2a2a40',
+          }}
+        >
+          <button
+            onClick={() => setActiveTab('template')}
+            style={{
+              flex: 1,
+              padding: '12px 20px',
+              borderRadius: '10px',
+              border: 'none',
+              background: activeTab === 'template'
+                ? 'linear-gradient(135deg, rgba(117, 54, 213, 0.2), rgba(90, 45, 184, 0.2))'
+                : 'transparent',
+              color: activeTab === 'template' ? '#e8e8f0' : '#9ca3af',
+              fontSize: '14px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+              transition: 'all 0.15s ease',
+              boxShadow: activeTab === 'template'
+                ? '0 2px 8px rgba(117, 54, 213, 0.15)'
+                : 'none',
+              borderBottom: activeTab === 'template'
+                ? '2px solid #7536d5'
+                : '2px solid transparent',
+            }}
+          >
+            🎵 模板生成
+          </button>
+          <button
+            onClick={() => setActiveTab('upload')}
+            style={{
+              flex: 1,
+              padding: '12px 20px',
+              borderRadius: '10px',
+              border: 'none',
+              background: activeTab === 'upload'
+                ? 'linear-gradient(135deg, rgba(117, 54, 213, 0.2), rgba(90, 45, 184, 0.2))'
+                : 'transparent',
+              color: activeTab === 'upload' ? '#e8e8f0' : '#9ca3af',
+              fontSize: '14px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+              transition: 'all 0.15s ease',
+              boxShadow: activeTab === 'upload'
+                ? '0 2px 8px rgba(117, 54, 213, 0.15)'
+                : 'none',
+              borderBottom: activeTab === 'upload'
+                ? '2px solid #7536d5'
+                : '2px solid transparent',
+            }}
+          >
+            🎹 上传编曲
+          </button>
+        </div>
+
+        {/* Template Generation Tab Content */}
+        <div style={{ display: activeTab === 'template' ? 'block' : 'none' }}>
 
         {/* Generation Progress */}
         {(isGenerating || isSensitivityLoading) && (
@@ -957,6 +1033,12 @@ export default function StudioPage() {
           )}
         </>
         )}
+        </div>{/* End Template Generation Tab Content */}
+
+        {/* Upload Arrangement Tab Content */}
+        <div style={{ display: activeTab === 'upload' ? 'block' : 'none' }}>
+          <AudioUploadTab />
+        </div>
       </div>
 
       {/* Copyright & Safety Modal */}

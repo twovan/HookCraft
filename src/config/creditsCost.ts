@@ -18,6 +18,7 @@ export const CREDITS_COST: Record<CreditOperationType, number> = {
   premium_singer: 5,
   export_wav: 3,
   export_stems: 10,
+  arrangement_generation: 15, // 上传音频生成编曲
   purchase: 0,            // 购买入账不消耗 Credits
 };
 
@@ -29,6 +30,7 @@ export const CREDITS_COST_RULES: CreditsCostRule[] = [
   { operation: 'premium_singer', cost: 5, description: '高级歌手声模（额外消耗）' },
   { operation: 'export_wav', cost: 3, description: 'WAV 高品质导出' },
   { operation: 'export_stems', cost: 10, description: '分轨导出' },
+  { operation: 'arrangement_generation', cost: 15, description: '上传音频生成编曲' },
 ];
 
 /**

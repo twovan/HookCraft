@@ -50,6 +50,7 @@ export type CreditOperationType =
   | 'premium_singer'      // 高级歌手声模（额外消耗）
   | 'export_wav'          // WAV 导出
   | 'export_stems'        // 分轨导出
+  | 'arrangement_generation' // 上传音频生成编曲
   | 'purchase';           // 购买入账
 
 /** Credits 消耗规则 */
