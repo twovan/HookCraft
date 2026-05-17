@@ -308,10 +308,21 @@ export class SensitivityFilterService {
           })
         );
 
+        // 自动将 Gemini 检测到的新敏感词保存到本地词库（异步，不阻塞）
+        this.autoSaveDetectedWords(geminiResult.detectedWords, {
+          rewrittenPrompt: geminiResult.rewrittenPrompt || '',
+          rewrittenPromptCn: '',
+          styleTags: geminiResult.styleTags || [],
+          styleTagsCn: geminiResult.styleTagsCn || [],
+        }).catch((err) => {
+          console.error('[SensitivityFilter] 自动保存检测到的敏感词失败:', err);
+        });
+
         return {
           type: 'rewrite',
           detectedWords,
           rewrittenPrompt: geminiResult.rewrittenPrompt,
+          rewrittenPromptCn: null,
           styleTags: geminiResult.styleTags,
           styleTagsCn: geminiResult.styleTagsCn,
         };
@@ -347,6 +358,42 @@ export class SensitivityFilterService {
         .from('sensitive_words')
         .update({ cached_rewrite: cache } as any)
         .eq('id', id);
+    }
+  }
+
+  /**
+   * 自动将 Gemini 检测到的新敏感词保存到本地词库
+   * 下次相同词出现时可直接本地匹配，不再调用 Gemini 检测
+   */
+  private async autoSaveDetectedWords(
+    detectedWords: Array<{ word: string; category: string }>,
+    cache: { rewrittenPrompt: string; rewrittenPromptCn: string; styleTags: string[]; styleTagsCn: string[] }
+  ): Promise<void> {
+    for (const w of detectedWords) {
+      // 跳过 forbidden 类型（违禁词不需要缓存改写结果）
+      if (w.category === 'forbidden') continue;
+
+      // 使用 upsert 避免重复插入（word + category 有唯一约束）
+      const { error } = await this.supabase
+        .from('sensitive_words')
+        .upsert(
+          {
+            word: w.word,
+            category: w.category,
+            variants: [],
+            note: '由 Gemini 自动检测添加',
+            hit_count: 1,
+            last_hit_at: new Date().toISOString(),
+            cached_rewrite: cache,
+          } as any,
+          { onConflict: 'word,category' }
+        );
+
+      if (error) {
+        console.error(`[autoSaveDetectedWords] 保存 "${w.word}" 失败:`, error.message);
+      } else {
+        console.log(`[autoSaveDetectedWords] 已自动保存敏感词: "${w.word}" (${w.category})`);
+      }
     }
   }
 }
