@@ -639,9 +639,9 @@ export default function StudioPage() {
                             color: '#e8e8f0', boxShadow: '0 8px 24px rgba(0,0,0,0.4)', zIndex: 100,
                             whiteSpace: 'normal', fontWeight: 400,
                           }}>
-                            请勿输入：<br/>
-                            1. 未经授权的现实公众人物名称<br/>
-                            2. 暴力、仇恨、歧视、色情等违反社区准则的词汇
+                            请勿输入以下违禁内容：<br/>
+                            1. 未与本平台签约的现实公众人物与版权导向：包含具体歌手、知名乐队名称，或明确要求模仿特定受版权保护的曲目。<br/>
+                            2. 不当内容：包含暴力、仇恨言论、歧视、色情或其他违反社区准则的词汇
                           </div>
                         </span>
                       </label>
