@@ -403,6 +403,7 @@ export default function StudioPage() {
 
         {/* Main Content Grid (creation form) */}
         {!isGenerating && !batchId && (
+          <>
           <div
             style={{
               display: 'grid',
@@ -619,47 +620,6 @@ export default function StudioPage() {
 
               {/* Premium Singer Toggle (paid users only) */}
               {/* Premium Singer - hidden, coming soon */}
-
-              {/* Credits exhausted messages */}
-              {creditsExhaustedPaid && (
-                <div
-                  style={{
-                    background: 'rgba(229, 57, 53, 0.1)',
-                    borderRadius: '12px',
-                    padding: '16px 20px',
-                    border: '1px solid rgba(229, 57, 53, 0.3)',
-                    fontSize: '13px',
-                    color: '#C53030',
-                    lineHeight: 1.6,
-                  }}
-                  role="alert"
-                >
-                  <strong>Credits 已用尽</strong>
-                  <p style={{ margin: '8px 0 0 0' }}>
-                    购买 Credits 充值包或等待下月刷新。您仍可访问和编辑已生成的音乐作品。
-                  </p>
-                </div>
-              )}
-
-              {previewsExhaustedFree && (
-                <div
-                  style={{
-                    background: 'rgba(229, 57, 53, 0.1)',
-                    borderRadius: '12px',
-                    padding: '16px 20px',
-                    border: '1px solid rgba(229, 57, 53, 0.3)',
-                    fontSize: '13px',
-                    color: '#C53030',
-                    lineHeight: 1.6,
-                  }}
-                  role="alert"
-                >
-                  <strong>预览次数不足</strong>
-                  <p style={{ margin: '8px 0 0 0' }}>
-                    多版本生成需要 3 次预览额度。升级到专业版获取更多创作额度。
-                  </p>
-                </div>
-              )}
             </div>
           </div>
 
@@ -704,6 +664,21 @@ export default function StudioPage() {
               </span>
             </button>
           </div>
+
+          {/* Credits exhausted messages */}
+          {creditsExhaustedPaid && (
+            <div style={{ background: 'rgba(229, 57, 53, 0.1)', borderRadius: '12px', padding: '16px 20px', border: '1px solid rgba(229, 57, 53, 0.3)', fontSize: '13px', color: '#C53030', lineHeight: 1.6, marginTop: 16 }} role="alert">
+              <strong>Credits 已用尽</strong>
+              <p style={{ margin: '8px 0 0 0' }}>购买 Credits 充值包或等待下月刷新。</p>
+            </div>
+          )}
+          {previewsExhaustedFree && (
+            <div style={{ background: 'rgba(229, 57, 53, 0.1)', borderRadius: '12px', padding: '16px 20px', border: '1px solid rgba(229, 57, 53, 0.3)', fontSize: '13px', color: '#C53030', lineHeight: 1.6, marginTop: 16 }} role="alert">
+              <strong>预览次数不足</strong>
+              <p style={{ margin: '8px 0 0 0' }}>升级到专业版获取更多创作额度。</p>
+            </div>
+          )}
+        </>
         )}
       </div>
 
