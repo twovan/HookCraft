@@ -23,6 +23,7 @@ export interface SensitiveWordEntry {
 /** 缓存的改写结果 */
 export interface CachedRewrite {
   rewrittenPrompt: string;
+  rewrittenPromptCn: string;
   styleTags: string[];
   styleTagsCn: string[];
 }
@@ -40,6 +41,7 @@ export interface SensitivityCheckResult {
   descriptionResult: DescriptionCheckResult | null;
   lyricsResult: LyricsCheckResult | null;
   rewrittenPrompt: string | null;
+  rewrittenPromptCn: string | null;
   styleTags: string[] | null;
   styleTagsCn: string[] | null;
   blockedWords: string[] | null;
@@ -106,6 +108,7 @@ export interface RewriteOnlyInput {
 /** 改写结果 */
 export interface RewriteResult {
   rewrittenPrompt: string;
+  rewrittenPromptCn: string;
   styleTags: string[];
   styleTagsCn: string[];
 }

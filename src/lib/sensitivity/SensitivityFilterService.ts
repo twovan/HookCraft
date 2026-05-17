@@ -1,4 +1,4 @@
-// lib/sensitivity/SensitivityFilterService.ts - 核心敏感词过滤服务
+// lib/sensitivity/SensitivityFilterService.ts - 核心敏感词过滤服�?
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '../supabase/types';
@@ -12,16 +12,16 @@ import { LocalWordMatcher } from './LocalWordMatcher';
 import { GeminiSensitivityDetector } from './GeminiSensitivityDetector';
 
 /**
- * SensitivityFilterService - 核心敏感词过滤服务
+ * SensitivityFilterService - 核心敏感词过滤服�?
  *
  * 编排完整的敏感词检测流程：
- * 1. 歌词优先检测：歌词中任何类型的敏感词直接 block（不走 rewrite）
- * 2. 创作描述检测：本地词库匹配 → Gemini 语义检测+改写
- * 3. 结果类型判定：forbidden → block，celebrity/song_name → rewrite，无命中 → pass
+ * 1. 歌词优先检测：歌词中任何类型的敏感词直�?block（不�?rewrite�?
+ * 2. 创作描述检测：本地词库匹配 �?Gemini 语义检�?改写
+ * 3. 结果类型判定：forbidden �?block，celebrity/song_name �?rewrite，无命中 �?pass
  *
- * 降级策略：
- * - Gemini 调用失败时，仅依赖本地词库结果
- * - 若本地未命中则放行（不阻塞用户），同时记录错误日志
+ * 降级策略�?
+ * - Gemini 调用失败时，仅依赖本地词库结�?
+ * - 若本地未命中则放行（不阻塞用户），同时记录错误日�?
  */
 export class SensitivityFilterService {
   private localMatcher: LocalWordMatcher;
@@ -38,30 +38,30 @@ export class SensitivityFilterService {
   }
 
   /**
-   * 执行完整的敏感词检测流程
+   * 执行完整的敏感词检测流�?
    *
-   * 流程：
-   * 1. 若有歌词，先检测歌词（歌词中所有类型敏感词直接 block）
-   * 2. 歌词通过后，检测创作描述
+   * 流程�?
+   * 1. 若有歌词，先检测歌词（歌词中所有类型敏感词直接 block�?
+   * 2. 歌词通过后，检测创作描�?
    * 3. 返回结构化结果，包含 durationMs
    */
   async check(input: SensitivityCheckInput): Promise<SensitivityCheckResult> {
     const startTime = Date.now();
 
-    // 确保本地词库已初始化并刷新
+    // 确保本地词库已初始化并刷�?
     if (!this.localMatcher.isInitialized()) {
       await this.localMatcher.initialize();
     } else {
       await this.localMatcher.refreshIfNeeded();
     }
 
-    // ─── 步骤 1：歌词优先检测 ───────────────────────────────
+    // ─── 步骤 1：歌词优先检�?───────────────────────────────
     let lyricsResult: LyricsCheckResult | null = null;
 
     if (input.lyrics && input.lyrics.trim().length > 0) {
       lyricsResult = this.checkLyrics(input.lyrics);
 
-      // 歌词命中敏感词 → 直接 block，短路不再检测描述
+      // 歌词命中敏感�?�?直接 block，短路不再检测描�?
       if (lyricsResult.type === 'block') {
         const blockedWords = lyricsResult.detectedWords.map((w) => w.word);
         return {
@@ -70,7 +70,8 @@ export class SensitivityFilterService {
           descriptionResult: null,
           lyricsResult,
           rewrittenPrompt: null,
-          styleTags: null,
+        rewrittenPromptCn: null,
+        styleTags: null,
           styleTagsCn: null,
           blockedWords,
           durationMs: Date.now() - startTime,
@@ -78,10 +79,10 @@ export class SensitivityFilterService {
       }
     }
 
-    // ─── 步骤 2：创作描述检测 ───────────────────────────────
+    // ─── 步骤 2：创作描述检�?───────────────────────────────
     const descriptionResult = await this.checkDescription(input.description);
 
-    // ─── 步骤 3：组装最终结果 ───────────────────────────────
+    // ─── 步骤 3：组装最终结�?───────────────────────────────
     const durationMs = Date.now() - startTime;
 
     if (descriptionResult.type === 'block') {
@@ -91,6 +92,7 @@ export class SensitivityFilterService {
         descriptionResult,
         lyricsResult,
         rewrittenPrompt: null,
+        rewrittenPromptCn: null,
         styleTags: null,
         styleTagsCn: null,
         blockedWords: descriptionResult.detectedWords
@@ -107,6 +109,7 @@ export class SensitivityFilterService {
         descriptionResult,
         lyricsResult,
         rewrittenPrompt: descriptionResult.rewrittenPrompt ?? null,
+        rewrittenPromptCn: descriptionResult.rewrittenPromptCn ?? null,
         styleTags: descriptionResult.styleTags ?? null,
         styleTagsCn: descriptionResult.styleTagsCn ?? null,
         blockedWords: null,
@@ -121,7 +124,8 @@ export class SensitivityFilterService {
       descriptionResult,
       lyricsResult,
       rewrittenPrompt: null,
-      styleTags: null,
+        rewrittenPromptCn: null,
+        styleTags: null,
       styleTagsCn: null,
       blockedWords: null,
       durationMs,
@@ -159,12 +163,12 @@ export class SensitivityFilterService {
   /**
    * 检测创作描述中的敏感词
    *
-   * 流程：
+   * 流程�?
    * 1. 本地词库匹配
-   *    - 命中 forbidden → 直接 block
-   *    - 命中 celebrity/song_name → 调用 Gemini 改写
-   * 2. 本地未命中 → 调用 Gemini 语义检测+改写
-   * 3. Gemini 失败时降级：仅依赖本地结果
+   *    - 命中 forbidden �?直接 block
+   *    - 命中 celebrity/song_name �?调用 Gemini 改写
+   * 2. 本地未命�?�?调用 Gemini 语义检�?改写
+   * 3. Gemini 失败时降级：仅依赖本地结�?
    */
   private async checkDescription(
     description: string
@@ -177,7 +181,7 @@ export class SensitivityFilterService {
         (w) => w.category === 'forbidden'
       );
 
-      // 本地命中 forbidden → 直接 block（block 优先于 rewrite）
+      // 本地命中 forbidden �?直接 block（block 优先�?rewrite�?
       if (hasForbidden) {
         const detectedWords: DetectedWord[] = localResult.words.map((w) => ({
           word: w.word,
@@ -191,11 +195,11 @@ export class SensitivityFilterService {
         };
       }
 
-      // 本地命中 celebrity/song_name → 检查是否有缓存的改写结果
+      // 本地命中 celebrity/song_name �?检查是否有缓存的改写结�?
       const sensitiveWords = localResult.words.map((w) => w.word);
       const firstMatchWithCache = localResult.words.find((w) => w.cachedRewrite);
 
-      // 如果有缓存的改写结果，直接使用，不调用 Gemini
+      // 如果有缓存的改写结果，直接使用，不调�?Gemini
       if (firstMatchWithCache?.cachedRewrite) {
         console.log('[SensitivityFilter] 使用缓存的改写结果，跳过 Gemini 调用');
         const cached = firstMatchWithCache.cachedRewrite;
@@ -209,12 +213,13 @@ export class SensitivityFilterService {
           type: 'rewrite',
           detectedWords,
           rewrittenPrompt: cached.rewrittenPrompt,
+          rewrittenPromptCn: cached.rewrittenPromptCn || cached.rewrittenPrompt,
           styleTags: cached.styleTags,
           styleTagsCn: cached.styleTagsCn,
         };
       }
 
-      // 没有缓存，调用 Gemini 改写
+      // 没有缓存，调�?Gemini 改写
       try {
         const rewriteResult = await this.geminiDetector.rewriteOnly({
           description,
@@ -227,13 +232,14 @@ export class SensitivityFilterService {
           source: 'local' as const,
         }));
 
-        // 保存改写结果到缓存（异步，不阻塞返回）
+        // 保存改写结果到缓存（异步，不阻塞返回�?
         const wordIdsToCache = localResult.words
           .filter((w) => w.id && !w.cachedRewrite)
           .map((w) => w.id!);
         if (wordIdsToCache.length > 0) {
           this.saveRewriteCache(wordIdsToCache, {
             rewrittenPrompt: rewriteResult.rewrittenPrompt,
+            rewrittenPromptCn: rewriteResult.rewrittenPromptCn,
             styleTags: rewriteResult.styleTags,
             styleTagsCn: rewriteResult.styleTagsCn,
           }).catch((err) => {
@@ -245,12 +251,13 @@ export class SensitivityFilterService {
           type: 'rewrite',
           detectedWords,
           rewrittenPrompt: rewriteResult.rewrittenPrompt,
+          rewrittenPromptCn: rewriteResult.rewrittenPromptCn,
           styleTags: rewriteResult.styleTags,
           styleTagsCn: rewriteResult.styleTagsCn,
         };
       } catch (error) {
-        // Gemini 改写失败：本地已命中但无法改写
-        // 根据设计文档：本地词库命中但 Gemini 改写失败 → 返回错误，提示用户手动修改
+        // Gemini 改写失败：本地已命中但无法改�?
+        // 根据设计文档：本地词库命中但 Gemini 改写失败 �?返回错误，提示用户手动修�?
         console.error('[SensitivityFilter] Gemini 改写失败:', error instanceof Error ? error.message : error);
 
         const detectedWords: DetectedWord[] = localResult.words.map((w) => ({
@@ -263,18 +270,19 @@ export class SensitivityFilterService {
           type: 'rewrite',
           detectedWords,
           rewrittenPrompt: null,
-          styleTags: null,
+        rewrittenPromptCn: null,
+        styleTags: null,
         };
       }
     }
 
-    // ─── 本地未命中场景：调用 Gemini 语义检测+改写 ─────────────
+    // ─── 本地未命中场景：调用 Gemini 语义检�?改写 ─────────────
     try {
       const geminiResult = await this.geminiDetector.detectAndRewrite({
         description,
       });
 
-      // Gemini 检测到违禁词 → block
+      // Gemini 检测到违禁�?�?block
       if (geminiResult.hasForbiddenWords && geminiResult.forbiddenWords.length > 0) {
         const detectedWords: DetectedWord[] = geminiResult.detectedWords.map(
           (w) => ({
@@ -309,14 +317,14 @@ export class SensitivityFilterService {
         };
       }
 
-      // Gemini 未检测到敏感词 → pass
+      // Gemini 未检测到敏感�?�?pass
       return {
         type: 'pass',
         detectedWords: [],
       };
     } catch (error) {
       // ─── 降级策略：Gemini 失败时仅依赖本地结果 ─────────────
-      // 本地未命中 + Gemini 失败 → 放行（不阻塞用户）
+      // 本地未命�?+ Gemini 失败 �?放行（不阻塞用户�?
       console.error('[SensitivityFilter] Gemini 检测失败，降级放行:', error);
 
       return {
@@ -327,12 +335,12 @@ export class SensitivityFilterService {
   }
 
   /**
-   * 保存改写结果到 sensitive_words 表的 cached_rewrite 字段
+   * 保存改写结果�?sensitive_words 表的 cached_rewrite 字段
    * 下次相同敏感词命中时可直接使用缓存，不再调用 Gemini
    */
   private async saveRewriteCache(
     wordIds: string[],
-    cache: { rewrittenPrompt: string; styleTags: string[]; styleTagsCn: string[] }
+    cache: { rewrittenPrompt: string; rewrittenPromptCn: string; styleTags: string[]; styleTagsCn: string[] }
   ): Promise<void> {
     for (const id of wordIds) {
       await this.supabase
@@ -344,13 +352,14 @@ export class SensitivityFilterService {
 }
 
 /**
- * 内部扩展的描述检测结果类型
- * 包含改写结果字段，用于在 check() 方法中传递改写数据
+ * 内部扩展的描述检测结果类�?
+ * 包含改写结果字段，用于在 check() 方法中传递改写数�?
  */
 interface DescriptionCheckResultInternal {
   type: 'pass' | 'rewrite' | 'block';
   detectedWords: DetectedWord[];
   rewrittenPrompt?: string | null;
+  rewrittenPromptCn?: string | null;
   styleTags?: string[] | null;
   styleTagsCn?: string[] | null;
 }

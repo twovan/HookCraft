@@ -99,8 +99,9 @@ export async function POST(req: NextRequest) {
       descriptionResult: result.descriptionResult,
       lyricsResult: result.lyricsResult,
       rewrittenPrompt: result.rewrittenPrompt,
-      styleTags: result.styleTags,
+      rewrittenPromptCn: result.rewrittenPromptCn,
       styleTagsCn: result.styleTagsCn,
+      styleTags: result.styleTags,
       blockedWords: result.blockedWords,
       durationMs: result.durationMs,
     });

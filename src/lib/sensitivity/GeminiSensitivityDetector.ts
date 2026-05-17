@@ -65,33 +65,34 @@ Respond with a JSON object (no markdown code fences, just raw JSON):
  * 仅改写的 Gemini Prompt 模板
  *
  * 本地已命中敏感词时使用，跳过检测步骤，直接改写
+ * 策略：保留用户原始输入，仅将敏感词替换为风格描述
  */
-const REWRITE_ONLY_PROMPT = `You are a music AI prompt engineering assistant. A user's music creation description contains sensitive words (celebrity names or song names) that have already been identified. Your task is to rewrite the description into a professional English music production prompt.
+const REWRITE_ONLY_PROMPT = `You are a music AI prompt engineering assistant. A user's music creation description contains sensitive words (celebrity names or song names) that have already been identified. Your task is to:
+1. Replace ONLY the sensitive words in the original Chinese description with music style descriptions (keep everything else unchanged)
+2. Generate a detailed English music production prompt for AI music generation
 
-## Input Description
+## Input Description (Chinese)
 {description}
 
-## Identified Sensitive Words
+## Identified Sensitive Words to Replace
 {sensitiveWords}
-
-## Task
-Rewrite the description into a detailed English music production prompt suitable for AI music generation (like Google Lyria 3). The rewritten prompt must NOT contain any of the identified sensitive words or any other celebrity/song names.
 
 ## Output Requirements
 Respond with a JSON object (no markdown code fences, just raw JSON):
 {
-  "rewrittenPrompt": "English music prompt with genre, BPM range, instrumentation, vocal characteristics, mood/atmosphere",
+  "rewrittenPromptCn": "原始中文描述，仅将敏感词替换为风格描述（如将'周杰伦'替换为'华语流行/R&B风格'）",
+  "rewrittenPrompt": "Full English music prompt with genre, BPM range, instrumentation, vocal characteristics, mood/atmosphere",
   "styleTags": ["English tag1", "English tag2", ...],
   "styleTagsCn": ["中文标签1", "中文标签2", ...]
 }
 
 ## Rules
-- The rewritten prompt must be in English
-- The rewritten prompt must NOT contain any celebrity names, song names, or sensitive words
-- Cover these dimensions: music genre, BPM range (e.g., 120-130 BPM), instrumentation (specific instruments), vocal characteristics (tone, style), mood/atmosphere
-- styleTags should be 2-5 descriptive music style keywords IN ENGLISH that capture the essence of the original description
-- styleTagsCn should be the CHINESE translation of each styleTags entry (same order, same count)
-- Preserve the user's intended musical style and mood while removing all sensitive references`;
+- rewrittenPromptCn: Keep the original Chinese text structure, ONLY replace the sensitive words with descriptive style terms. Example: "帮我写一首关于夏天的歌，风格参考周杰伦" → "帮我写一首关于夏天的歌，风格参考华语流行/R&B"
+- rewrittenPrompt: A complete English music production prompt covering genre, BPM, instrumentation, vocals, mood
+- Neither rewrittenPromptCn nor rewrittenPrompt should contain any celebrity names or song names
+- styleTags: 2-5 English music style keywords
+- styleTagsCn: Chinese translation of styleTags (same order, same count)
+- Preserve the user's original intent (theme, mood, etc.) while removing sensitive references`;
 
 /**
  * GeminiSensitivityDetector - Gemini Flash 语义检测与改写服务
@@ -336,8 +337,14 @@ export class GeminiSensitivityDetector {
         styleTagsCn = styleTags;
       }
 
+      // 中文改写版本（仅替换敏感词）
+      const rewrittenPromptCn = typeof parsed.rewrittenPromptCn === 'string'
+        ? parsed.rewrittenPromptCn.trim()
+        : '';
+
       return {
         rewrittenPrompt,
+        rewrittenPromptCn: rewrittenPromptCn || rewrittenPrompt,
         styleTags,
         styleTagsCn,
       };

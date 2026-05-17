@@ -47,10 +47,15 @@ export default function CreationsPage() {
     fetchBatches();
   }, [range]);
 
-  // Auto-expand batch from URL param (after generation redirect)
+  // Auto-expand batch from URL param (after generation redirect) or latest batch
   useEffect(() => {
-    if (expandParam && batches.length > 0 && !expandedBatchId) {
-      handleExpand(expandParam);
+    if (batches.length > 0 && !expandedBatchId) {
+      if (expandParam) {
+        handleExpand(expandParam);
+      } else {
+        // 默认展开最新的创作
+        handleExpand(batches[0].batchId);
+      }
     }
   }, [expandParam, batches]);
 
