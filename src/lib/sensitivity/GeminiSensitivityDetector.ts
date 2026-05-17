@@ -13,7 +13,7 @@ import type {
 const TIMEOUT_MS = 10000;
 
 /** Gemini Flash 模型 ID */
-const MODEL_ID = 'gemini-2.5-flash-preview-05-20';
+const MODEL_ID = 'gemini-3-flash-preview';
 
 /**
  * 检测+改写的 Gemini Prompt 模板
