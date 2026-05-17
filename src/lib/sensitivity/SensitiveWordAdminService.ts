@@ -101,6 +101,7 @@ export class SensitiveWordAdminService {
       note: row.note ?? '',
       hitCount: row.hit_count ?? 0,
       lastHitAt: row.last_hit_at,
+      cachedRewrite: (row as any).cached_rewrite ?? null,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     }));
@@ -146,6 +147,7 @@ export class SensitiveWordAdminService {
       note: data.note ?? '',
       hitCount: data.hit_count ?? 0,
       lastHitAt: data.last_hit_at,
+      cachedRewrite: (data as any).cached_rewrite ?? null,
       createdAt: data.created_at,
       updatedAt: data.updated_at,
     };
@@ -203,6 +205,7 @@ export class SensitiveWordAdminService {
       note: data.note ?? '',
       hitCount: data.hit_count ?? 0,
       lastHitAt: data.last_hit_at,
+      cachedRewrite: (data as any).cached_rewrite ?? null,
       createdAt: data.created_at,
       updatedAt: data.updated_at,
     };

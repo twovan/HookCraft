@@ -26,11 +26,13 @@ import { GeminiSensitivityDetector } from './GeminiSensitivityDetector';
 export class SensitivityFilterService {
   private localMatcher: LocalWordMatcher;
   private geminiDetector: GeminiSensitivityDetector;
+  private supabase: SupabaseClient<Database>;
 
   constructor(deps: {
     supabase: SupabaseClient<Database>;
     geminiApiKey: string;
   }) {
+    this.supabase = deps.supabase;
     this.localMatcher = new LocalWordMatcher(deps.supabase);
     this.geminiDetector = new GeminiSensitivityDetector(deps.geminiApiKey);
   }
@@ -69,6 +71,7 @@ export class SensitivityFilterService {
           lyricsResult,
           rewrittenPrompt: null,
           styleTags: null,
+          styleTagsCn: null,
           blockedWords,
           durationMs: Date.now() - startTime,
         };
@@ -89,6 +92,7 @@ export class SensitivityFilterService {
         lyricsResult,
         rewrittenPrompt: null,
         styleTags: null,
+        styleTagsCn: null,
         blockedWords: descriptionResult.detectedWords
           .filter((w) => w.category === 'forbidden')
           .map((w) => w.word),
@@ -104,6 +108,7 @@ export class SensitivityFilterService {
         lyricsResult,
         rewrittenPrompt: descriptionResult.rewrittenPrompt ?? null,
         styleTags: descriptionResult.styleTags ?? null,
+        styleTagsCn: descriptionResult.styleTagsCn ?? null,
         blockedWords: null,
         durationMs,
       };
@@ -117,6 +122,7 @@ export class SensitivityFilterService {
       lyricsResult,
       rewrittenPrompt: null,
       styleTags: null,
+      styleTagsCn: null,
       blockedWords: null,
       durationMs,
     };
@@ -185,8 +191,30 @@ export class SensitivityFilterService {
         };
       }
 
-      // 本地命中 celebrity/song_name → 调用 Gemini 改写
+      // 本地命中 celebrity/song_name → 检查是否有缓存的改写结果
       const sensitiveWords = localResult.words.map((w) => w.word);
+      const firstMatchWithCache = localResult.words.find((w) => w.cachedRewrite);
+
+      // 如果有缓存的改写结果，直接使用，不调用 Gemini
+      if (firstMatchWithCache?.cachedRewrite) {
+        console.log('[SensitivityFilter] 使用缓存的改写结果，跳过 Gemini 调用');
+        const cached = firstMatchWithCache.cachedRewrite;
+        const detectedWords: DetectedWord[] = localResult.words.map((w) => ({
+          word: w.word,
+          category: w.category,
+          source: 'local' as const,
+        }));
+
+        return {
+          type: 'rewrite',
+          detectedWords,
+          rewrittenPrompt: cached.rewrittenPrompt,
+          styleTags: cached.styleTags,
+          styleTagsCn: cached.styleTagsCn,
+        };
+      }
+
+      // 没有缓存，调用 Gemini 改写
       try {
         const rewriteResult = await this.geminiDetector.rewriteOnly({
           description,
@@ -199,11 +227,26 @@ export class SensitivityFilterService {
           source: 'local' as const,
         }));
 
+        // 保存改写结果到缓存（异步，不阻塞返回）
+        const wordIdsToCache = localResult.words
+          .filter((w) => w.id && !w.cachedRewrite)
+          .map((w) => w.id!);
+        if (wordIdsToCache.length > 0) {
+          this.saveRewriteCache(wordIdsToCache, {
+            rewrittenPrompt: rewriteResult.rewrittenPrompt,
+            styleTags: rewriteResult.styleTags,
+            styleTagsCn: rewriteResult.styleTagsCn,
+          }).catch((err) => {
+            console.error('[SensitivityFilter] 保存改写缓存失败:', err);
+          });
+        }
+
         return {
           type: 'rewrite',
           detectedWords,
           rewrittenPrompt: rewriteResult.rewrittenPrompt,
           styleTags: rewriteResult.styleTags,
+          styleTagsCn: rewriteResult.styleTagsCn,
         };
       } catch (error) {
         // Gemini 改写失败：本地已命中但无法改写
@@ -262,6 +305,7 @@ export class SensitivityFilterService {
           detectedWords,
           rewrittenPrompt: geminiResult.rewrittenPrompt,
           styleTags: geminiResult.styleTags,
+          styleTagsCn: geminiResult.styleTagsCn,
         };
       }
 
@@ -281,6 +325,22 @@ export class SensitivityFilterService {
       };
     }
   }
+
+  /**
+   * 保存改写结果到 sensitive_words 表的 cached_rewrite 字段
+   * 下次相同敏感词命中时可直接使用缓存，不再调用 Gemini
+   */
+  private async saveRewriteCache(
+    wordIds: string[],
+    cache: { rewrittenPrompt: string; styleTags: string[]; styleTagsCn: string[] }
+  ): Promise<void> {
+    for (const id of wordIds) {
+      await this.supabase
+        .from('sensitive_words')
+        .update({ cached_rewrite: cache } as any)
+        .eq('id', id);
+    }
+  }
 }
 
 /**
@@ -292,4 +352,5 @@ interface DescriptionCheckResultInternal {
   detectedWords: DetectedWord[];
   rewrittenPrompt?: string | null;
   styleTags?: string[] | null;
+  styleTagsCn?: string[] | null;
 }

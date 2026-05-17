@@ -100,6 +100,7 @@ export async function POST(req: NextRequest) {
       lyricsResult: result.lyricsResult,
       rewrittenPrompt: result.rewrittenPrompt,
       styleTags: result.styleTags,
+      styleTagsCn: result.styleTagsCn,
       blockedWords: result.blockedWords,
       durationMs: result.durationMs,
     });

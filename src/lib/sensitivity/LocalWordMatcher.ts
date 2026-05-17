@@ -72,6 +72,8 @@ export class LocalWordMatcher {
         matchedWords.push({
           word: entry.word,
           category: entry.category,
+          id: entry.id,
+          cachedRewrite: entry.cachedRewrite,
         });
         continue; // 已匹配到主词，跳过变体检查
       }
@@ -87,6 +89,8 @@ export class LocalWordMatcher {
               word: entry.word,
               category: entry.category,
               matchedVariant: variant,
+              id: entry.id,
+              cachedRewrite: entry.cachedRewrite,
             });
             variantMatched = true;
             break; // 匹配到一个变体即可
@@ -138,6 +142,7 @@ export class LocalWordMatcher {
       note: row.note ?? '',
       hitCount: row.hit_count ?? 0,
       lastHitAt: row.last_hit_at,
+      cachedRewrite: (row as any).cached_rewrite ?? null,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     }));

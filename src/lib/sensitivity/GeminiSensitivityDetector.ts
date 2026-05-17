@@ -48,15 +48,17 @@ Respond with a JSON object (no markdown code fences, just raw JSON):
   "hasForbiddenWords": boolean,
   "forbiddenWords": ["list of forbidden words found"],
   "rewrittenPrompt": "English music prompt with genre, BPM range, instrumentation, vocal characteristics, mood/atmosphere" | null,
-  "styleTags": ["tag1", "tag2", ...] | null
+  "styleTags": ["English tag1", "English tag2", ...] | null,
+  "styleTagsCn": ["中文标签1", "中文标签2", ...] | null
 }
 
 ## Rules
-- If no sensitive content is detected, set hasSensitiveContent to false, detectedWords to [], rewrittenPrompt to null, styleTags to null
+- If no sensitive content is detected, set hasSensitiveContent to false, detectedWords to [], rewrittenPrompt to null, styleTags to null, styleTagsCn to null
 - If celebrity/song names are detected, rewrite the prompt into English covering: music genre, BPM range, instrumentation, vocal characteristics, mood/atmosphere
 - If forbidden words are detected, set hasForbiddenWords to true, list them in forbiddenWords, set rewrittenPrompt to null
 - The rewritten prompt must be in English and must NOT contain any celebrity names, song names, or sensitive words
-- Style tags should be 2-5 descriptive music style keywords extracted from the context
+- styleTags should be 2-5 descriptive music style keywords IN ENGLISH extracted from the context
+- styleTagsCn should be the CHINESE translation of each styleTags entry (same order, same count)
 - Be thorough in detecting variants, nicknames, pinyin, and transliterations of celebrity/song names`;
 
 /**
@@ -79,14 +81,16 @@ Rewrite the description into a detailed English music production prompt suitable
 Respond with a JSON object (no markdown code fences, just raw JSON):
 {
   "rewrittenPrompt": "English music prompt with genre, BPM range, instrumentation, vocal characteristics, mood/atmosphere",
-  "styleTags": ["tag1", "tag2", ...]
+  "styleTags": ["English tag1", "English tag2", ...],
+  "styleTagsCn": ["中文标签1", "中文标签2", ...]
 }
 
 ## Rules
 - The rewritten prompt must be in English
 - The rewritten prompt must NOT contain any celebrity names, song names, or sensitive words
 - Cover these dimensions: music genre, BPM range (e.g., 120-130 BPM), instrumentation (specific instruments), vocal characteristics (tone, style), mood/atmosphere
-- Style tags should be 2-5 descriptive music style keywords that capture the essence of the original description
+- styleTags should be 2-5 descriptive music style keywords IN ENGLISH that capture the essence of the original description
+- styleTagsCn should be the CHINESE translation of each styleTags entry (same order, same count)
 - Preserve the user's intended musical style and mood while removing all sensitive references`;
 
 /**
@@ -256,11 +260,21 @@ export class GeminiSensitivityDetector {
         }
       }
 
+      // Style Tags 中文版
+      let styleTagsCn: string[] | null = null;
+      if (Array.isArray(parsed.styleTagsCn) && parsed.styleTagsCn.length > 0) {
+        styleTagsCn = parsed.styleTagsCn
+          .filter((tag: unknown) => typeof tag === 'string' && (tag as string).trim())
+          .map((tag: string) => tag.trim())
+          .slice(0, 5);
+      }
+
       return {
         hasSensitiveContent,
         detectedWords,
         rewrittenPrompt,
         styleTags,
+        styleTagsCn,
         hasForbiddenWords,
         forbiddenWords,
       };
@@ -271,6 +285,7 @@ export class GeminiSensitivityDetector {
         detectedWords: [],
         rewrittenPrompt: null,
         styleTags: null,
+        styleTagsCn: null,
         hasForbiddenWords: false,
         forbiddenWords: [],
       };
@@ -308,9 +323,23 @@ export class GeminiSensitivityDetector {
         styleTags = this.extractFallbackTags(rewrittenPrompt, styleTags);
       }
 
+      // Style Tags 中文版
+      let styleTagsCn: string[] = [];
+      if (Array.isArray(parsed.styleTagsCn)) {
+        styleTagsCn = parsed.styleTagsCn
+          .filter((tag: unknown) => typeof tag === 'string' && (tag as string).trim())
+          .map((tag: string) => tag.trim())
+          .slice(0, 5);
+      }
+      // 如果中文标签为空，用英文标签作为 fallback
+      if (styleTagsCn.length === 0) {
+        styleTagsCn = styleTags;
+      }
+
       return {
         rewrittenPrompt,
         styleTags,
+        styleTagsCn,
       };
     } catch (error) {
       throw new Error(

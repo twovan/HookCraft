@@ -15,8 +15,16 @@ export interface SensitiveWordEntry {
   note: string;
   hitCount: number;
   lastHitAt: string | null;
+  cachedRewrite: CachedRewrite | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** 缓存的改写结果 */
+export interface CachedRewrite {
+  rewrittenPrompt: string;
+  styleTags: string[];
+  styleTagsCn: string[];
 }
 
 /** 检测请求输入 */
@@ -33,6 +41,7 @@ export interface SensitivityCheckResult {
   lyricsResult: LyricsCheckResult | null;
   rewrittenPrompt: string | null;
   styleTags: string[] | null;
+  styleTagsCn: string[] | null;
   blockedWords: string[] | null;
   durationMs: number;
 }
@@ -63,6 +72,8 @@ export interface LocalMatchResult {
     word: string;
     category: SensitiveWordCategory;
     matchedVariant?: string;  // 实际匹配到的变体
+    id?: string;              // 敏感词条目 ID（用于更新缓存）
+    cachedRewrite?: CachedRewrite | null;  // 缓存的改写结果
   }>;
 }
 
@@ -81,6 +92,7 @@ export interface DetectAndRewriteResult {
   }>;
   rewrittenPrompt: string | null;
   styleTags: string[] | null;
+  styleTagsCn: string[] | null;
   hasForbiddenWords: boolean;
   forbiddenWords: string[];
 }
@@ -95,6 +107,7 @@ export interface RewriteOnlyInput {
 export interface RewriteResult {
   rewrittenPrompt: string;
   styleTags: string[];
+  styleTagsCn: string[];
 }
 
 /** 检测日志条目 */

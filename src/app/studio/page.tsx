@@ -1025,7 +1025,7 @@ export default function StudioPage() {
       {/* Sensitivity Confirm Dialog (rewrite type) */}
       <SensitivityConfirmDialog
         open={showConfirmDialog}
-        styleTags={sensitivityResult?.styleTags ?? []}
+        styleTags={sensitivityResult?.styleTagsCn ?? sensitivityResult?.styleTags ?? []}
         onConfirm={handleSensitivityConfirm}
         onCancel={handleSensitivityCancel}
       />
