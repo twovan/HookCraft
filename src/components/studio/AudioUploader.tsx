@@ -170,6 +170,7 @@ export default function AudioUploader({
         width: '100%',
         minHeight: 200,
         borderRadius: 16,
+        overflow: 'hidden',
         border: isDragOver
           ? '2px solid #7536d5'
           : status === 'error'
