@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Step 3: 解析请求体
-    let body: { audioBase64?: string; mimeType?: string };
+    let body: { audioBase64?: string; audioUrl?: string; mimeType?: string };
     try {
       body = await req.json();
     } catch {
@@ -129,14 +129,28 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { audioBase64, mimeType } = body;
+    const { audioBase64, audioUrl, mimeType } = body;
 
-    // Step 4: 校验音频数据非空 (Requirement 10.4)
-    if (!audioBase64 || audioBase64.trim().length === 0) {
+    // Step 4: 校验音频数据（audioUrl 或 audioBase64 必须提供其一）
+    if ((!audioBase64 || audioBase64.trim().length === 0) && (!audioUrl || audioUrl.trim().length === 0)) {
       return NextResponse.json(
-        { error: '音频数据不能为空' },
+        { error: '音频数据不能为空（需提供 audioUrl 或 audioBase64）' },
         { status: 400 }
       );
+    }
+
+    // 如果提供了 audioUrl，跳过 MIME 和大小校验（由 MiniMax API 校验）
+    if (audioUrl) {
+      // Step 7: 直接调用 MiniMax 预处理 API（使用 URL）
+      const provider = new MiniMaxProvider();
+      const result = await provider.preprocess({ audioBase64: '', audioUrl });
+
+      return NextResponse.json({
+        coverFeatureId: result.coverFeatureId,
+        lyrics: result.formattedLyrics,
+        structure: result.structureResult,
+        duration: result.audioDuration,
+      });
     }
 
     // Step 5: 校验 MIME 类型 (Requirement 10.2)

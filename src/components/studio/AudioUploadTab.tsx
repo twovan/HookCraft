@@ -145,17 +145,33 @@ export default function AudioUploadTab() {
 
   // --- Preprocess handler (Task 8.1: Requirement 3.1-3.6) ---
   const handlePreprocess = useCallback(async () => {
-    if (!audioBase64 || preprocessStatus === 'processing') return;
+    if (!audioFile || preprocessStatus === 'processing') return;
 
     setPreprocessStatus('processing');
     setPreprocessError(null);
 
     try {
-      const mimeType = audioFile?.type || 'audio/mpeg';
+      // Step 1: 上传音频到 Supabase Storage 获取公开 URL
+      const formData = new FormData();
+      formData.append('file', audioFile);
+
+      const uploadRes = await fetch('/api/minimax/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!uploadRes.ok) {
+        const uploadError = await uploadRes.json().catch(() => ({ error: '音频上传失败' }));
+        throw new Error(uploadError.error || '音频上传失败');
+      }
+
+      const { audioUrl } = await uploadRes.json();
+
+      // Step 2: 调用预处理 API（传 URL 而不是 Base64，避免 payload 过大）
       const res = await fetch('/api/minimax/preprocess', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ audioBase64, mimeType }),
+        body: JSON.stringify({ audioUrl }),
       });
 
       if (!res.ok) {
@@ -173,10 +189,9 @@ export default function AudioUploadTab() {
       const message = err instanceof Error ? err.message : '音频分析失败，请重试';
       setPreprocessError(message);
       setPreprocessStatus('error');
-      // Task 8.3: Requirement 12.4 - return to ready state
       setUploadStatus('ready');
     }
-  }, [audioBase64, audioFile, preprocessStatus]);
+  }, [audioFile, preprocessStatus]);
 
   // --- Generate handler (Task 8.1: Requirements 5.x, 6.x, 7.x) ---
   const handleGenerate = useCallback(async () => {
