@@ -205,12 +205,8 @@ export default function AudioUploadTab() {
       }
     }
 
-    // Check credits (Requirement 6.1, 6.2)
-    const cost = CREDITS_COST.arrangement_generation;
-    if (credits && credits.totalAvailable < cost) {
-      setGenerationError(`Credits 余额不足（需要 ${cost} Credits）`);
-      return;
-    }
+    // Credits 检查交给服务端处理，前端不再预判断
+    // 服务端 /api/minimax/generate 会返回 INSUFFICIENT_CREDITS 错误码
 
     // Check network
     if (!isOnline) {
