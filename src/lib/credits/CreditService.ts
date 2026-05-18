@@ -309,9 +309,9 @@ export class CreditService {
     userId: string,
     operations: CreditOperationType[]
   ): Promise<boolean> {
-    const info = await this.getCredits(userId);
+    const info = await this.getCreditsEnhanced(userId);
     const totalCost = this.calculateTotalCost(operations);
-    return info.remaining >= totalCost;
+    return info.totalAvailable >= totalCost;
   }
 
   /**
