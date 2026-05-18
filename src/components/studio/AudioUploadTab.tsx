@@ -514,46 +514,46 @@ export default function AudioUploadTab() {
               )}
             </div>
           )}
-        </div>
 
-        {/* 歌词结构标签 - 左侧面板 */}
-        <div style={{
-          background: '#1a1a2e',
-          borderRadius: 16,
-          padding: 20,
-          border: '1px solid #2a2a40',
-        }}>
-          <h3 style={{ fontSize: 14, fontWeight: 600, color: '#e8e8f0', margin: '0 0 10px 0', fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" }}>
-            歌词结构标签
-          </h3>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {['[Intro]', '[Verse]', '[Pre Chorus]', '[Chorus]', '[Bridge]', '[Outro]', '[Interlude]', '[Hook]', '[Inst]'].map((tag) => (
-              <span key={tag} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #2a2a40', background: '#12121e', color: '#e8e8f0', fontSize: 12, fontFamily: 'monospace' }}>
-                {tag}
-              </span>
-            ))}
+          {/* 歌词结构标签 - 左侧面板内 */}
+          <div style={{
+            background: '#12121e',
+            borderRadius: 12,
+            padding: 16,
+            border: '1px solid #2a2a40',
+          }}>
+            <h3 style={{ fontSize: 14, fontWeight: 600, color: '#e8e8f0', margin: '0 0 10px 0', fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" }}>
+              歌词结构标签
+            </h3>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {['[Intro]', '[Verse]', '[Pre Chorus]', '[Chorus]', '[Bridge]', '[Outro]', '[Interlude]', '[Hook]', '[Inst]'].map((tag) => (
+                <span key={tag} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #2a2a40', background: '#1a1a2e', color: '#e8e8f0', fontSize: 12, fontFamily: 'monospace' }}>
+                  {tag}
+                </span>
+              ))}
+            </div>
+            <p style={{ fontSize: 11, color: '#6b7280', margin: '8px 0 0 0', fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" }}>
+              在右侧歌词编辑器中使用这些标签来标记歌曲结构
+            </p>
           </div>
-          <p style={{ fontSize: 11, color: '#6b7280', margin: '8px 0 0 0', fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" }}>
-            在右侧歌词编辑器中使用这些标签来标记歌曲结构
-          </p>
-        </div>
 
-        {/* 使用提示 - 左侧面板 */}
-        <div style={{
-          background: '#1a1a2e',
-          borderRadius: 16,
-          padding: 20,
-          border: '1px solid #2a2a40',
-        }}>
-          <p style={{ fontSize: 12, fontWeight: 600, color: '#f59e0b', margin: '0 0 8px 0', fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" }}>
-            💡 使用提示
-          </p>
-          <ul style={{ fontSize: 11, color: '#9ca3af', margin: 0, paddingLeft: 16, lineHeight: 1.8, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" }}>
-            <li>使用结构标签如 [Verse]、[Chorus] 优化音乐结构</li>
-            <li>风格描述越详细，生成效果越好（最多 300 字符）</li>
-            <li>生成时间约 30-60 秒，请耐心等待</li>
-            <li>一步模式歌词可选，不填则自动从参考音频提取</li>
-          </ul>
+          {/* 使用提示 - 左侧面板内 */}
+          <div style={{
+            background: '#12121e',
+            borderRadius: 12,
+            padding: 16,
+            border: '1px solid #2a2a40',
+          }}>
+            <p style={{ fontSize: 12, fontWeight: 600, color: '#f59e0b', margin: '0 0 8px 0', fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" }}>
+              💡 使用提示
+            </p>
+            <ul style={{ fontSize: 11, color: '#9ca3af', margin: 0, paddingLeft: 16, lineHeight: 1.8, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" }}>
+              <li>使用结构标签如 [Verse]、[Chorus] 优化音乐结构</li>
+              <li>风格描述越详细，生成效果越好（最多 300 字符）</li>
+              <li>生成时间约 30-60 秒，请耐心等待</li>
+              <li>一步模式歌词可选，不填则自动从参考音频提取</li>
+            </ul>
+          </div>
         </div>
 
         {/* Right Column: Params Editor */}
