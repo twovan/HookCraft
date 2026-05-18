@@ -24,10 +24,21 @@ interface MiniMaxPreprocessResponse extends MiniMaxBaseResponse {
 
 /** MiniMax 生成 API 响应 */
 interface MiniMaxGenerationResponse extends MiniMaxBaseResponse {
+  data?: {
+    audio?: string;  // hex 编码的音频数据 或 URL（取决于 output_format）
+    status?: number;
+  };
+  extra_info?: {
+    music_duration?: number;
+    music_sample_rate?: number;
+    music_channel?: number;
+    bitrate?: number;
+    music_size?: number;
+  };
+  // 兼容旧字段
   audio_file?: string;
   audio_hex?: string;
   task_id?: string;
-  status?: string;
 }
 
 /** MiniMax Provider 配置 */
@@ -159,9 +170,10 @@ export class MiniMaxProvider {
 
     return {
       success: true,
-      audioUrl: data.audio_file || undefined,
-      audioHex: data.audio_hex || undefined,
-      taskId: data.task_id || undefined,
+      // output_format: 'url' 时 data.audio 是 URL，否则是 hex
+      audioUrl: data.data?.audio?.startsWith('http') ? data.data.audio : (data.audio_file || undefined),
+      audioHex: data.data?.audio && !data.data.audio.startsWith('http') ? data.data.audio : (data.audio_hex || undefined),
+      taskId: data.task_id || crypto.randomUUID(),
     };
   }
 
