@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import type { ArrangementParams, MusicalKey, MusicalScale, ArrangementDuration } from '@/types/arrangement';
+import type { ArrangementParams } from '@/types/arrangement';
 
 export interface ArrangementParamsEditorProps {
   params: ArrangementParams;
@@ -12,50 +12,16 @@ export interface ArrangementParamsEditorProps {
   disabled: boolean;
 }
 
-/** 时长选项 */
-const DURATION_OPTIONS: ArrangementDuration[] = [30, 60, 90, 120];
-
-/** 12 个半音 */
-const MUSICAL_KEYS: MusicalKey[] = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-
-/** 音阶选项及中文标签 */
-const SCALE_OPTIONS: { value: MusicalScale; label: string }[] = [
-  { value: 'major', label: '大调 (Major)' },
-  { value: 'minor', label: '小调 (Minor)' },
-  { value: 'dorian', label: '多利亚 (Dorian)' },
-  { value: 'mixolydian', label: '混合利底亚 (Mixolydian)' },
-  { value: 'pentatonic', label: '五声音阶 (Pentatonic)' },
-];
-
-/** 常用乐器列表 */
-const COMMON_INSTRUMENTS: string[] = [
-  'piano', 'guitar', 'bass', 'drums', 'strings', 'synth',
-  'violin', 'cello', 'flute', 'saxophone', 'trumpet', 'organ',
-  'harp', 'ukulele', 'mandolin', 'accordion', 'harmonica',
-  'erhu', 'pipa', 'guzheng',
-];
-
-/** 乐器中文标签映射 */
-const INSTRUMENT_LABELS: Record<string, string> = {
-  piano: '钢琴', guitar: '吉他', bass: '贝斯', drums: '鼓',
-  strings: '弦乐', synth: '合成器', violin: '小提琴', cello: '大提琴',
-  flute: '长笛', saxophone: '萨克斯', trumpet: '小号', organ: '管风琴',
-  harp: '竖琴', ukulele: '尤克里里', mandolin: '曼陀林',
-  accordion: '手风琴', harmonica: '口琴', erhu: '二胡', pipa: '琵琶', guzheng: '古筝',
-};
-
 /**
- * 编曲参数编辑面板
- * - 时长选择按钮组（30/60/90/120s，默认 60s）
- * - BPM 滑块（60-200，步进 1，默认 120）
- * - 调性选择器（12 个半音，默认 C）
- * - 音阶选择器（major/minor/dorian/mixolydian/pentatonic，默认 major）
- * - 乐器多选标签（1-10 个）
- * - 风格描述 Prompt 输入（最大 2000 字符，可选）
- * - 歌词编辑器（预填充提取歌词，最大 3500 字符）
- * - 纯器乐模式切换（启用时禁用歌词编辑器，保留内容）
- * - 输出格式选择（MP3/WAV，默认 MP3）
- * - 预处理未完成时禁用生成按钮和参数控件
+ * 编曲参数编辑面板（精简版）
+ *
+ * 根据 MiniMax music-cover API 文档，实际有效参数为：
+ * - prompt: 风格描述（必填，最多 2000 字符）
+ * - lyrics: 歌词（可选，支持结构标签）
+ * - sample_rate / bitrate / format: 音频输出设置
+ *
+ * BPM、调性、音阶、乐器等不是 API 独立参数，
+ * 用户可以在风格描述中自由表达这些意图。
  */
 export default function ArrangementParamsEditor({
   params,
@@ -79,183 +45,53 @@ export default function ArrangementParamsEditor({
     onChange({ ...params, [key]: value });
   };
 
-  const toggleInstrument = (instrument: string) => {
-    if (disabled) return;
-    const current = params.instruments;
-    if (current.includes(instrument)) {
-      if (current.length > 1) {
-        updateParam('instruments', current.filter((i) => i !== instrument));
-      }
-    } else {
-      if (current.length < 10) {
-        updateParam('instruments', [...current, instrument]);
-      }
-    }
-  };
-
   const isButtonDisabled = disabled || isGenerating;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      {/* 时长选择 */}
-      <Section title="生成时长">
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }} role="radiogroup" aria-label="生成时长选择">
-          {DURATION_OPTIONS.map((d) => {
-            const isSelected = params.duration === d;
-            return (
-              <button
-                key={d}
-                onClick={() => updateParam('duration', d)}
-                disabled={isButtonDisabled}
-                role="radio"
-                aria-checked={isSelected}
-                style={{
-                  padding: '8px 20px',
-                  borderRadius: '8px',
-                  border: isSelected ? '2px solid #7536d5' : '1px solid #2a2a40',
-                  background: isSelected
-                    ? 'linear-gradient(135deg, rgba(117, 54, 213, 0.15) 0%, #0d0d14 100%)'
-                    : '#1a1a2e',
-                  color: isSelected ? '#7536d5' : '#e8e8f0',
-                  fontSize: '14px',
-                  fontWeight: isSelected ? 700 : 500,
-                  cursor: isButtonDisabled ? 'not-allowed' : 'pointer',
-                  opacity: isButtonDisabled ? 0.5 : 1,
-                  transition: 'all 0.2s ease',
-                  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-                }}
-              >
-                {d}s
-              </button>
-            );
-          })}
-        </div>
-      </Section>
-
-      {/* BPM 滑块 */}
-      <Section title="BPM (速度)">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <input
-            type="range"
-            min={60}
-            max={200}
-            step={1}
-            value={params.bpm}
-            onChange={(e) => updateParam('bpm', Number(e.target.value))}
-            disabled={isButtonDisabled}
-            aria-label="BPM 滑块"
-            style={{
-              flex: 1,
-              height: '6px',
-              borderRadius: '3px',
-              cursor: isButtonDisabled ? 'not-allowed' : 'pointer',
-              accentColor: '#7536d5',
-            }}
-          />
-          <span
-            style={{
-              minWidth: '44px',
-              textAlign: 'center',
-              fontSize: '14px',
-              fontWeight: 700,
-              color: '#7536d5',
-              background: '#1a1a2e',
-              padding: '4px 8px',
-              borderRadius: '6px',
-              border: '1px solid #2a2a40',
-            }}
-          >
-            {params.bpm}
-          </span>
-        </div>
-      </Section>
-
-      {/* 调性 & 音阶 */}
-      <div style={{ display: 'flex', gap: '16px' }}>
-        <Section title="调性" style={{ flex: 1 }}>
-          <select
-            value={params.musicalKey}
-            onChange={(e) => updateParam('musicalKey', e.target.value as MusicalKey)}
-            disabled={isButtonDisabled}
-            aria-label="调性选择"
-            style={selectStyle(isButtonDisabled)}
-          >
-            {MUSICAL_KEYS.map((key) => (
-              <option key={key} value={key}>{key}</option>
-            ))}
-          </select>
-        </Section>
-
-        <Section title="音阶" style={{ flex: 1 }}>
-          <select
-            value={params.scale}
-            onChange={(e) => updateParam('scale', e.target.value as MusicalScale)}
-            disabled={isButtonDisabled}
-            aria-label="音阶选择"
-            style={selectStyle(isButtonDisabled)}
-          >
-            {SCALE_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-        </Section>
-      </div>
-
-      {/* 乐器多选标签 */}
-      <Section title={`乐器选择 (${params.instruments.length}/10)`}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-          {COMMON_INSTRUMENTS.map((inst) => {
-            const isSelected = params.instruments.includes(inst);
-            const atMax = params.instruments.length >= 10 && !isSelected;
-            return (
-              <button
-                key={inst}
-                onClick={() => toggleInstrument(inst)}
-                disabled={isButtonDisabled || atMax}
-                aria-pressed={isSelected}
-                title={INSTRUMENT_LABELS[inst] || inst}
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: '16px',
-                  border: isSelected ? '1.5px solid #7536d5' : '1px solid #2a2a40',
-                  background: isSelected ? 'rgba(117, 54, 213, 0.15)' : '#1a1a2e',
-                  color: isSelected ? '#7536d5' : '#e8e8f0',
-                  fontSize: '12px',
-                  fontWeight: isSelected ? 600 : 400,
-                  cursor: isButtonDisabled || atMax ? 'not-allowed' : 'pointer',
-                  opacity: isButtonDisabled ? 0.5 : atMax ? 0.4 : 1,
-                  transition: 'all 0.2s ease',
-                  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-                }}
-              >
-                {INSTRUMENT_LABELS[inst] || inst}
-              </button>
-            );
-          })}
-        </div>
-      </Section>
-
-      {/* 风格描述 Prompt */}
-      <Section title="风格描述 (可选)">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* 风格描述 Prompt（核心参数） */}
+      <Section title="风格描述" required>
         <textarea
           value={params.prompt}
           onChange={(e) => updateParam('prompt', e.target.value)}
           disabled={isButtonDisabled}
           maxLength={2000}
-          placeholder="描述你想要的编曲风格，例如：梦幻感的电子流行编曲，带有空灵的合成器音色..."
+          placeholder="描述你想要的翻唱/编曲风格，例如：&#10;• Jazz arrangement, saxophone lead, smooth female vocal&#10;• EDM remix, 128 BPM, synth bass, driving beat&#10;• 民谣风格，木吉他伴奏，温暖男声&#10;• Lo-fi hip hop, vinyl crackle, chill beat"
           aria-label="风格描述输入"
-          style={textareaStyle(isButtonDisabled, '80px')}
+          style={textareaStyle(isButtonDisabled, '120px')}
           onFocus={(e) => { if (!isButtonDisabled) e.currentTarget.style.borderColor = '#7536d5'; }}
           onBlur={(e) => { e.currentTarget.style.borderColor = '#2a2a40'; }}
         />
-        <CharCount current={params.prompt.length} max={2000} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px' }}>
+          <span style={{
+            fontSize: '12px',
+            color: '#6b7280',
+            fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+          }}>
+            可包含风格、乐器、BPM、情绪等描述
+          </span>
+          <CharCount current={params.prompt.length} max={2000} />
+        </div>
       </Section>
 
       {/* 纯器乐模式切换 */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: '14px', fontWeight: 600, color: '#e8e8f0', fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" }}>
-          纯器乐模式
-        </span>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '12px 16px',
+        background: '#12121e',
+        borderRadius: '10px',
+        border: '1px solid #2a2a40',
+      }}>
+        <div>
+          <span style={{ fontSize: '14px', fontWeight: 600, color: '#e8e8f0', fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" }}>
+            纯器乐模式
+          </span>
+          <p style={{ fontSize: '12px', color: '#6b7280', margin: '4px 0 0 0', fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" }}>
+            开启后不使用歌词，仅生成器乐版本
+          </p>
+        </div>
         <label
           style={{
             position: 'relative',
@@ -264,6 +100,7 @@ export default function ArrangementParamsEditor({
             height: '24px',
             cursor: isButtonDisabled ? 'not-allowed' : 'pointer',
             opacity: isButtonDisabled ? 0.5 : 1,
+            flexShrink: 0,
           }}
           aria-label="纯器乐模式切换"
         >
@@ -299,54 +136,116 @@ export default function ArrangementParamsEditor({
       </div>
 
       {/* 歌词编辑器 */}
-      <Section title="歌词">
-        <textarea
-          value={params.lyrics}
-          onChange={(e) => updateParam('lyrics', e.target.value)}
-          disabled={isButtonDisabled || params.isInstrumental}
-          maxLength={3500}
-          placeholder={params.isInstrumental ? '纯器乐模式已启用，歌词编辑已禁用' : '输入或编辑歌词，支持结构标签如 [verse]、[chorus]...'}
-          aria-label="歌词编辑器"
-          style={textareaStyle(isButtonDisabled || params.isInstrumental, '140px')}
-          onFocus={(e) => { if (!isButtonDisabled && !params.isInstrumental) e.currentTarget.style.borderColor = '#7536d5'; }}
-          onBlur={(e) => { e.currentTarget.style.borderColor = '#2a2a40'; }}
-        />
-        <CharCount current={params.lyrics.length} max={3500} />
-      </Section>
+      {!params.isInstrumental && (
+        <Section title="歌词">
+          <textarea
+            value={params.lyrics}
+            onChange={(e) => updateParam('lyrics', e.target.value)}
+            disabled={isButtonDisabled}
+            maxLength={3500}
+            placeholder="输入或编辑歌词，支持结构标签如 [verse]、[chorus]、[bridge]...&#10;&#10;预处理后会自动填充提取的歌词，你可以在此基础上修改。"
+            aria-label="歌词编辑器"
+            style={textareaStyle(isButtonDisabled, '160px')}
+            onFocus={(e) => { if (!isButtonDisabled) e.currentTarget.style.borderColor = '#7536d5'; }}
+            onBlur={(e) => { e.currentTarget.style.borderColor = '#2a2a40'; }}
+          />
+          <CharCount current={params.lyrics.length} max={3500} />
+        </Section>
+      )}
 
-      {/* 输出格式 */}
-      <Section title="输出格式">
-        <div style={{ display: 'flex', gap: '12px' }} role="radiogroup" aria-label="输出格式选择">
-          {(['mp3', 'wav'] as const).map((fmt) => {
-            const isSelected = params.outputFormat === fmt;
-            return (
-              <button
-                key={fmt}
-                onClick={() => updateParam('outputFormat', fmt)}
-                disabled={isButtonDisabled}
-                role="radio"
-                aria-checked={isSelected}
-                style={{
-                  padding: '8px 24px',
-                  borderRadius: '8px',
-                  border: isSelected ? '2px solid #7536d5' : '1px solid #2a2a40',
-                  background: isSelected
-                    ? 'linear-gradient(135deg, rgba(117, 54, 213, 0.15) 0%, #0d0d14 100%)'
-                    : '#1a1a2e',
-                  color: isSelected ? '#7536d5' : '#e8e8f0',
-                  fontSize: '14px',
-                  fontWeight: isSelected ? 700 : 500,
-                  cursor: isButtonDisabled ? 'not-allowed' : 'pointer',
-                  opacity: isButtonDisabled ? 0.5 : 1,
-                  transition: 'all 0.2s ease',
-                  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-                  textTransform: 'uppercase',
-                }}
-              >
-                {fmt}
-              </button>
-            );
-          })}
+      {/* 输出设置 */}
+      <Section title="输出设置">
+        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+          {/* 输出格式 */}
+          <div style={{ flex: 1, minWidth: '120px' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '12px',
+              color: '#9ca3af',
+              marginBottom: '6px',
+              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+            }}>
+              格式
+            </label>
+            <div style={{ display: 'flex', gap: '8px' }} role="radiogroup" aria-label="输出格式选择">
+              {(['mp3', 'wav'] as const).map((fmt) => {
+                const isSelected = params.outputFormat === fmt;
+                return (
+                  <button
+                    key={fmt}
+                    onClick={() => updateParam('outputFormat', fmt)}
+                    disabled={isButtonDisabled}
+                    role="radio"
+                    aria-checked={isSelected}
+                    style={{
+                      padding: '6px 16px',
+                      borderRadius: '6px',
+                      border: isSelected ? '1.5px solid #7536d5' : '1px solid #2a2a40',
+                      background: isSelected ? 'rgba(117, 54, 213, 0.12)' : '#1a1a2e',
+                      color: isSelected ? '#7536d5' : '#e8e8f0',
+                      fontSize: '13px',
+                      fontWeight: isSelected ? 600 : 400,
+                      cursor: isButtonDisabled ? 'not-allowed' : 'pointer',
+                      opacity: isButtonDisabled ? 0.5 : 1,
+                      transition: 'all 0.2s ease',
+                      fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    {fmt}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 采样率 */}
+          <div style={{ flex: 1, minWidth: '120px' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '12px',
+              color: '#9ca3af',
+              marginBottom: '6px',
+              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+            }}>
+              采样率
+            </label>
+            <select
+              value={44100}
+              disabled={isButtonDisabled}
+              aria-label="采样率选择"
+              style={selectStyle(isButtonDisabled)}
+            >
+              <option value={44100}>44100 Hz</option>
+              <option value={32000}>32000 Hz</option>
+              <option value={24000}>24000 Hz</option>
+              <option value={16000}>16000 Hz</option>
+            </select>
+          </div>
+
+          {/* 比特率 */}
+          <div style={{ flex: 1, minWidth: '120px' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '12px',
+              color: '#9ca3af',
+              marginBottom: '6px',
+              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+            }}>
+              比特率
+            </label>
+            <select
+              value={256000}
+              disabled={isButtonDisabled}
+              aria-label="比特率选择"
+              style={selectStyle(isButtonDisabled)}
+            >
+              <option value={256000}>256 kbps</option>
+              <option value={128000}>128 kbps</option>
+              <option value={64000}>64 kbps</option>
+              <option value={32000}>32 kbps</option>
+            </select>
+          </div>
         </div>
       </Section>
 
@@ -375,6 +274,19 @@ export default function ArrangementParamsEditor({
       >
         {isGenerating ? '生成中...' : '生成编曲'}
       </button>
+
+      {/* 提示信息 */}
+      {disabled && (
+        <p style={{
+          fontSize: '12px',
+          color: '#6b7280',
+          textAlign: 'center',
+          margin: 0,
+          fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+        }}>
+          请先上传音频并完成分析后再编辑参数
+        </p>
+      )}
     </div>
   );
 }
@@ -384,10 +296,12 @@ function Section({
   title,
   children,
   style,
+  required,
 }: {
   title: string;
   children: React.ReactNode;
   style?: React.CSSProperties;
+  required?: boolean;
 }) {
   return (
     <div style={style}>
@@ -402,6 +316,7 @@ function Section({
         }}
       >
         {title}
+        {required && <span style={{ color: '#7536d5', marginLeft: '4px' }}>*</span>}
       </label>
       {children}
     </div>
@@ -411,17 +326,14 @@ function Section({
 /** 字符计数组件 */
 function CharCount({ current, max }: { current: number; max: number }) {
   return (
-    <div
+    <span
       style={{
-        display: 'flex',
-        justifyContent: 'flex-end',
-        marginTop: '4px',
         fontSize: '12px',
-        color: current > max * 0.9 ? '#e74c3c' : '#666',
+        color: current > max * 0.9 ? '#e74c3c' : '#6b7280',
       }}
     >
       {current}/{max}
-    </div>
+    </span>
   );
 }
 
@@ -429,12 +341,12 @@ function CharCount({ current, max }: { current: number; max: number }) {
 function selectStyle(isDisabled: boolean): React.CSSProperties {
   return {
     width: '100%',
-    padding: '10px 12px',
-    borderRadius: '8px',
+    padding: '8px 10px',
+    borderRadius: '6px',
     border: '1px solid #2a2a40',
     background: isDisabled ? '#12121e' : '#0d0d14',
     color: '#e8e8f0',
-    fontSize: '14px',
+    fontSize: '13px',
     fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
     cursor: isDisabled ? 'not-allowed' : 'pointer',
     opacity: isDisabled ? 0.5 : 1,
