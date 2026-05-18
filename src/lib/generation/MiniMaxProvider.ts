@@ -121,8 +121,7 @@ export class MiniMaxProvider {
 
     const body: Record<string, unknown> = {
       model: input.model,
-      cover_feature_id: input.coverFeatureId,
-      lyrics: input.lyrics,
+      lyrics: input.lyrics || undefined,
       audio_setting: {
         sample_rate: input.audioSetting.sampleRate,
         bitrate: input.audioSetting.bitrate,
@@ -130,6 +129,15 @@ export class MiniMaxProvider {
       },
       output_format: 'url',
     };
+
+    // 两步模式：传 cover_feature_id
+    if (input.coverFeatureId) {
+      body.cover_feature_id = input.coverFeatureId;
+    }
+    // 一步模式：传 audio_url
+    if (input.audioUrl) {
+      body.audio_url = input.audioUrl;
+    }
 
     if (input.prompt) {
       body.prompt = input.prompt;

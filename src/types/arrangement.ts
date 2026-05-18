@@ -49,7 +49,8 @@ export interface PreprocessResult {
 /** 编曲生成输入 */
 export interface ArrangementGenerationInput {
   model: 'music-cover' | 'music-cover-free';
-  coverFeatureId: string;
+  coverFeatureId?: string;
+  audioUrl?: string;  // 一步模式：直接传音频 URL
   lyrics: string;
   prompt?: string;
   isInstrumental: boolean;

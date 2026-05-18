@@ -68,6 +68,9 @@ export default function AudioUploadTab() {
   // Network state
   const [isOnline, setIsOnline] = useState(true);
 
+  // Cover mode state
+  const [coverMode, setCoverMode] = useState<'one-step' | 'two-step'>('one-step');
+
   // Credits store
   const credits = useCreditStore((s) => s.credits);
   const fetchCredits = useCreditStore((s) => s.fetchCredits);
@@ -193,20 +196,19 @@ export default function AudioUploadTab() {
     }
   }, [audioFile, preprocessStatus]);
 
-  // --- Generate handler (Task 8.1: Requirements 5.x, 6.x, 7.x) ---
+  // --- Generate handler ---
   const handleGenerate = useCallback(async () => {
-    if (!coverFeatureId || generationStatus === 'generating') return;
+    if (generationStatus === 'generating') return;
 
-    // Validate lyrics structure for non-instrumental mode (Requirement 5.4, 5.5)
-    if (!params.isInstrumental && params.lyrics.trim()) {
-      if (!validateLyricsStructure(params.lyrics)) {
-        setGenerationError('歌词需要包含至少一个结构标签（如 [verse]、[chorus]、[bridge]、[intro]、[outro]）');
-        return;
-      }
+    // 一步模式需要 audioFile，两步模式需要 coverFeatureId
+    if (coverMode === 'two-step' && !coverFeatureId) return;
+    if (coverMode === 'one-step' && !audioFile) return;
+
+    // 风格描述必填
+    if (!params.prompt || params.prompt.trim().length < 10) {
+      setGenerationError('风格描述必填，至少 10 个字符');
+      return;
     }
-
-    // Credits 检查交给服务端处理，前端不再预判断
-    // 服务端 /api/minimax/generate 会返回 INSUFFICIENT_CREDITS 错误码
 
     // Check network
     if (!isOnline) {
@@ -220,49 +222,51 @@ export default function AudioUploadTab() {
     setShowRewriteConfirm(false);
 
     try {
-      // Build prompt (Requirement 5.1-5.3)
-      const builtPrompt = buildArrangementPrompt(params);
+      let requestBody: Record<string, unknown>;
+
+      if (coverMode === 'one-step') {
+        // 一步模式：先上传音频获取 URL，然后直接传 audio_url + prompt 生成
+        // 上传音频
+        const formData = new FormData();
+        formData.append('file', audioFile!);
+        const uploadRes = await fetch('/api/minimax/upload', { method: 'POST', body: formData });
+        if (!uploadRes.ok) {
+          const err = await uploadRes.json().catch(() => ({ error: '音频上传失败' }));
+          throw new Error(err.error || '音频上传失败');
+        }
+        const { audioUrl } = await uploadRes.json();
+
+        requestBody = {
+          audioUrl, // 一步模式传 audio_url
+          lyrics: params.lyrics.trim() || undefined, // 可选
+          prompt: params.prompt.trim(),
+          isInstrumental: false,
+          audioSetting: { sampleRate: 44100, bitrate: 256000, format: params.outputFormat },
+        };
+      } else {
+        // 两步模式：传 coverFeatureId + lyrics
+        requestBody = {
+          coverFeatureId,
+          lyrics: params.lyrics.trim(),
+          prompt: params.prompt.trim(),
+          isInstrumental: false,
+          audioSetting: { sampleRate: 44100, bitrate: 256000, format: params.outputFormat },
+        };
+      }
 
       const res = await fetch('/api/minimax/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          coverFeatureId,
-          lyrics: params.isInstrumental ? '' : params.lyrics,
-          prompt: builtPrompt,
-          isInstrumental: params.isInstrumental,
-          audioSetting: {
-            sampleRate: 44100,
-            bitrate: 256000,
-            format: params.outputFormat,
-          },
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        // Handle specific error codes
-        const errorCode = data.code || data.error?.code || '';
-        const errorMessage = data.error || data.message || '生成失败，请重试';
+        const errorCode = data.code || '';
+        const errorMessage = data.error || '生成失败，请重试';
 
-        if (errorCode === 'SENSITIVITY_BLOCKED' || errorCode === 'sensitivity_blocked') {
-          // Requirement 7.3: blocked words
-          setGenerationError(`内容包含敏感词被拦截：${data.blockedWords?.join('、') || errorMessage}`);
-          setGenerationStatus('error');
-          return;
-        }
-
-        if (errorCode === 'SENSITIVITY_REWRITE' || errorCode === 'sensitivity_rewrite') {
-          // Requirement 7.4: rewrite suggestion
-          setRewrittenPrompt(data.rewrittenPrompt || null);
-          setShowRewriteConfirm(true);
-          setGenerationStatus('error');
-          return;
-        }
-
-        if (errorCode === 'INSUFFICIENT_CREDITS' || errorCode === 'insufficient_credits') {
-          // Requirement 6.2: credits insufficient
+        if (errorCode === 'INSUFFICIENT_CREDITS') {
           setGenerationError('Credits 余额不足');
           setGenerationStatus('error');
           return;
@@ -274,22 +278,17 @@ export default function AudioUploadTab() {
       // Success
       setGenerationResult(data);
       setGenerationStatus('completed');
-      // Refresh credits
       fetchCredits();
     } catch (err) {
       const message = err instanceof Error ? err.message : '生成失败，请重试';
-
-      // Check if network went offline during generation
       if (!navigator.onLine) {
         setGenerationError('网络连接中断');
       } else {
         setGenerationError(message);
       }
-
-      // Task 8.3: Requirement 12.5 - return to preprocessing-completed state
       setGenerationStatus('error');
     }
-  }, [coverFeatureId, generationStatus, params, credits, isOnline, fetchCredits]);
+  }, [coverMode, coverFeatureId, audioFile, generationStatus, params, isOnline, fetchCredits]);
 
   // --- Regenerate handler (Task 8.2: Requirement 11.3) ---
   const handleRegenerate = useCallback(() => {
@@ -324,7 +323,10 @@ export default function AudioUploadTab() {
   const isCompleted = generationStatus === 'completed';
   const canPreprocess = uploadStatus === 'ready' && !isPreprocessing && preprocessStatus !== 'completed';
   const canRetryPreprocess = preprocessStatus === 'error' && preprocessRetryCount < 3;
-  const paramsDisabled = !isPreprocessed || isGenerating;
+  // 一步模式下只需要上传音频即可编辑参数，两步模式需要预处理完成
+  const paramsDisabled = coverMode === 'one-step'
+    ? (uploadStatus !== 'ready' && preprocessStatus !== 'completed') || isGenerating
+    : !isPreprocessed || isGenerating;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -538,6 +540,8 @@ export default function AudioUploadTab() {
             onGenerate={handleGenerate}
             isGenerating={isGenerating}
             disabled={paramsDisabled}
+            coverMode={coverMode}
+            onCoverModeChange={setCoverMode}
           />
 
           {/* Generation error below params (Task 8.2: Requirement 11.4) */}

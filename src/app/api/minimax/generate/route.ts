@@ -37,8 +37,13 @@ function checkRateLimit(userId: string): boolean {
 
 // ─── 请求体类型 ─────────────────────────────────────────────
 interface GenerateRequestBody {
-  coverFeatureId: string;
+  coverFeatureId?: string;
+  audioUrl?: string;  // 一步模式：直接传音频 URL
   lyrics?: string;
+  prompt?: string;
+  isInstrumental?: boolean;
+  audioSetting: AudioSetting;
+}
   prompt?: string;
   isInstrumental?: boolean;
   audioSetting: AudioSetting;
@@ -83,15 +88,17 @@ export async function POST(req: NextRequest) {
     const body: GenerateRequestBody = await req.json();
     const {
       coverFeatureId,
+      audioUrl,
       lyrics,
       prompt,
       isInstrumental = false,
       audioSetting,
     } = body;
 
-    if (!coverFeatureId) {
+    // 必须提供 coverFeatureId 或 audioUrl 其中之一
+    if (!coverFeatureId && !audioUrl) {
       return NextResponse.json(
-        { error: '缺少 coverFeatureId 参数' },
+        { error: '缺少 coverFeatureId 或 audioUrl 参数' },
         { status: 400 }
       );
     }
@@ -128,10 +135,13 @@ export async function POST(req: NextRequest) {
 
     const generationInput: ArrangementGenerationInput = {
       model: 'music-cover',
-      coverFeatureId,
-      // music-cover 模型使用 cover_feature_id 时 lyrics 必填 [10, 1000]
-      // 即使纯器乐模式也需要传歌词（MiniMax 会忽略歌词内容但字段必须存在）
-      lyrics: lyrics && lyrics.trim().length >= 10 ? lyrics.trim().slice(0, 1000) : '[Verse]\nla la la la la la\nla la la la la',
+      coverFeatureId: coverFeatureId || '',
+      // 一步模式传 audioUrl，两步模式传 coverFeatureId
+      audioUrl: audioUrl || undefined,
+      // music-cover 使用 cover_feature_id 时 lyrics 必填 [10, 1000]
+      lyrics: coverFeatureId
+        ? (lyrics && lyrics.trim().length >= 10 ? lyrics.trim().slice(0, 1000) : '[Verse]\nla la la la la la\nla la la la la')
+        : (lyrics || ''),  // 一步模式歌词可选
       prompt: prompt || undefined,
       isInstrumental: false, // music-cover 不支持 is_instrumental
       audioSetting,
