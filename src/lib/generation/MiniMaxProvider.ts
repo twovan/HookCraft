@@ -50,7 +50,7 @@ export class MiniMaxProvider {
 
   constructor(config?: MiniMaxProviderConfig) {
     this.apiKey = config?.apiKey || process.env.MINIMAX_API_KEY || '';
-    this.baseUrl = config?.baseUrl || 'https://api.minimax.io';
+    this.baseUrl = config?.baseUrl || 'https://api.minimax.chat';
 
     if (!this.apiKey) {
       throw new Error('MiniMax API Key 未配置');
