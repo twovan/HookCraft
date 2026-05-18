@@ -167,7 +167,6 @@ export default function AudioUploader({
       }}
       style={{
         position: 'relative',
-        width: '100%',
         minHeight: 200,
         borderRadius: 16,
         overflow: 'hidden',
