@@ -61,7 +61,9 @@ export class MiniMaxProvider {
   async preprocess(input: PreprocessInput): Promise<PreprocessResult> {
     const url = `${this.baseUrl}/v1/music_cover_preprocess`;
 
-    const body: Record<string, unknown> = {};
+    const body: Record<string, unknown> = {
+      model: 'music-cover',
+    };
     if (input.audioBase64) {
       body.audio_data = input.audioBase64;
     }

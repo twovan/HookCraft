@@ -175,12 +175,12 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     console.error('[/api/minimax/preprocess] Error:', error);
 
-    // 区分不同类型的错误
+    // 区分不同类型的错误，透传具体信息便于调试
     const message = error?.message || '预处理失败';
 
-    if (message.includes('API Key')) {
+    if (message.includes('API Key') || message.includes('未配置')) {
       return NextResponse.json(
-        { error: '服务配置异常，请稍后重试' },
+        { error: '服务配置异常：MiniMax API Key 未配置或无效' },
         { status: 500 }
       );
     }
@@ -192,8 +192,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // 透传 MiniMax API 的具体错误信息
     return NextResponse.json(
-      { error: '音频分析失败，请重试' },
+      { error: `音频分析失败: ${message}` },
       { status: 500 }
     );
   }
