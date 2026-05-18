@@ -248,7 +248,7 @@ export default function AudioUploader({
               color: '#9ca3af',
             }}
           >
-            支持 MP3/WAV 格式，最大 50MB，时长 6秒-3分钟
+            支持 MP3/WAV 格式，最大 50MB，时长 6秒-6分钟
           </p>
         </>
       )}

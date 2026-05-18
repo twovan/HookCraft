@@ -12,8 +12,8 @@ const MAX_SIZE = 50 * 1024 * 1024;
 /** 最短音频时长：6 秒 */
 const MIN_DURATION = 6;
 
-/** 最长音频时长：180 秒（3 分钟） */
-const MAX_DURATION = 180;
+/** 最长音频时长：360 秒（6 分钟，MiniMax API 上限） */
+const MAX_DURATION = 360;
 
 /**
  * 使用 Web Audio API 获取音频文件时长（秒）
@@ -86,7 +86,7 @@ export async function validateAudioFile(file: File): Promise<ValidationResult> {
   }
 
   if (duration > MAX_DURATION) {
-    return { valid: false, error: '音频时长不能超过 3 分钟' };
+    return { valid: false, error: '音频时长不能超过 6 分钟' };
   }
 
   return { valid: true, duration };
