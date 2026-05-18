@@ -308,18 +308,7 @@ export default function ArrangementParamsEditor({
               />
             </div>
 
-            {/* AI 音频水印 */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <input
-                type="checkbox"
-                id="aigc-watermark"
-                disabled={isButtonDisabled}
-                style={{ accentColor: '#7536d5' }}
-              />
-              <label htmlFor="aigc-watermark" style={{ fontSize: '13px', color: '#e8e8f0', fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" }}>
-                添加 AI 音频水印
-              </label>
-            </div>
+            {/* AI 音频水印 - 已移除 */}
           </div>
         )}
       </div>

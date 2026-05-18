@@ -204,9 +204,9 @@ export default function AudioUploadTab() {
     if (coverMode === 'two-step' && !coverFeatureId) return;
     if (coverMode === 'one-step' && !audioFile) return;
 
-    // 风格描述必填
-    if (!params.prompt || params.prompt.trim().length < 10) {
-      setGenerationError('风格描述必填，至少 10 个字符');
+    // 风格描述必填（一步模式 10-300 字符，两步模式 10-2000 字符）
+    if (!params.prompt || params.prompt.trim().length < 2) {
+      setGenerationError('风格描述必填');
       return;
     }
 
@@ -546,8 +546,8 @@ export default function AudioUploadTab() {
             onCoverModeChange={setCoverMode}
           />
 
-          {/* Generation error below params (Task 8.2: Requirement 11.4) */}
-          {generationStatus === 'error' && generationError && !showRewriteConfirm && (
+          {/* Generation error below params */}
+          {generationError && !showRewriteConfirm && (
             <div style={{
               marginTop: 16,
               padding: '14px 16px',
