@@ -106,10 +106,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 非纯器乐模式时，歌词必填
-    if (!isInstrumental && (!lyrics || lyrics.trim().length === 0)) {
+    // 两步模式（有 coverFeatureId）时歌词必填，一步模式（有 audioUrl）歌词可选
+    if (coverFeatureId && !isInstrumental && (!lyrics || lyrics.trim().length === 0)) {
       return NextResponse.json(
-        { error: '非纯器乐模式下歌词不能为空' },
+        { error: '自定义翻唱模式下歌词不能为空' },
         { status: 400 }
       );
     }
