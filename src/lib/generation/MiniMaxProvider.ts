@@ -120,11 +120,6 @@ export class MiniMaxProvider {
       output_format: 'url',
     };
 
-    // is_instrumental 只有 music-2.6 支持，music-cover 不支持
-    if (input.model === 'music-2.6' || input.model === 'music-2.6-free') {
-      body.is_instrumental = input.isInstrumental;
-    }
-
     if (input.prompt) {
       body.prompt = input.prompt;
     }
