@@ -133,61 +133,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ─── Step 5: 敏感词检查 ───────────────────────────────────
-    const geminiApiKey = process.env.GEMINI_API_KEY;
-    if (geminiApiKey && geminiApiKey !== 'your_api_key_here') {
-      const filterService = new SensitivityFilterService({
-        supabase: supabaseAdmin,
-        geminiApiKey,
-      });
-
-      try {
-        const sensitivityInput = {
-          description: prompt || '',
-          lyrics: isInstrumental ? undefined : lyrics,
-        };
-
-        // 只有当有内容需要检查时才执行
-        if (sensitivityInput.description || sensitivityInput.lyrics) {
-          const checkResult = await filterService.check({
-            description: sensitivityInput.description || '(无描述)',
-            lyrics: sensitivityInput.lyrics,
-          });
-
-          if (checkResult.resultType === 'block') {
-            const blockedWordsMsg = checkResult.blockedWords?.join(', ') || '敏感内容';
-            return NextResponse.json(
-              {
-                error: `内容包含敏感词，请修改后重试`,
-                code: 'SENSITIVITY_BLOCKED',
-                blockedWords: checkResult.blockedWords,
-                details: `检测到敏感词: ${blockedWordsMsg}`,
-              },
-              { status: 400 }
-            );
-          }
-
-          if (checkResult.resultType === 'rewrite') {
-            // prompt 中检测到 celebrity/song_name → 返回改写建议供用户确认
-            return NextResponse.json(
-              {
-                error: '创作描述中包含受保护的名称引用，请确认使用改写后的描述',
-                code: 'SENSITIVITY_REWRITE',
-                rewrittenPrompt: checkResult.rewrittenPrompt,
-                rewrittenPromptCn: checkResult.rewrittenPromptCn,
-                styleTags: checkResult.styleTags,
-                styleTagsCn: checkResult.styleTagsCn,
-                detectedWords: checkResult.descriptionResult?.detectedWords,
-              },
-              { status: 200 }
-            );
-          }
-        }
-      } catch (err: any) {
-        // 敏感词服务不可用时降级：仅记录日志，允许请求继续
-        console.error('[minimax/generate] 敏感词检查异常，降级放行:', err?.message || err);
-      }
-    }
+    // ─── Step 5: 敏感词检查（暂时跳过，依赖 MiniMax 自身的内容安全过滤）───
+    // TODO: 后续优化本地敏感词库误报问题后重新启用
+    // const geminiApiKey = process.env.GEMINI_API_KEY;
+    // if (geminiApiKey && geminiApiKey !== 'your_api_key_here') { ... }
 
     // ─── Step 6: 调用 MiniMax 生成 API ───────────────────────
     const provider = new MiniMaxProvider();
