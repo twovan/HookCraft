@@ -98,27 +98,9 @@ export default function AudioUploadTab() {
   }, []);
 
   // --- Check for pending tasks on mount (Task 8.3: Requirement 12.2) ---
-  useEffect(() => {
-    const checkPendingTasks = async () => {
-      try {
-        const res = await fetch('/api/minimax/generate?checkPending=true');
-        if (res.ok) {
-          const data = await res.json();
-          if (data.task && data.task.status === 'completed' && data.task.audioUrl) {
-            setGenerationStatus('completed');
-            setGenerationResult({
-              success: true,
-              audioUrl: data.task.audioUrl,
-              taskId: data.task.id,
-            });
-          }
-        }
-      } catch {
-        // Silently fail - not critical
-      }
-    };
-    checkPendingTasks();
-  }, []);
+  // --- Check for pending tasks on mount (Task 8.3: Requirement 12.2) ---
+  // Note: Disabled until GET endpoint is implemented
+  // useEffect(() => { ... }, []);
 
   // --- File selection handler ---
   const handleFileSelected = useCallback((file: File, base64: string, duration: number) => {
