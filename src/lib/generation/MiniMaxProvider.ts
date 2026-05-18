@@ -65,7 +65,7 @@ export class MiniMaxProvider {
       model: 'music-cover',
     };
     if (input.audioBase64) {
-      body.audio_data = input.audioBase64;
+      body.audio_base64 = input.audioBase64;
     }
     if (input.audioUrl) {
       body.audio_url = input.audioUrl;
