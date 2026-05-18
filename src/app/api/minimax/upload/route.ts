@@ -71,13 +71,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Step 5: 获取公开 URL
-    const { data: urlData } = supabaseAdmin.storage
+    // Step 5: 获取签名 URL（有效期 1 小时，供 MiniMax API 下载）
+    const { data: signedUrlData, error: signedUrlError } = await supabaseAdmin.storage
       .from('generations')
-      .getPublicUrl(data.path);
+      .createSignedUrl(data.path, 3600); // 1 hour
+
+    if (signedUrlError || !signedUrlData?.signedUrl) {
+      console.error('[/api/minimax/upload] Signed URL error:', signedUrlError);
+      // 降级尝试 public URL
+      const { data: urlData } = supabaseAdmin.storage
+        .from('generations')
+        .getPublicUrl(data.path);
+      return NextResponse.json({
+        audioUrl: urlData.publicUrl,
+        path: data.path,
+      });
+    }
 
     return NextResponse.json({
-      audioUrl: urlData.publicUrl,
+      audioUrl: signedUrlData.signedUrl,
       path: data.path,
     });
   } catch (error: any) {
