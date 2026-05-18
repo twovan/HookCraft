@@ -527,13 +527,17 @@ export default function AudioUploadTab() {
             </h3>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {['[Intro]', '[Verse]', '[Pre Chorus]', '[Chorus]', '[Bridge]', '[Outro]', '[Interlude]', '[Hook]', '[Inst]'].map((tag) => (
-                <span key={tag} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #2a2a40', background: '#1a1a2e', color: '#e8e8f0', fontSize: 12, fontFamily: 'monospace' }}>
+                <button
+                  key={tag}
+                  onClick={() => setParams(prev => ({ ...prev, lyrics: prev.lyrics + (prev.lyrics.endsWith('\n') || prev.lyrics === '' ? '' : '\n') + tag + '\n' }))}
+                  style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #2a2a40', background: '#1a1a2e', color: '#e8e8f0', fontSize: 12, fontFamily: 'monospace', cursor: 'pointer', transition: 'all 0.15s ease' }}
+                >
                   {tag}
-                </span>
+                </button>
               ))}
             </div>
             <p style={{ fontSize: 11, color: '#6b7280', margin: '8px 0 0 0', fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" }}>
-              在右侧歌词编辑器中使用这些标签来标记歌曲结构
+              点击标签可快速插入到歌词中
             </p>
           </div>
 
