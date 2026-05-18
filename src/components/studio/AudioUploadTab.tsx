@@ -397,7 +397,8 @@ export default function AudioUploadTab() {
           )}
 
           {/* Preprocess button / status */}
-          {uploadStatus === 'ready' && (
+          {/* 预处理区域 - 仅两步模式（自定义翻唱）显示 */}
+          {uploadStatus === 'ready' && coverMode === 'two-step' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {/* Preprocess error message (Task 8.3) */}
               {preprocessStatus === 'error' && preprocessError && (
