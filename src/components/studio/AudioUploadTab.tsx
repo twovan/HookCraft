@@ -374,7 +374,6 @@ export default function AudioUploadTab() {
           display: 'flex',
           flexDirection: 'column',
           gap: 16,
-          overflow: 'hidden',
           minWidth: 0,
         }}>
           <h2 style={{
@@ -527,7 +526,6 @@ export default function AudioUploadTab() {
           padding: 24,
           border: '1px solid #2a2a40',
           boxShadow: '0 4px 20px rgba(117, 54, 213, 0.06)',
-          overflow: 'hidden',
           minWidth: 0,
         }}>
           <h2 style={{
