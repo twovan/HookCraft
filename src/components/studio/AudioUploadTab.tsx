@@ -323,10 +323,11 @@ export default function AudioUploadTab() {
   const isCompleted = generationStatus === 'completed';
   const canPreprocess = uploadStatus === 'ready' && !isPreprocessing && preprocessStatus !== 'completed';
   const canRetryPreprocess = preprocessStatus === 'error' && preprocessRetryCount < 3;
-  // 一步模式下只需要上传音频即可编辑参数，两步模式需要预处理完成
+  // 一步模式：上传音频后即可编辑参数和生成
+  // 两步模式：需要预处理完成后才能编辑参数和生成
   const paramsDisabled = coverMode === 'one-step'
-    ? (uploadStatus !== 'ready' && preprocessStatus !== 'completed') || isGenerating
-    : !isPreprocessed || isGenerating;
+    ? (uploadStatus !== 'ready') || isGenerating
+    : (!isPreprocessed) || isGenerating;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>

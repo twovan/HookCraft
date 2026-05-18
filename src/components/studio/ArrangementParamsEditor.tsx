@@ -81,12 +81,11 @@ export default function ArrangementParamsEditor({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {/* 翻唱模式切换 */}
+      {/* 翻唱模式切换 - 不受 disabled 控制，随时可切换 */}
       <Section title="翻唱模式">
         <div style={{ display: 'flex', gap: '4px', background: '#12121e', borderRadius: '10px', padding: '4px' }}>
           <button
             onClick={() => onCoverModeChange('one-step')}
-            disabled={isButtonDisabled}
             style={{
               flex: 1,
               padding: '10px 16px',
@@ -96,7 +95,7 @@ export default function ArrangementParamsEditor({
               color: coverMode === 'one-step' ? '#e8e8f0' : '#9ca3af',
               fontSize: '13px',
               fontWeight: 600,
-              cursor: isButtonDisabled ? 'not-allowed' : 'pointer',
+              cursor: 'pointer',
               transition: 'all 0.2s ease',
               fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
               borderBottom: coverMode === 'one-step' ? '2px solid #7536d5' : '2px solid transparent',
@@ -106,7 +105,6 @@ export default function ArrangementParamsEditor({
           </button>
           <button
             onClick={() => onCoverModeChange('two-step')}
-            disabled={isButtonDisabled}
             style={{
               flex: 1,
               padding: '10px 16px',
@@ -116,7 +114,7 @@ export default function ArrangementParamsEditor({
               color: coverMode === 'two-step' ? '#e8e8f0' : '#9ca3af',
               fontSize: '13px',
               fontWeight: 600,
-              cursor: isButtonDisabled ? 'not-allowed' : 'pointer',
+              cursor: 'pointer',
               transition: 'all 0.2s ease',
               fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
               borderBottom: coverMode === 'two-step' ? '2px solid #7536d5' : '2px solid transparent',
