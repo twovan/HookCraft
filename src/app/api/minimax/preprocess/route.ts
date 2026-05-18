@@ -155,7 +155,7 @@ export async function POST(req: NextRequest) {
 
     // Step 5: 校验 MIME 类型 (Requirement 10.2)
     // 优先使用客户端传递的 mimeType，同时通过文件头检测进行验证
-    const detectedMime = detectMimeTypeFromBase64(audioBase64);
+    const detectedMime = detectMimeTypeFromBase64(audioBase64!);
     const effectiveMime = detectedMime || mimeType || '';
 
     if (!ALLOWED_MIME_TYPES.includes(effectiveMime)) {
@@ -167,7 +167,7 @@ export async function POST(req: NextRequest) {
 
     // Step 6: 校验文件大小 (Requirement 10.1)
     // Base64 编码后大小约为原始大小的 4/3
-    const estimatedSizeBytes = Math.ceil((audioBase64.length * 3) / 4);
+    const estimatedSizeBytes = Math.ceil((audioBase64!.length * 3) / 4);
     if (estimatedSizeBytes > MAX_AUDIO_SIZE_BYTES) {
       return NextResponse.json(
         { error: '文件大小不能超过 50MB' },
@@ -177,7 +177,7 @@ export async function POST(req: NextRequest) {
 
     // Step 7: 调用 MiniMax 预处理 API
     const provider = new MiniMaxProvider();
-    const result = await provider.preprocess({ audioBase64 });
+    const result = await provider.preprocess({ audioBase64: audioBase64! });
 
     // Step 8: 返回预处理结果
     return NextResponse.json({
