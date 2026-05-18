@@ -181,37 +181,7 @@ export default function ArrangementParamsEditor({
         </label>
       </div>
 
-      {/* 歌词结构标签 - 纯器乐模式下隐藏 */}
-      {!params.isInstrumental && (
-      <Section title="歌词结构标签">
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-          {STRUCTURE_TAGS.map((tag) => (
-            <button
-              key={tag}
-              onClick={() => insertTag(tag)}
-              disabled={isButtonDisabled}
-              style={{
-                padding: '4px 10px',
-                borderRadius: '6px',
-                border: '1px solid #2a2a40',
-                background: '#1a1a2e',
-                color: '#e8e8f0',
-                fontSize: '12px',
-                cursor: isButtonDisabled ? 'not-allowed' : 'pointer',
-                opacity: isButtonDisabled ? 0.5 : 1,
-                transition: 'all 0.15s ease',
-                fontFamily: 'monospace',
-              }}
-            >
-              {tag}
-            </button>
-          ))}
-        </div>
-        <p style={{ fontSize: '11px', color: '#6b7280', margin: '6px 0 0 0', fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" }}>
-          点击标签可快速插入到歌词中
-        </p>
-      </Section>
-      )}
+      {/* 歌词结构标签 - 已移到左侧面板 */}
 
       {/* 歌词编辑 - 纯器乐模式下隐藏 */}
       {!params.isInstrumental && (
@@ -373,22 +343,7 @@ export default function ArrangementParamsEditor({
         {isGenerating ? '生成中...' : '🎵 生成音乐'}
       </button>
 
-      {/* 使用提示 */}
-      <div style={{
-        padding: '12px 14px',
-        background: '#12121e',
-        borderRadius: '8px',
-        border: '1px solid #2a2a40',
-      }}>
-        <p style={{ fontSize: '12px', fontWeight: 600, color: '#f59e0b', margin: '0 0 6px 0', fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" }}>
-          💡 使用提示
-        </p>
-        <ul style={{ fontSize: '11px', color: '#9ca3af', margin: 0, paddingLeft: '16px', lineHeight: 1.8, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" }}>
-          <li>使用结构标签如 [Verse]、[Chorus] 优化音乐结构</li>
-          <li>风格描述越详细，生成效果越好（最多 {coverMode === 'one-step' ? 300 : 2000} 字符）</li>
-          <li>生成时间约 30-60 秒，请耐心等待</li>
-        </ul>
-      </div>
+      {/* 使用提示 - 已移到左侧面板 */}
     </div>
   );
 }
