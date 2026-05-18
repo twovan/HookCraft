@@ -44,10 +44,6 @@ interface GenerateRequestBody {
   isInstrumental?: boolean;
   audioSetting: AudioSetting;
 }
-  prompt?: string;
-  isInstrumental?: boolean;
-  audioSetting: AudioSetting;
-}
 
 /**
  * POST /api/minimax/generate
