@@ -144,9 +144,11 @@ export async function POST(req: NextRequest) {
     const generationInput: ArrangementGenerationInput = {
       model: 'music-cover',
       coverFeatureId,
-      lyrics: isInstrumental ? '' : (lyrics || ''),
+      // music-cover 模型使用 cover_feature_id 时 lyrics 必填 [10, 1000]
+      // 即使纯器乐模式也需要传歌词（MiniMax 会忽略歌词内容但字段必须存在）
+      lyrics: lyrics && lyrics.trim().length >= 10 ? lyrics.trim().slice(0, 1000) : '[Verse]\nla la la la la la\nla la la la la',
       prompt: prompt || undefined,
-      isInstrumental,
+      isInstrumental: false, // music-cover 不支持 is_instrumental
       audioSetting,
     };
 

@@ -111,14 +111,19 @@ export class MiniMaxProvider {
     const body: Record<string, unknown> = {
       model: input.model,
       cover_feature_id: input.coverFeatureId,
-      lyrics: input.isInstrumental ? '' : input.lyrics,
-      is_instrumental: input.isInstrumental,
+      lyrics: input.lyrics,
       audio_setting: {
         sample_rate: input.audioSetting.sampleRate,
         bitrate: input.audioSetting.bitrate,
         format: input.audioSetting.format,
       },
+      output_format: 'url',
     };
+
+    // is_instrumental 只有 music-2.6 支持，music-cover 不支持
+    if (input.model === 'music-2.6' || input.model === 'music-2.6-free') {
+      body.is_instrumental = input.isInstrumental;
+    }
 
     if (input.prompt) {
       body.prompt = input.prompt;
