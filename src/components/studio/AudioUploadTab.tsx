@@ -71,9 +71,7 @@ export default function AudioUploadTab() {
   // Cover mode state
   const [coverMode, setCoverMode] = useState<'one-step' | 'two-step'>('one-step');
 
-  // Credits store
-  const credits = useCreditStore((s) => s.credits);
-  const fetchCredits = useCreditStore((s) => s.fetchCredits);
+  // Credits store - 生成成功后通过 getState() 刷新
 
   // Refs
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -283,7 +281,8 @@ export default function AudioUploadTab() {
       // Success
       setGenerationResult(data);
       setGenerationStatus('completed');
-      fetchCredits();
+      // 刷新 credits 显示（不放在依赖中避免循环）
+      useCreditStore.getState().fetchCredits();
     } catch (err) {
       const message = err instanceof Error ? err.message : '生成失败，请重试';
       if (!navigator.onLine) {
@@ -293,7 +292,7 @@ export default function AudioUploadTab() {
       }
       setGenerationStatus('error');
     }
-  }, [coverMode, coverFeatureId, audioFile, generationStatus, params, isOnline, fetchCredits]);
+  }, [coverMode, coverFeatureId, audioFile, generationStatus, params, isOnline]);
 
   // --- Regenerate handler (Task 8.2: Requirement 11.3) ---
   const handleRegenerate = useCallback(() => {
