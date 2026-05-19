@@ -218,10 +218,29 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ─── Step 9: 创建 generation_tasks 记录 ───────────────────
+    // ─── Step 9: 创建 generation_batches + generation_tasks 记录 ───
     const taskId = result.taskId || crypto.randomUUID();
+    const batchId = crypto.randomUUID();
     const creditsCost = CREDITS_COST.arrangement_generation;
 
+    // 先创建 batch 记录（创作列表查询的是这个表）
+    const { error: batchError } = await supabaseAdmin
+      .from('generation_batches')
+      .insert({
+        id: batchId,
+        user_id: user.id,
+        generation_type: 'arrangement',
+        prompt: prompt || null,
+        status: 'completed',
+        version_count: 1,
+        selected_task_id: taskId,
+      } as any);
+
+    if (batchError) {
+      console.error('[minimax/generate] 创建 batch 记录失败:', batchError);
+    }
+
+    // 再创建 task 记录
     const { error: insertError } = await supabaseAdmin
       .from('generation_tasks')
       .insert({
@@ -234,6 +253,7 @@ export async function POST(req: NextRequest) {
         audio_path: audioStoragePath || publicAudioUrl || null,
         lyrics: isInstrumental ? null : (lyrics || null),
         credits_consumed: creditsCost,
+        batch_id: batchId,
       } as any);
 
     if (insertError) {
