@@ -151,40 +151,7 @@ export default function ArrangementParamsEditor({
         </div>
       </Section>
 
-      {/* 纯器乐模式开关 */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '12px 16px',
-        background: '#12121e',
-        borderRadius: '10px',
-        border: '1px solid #2a2a40',
-      }}>
-        <div>
-          <span style={{ fontSize: '14px', fontWeight: 600, color: '#e8e8f0', fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" }}>
-            纯器乐模式
-          </span>
-          <p style={{ fontSize: '12px', color: '#6b7280', margin: '4px 0 0 0', fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" }}>
-            开启后不使用歌词，仅生成器乐版本
-          </p>
-        </div>
-        <label style={{ position: 'relative', display: 'inline-block', width: '44px', height: '24px', cursor: 'pointer', flexShrink: 0 }}>
-          <input
-            type="checkbox"
-            checked={params.isInstrumental}
-            onChange={(e) => updateParam('isInstrumental', e.target.checked)}
-            style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
-          />
-          <span style={{ position: 'absolute', inset: 0, borderRadius: '12px', background: params.isInstrumental ? '#7536d5' : '#2a2a40', transition: 'background 0.3s ease' }} />
-          <span style={{ position: 'absolute', top: '3px', left: params.isInstrumental ? '23px' : '3px', width: '18px', height: '18px', borderRadius: '50%', background: '#fff', transition: 'left 0.3s ease' }} />
-        </label>
-      </div>
-
-      {/* 歌词结构标签 - 已移到左侧面板 */}
-
-      {/* 歌词编辑 - 纯器乐模式下隐藏 */}
-      {!params.isInstrumental && (
+      {/* 歌词编辑 */}
       <Section title="歌词">
         <textarea
           ref={lyricsRef}
@@ -207,7 +174,6 @@ export default function ArrangementParamsEditor({
           <CharCount current={params.lyrics.length} max={coverMode === 'one-step' ? 1000 : 3500} />
         </div>
       </Section>
-      )}
 
       {/* 高级设置折叠 */}
       <div>
