@@ -554,7 +554,7 @@ export default function AudioUploadTab() {
           )}
 
           {/* Preprocess button / status */}
-          {/* 预处理区域 - 仅两步模式（自定义翻唱）显示 */}
+          {/* 预处理区域 - 仅两步模式（自定义创作）显示 */}
           {uploadStatus === 'ready' && coverMode === 'two-step' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {/* Preprocess error message (Task 8.3) */}
@@ -708,7 +708,7 @@ export default function AudioUploadTab() {
               💡 使用提示
             </p>
             <ul style={{ fontSize: 11, color: '#9ca3af', margin: 0, paddingLeft: 16, lineHeight: 1.8, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" }}>
-              <li>使用结构标签如 [Verse]、[Chorus] 优化音乐结构</li>
+              <li>使用结构标签如 [Verse]、[Chorus] 优化歌词结构</li>
               <li>风格描述越详细，生成效果越好（最多 300 字符）</li>
               <li>生成时间约 30-60 秒，请耐心等待</li>
               <li>一步模式歌词可选，不填则自动从参考音频提取</li>

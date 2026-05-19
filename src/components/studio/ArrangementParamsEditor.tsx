@@ -81,8 +81,8 @@ export default function ArrangementParamsEditor({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {/* 翻唱模式切换 - 不受 disabled 控制，随时可切换 */}
-      <Section title="翻唱模式">
+      {/* 模式切换 - 不受 disabled 控制，随时可切换 */}
+      <Section title="创作模式">
         <div style={{ display: 'flex', gap: '4px', background: '#12121e', borderRadius: '10px', padding: '4px' }}>
           <button
             onClick={() => onCoverModeChange('one-step')}
@@ -101,7 +101,7 @@ export default function ArrangementParamsEditor({
               borderBottom: coverMode === 'one-step' ? '2px solid #7536d5' : '2px solid transparent',
             }}
           >
-            快速翻唱（一步）
+            快速创作（一步）
           </button>
           <button
             onClick={() => onCoverModeChange('two-step')}
@@ -120,12 +120,12 @@ export default function ArrangementParamsEditor({
               borderBottom: coverMode === 'two-step' ? '2px solid #7536d5' : '2px solid transparent',
             }}
           >
-            自定义翻唱（两步）
+            自定义创作（两步）
           </button>
         </div>
         <p style={{ fontSize: '12px', color: '#6b7280', margin: '8px 0 0 0', fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" }}>
           {coverMode === 'one-step'
-            ? '直接传入音频生成翻唱，歌词自动提取'
+            ? '直接传入音频生成，歌词自动提取'
             : '先上传音频预处理提取歌词，再修改歌词生成'}
         </p>
       </Section>
@@ -137,7 +137,7 @@ export default function ArrangementParamsEditor({
           onChange={(e) => updateParam('prompt', e.target.value)}
           disabled={isButtonDisabled}
           maxLength={2000}
-          placeholder="描述目标翻唱风格，例如：摇滚,热血,叛逆,青春,吉他,激情"
+          placeholder="描述目标风格，例如：摇滚,热血,叛逆,青春,吉他,激情"
           aria-label="风格描述输入"
           style={textareaStyle(isButtonDisabled, '80px')}
           onFocus={(e) => { if (!isButtonDisabled) e.currentTarget.style.borderColor = '#7536d5'; }}

@@ -257,7 +257,7 @@ export async function POST(req: NextRequest) {
     // 两步模式（有 coverFeatureId）时歌词必填，一步模式（有 audioUrl）歌词可选
     if (coverFeatureId && !isInstrumental && (!lyrics || lyrics.trim().length === 0)) {
       return NextResponse.json(
-        { error: '自定义翻唱模式下歌词不能为空' },
+        { error: '自定义创作模式下歌词不能为空' },
         { status: 400 }
       );
     }
