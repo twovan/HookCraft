@@ -194,7 +194,72 @@ export default function AudioUploadTab() {
     }
   }, [audioFile, preprocessStatus]);
 
-  // --- Generate handler ---
+  // --- Polling ref to allow cleanup ---
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, []);
+
+  // --- Poll task status until completed or failed ---
+  const pollTaskStatus = useCallback((taskId: string) => {
+    // Clear any existing polling
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+    }
+
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/minimax/generate/status?taskId=${taskId}`);
+        if (!res.ok) {
+          // Non-critical error, keep polling
+          console.warn('[pollTaskStatus] 查询失败, 继续轮询...');
+          return;
+        }
+
+        const data = await res.json();
+
+        if (data.status === 'completed') {
+          // 生成完成
+          if (pollingRef.current) {
+            clearInterval(pollingRef.current);
+            pollingRef.current = null;
+          }
+          setGenerationResult({
+            success: true,
+            audioUrl: data.audioUrl,
+            taskId,
+          });
+          setGenerationStatus('completed');
+          useCreditStore.getState().fetchCredits();
+        } else if (data.status === 'failed') {
+          // 生成失败
+          if (pollingRef.current) {
+            clearInterval(pollingRef.current);
+            pollingRef.current = null;
+          }
+          setGenerationError(data.error || '生成失败，请重试');
+          setGenerationStatus('error');
+        }
+        // 'pending' or 'generating' → keep polling
+      } catch (err) {
+        // Network error during polling, keep trying
+        console.warn('[pollTaskStatus] 网络错误, 继续轮询...');
+      }
+    };
+
+    // Poll immediately once, then every 5 seconds
+    poll();
+    pollingRef.current = setInterval(poll, 5000);
+  }, []);
+
+  // --- Generate handler (async mode with polling) ---
   const handleGenerate = useCallback(async () => {
     if (generationStatus === 'generating') return;
 
@@ -278,11 +343,18 @@ export default function AudioUploadTab() {
         throw new Error(errorMessage);
       }
 
-      // Success
-      setGenerationResult(data);
-      setGenerationStatus('completed');
-      // 刷新 credits 显示（不放在依赖中避免循环）
-      useCreditStore.getState().fetchCredits();
+      // 后端立即返回 taskId，开始轮询状态
+      const { taskId } = data;
+      if (taskId) {
+        pollTaskStatus(taskId);
+      } else {
+        // 兼容：如果后端直接返回了 audioUrl（不应该发生，但防御性处理）
+        if (data.audioUrl) {
+          setGenerationResult(data);
+          setGenerationStatus('completed');
+          useCreditStore.getState().fetchCredits();
+        }
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : '生成失败，请重试';
       if (!navigator.onLine) {
@@ -292,10 +364,15 @@ export default function AudioUploadTab() {
       }
       setGenerationStatus('error');
     }
-  }, [coverMode, coverFeatureId, audioFile, generationStatus, params, isOnline]);
+  }, [coverMode, coverFeatureId, audioFile, generationStatus, params, isOnline, pollTaskStatus]);
 
   // --- Regenerate handler (Task 8.2: Requirement 11.3) ---
   const handleRegenerate = useCallback(() => {
+    // Stop any active polling
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
     setGenerationStatus('idle');
     setGenerationResult(null);
     setGenerationError(null);
@@ -737,7 +814,7 @@ export default function AudioUploadTab() {
             margin: '8px 0 0 0',
             fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
           }}>
-            生成可能需要 30 秒到 2 分钟
+            生成可能需要 30 秒到 2 分钟，页面会自动刷新结果
           </p>
         </div>
       )}

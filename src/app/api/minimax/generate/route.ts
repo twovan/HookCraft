@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { MiniMaxProvider } from '../../../../lib/generation/MiniMaxProvider';
 import { CreditService } from '../../../../lib/credits/CreditService';
-import { SensitivityFilterService } from '../../../../lib/sensitivity/SensitivityFilterService';
 import { supabaseAdmin } from '../../../../lib/supabase/server';
 import { getAuthUser } from '../../../../lib/supabase/auth-helpers';
 import { CREDITS_COST } from '../../../../config/creditsCost';
@@ -46,20 +45,168 @@ interface GenerateRequestBody {
 }
 
 /**
+ * 后台处理 MiniMax 生成任务
+ * 在返回 taskId 给前端后异步执行，前端通过 /api/minimax/generate/status 轮询结果
+ */
+async function processGenerationInBackground(
+  taskId: string,
+  batchId: string,
+  userId: string,
+  generationInput: ArrangementGenerationInput,
+  audioSetting: AudioSetting,
+  lyrics: string | undefined,
+  isInstrumental: boolean,
+) {
+  const provider = new MiniMaxProvider();
+
+  try {
+    // 更新状态为 generating
+    await supabaseAdmin
+      .from('generation_tasks')
+      .update({ status: 'generating', updated_at: new Date().toISOString() } as any)
+      .eq('id', taskId);
+
+    const result = await provider.generateArrangement(generationInput);
+
+    if (!result.success) {
+      // 生成失败，更新状态
+      await supabaseAdmin
+        .from('generation_tasks')
+        .update({
+          status: 'failed',
+          error_code: result.error?.code || 'GENERATION_FAILED',
+          error_message: result.error?.message || '编曲生成失败',
+          updated_at: new Date().toISOString(),
+        } as any)
+        .eq('id', taskId);
+
+      await supabaseAdmin
+        .from('generation_batches')
+        .update({ status: 'failed' } as any)
+        .eq('id', batchId);
+
+      return;
+    }
+
+    // ─── 上传音频到 Supabase Storage ─────────────────
+    let audioStoragePath: string | null = null;
+    let publicAudioUrl: string | null = result.audioUrl || null;
+
+    if (result.audioHex) {
+      const audioBuffer = Buffer.from(result.audioHex, 'hex');
+      const extension = audioSetting.format || 'mp3';
+      const storagePath = `${userId}/arrangements/${taskId}.${extension}`;
+
+      const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+        .from('generations')
+        .upload(storagePath, audioBuffer, {
+          upsert: true,
+          contentType: extension === 'wav' ? 'audio/wav' : 'audio/mpeg',
+        });
+
+      if (uploadError) {
+        console.error('[minimax/generate] 音频上传失败:', uploadError);
+      } else {
+        audioStoragePath = uploadData.path;
+        const { data: urlData } = supabaseAdmin.storage
+          .from('generations')
+          .getPublicUrl(storagePath);
+        publicAudioUrl = urlData.publicUrl;
+      }
+    } else if (result.audioUrl) {
+      try {
+        const audioResponse = await fetch(result.audioUrl);
+        if (audioResponse.ok) {
+          const audioArrayBuffer = await audioResponse.arrayBuffer();
+          const audioBuffer = Buffer.from(audioArrayBuffer);
+          const extension = audioSetting.format || 'mp3';
+          const storagePath = `${userId}/arrangements/${taskId}.${extension}`;
+
+          const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+            .from('generations')
+            .upload(storagePath, audioBuffer, {
+              upsert: true,
+              contentType: extension === 'wav' ? 'audio/wav' : 'audio/mpeg',
+            });
+
+          if (uploadError) {
+            console.error('[minimax/generate] 音频上传失败:', uploadError);
+          } else {
+            audioStoragePath = uploadData.path;
+            const { data: urlData } = supabaseAdmin.storage
+              .from('generations')
+              .getPublicUrl(storagePath);
+            publicAudioUrl = urlData.publicUrl;
+          }
+        }
+      } catch (downloadErr: any) {
+        console.error('[minimax/generate] 音频下载失败:', downloadErr?.message);
+      }
+    }
+
+    // ─── 更新 task 和 batch 为 completed ─────────────────
+    const creditsCost = CREDITS_COST.arrangement_generation;
+
+    await supabaseAdmin
+      .from('generation_tasks')
+      .update({
+        status: 'completed',
+        audio_path: audioStoragePath || publicAudioUrl || null,
+        lyrics: isInstrumental ? null : (lyrics || null),
+        credits_consumed: creditsCost,
+        updated_at: new Date().toISOString(),
+      } as any)
+      .eq('id', taskId);
+
+    await supabaseAdmin
+      .from('generation_batches')
+      .update({ status: 'completed', selected_task_id: taskId } as any)
+      .eq('id', batchId);
+
+    // ─── 扣减 Credits ────────────────────────────────
+    try {
+      const creditService = new CreditService(supabaseAdmin);
+      const operations: CreditOperationType[] = ['arrangement_generation'];
+      const consumeResult = await creditService.consumeCredits(userId, operations);
+      if (!consumeResult.success) {
+        console.error('[minimax/generate] Credits 扣减失败:', consumeResult.error);
+      }
+    } catch (err: any) {
+      console.error('[minimax/generate] Credits 扣减异常:', err?.message || err);
+    }
+  } catch (error: any) {
+    console.error('[minimax/generate] 后台处理异常:', error);
+
+    // 更新任务状态为失败
+    await supabaseAdmin
+      .from('generation_tasks')
+      .update({
+        status: 'failed',
+        error_code: 'PROCESSING_ERROR',
+        error_message: error?.message || '编曲生成服务异常',
+        updated_at: new Date().toISOString(),
+      } as any)
+      .eq('id', taskId);
+
+    await supabaseAdmin
+      .from('generation_batches')
+      .update({ status: 'failed' } as any)
+      .eq('id', batchId);
+  }
+}
+
+/**
  * POST /api/minimax/generate
  *
- * 编曲生成 API 端点
- * 接收预处理后的 coverFeatureId 和参数，调用 MiniMax music-cover 模型生成编曲。
- *
+ * 编曲生成 API 端点（异步模式）
+ * 
  * 流程：
- * 1. 验证用户认证
- * 2. 速率限制检查
- * 3. 请求参数校验
- * 4. Credits 余额检查
- * 5. 敏感词检查（prompt + lyrics）
- * 6. 调用 MiniMax 生成 API
- * 7. 成功后：上传音频到 Storage，创建 generation_tasks 记录，扣减 Credits
- * 8. 失败时不扣减 Credits
+ * 1. 验证用户认证 + 速率限制
+ * 2. 请求参数校验
+ * 3. 立即创建 generation_batches + generation_tasks 记录（status='pending'）
+ * 4. 返回 taskId 给前端（快速响应，避免 Vercel 超时）
+ * 5. 在后台继续执行 MiniMax 生成、上传、扣费
+ * 6. 前端通过 /api/minimax/generate/status?taskId=xxx 轮询结果
  */
 export async function POST(req: NextRequest) {
   try {
@@ -114,26 +261,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ─── Step 4: Credits 余额检查（暂时跳过，hasEnoughCredits 有 bug 未计算购买额度）───
-    // TODO: 修复 CreditService.hasEnoughCredits 后重新启用
-    // const creditService = new CreditService(supabaseAdmin);
-    // const operations: CreditOperationType[] = ['arrangement_generation'];
-    const creditService = new CreditService(supabaseAdmin);
-    const operations: CreditOperationType[] = ['arrangement_generation'];
-
-    // ─── Step 5: 敏感词检查（暂时跳过，依赖 MiniMax 自身的内容安全过滤）───
-    // TODO: 后续优化本地敏感词库误报问题后重新启用
-    // const geminiApiKey = process.env.GEMINI_API_KEY;
-    // if (geminiApiKey && geminiApiKey !== 'your_api_key_here') { ... }
-
-    // ─── Step 6: 调用 MiniMax 生成 API ───────────────────────
-    const provider = new MiniMaxProvider();
-
+    // ─── Step 4: 构建生成输入 ─────────────────────────────────
     const generationInput: ArrangementGenerationInput = {
       model: 'music-cover',
       coverFeatureId: coverFeatureId || undefined,
       audioUrl: audioUrl || undefined,
-      // 一步模式（audioUrl）歌词可选；两步模式（coverFeatureId）歌词必填 [10, 1000]
       lyrics: coverFeatureId
         ? (lyrics && lyrics.trim().length >= 10 ? lyrics.trim().slice(0, 1000) : '[Verse]\nla la la la la la\nla la la la la')
         : (lyrics?.trim() || ''),
@@ -142,88 +274,11 @@ export async function POST(req: NextRequest) {
       audioSetting,
     };
 
-    const result = await provider.generateArrangement(generationInput);
-
-    // ─── Step 7: 处理生成结果 ─────────────────────────────────
-    if (!result.success) {
-      // 生成失败，不扣减 Credits
-      return NextResponse.json(
-        {
-          error: result.error?.message || '编曲生成失败',
-          code: result.error?.code || 'GENERATION_FAILED',
-        },
-        { status: 500 }
-      );
-    }
-
-    // ─── Step 8: 上传音频到 Supabase Storage ─────────────────
-    let audioStoragePath: string | null = null;
-    let publicAudioUrl: string | null = result.audioUrl || null;
-
-    if (result.audioHex) {
-      // 如果返回的是 hex 编码的音频数据，上传到 Storage
-      const audioBuffer = Buffer.from(result.audioHex, 'hex');
-      const extension = audioSetting.format || 'mp3';
-      const taskId = result.taskId || crypto.randomUUID();
-      const storagePath = `${user.id}/arrangements/${taskId}.${extension}`;
-
-      const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
-        .from('generations')
-        .upload(storagePath, audioBuffer, {
-          upsert: true,
-          contentType: extension === 'wav' ? 'audio/wav' : 'audio/mpeg',
-        });
-
-      if (uploadError) {
-        console.error('[minimax/generate] 音频上传失败:', uploadError);
-        // 上传失败仍然返回结果（audioUrl 可能可用）
-      } else {
-        audioStoragePath = uploadData.path;
-        const { data: urlData } = supabaseAdmin.storage
-          .from('generations')
-          .getPublicUrl(storagePath);
-        publicAudioUrl = urlData.publicUrl;
-      }
-    } else if (result.audioUrl) {
-      // 如果返回的是 URL，下载后上传到 Storage
-      try {
-        const audioResponse = await fetch(result.audioUrl);
-        if (audioResponse.ok) {
-          const audioArrayBuffer = await audioResponse.arrayBuffer();
-          const audioBuffer = Buffer.from(audioArrayBuffer);
-          const extension = audioSetting.format || 'mp3';
-          const taskId = result.taskId || crypto.randomUUID();
-          const storagePath = `${user.id}/arrangements/${taskId}.${extension}`;
-
-          const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
-            .from('generations')
-            .upload(storagePath, audioBuffer, {
-              upsert: true,
-              contentType: extension === 'wav' ? 'audio/wav' : 'audio/mpeg',
-            });
-
-          if (uploadError) {
-            console.error('[minimax/generate] 音频上传失败:', uploadError);
-          } else {
-            audioStoragePath = uploadData.path;
-            const { data: urlData } = supabaseAdmin.storage
-              .from('generations')
-              .getPublicUrl(storagePath);
-            publicAudioUrl = urlData.publicUrl;
-          }
-        }
-      } catch (downloadErr: any) {
-        console.error('[minimax/generate] 音频下载失败:', downloadErr?.message);
-        // 下载失败时使用原始 URL
-      }
-    }
-
-    // ─── Step 9: 创建 generation_batches + generation_tasks 记录 ───
-    const taskId = result.taskId || crypto.randomUUID();
+    // ─── Step 5: 立即创建 task 记录（status='pending'）并返回 taskId ───
+    const taskId = crypto.randomUUID();
     const batchId = crypto.randomUUID();
-    const creditsCost = CREDITS_COST.arrangement_generation;
 
-    // 先创建 batch 记录（创作列表查询的是这个表）
+    // 创建 batch 记录
     const { error: batchError } = await supabaseAdmin
       .from('generation_batches')
       .insert({
@@ -231,63 +286,64 @@ export async function POST(req: NextRequest) {
         user_id: user.id,
         generation_type: 'arrangement',
         prompt: prompt || null,
-        status: 'completed',
+        status: 'pending',
         version_count: 1,
-        selected_task_id: taskId,
       } as any);
 
     if (batchError) {
       console.error('[minimax/generate] 创建 batch 记录失败:', batchError);
+      return NextResponse.json(
+        { error: '创建任务失败，请重试' },
+        { status: 500 }
+      );
     }
 
-    // 再创建 task 记录
+    // 创建 task 记录
     const { error: insertError } = await supabaseAdmin
       .from('generation_tasks')
       .insert({
         id: taskId,
         user_id: user.id,
         generation_type: 'arrangement' as any,
-        status: 'completed',
+        status: 'pending',
         prompt: prompt || null,
         model_id: 'music-cover',
-        audio_path: audioStoragePath || publicAudioUrl || null,
         lyrics: isInstrumental ? null : (lyrics || null),
-        credits_consumed: creditsCost,
+        credits_consumed: 0,
         batch_id: batchId,
       } as any);
 
     if (insertError) {
       console.error('[minimax/generate] 创建任务记录失败:', insertError);
-      // 记录创建失败不影响返回结果，但记录日志
-    }
-
-    // ─── Step 10: 扣减 Credits ────────────────────────────────
-    try {
-      const consumeResult = await creditService.consumeCredits(user.id, operations);
-      if (!consumeResult.success) {
-        console.error('[minimax/generate] Credits 扣减失败:', consumeResult.error);
-      }
-    } catch (err: any) {
-      console.error('[minimax/generate] Credits 扣减异常:', err?.message || err);
-    }
-
-    // ─── Step 11: 返回成功结果 ────────────────────────────────
-    return NextResponse.json({
-      taskId,
-      audioUrl: publicAudioUrl,
-      lyrics: isInstrumental ? null : (lyrics || null),
-    });
-  } catch (error: any) {
-    console.error('[minimax/generate] 未预期错误:', error);
-
-    // 超时错误
-    if (error?.message?.includes('超时') || error?.name === 'AbortError') {
       return NextResponse.json(
-        { error: '生成超时，请稍后重试', code: 'TIMEOUT' },
-        { status: 504 }
+        { error: '创建任务失败，请重试' },
+        { status: 500 }
       );
     }
 
+    // ─── Step 6: 启动后台处理（fire-and-forget）─────────────────
+    // 不 await，让函数在返回响应后继续执行
+    // Vercel Serverless Functions 在响应发送后仍会继续执行直到超时
+    processGenerationInBackground(
+      taskId,
+      batchId,
+      user.id,
+      generationInput,
+      audioSetting,
+      lyrics,
+      isInstrumental,
+    ).catch((err) => {
+      console.error('[minimax/generate] 后台任务启动失败:', err);
+    });
+
+    // ─── Step 7: 立即返回 taskId ──────────────────────────────
+    return NextResponse.json({
+      taskId,
+      status: 'pending',
+      message: '任务已创建，正在生成中...',
+    });
+  } catch (error: any) {
+    console.error('[minimax/generate] 未预期错误:', error);
     return NextResponse.json(
       { error: '编曲生成服务异常，请稍后重试' },
       { status: 500 }
