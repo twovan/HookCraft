@@ -66,14 +66,20 @@ export async function GET(
       status: batch.status,
     };
 
-    // Generate signed URLs for audio files
+    // Generate playable URLs for audio files
     const versions = await Promise.all((tasks ?? []).map(async (task) => {
       let audioUrl: string | undefined;
       if (task.audio_path) {
-        const { data: signedData } = await supabaseAdmin.storage
-          .from('generations')
-          .createSignedUrl(task.audio_path, 3600);
-        audioUrl = signedData?.signedUrl;
+        if (task.audio_path.startsWith('http')) {
+          // 已经是完整 URL（公开 URL 或 MiniMax 临时 URL）
+          audioUrl = task.audio_path;
+        } else {
+          // Supabase 内部路径，生成签名 URL
+          const { data: signedData } = await supabaseAdmin.storage
+            .from('generations')
+            .createSignedUrl(task.audio_path, 3600);
+          audioUrl = signedData?.signedUrl;
+        }
       }
       return {
         taskId: task.id,
@@ -181,7 +187,7 @@ export async function DELETE(
     if (tasks && tasks.length > 0) {
       const audioPaths = tasks
         .map((t) => t.audio_path)
-        .filter((p): p is string => !!p);
+        .filter((p): p is string => !!p && !p.startsWith('http'));
 
       if (audioPaths.length > 0) {
         await supabaseAdmin.storage.from('generations').remove(audioPaths);

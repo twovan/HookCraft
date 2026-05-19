@@ -194,8 +194,12 @@ export default function AudioUploadTab() {
     }
   }, [audioFile, preprocessStatus]);
 
-  // --- Polling ref to allow cleanup ---
+  // --- Polling for task status with timeout protection ---
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollingStartRef = useRef<number>(0);
+
+  // Max polling duration: 5 minutes
+  const MAX_POLLING_MS = 5 * 60 * 1000;
 
   // Cleanup polling on unmount
   useEffect(() => {
@@ -207,18 +211,27 @@ export default function AudioUploadTab() {
     };
   }, []);
 
-  // --- Poll task status until completed or failed ---
   const pollTaskStatus = useCallback((taskId: string) => {
-    // Clear any existing polling
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
     }
+    pollingStartRef.current = Date.now();
 
     const poll = async () => {
+      // 超时保护：超过 5 分钟停止轮询
+      if (Date.now() - pollingStartRef.current > MAX_POLLING_MS) {
+        if (pollingRef.current) {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+        }
+        setGenerationError('生成超时，请重试');
+        setGenerationStatus('error');
+        return;
+      }
+
       try {
         const res = await fetch(`/api/minimax/generate/status?taskId=${taskId}`);
         if (!res.ok) {
-          // Non-critical error, keep polling
           console.warn('[pollTaskStatus] 查询失败, 继续轮询...');
           return;
         }
@@ -226,7 +239,6 @@ export default function AudioUploadTab() {
         const data = await res.json();
 
         if (data.status === 'completed') {
-          // 生成完成
           if (pollingRef.current) {
             clearInterval(pollingRef.current);
             pollingRef.current = null;
@@ -239,7 +251,6 @@ export default function AudioUploadTab() {
           setGenerationStatus('completed');
           useCreditStore.getState().fetchCredits();
         } else if (data.status === 'failed') {
-          // 生成失败
           if (pollingRef.current) {
             clearInterval(pollingRef.current);
             pollingRef.current = null;
@@ -249,17 +260,15 @@ export default function AudioUploadTab() {
         }
         // 'pending' or 'generating' → keep polling
       } catch (err) {
-        // Network error during polling, keep trying
         console.warn('[pollTaskStatus] 网络错误, 继续轮询...');
       }
     };
 
-    // Poll immediately once, then every 5 seconds
     poll();
     pollingRef.current = setInterval(poll, 5000);
   }, []);
 
-  // --- Generate handler (async mode with polling) ---
+  // --- Generate handler (sync mode) ---
   const handleGenerate = useCallback(async () => {
     if (generationStatus === 'generating') return;
 
@@ -328,9 +337,9 @@ export default function AudioUploadTab() {
         body: JSON.stringify(requestBody),
       });
 
-      const data = await res.json();
-
       if (!res.ok) {
+        // 非流式错误响应（参数校验等）
+        const data = await res.json().catch(() => ({ error: '生成失败，请重试' }));
         const errorCode = data.code || '';
         const errorMessage = data.error || '生成失败，请重试';
 
@@ -343,17 +352,88 @@ export default function AudioUploadTab() {
         throw new Error(errorMessage);
       }
 
-      // 后端立即返回 taskId，开始轮询状态
-      const { taskId } = data;
-      if (taskId) {
-        pollTaskStatus(taskId);
-      } else {
-        // 兼容：如果后端直接返回了 audioUrl（不应该发生，但防御性处理）
-        if (data.audioUrl) {
-          setGenerationResult(data);
-          setGenerationStatus('completed');
-          useCreditStore.getState().fetchCredits();
+      // 流式响应：读取 SSE 事件
+      const reader = res.body?.getReader();
+      if (!reader) {
+        throw new Error('无法读取响应流');
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let completed = false;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const jsonStr = line.slice(6).trim();
+          if (!jsonStr) continue;
+
+          try {
+            const event = JSON.parse(jsonStr);
+            console.log('[generate] SSE event:', event.type, event);
+
+            if (event.type === 'completed' && event.audioUrl) {
+              setGenerationResult({
+                success: true,
+                audioUrl: event.audioUrl,
+                taskId: event.taskId,
+              });
+              setGenerationStatus('completed');
+              useCreditStore.getState().fetchCredits();
+              completed = true;
+              return;
+            } else if (event.type === 'error') {
+              throw new Error(event.error || '生成失败，请重试');
+            }
+            // heartbeat 和 started 事件忽略，继续读取
+          } catch (parseErr) {
+            if (parseErr instanceof Error && parseErr.message.includes('生成')) {
+              throw parseErr;
+            }
+            // JSON 解析失败的行忽略
+          }
         }
+      }
+
+      // 流结束后处理 buffer 中剩余数据
+      if (!completed && buffer.trim()) {
+        const remainingLine = buffer.trim();
+        if (remainingLine.startsWith('data: ')) {
+          const jsonStr = remainingLine.slice(6).trim();
+          if (jsonStr) {
+            try {
+              const event = JSON.parse(jsonStr);
+              if (event.type === 'completed' && event.audioUrl) {
+                setGenerationResult({
+                  success: true,
+                  audioUrl: event.audioUrl,
+                  taskId: event.taskId,
+                });
+                setGenerationStatus('completed');
+                useCreditStore.getState().fetchCredits();
+                completed = true;
+              } else if (event.type === 'error') {
+                throw new Error(event.error || '生成失败，请重试');
+              }
+            } catch (parseErr) {
+              if (parseErr instanceof Error && parseErr.message.includes('生成')) {
+                throw parseErr;
+              }
+            }
+          }
+        }
+      }
+
+      // 流结束但没收到 completed 事件
+      if (!completed) {
+        throw new Error('生成超时，请重试');
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : '生成失败，请重试';
@@ -364,15 +444,10 @@ export default function AudioUploadTab() {
       }
       setGenerationStatus('error');
     }
-  }, [coverMode, coverFeatureId, audioFile, generationStatus, params, isOnline, pollTaskStatus]);
+  }, [coverMode, coverFeatureId, audioFile, generationStatus, params, isOnline]);
 
   // --- Regenerate handler (Task 8.2: Requirement 11.3) ---
   const handleRegenerate = useCallback(() => {
-    // Stop any active polling
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current);
-      pollingRef.current = null;
-    }
     setGenerationStatus('idle');
     setGenerationResult(null);
     setGenerationError(null);

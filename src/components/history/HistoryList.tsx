@@ -224,18 +224,6 @@ export default function HistoryList({
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                {batch.selectedVersionId && (
-                  <span style={{
-                    padding: '4px 10px',
-                    background: 'rgba(34, 197, 94, 0.1)',
-                    color: '#22c55e',
-                    fontSize: 11,
-                    fontWeight: 600,
-                    borderRadius: 8,
-                  }}>
-                    已选中
-                  </span>
-                )}
                 {onDelete && (
                   <button
                     onClick={(e) => {
@@ -359,19 +347,6 @@ export default function HistoryList({
                                   <span style={{ fontSize: 13, fontWeight: 600, color: '#e8e8f0' }}>{version.title}</span>
                                 ) : (
                                   <>版本 {version.versionNumber}</>
-                                )}
-                                {isSelected && (
-                                  <span style={{
-                                    marginLeft: 8,
-                                    padding: '2px 6px',
-                                    background: 'rgba(34, 197, 94, 0.1)',
-                                    color: '#22c55e',
-                                    fontSize: 10,
-                                    fontWeight: 600,
-                                    borderRadius: 4,
-                                  }}>
-                                    已选中
-                                  </span>
                                 )}
                               </span>
                               <span style={{ fontSize: 11, color: '#6b7280' }}>

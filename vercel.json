@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "src/app/api/minimax/generate/route.ts": {
+      "maxDuration": 300
+    }
+  }
+}
