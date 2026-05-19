@@ -50,8 +50,8 @@ interface MiniMaxProviderConfig {
 /** 预处理超时时间（毫秒） */
 const PREPROCESS_TIMEOUT_MS = 60_000;
 
-/** 生成超时时间（毫秒） */
-const GENERATION_TIMEOUT_MS = 300_000;
+/** 生成超时时间（毫秒）- 需在 Vercel function 超时前完成 */
+const GENERATION_TIMEOUT_MS = 55_000;
 
 /** MiniMax music-cover 模型提供方实现 */
 export class MiniMaxProvider {

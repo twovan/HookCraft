@@ -8,8 +8,8 @@ import { CREDITS_COST } from '../../../../config/creditsCost';
 import type { ArrangementGenerationInput, AudioSetting } from '../../../../types/arrangement';
 import type { CreditOperationType } from '../../../../types/credits';
 
-// Vercel serverless 超时设置（300 秒）
-export const maxDuration = 300;
+// Vercel serverless 超时设置（Pro Trial 限制 60 秒）
+export const maxDuration = 60;
 
 // ─── 用户级速率限制（内存实现） ─────────────────────────────
 const rateLimitMap = new Map<string, number[]>();
