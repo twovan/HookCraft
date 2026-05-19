@@ -225,8 +225,8 @@ export default function AudioUploadTab() {
       let requestBody: Record<string, unknown>;
 
       if (coverMode === 'one-step') {
-        // 一步模式：自动先 preprocess 再 generate（用户无需手动分析）
-        // Step 1: 上传音频获取 URL
+        // 一步模式：上传音频获取 URL，直接传 audio_url 给 generation API
+        // audio_url 和 cover_feature_id 互斥
         const formData = new FormData();
         formData.append('file', audioFile!);
         const uploadRes = await fetch('/api/minimax/upload', { method: 'POST', body: formData });
@@ -236,22 +236,9 @@ export default function AudioUploadTab() {
         }
         const { audioUrl } = await uploadRes.json();
 
-        // Step 2: 自动 preprocess 获取 coverFeatureId
-        const preprocessRes = await fetch('/api/minimax/preprocess', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ audioUrl }),
-        });
-        if (!preprocessRes.ok) {
-          const err = await preprocessRes.json().catch(() => ({ error: '音频分析失败' }));
-          throw new Error(err.error || '音频分析失败');
-        }
-        const preprocessData = await preprocessRes.json();
-
-        // Step 3: 用 coverFeatureId 生成
         requestBody = {
-          coverFeatureId: preprocessData.coverFeatureId,
-          lyrics: params.lyrics.trim() || undefined, // 一步模式歌词可选
+          audioUrl, // 一步模式：传 audio_url（与 cover_feature_id 互斥）
+          lyrics: params.lyrics.trim() || undefined, // 可选，不填则自动从参考音频提取
           prompt: params.prompt.trim(),
           isInstrumental: params.isInstrumental,
           audioSetting: { sampleRate: 44100, bitrate: 256000, format: params.outputFormat },

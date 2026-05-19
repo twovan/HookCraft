@@ -131,13 +131,14 @@ export async function POST(req: NextRequest) {
 
     const generationInput: ArrangementGenerationInput = {
       model: 'music-cover',
-      coverFeatureId: coverFeatureId || '',
-      // music-cover 必须用 cover_feature_id，不支持直接传 audio_url
+      coverFeatureId: coverFeatureId || undefined,
+      audioUrl: audioUrl || undefined,
+      // 一步模式（audioUrl）歌词可选；两步模式（coverFeatureId）歌词必填 [10, 1000]
       lyrics: coverFeatureId
         ? (lyrics && lyrics.trim().length >= 10 ? lyrics.trim().slice(0, 1000) : '[Verse]\nla la la la la la\nla la la la la')
-        : (lyrics || ''),
+        : (lyrics?.trim() || ''),
       prompt: prompt || undefined,
-      isInstrumental: false,
+      isInstrumental: isInstrumental || false,
       audioSetting,
     };
 
