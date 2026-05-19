@@ -132,14 +132,12 @@ export async function POST(req: NextRequest) {
     const generationInput: ArrangementGenerationInput = {
       model: 'music-cover',
       coverFeatureId: coverFeatureId || '',
-      // 一步模式传 audioUrl，两步模式传 coverFeatureId
-      audioUrl: audioUrl || undefined,
-      // music-cover 使用 cover_feature_id 时 lyrics 必填 [10, 1000]
+      // music-cover 必须用 cover_feature_id，不支持直接传 audio_url
       lyrics: coverFeatureId
         ? (lyrics && lyrics.trim().length >= 10 ? lyrics.trim().slice(0, 1000) : '[Verse]\nla la la la la la\nla la la la la')
-        : (lyrics || ''),  // 一步模式歌词可选
+        : (lyrics || ''),
       prompt: prompt || undefined,
-      isInstrumental: false, // music-cover 不支持 is_instrumental
+      isInstrumental: false,
       audioSetting,
     };
 

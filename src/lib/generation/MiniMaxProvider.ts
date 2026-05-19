@@ -130,13 +130,9 @@ export class MiniMaxProvider {
       output_format: 'url',
     };
 
-    // 两步模式：传 cover_feature_id
+    // music-cover 必须用 cover_feature_id
     if (input.coverFeatureId) {
       body.cover_feature_id = input.coverFeatureId;
-    }
-    // 一步模式：传 audio_url
-    if (input.audioUrl) {
-      body.audio_url = input.audioUrl;
     }
 
     if (input.prompt) {
