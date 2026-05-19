@@ -204,9 +204,14 @@ export default function AudioUploadTab() {
     if (coverMode === 'two-step' && !coverFeatureId) return;
     if (coverMode === 'one-step' && !audioFile) return;
 
-    // 风格描述必填（一步模式 10-300 字符，两步模式 10-2000 字符）
-    if (!params.prompt || params.prompt.trim().length < 2) {
-      setGenerationError('风格描述必填');
+    // 风格描述必填，music-cover 要求 10-300 字符
+    const promptLength = params.prompt.trim().length;
+    if (!params.prompt || promptLength < 10) {
+      setGenerationError('风格描述必填，至少 10 个字符');
+      return;
+    }
+    if (coverMode === 'one-step' && promptLength > 300) {
+      setGenerationError('一步模式风格描述不能超过 300 个字符');
       return;
     }
 

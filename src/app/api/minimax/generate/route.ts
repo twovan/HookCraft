@@ -231,10 +231,9 @@ export async function POST(req: NextRequest) {
         status: 'completed',
         prompt: prompt || null,
         model_id: 'music-cover',
-        audio_path: audioStoragePath || null,
+        audio_path: audioStoragePath || publicAudioUrl || null,
         lyrics: isInstrumental ? null : (lyrics || null),
         credits_consumed: creditsCost,
-        cover_feature_id: coverFeatureId,
       } as any);
 
     if (insertError) {
