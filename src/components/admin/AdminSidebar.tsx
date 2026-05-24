@@ -53,6 +53,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'AI 任务', icon: '🤖', href: '/admin/ai-tasks' },
       { label: '生成歌曲', icon: '♪', href: '/admin/generated-songs' },
       { label: 'Credits', icon: '⚡', href: '/admin/credits' },
+      { label: 'AI 操作定价', icon: '¥', href: '/admin/credits/cost-rules' },
     ],
   },
   {
@@ -123,6 +124,7 @@ export default function AdminSidebar() {
 
   const isActive = (href: string) => {
     if (href === '/admin') return pathname === '/admin';
+    if (href === '/admin/credits') return pathname === '/admin/credits';
     return pathname.startsWith(href);
   };
 

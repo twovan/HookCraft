@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import StatCard from '@/components/admin/StatCard';
 import DataTable, { Column } from '@/components/admin/DataTable';
 import Tag from '@/components/admin/Tag';
@@ -65,6 +66,24 @@ export default function AdminCreditsPage() {
     business: 'Business',
   };
 
+  const managementLinks = [
+    {
+      title: 'AI 操作定价',
+      description: '设置创作、编辑、分轨、预处理等 AI 操作扣除多少 Credits',
+      href: '/admin/credits/cost-rules',
+    },
+    {
+      title: '积分包配置',
+      description: '配置用户购买积分包的价格、积分数量和上下架状态',
+      href: '/admin/credits/credits-pack',
+    },
+    {
+      title: '套餐定价',
+      description: '配置会员套餐价格、月度积分和权益展示',
+      href: '/admin/credits/pricing',
+    },
+  ];
+
   const exhaustedColumns: Column<ExhaustedUser>[] = [
     {
       key: 'userName',
@@ -117,6 +136,16 @@ export default function AdminCreditsPage() {
 
   return (
     <div>
+      <div style={managementGridStyle}>
+        {managementLinks.map((item) => (
+          <Link key={item.href} href={item.href} style={managementCardStyle}>
+            <div style={managementTitleStyle}>{item.title}</div>
+            <div style={managementDescriptionStyle}>{item.description}</div>
+            <div style={managementActionStyle}>进入配置 →</div>
+          </Link>
+        ))}
+      </div>
+
       {/* Stats */}
       <div style={statsGridStyle}>
         <StatCard label="月度总配额" value={stats.totalIssued} icon="📊" iconColor="blue" />
@@ -183,6 +212,44 @@ export default function AdminCreditsPage() {
     </div>
   );
 }
+
+const managementGridStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+  gap: 16,
+  marginBottom: 16,
+};
+
+const managementCardStyle: React.CSSProperties = {
+  display: 'block',
+  background: '#fff',
+  borderRadius: 8,
+  padding: '18px 20px',
+  boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+  border: '1px solid rgba(0,0,0,0.06)',
+  textDecoration: 'none',
+};
+
+const managementTitleStyle: React.CSSProperties = {
+  fontSize: 15,
+  fontWeight: 700,
+  color: '#1f2937',
+  marginBottom: 8,
+};
+
+const managementDescriptionStyle: React.CSSProperties = {
+  fontSize: 12,
+  lineHeight: 1.6,
+  color: '#6b7280',
+  minHeight: 38,
+};
+
+const managementActionStyle: React.CSSProperties = {
+  marginTop: 12,
+  fontSize: 12,
+  fontWeight: 600,
+  color: '#D4A574',
+};
 
 const statsGridStyle: React.CSSProperties = {
   display: 'grid',
