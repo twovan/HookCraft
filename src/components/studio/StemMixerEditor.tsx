@@ -11,6 +11,7 @@ import { resolveStemEditorShortcut } from '@/lib/stems/stemEditorShortcuts';
 import { resolveVisibleStemSelection } from '@/lib/stems/stemSelection';
 import { buildWaveformPeaksFromSamples } from '@/lib/stems/waveformPeaks';
 import { selectStemTypesForAudioLoad } from '@/lib/stems/stemAudioLoadPlan';
+import { resolveWaveformPointerIntent } from '@/lib/stems/waveformPointerIntent';
 import {
   resolveStemTrackAudioStatus,
   type StemTrackAudioStatus,
@@ -1997,7 +1998,9 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
                 trimEnd={trimEnd}
                 muted={!isAudible}
                 selected={isSelectedTrack}
+                editable={isSelectedTrack}
                 bufferVersion={bufferVersion}
+                onSelect={() => setSelectedTrackType(stem.type)}
                 onSeek={handleSeek}
                 onTrimChange={(edge, time) => setTrackTrim(stem.type, edge, time)}
               />
@@ -2784,7 +2787,9 @@ function WaveformTrackCanvas({
   trimEnd,
   muted,
   selected,
+  editable,
   bufferVersion,
+  onSelect,
   onSeek,
   onTrimChange,
 }: {
@@ -2797,7 +2802,9 @@ function WaveformTrackCanvas({
   trimEnd: number;
   muted: boolean;
   selected: boolean;
+  editable: boolean;
   bufferVersion: number;
+  onSelect: () => void;
   onSeek: (time: number) => void;
   onTrimChange: (edge: 'start' | 'end', time: number) => void;
 }) {
@@ -2907,7 +2914,9 @@ function WaveformTrackCanvas({
       context.fillStyle = selected ? 'rgba(156, 108, 255, 0.11)' : 'rgba(255,255,255,0.04)';
       context.fillRect(startX, 0, Math.max(0, endX - startX), height);
 
-      context.strokeStyle = selected ? '#d8c9ff' : '#a855f7';
+      const handleColor = selected ? '#d8c9ff' : 'rgba(148, 163, 184, 0.42)';
+      const handleWidth = selected ? 10 * ratio : 4 * ratio;
+      context.strokeStyle = handleColor;
       context.lineWidth = Math.max(2, 2 * ratio);
       context.beginPath();
       context.moveTo(startX, 0);
@@ -2916,18 +2925,20 @@ function WaveformTrackCanvas({
       context.lineTo(endX, height);
       context.stroke();
 
-      context.fillStyle = selected ? '#d8c9ff' : '#a855f7';
-      context.fillRect(startX - 5 * ratio, 0, 10 * ratio, height);
-      context.fillRect(endX - 5 * ratio, 0, 10 * ratio, height);
-      context.fillStyle = 'rgba(255,255,255,0.95)';
-      context.fillRect(startX - 1 * ratio, 6 * ratio, 2 * ratio, height - 12 * ratio);
-      context.fillRect(endX - 1 * ratio, 6 * ratio, 2 * ratio, height - 12 * ratio);
+      context.fillStyle = handleColor;
+      context.fillRect(startX - handleWidth / 2, 0, handleWidth, height);
+      context.fillRect(endX - handleWidth / 2, 0, handleWidth, height);
+      if (selected) {
+        context.fillStyle = 'rgba(255,255,255,0.95)';
+        context.fillRect(startX - 1 * ratio, 6 * ratio, 2 * ratio, height - 12 * ratio);
+        context.fillRect(endX - 1 * ratio, 6 * ratio, 2 * ratio, height - 12 * ratio);
 
-      context.fillStyle = 'rgba(255,255,255,0.78)';
-      context.font = `${Math.max(9, 10 * ratio)}px sans-serif`;
-      context.textAlign = 'center';
-      context.fillText('入', Math.max(10 * ratio, Math.min(width - 10 * ratio, startX)), 12 * ratio);
-      context.fillText('出', Math.max(10 * ratio, Math.min(width - 10 * ratio, endX)), height - 6 * ratio);
+        context.fillStyle = 'rgba(255,255,255,0.78)';
+        context.font = `${Math.max(9, 10 * ratio)}px sans-serif`;
+        context.textAlign = 'center';
+        context.fillText('入', Math.max(10 * ratio, Math.min(width - 10 * ratio, startX)), 12 * ratio);
+        context.fillText('出', Math.max(10 * ratio, Math.min(width - 10 * ratio, endX)), height - 6 * ratio);
+      }
 
       const playheadX = (Math.min(duration, Math.max(0, currentTime)) / duration) * width;
       context.strokeStyle = 'rgba(255,255,255,0.58)';
@@ -2947,28 +2958,31 @@ function WaveformTrackCanvas({
   const handlePointerDown = useCallback((event: PointerEvent<HTMLCanvasElement>) => {
     if (duration <= 0) return;
     const rect = event.currentTarget.getBoundingClientRect();
-    const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
-    const time = ratio * duration;
-    const startX = (Math.max(0, trimStart) / duration) * rect.width;
-    const endX = (Math.min(duration, trimEnd) / duration) * rect.width;
     const pointerX = event.clientX - rect.left;
-    const hitSize = 14;
-    const startDistance = Math.abs(pointerX - startX);
-    const endDistance = Math.abs(pointerX - endX);
+    const intent = resolveWaveformPointerIntent({
+      editable,
+      pointerX,
+      width: rect.width,
+      duration,
+      trimStart,
+      trimEnd,
+    });
 
-    if (startDistance <= hitSize || endDistance <= hitSize) {
+    onSelect();
+
+    if (intent.kind === 'trim') {
       trimDragRef.current = {
-        edge: startDistance <= endDistance ? 'start' : 'end',
+        edge: intent.edge,
         moved: false,
       };
       pendingSeekRef.current = null;
       event.preventDefault();
     } else {
-      pendingSeekRef.current = { x: event.clientX, time, moved: false };
+      pendingSeekRef.current = { x: event.clientX, time: intent.time, moved: false };
       trimDragRef.current = null;
     }
     event.currentTarget.setPointerCapture(event.pointerId);
-  }, [duration, trimEnd, trimStart]);
+  }, [duration, editable, onSelect, trimEnd, trimStart]);
 
   const handlePointerMove = useCallback((event: PointerEvent<HTMLCanvasElement>) => {
     if (trimDragRef.current) {
@@ -3017,19 +3031,19 @@ function WaveformTrackCanvas({
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
-      style={waveformCanvasStyle(selected, muted)}
+      style={waveformCanvasStyle(selected, muted, editable)}
     />
   );
 }
 
-function waveformCanvasStyle(selected: boolean, muted: boolean): CSSProperties {
+function waveformCanvasStyle(selected: boolean, muted: boolean, editable: boolean): CSSProperties {
   return {
     width: '100%',
     height: 58,
     borderRadius: 8,
     border: selected ? '1px solid rgba(156, 108, 255, 0.78)' : '1px solid rgba(48, 52, 76, 0.86)',
     background: '#0b0e1c',
-    cursor: 'pointer',
+    cursor: editable ? 'ew-resize' : 'pointer',
     opacity: muted ? 0.72 : 1,
     touchAction: 'none',
     userSelect: 'none',
