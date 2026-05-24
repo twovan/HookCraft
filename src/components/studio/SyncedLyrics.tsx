@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useMemo } from 'react';
+import { useRef, useEffect, useMemo, useState } from 'react';
 
 interface SyncedLyricsProps {
   lyrics: string;
@@ -12,6 +12,12 @@ interface LyricLine {
   text: string;
   startTime: number;
   isSectionMarker: boolean;
+}
+
+function hasTimedLyrics(raw: string) {
+  return raw
+    .split('\n')
+    .some((line) => /^\[(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)?\]\s*\S+/.test(line.trim()));
 }
 
 /**
@@ -34,8 +40,8 @@ function parseLyrics(raw: string): LyricLine[] {
     const trimmed = line.trim();
     if (!trimmed) continue;
 
-    // Section marker: [[A0]], [[B1]], etc.
-    if (/^\[\[[A-Z]\d+\]\]$/.test(trimmed)) {
+    // Section markers: [[A0]], [[B1]], [Verse], [Chorus], etc.
+    if (/^\[\[[A-Z]\d+\]\]$/.test(trimmed) || /^\[[A-Za-z][^\]]*\]$/.test(trimmed)) {
       rawLines.push({ text: trimmed.replace(/[\[\]]/g, ''), knownTime: null, isSectionMarker: true });
       continue;
     }
@@ -161,15 +167,27 @@ function getCurrentLineIndex(lines: LyricLine[], currentTime: number): number {
 
 export default function SyncedLyrics({ lyrics, currentTime, isPlaying }: SyncedLyricsProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [copied, setCopied] = useState(false);
+  const hasTiming = useMemo(() => hasTimedLyrics(lyrics), [lyrics]);
   const parsedLines = useMemo(() => parseLyrics(lyrics), [lyrics]);
   const currentLineIndex = useMemo(
-    () => getCurrentLineIndex(parsedLines, currentTime),
-    [parsedLines, currentTime]
+    () => hasTiming ? getCurrentLineIndex(parsedLines, currentTime) : -1,
+    [hasTiming, parsedLines, currentTime]
   );
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(lyrics);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2400);
+    } catch {
+      setCopied(false);
+    }
+  };
 
   // Auto-scroll within container only (don't affect page scroll)
   useEffect(() => {
-    if (currentLineIndex < 0 || !containerRef.current) return;
+    if (!hasTiming || currentLineIndex < 0 || !containerRef.current) return;
     const container = containerRef.current;
     const lineEl = container.children[currentLineIndex] as HTMLElement | undefined;
     if (lineEl) {
@@ -184,11 +202,50 @@ export default function SyncedLyrics({ lyrics, currentTime, isPlaying }: SyncedL
         container.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' });
       }
     }
-  }, [currentLineIndex]);
+  }, [hasTiming, currentLineIndex]);
 
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 600, color: '#c0a7fc', marginBottom: 8 }}>歌词</div>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 10,
+        marginBottom: 8,
+      }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: '#c0a7fc' }}>歌词</div>
+        <button
+          type="button"
+          onClick={handleCopy}
+          style={{
+            border: '1px solid rgba(117, 54, 213, 0.45)',
+            background: copied ? 'rgba(34, 197, 94, 0.12)' : 'rgba(117, 54, 213, 0.14)',
+            color: copied ? '#86efac' : '#c0a7fc',
+            borderRadius: 999,
+            padding: '4px 10px',
+            fontSize: 11,
+            fontWeight: 700,
+            cursor: 'pointer',
+            fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+          }}
+        >
+          {copied ? '已复制' : '复制歌词'}
+        </button>
+      </div>
+      {copied && (
+        <div style={{
+          marginBottom: 8,
+          borderRadius: 8,
+          background: 'rgba(34, 197, 94, 0.1)',
+          border: '1px solid rgba(34, 197, 94, 0.22)',
+          color: '#86efac',
+          fontSize: 11,
+          padding: '6px 8px',
+          lineHeight: 1.5,
+        }}>
+          歌词已复制到剪贴板
+        </div>
+      )}
       <div
         ref={containerRef}
         style={{
@@ -203,11 +260,18 @@ export default function SyncedLyrics({ lyrics, currentTime, isPlaying }: SyncedL
         {parsedLines.map((line, idx) => {
           if (line.isSectionMarker) {
             return (
-              <div key={idx} style={{ height: 1, background: '#2a2a40', margin: '8px 0' }} />
+              <div key={idx} style={{
+                color: '#c0a7fc',
+                fontSize: 12,
+                fontWeight: 700,
+                margin: '10px 0 6px',
+              }}>
+                {line.text}
+              </div>
             );
           }
 
-          const isCurrent = idx === currentLineIndex;
+          const isCurrent = hasTiming && idx === currentLineIndex;
 
           return (
             <div
@@ -215,11 +279,15 @@ export default function SyncedLyrics({ lyrics, currentTime, isPlaying }: SyncedL
               style={{
                 fontSize: isCurrent ? 14 : 13,
                 fontWeight: isCurrent ? 600 : 400,
-                color: isCurrent ? '#7536d5' : '#9ca3af',
+                color: isCurrent ? '#c0a7fc' : '#9ca3af',
                 lineHeight: 1.8,
                 transition: 'all 0.2s ease',
                 fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-                padding: '2px 0',
+                padding: '3px 8px',
+                margin: '3px 0',
+                borderRadius: 8,
+                background: isCurrent ? 'rgba(117, 54, 213, 0.18)' : 'transparent',
+                borderLeft: isCurrent ? '2px solid #7536d5' : '2px solid transparent',
               }}
             >
               {line.text}

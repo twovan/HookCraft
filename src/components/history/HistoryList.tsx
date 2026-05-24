@@ -1,19 +1,31 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import AudioPlayerInline from '@/components/studio/AudioPlayerInline';
+import { useRef, useState } from 'react';
+import Link from 'next/link';
+import type { CSSProperties } from 'react';
 import SyncedLyrics from '@/components/studio/SyncedLyrics';
 
 interface BatchSummary {
   batchId: string;
+  taskId?: string;
+  versionNumber?: number;
   createdAt: string;
-  title?: string;
+  title?: string | null;
   templateName?: string;
   promptSummary?: string;
   generationType: 'preview' | 'full_demo';
   versionCount: number;
   selectedVersionId?: string;
   status: string;
+  errorMessage?: string | null;
+  refundedCredits?: number;
+  durationSeconds?: number | null;
+  lyrics?: string | null;
+  authorName?: string | null;
+  styleTags?: string[];
+  canEditSong?: boolean;
+  hasStemCache?: boolean;
+  stemJobId?: string | null;
 }
 
 interface VersionDetail {
@@ -24,18 +36,23 @@ interface VersionDetail {
   lyrics?: string;
   durationSeconds?: number;
   creditsConsumed: number;
+  errorMessage?: string;
   createdAt: string;
   title?: string | null;
   authorName?: string | null;
   styleTags?: string[];
+  canEditSong?: boolean;
+  hasStemCache?: boolean;
+  stemJobId?: string | null;
 }
 
 interface HistoryListProps {
   batches: BatchSummary[];
-  onExpand: (batchId: string) => void;
-  onReCreate: (batchId: string) => void;
+  onExpand: (taskId: string, batchId?: string) => void;
+  onReCreate: (taskId: string) => void;
   onDelete?: (batchId: string) => void;
   expandedBatchId?: string;
+  expandedTaskId?: string;
   expandedVersions?: VersionDetail[];
   expandedBatchDetail?: { templateName?: string; prompt?: string };
 }
@@ -46,39 +63,42 @@ export default function HistoryList({
   onReCreate,
   onDelete,
   expandedBatchId,
+  expandedTaskId,
   expandedVersions,
   expandedBatchDetail,
 }: HistoryListProps) {
   const [playingTaskId, setPlayingTaskId] = useState<string | null>(null);
-  const audioRefs = useRef<Record<string, HTMLAudioElement>>({});
-
-  // Pause all other audio when one starts playing
-  const handleAudioPlay = (taskId: string) => {
-    // Pause all other audio elements
-    Object.entries(audioRefs.current).forEach(([id, el]) => {
-      if (id !== taskId && el && !el.paused) {
-        el.pause();
-      }
-    });
-    setPlayingTaskId(taskId);
-  };
   const [downloadingTaskId, setDownloadingTaskId] = useState<string | null>(null);
   const [editingBatchId, setEditingBatchId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [batchNames, setBatchNames] = useState<Record<string, string>>({});
   const [audioTimes, setAudioTimes] = useState<Record<string, number>>({});
+  const audioRefs = useRef<Record<string, HTMLAudioElement>>({});
 
-  const saveName = async (batchId: string, name: string) => {
-    if (!name.trim()) return;
-    setBatchNames((prev) => ({ ...prev, [batchId]: name.trim() }));
+  const expandedBatch = batches.find((batch) => (batch.taskId || batch.batchId) === expandedTaskId);
+  const showDetail = Boolean(expandedBatchId && expandedBatch && expandedVersions);
+
+  const handleAudioPlay = (taskId: string) => {
+    Object.entries(audioRefs.current).forEach(([id, el]) => {
+      if (id !== taskId && el && !el.paused) el.pause();
+    });
+    setPlayingTaskId(taskId);
+  };
+
+  const saveName = async (taskId: string, name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setBatchNames((prev) => ({ ...prev, [taskId]: trimmed }));
     setEditingBatchId(null);
     try {
-      await fetch(`/api/batches/${batchId}`, {
-        method: 'PATCH',
+      await fetch(`/api/versions/${taskId}/title`, {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: name.trim() }),
+        body: JSON.stringify({ title: trimmed }),
       });
-    } catch { /* silently fail */ }
+    } catch {
+      // Keep the optimistic title; rename is non-critical for playback.
+    }
   };
 
   const handleDownload = async (taskId: string) => {
@@ -100,8 +120,6 @@ export default function HistoryList({
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
       }
-    } catch {
-      // Handle error
     } finally {
       setDownloadingTaskId(null);
     }
@@ -109,7 +127,7 @@ export default function HistoryList({
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
-    return d.toLocaleDateString('zh-CN', {
+    return d.toLocaleString('zh-CN', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -121,345 +139,513 @@ export default function HistoryList({
   const formatDuration = (seconds?: number) => {
     if (!seconds) return '--:--';
     const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
+    const s = Math.floor(seconds % 60);
     return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const getBatchTitle = (batch: BatchSummary) => {
+    const songId = batch.taskId || batch.batchId;
+    return batchNames[songId] || batch.title || batch.templateName || '未命名歌曲';
   };
 
   if (batches.length === 0) {
     return (
-      <div style={{
-        textAlign: 'center',
-        padding: '60px 20px',
-        color: '#6b7280',
-      }}>
-        <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.5 }}>🎵</div>
-        <p style={{ fontSize: 15 }}>暂无创作记录</p>
+      <div style={emptyStyle}>
+        <div style={{ fontSize: 38, marginBottom: 12, opacity: 0.55 }}>♪</div>
+        <p style={{ fontSize: 15, margin: 0 }}>暂无创作记录</p>
       </div>
     );
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {batches.map((batch) => {
-        const isExpanded = expandedBatchId === batch.batchId;
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: showDetail ? 'minmax(0, 1fr) minmax(360px, 420px)' : 'minmax(0, 1fr)',
+        gap: 18,
+        alignItems: 'start',
+      }}
+    >
+      <section style={listPanelStyle}>
+        <div style={listHeaderStyle}>
+          <div style={{ color: '#d7d7df', fontSize: 16, fontWeight: 600 }}>
+            我的创作({batches.length})
+          </div>
+          <div style={{ display: 'flex', gap: 18, color: '#a1a1aa', fontSize: 13 }}>
+            <span>状态 <strong style={{ color: '#e8e8f0' }}>全部</strong></span>
+            <span>模型 <strong style={{ color: '#e8e8f0' }}>全部</strong></span>
+          </div>
+        </div>
 
-        return (
-          <div
-            key={batch.batchId}
-            style={{
-              background: '#1a1a2e',
-              borderRadius: 16,
-              border: '1px solid #2a2a40',
-              boxShadow: '0 2px 12px rgba(0, 0, 0, 0.04)',
-              overflow: 'hidden',
-            }}
-          >
-            {/* Batch summary row */}
-            <div
-              onClick={() => onExpand(batch.batchId)}
-              style={{
-                padding: '16px 20px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                cursor: 'pointer',
-                transition: 'background 0.2s',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16, flex: 1 }}>
-                <div style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 10,
-                  background: 'linear-gradient(135deg, rgba(117, 54, 213, 0.15), #0d0d14)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: 18,
-                  flexShrink: 0,
-                }}>
-                  🎵
+        <div style={{ maxHeight: showDetail ? '76vh' : 'none', overflowY: showDetail ? 'auto' : 'visible' }}>
+          {batches.map((batch) => {
+            const songId = batch.taskId || batch.batchId;
+            const isActive = expandedTaskId === songId;
+            const isFailed = batch.status === 'failed';
+            const title = getBatchTitle(batch);
+
+            return (
+              <div
+                key={songId}
+                onClick={() => !isFailed && onExpand(songId, batch.batchId)}
+                style={{
+                  ...rowStyle,
+                  background: isActive ? 'rgba(212, 165, 116, 0.11)' : 'transparent',
+                  cursor: isFailed ? 'default' : 'pointer',
+                  opacity: isFailed ? 0.82 : 1,
+                }}
+              >
+                <div style={{ ...coverStyle, borderColor: isFailed ? '#ff163b' : 'rgba(255,255,255,0.08)' }}>
+                  <span style={{ fontSize: 22 }}>{isFailed ? '×' : '♪'}</span>
                 </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  {editingBatchId === batch.batchId ? (
+
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  {editingBatchId === songId && !isFailed ? (
                     <input
                       value={editName}
                       onChange={(e) => setEditName(e.target.value)}
-                      onBlur={() => saveName(batch.batchId, editName)}
+                      onBlur={() => saveName(songId, editName)}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter') saveName(batch.batchId, editName);
+                        if (e.key === 'Enter') saveName(songId, editName);
                         if (e.key === 'Escape') setEditingBatchId(null);
                       }}
                       onClick={(e) => e.stopPropagation()}
                       autoFocus
-                      style={{
-                        fontSize: 14, fontWeight: 600, color: '#e8e8f0',
-                        border: '1px solid #7536d5', borderRadius: 6, padding: '2px 8px',
-                        outline: 'none', width: '100%', maxWidth: 300,
-                        fontFamily: "'Inter', sans-serif",
-                      }}
+                      style={editInputStyle}
                     />
                   ) : (
-                    <div style={{
-                      fontSize: 14, fontWeight: 600, color: '#e8e8f0', marginBottom: 4,
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                      display: 'flex', alignItems: 'center', gap: 6,
-                    }}>
-                      <span>{batchNames[batch.batchId] || batch.title || batch.templateName || batch.promptSummary || '自定义创作'}</span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingBatchId(batch.batchId);
-                          setEditName(batchNames[batch.batchId] || batch.title || batch.templateName || batch.promptSummary || '');
-                        }}
-                        style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 12, color: '#6b7280', padding: 0 }}
-                        title="重命名"
-                      >✏️</button>
+                    <div style={titleRowStyle}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {title}
+                      </span>
+                      {isFailed && <span style={failedBadgeStyle}>生成异常，积分已退回</span>}
+                      {!isFailed && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingBatchId(songId);
+                            setEditName(title);
+                          }}
+                          style={iconButtonStyle}
+                          title="重命名"
+                        >
+                          ✎
+                        </button>
+                      )}
                     </div>
                   )}
-                  <div style={{ fontSize: 12, color: '#6b7280' }}>
-                    {formatDate(batch.createdAt)} · {batch.generationType === 'preview' ? 'Preview' : 'Full Demo'} · {batch.versionCount} 个版本
+
+                  <div style={metaStyle}>{formatDate(batch.createdAt)}</div>
+                  <div style={summaryStyle}>
+                    {batch.promptSummary || batch.templateName || '未填写描述'}
                   </div>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                {onDelete && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (window.confirm('确定要删除这个创作吗？删除后无法恢复。')) {
-                        onDelete(batch.batchId);
-                      }
-                    }}
-                    title="删除"
-                    style={{
-                      border: 'none',
-                      background: 'none',
-                      cursor: 'pointer',
-                      fontSize: 14,
-                      color: '#ccc',
-                      padding: '4px',
-                      borderRadius: 4,
-                      transition: 'color 0.2s',
-                      lineHeight: 1,
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
-                    onMouseLeave={(e) => (e.currentTarget.style.color = '#ccc')}
-                  >
-                    🗑️
-                  </button>
-                )}
-                <span style={{
-                  fontSize: 12,
-                  color: '#6b7280',
-                  transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                  transition: 'transform 0.2s',
-                  display: 'inline-block',
-                }}>
-                  ▼
-                </span>
-              </div>
-            </div>
-
-            {/* Expanded versions */}
-            {isExpanded && expandedVersions && (
-              <div style={{
-                borderTop: '1px solid #2a2a40',
-                padding: '16px 20px',
-                background: '#0d0d14',
-              }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 3fr', gap: 20 }}>
-                  {/* Left: Creation Info */}
-                  <div style={{
-                    background: '#1a1a2e',
-                    borderRadius: 12,
-                    padding: 16,
-                    border: '1px solid #2a2a40',
-                    alignSelf: 'start',
-                  }}>
-                    <h4 style={{
-                      fontSize: 14,
-                      fontWeight: 600,
-                      color: '#e8e8f0',
-                      margin: '0 0 12px 0',
-                      fontFamily: "'Inter', sans-serif",
-                    }}>
-                      创作信息
-                    </h4>
-                    {(expandedBatchDetail?.templateName || expandedBatchDetail?.prompt) ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                        {expandedBatchDetail.templateName && (
-                          <div>
-                            <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>使用模板</div>
-                            <div style={{ fontSize: 13, color: '#e8e8f0', fontWeight: 500 }}>
-                              🎵 {expandedBatchDetail.templateName}
-                            </div>
-                          </div>
-                        )}
-                        {expandedBatchDetail.prompt && (
-                          <div>
-                            <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>提示词</div>
-                            <div style={{
-                              fontSize: 13,
-                              color: '#9ca3af',
-                              lineHeight: 1.6,
-                              whiteSpace: 'pre-wrap',
-                              wordBreak: 'break-word',
-                            }}>
-                              ✏️ {expandedBatchDetail.prompt}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div style={{ fontSize: 13, color: '#6b7280' }}>
-                        自由创作（无模板/提示词）
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Right: Versions with players and lyrics */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {expandedVersions.map((version) => {
-                      const isSelected = version.status === 'selected';
-
-                      return (
-                        <div
-                          key={version.taskId}
-                          style={{
-                            padding: '12px 16px',
-                            background: '#1a1a2e',
-                            borderRadius: 12,
-                            border: isSelected ? '1px solid #7536d5' : '1px solid #2a2a40',
-                          }}
-                        >
-                          {/* Version label with title and metadata */}
-                          <div style={{
-                            fontSize: 11,
-                            color: '#6b7280',
-                            marginBottom: 8,
-                            fontWeight: 500,
-                          }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                              <span>
-                                {version.title ? (
-                                  <span style={{ fontSize: 13, fontWeight: 600, color: '#e8e8f0' }}>{version.title}</span>
-                                ) : (
-                                  <>版本 {version.versionNumber}</>
-                                )}
-                              </span>
-                              <span style={{ fontSize: 11, color: '#6b7280' }}>
-                                {formatDate(version.createdAt)}
-                              </span>
-                            </div>
-                            {version.authorName && (
-                              <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>
-                                作者: {version.authorName}
-                              </div>
-                            )}
-                            {version.styleTags && version.styleTags.length > 0 && (
-                              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 4 }}>
-                                {version.styleTags.map((tag, idx) => (
-                                  <span key={idx} style={{
-                                    padding: '1px 6px',
-                                    background: 'rgba(117, 54, 213, 0.12)',
-                                    color: '#c0a7fc',
-                                    fontSize: 10,
-                                    fontWeight: 500,
-                                    borderRadius: 4,
-                                  }}>
-                                    {tag}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Audio player */}
-                          {version.audioUrl ? (
-                            <audio
-                              ref={(el) => { if (el) audioRefs.current[version.taskId] = el; }}
-                              controls
-                              src={version.audioUrl}
-                              onTimeUpdate={(e) =>
-                                setAudioTimes((prev) => ({
-                                  ...prev,
-                                  [version.taskId]: (e.target as HTMLAudioElement).currentTime,
-                                }))
-                              }
-                              onPlay={() => handleAudioPlay(version.taskId)}
-                              onPause={() => {
-                                if (playingTaskId === version.taskId) setPlayingTaskId(null);
-                              }}
-                              style={{ width: '100%', height: 32, borderRadius: 8 }}
-                            />
-                          ) : (
-                            <div style={{ fontSize: 13, color: '#6b7280' }}>音频加载中...</div>
-                          )}
-
-                          {/* Lyrics */}
-                          {version.lyrics && (
-                            <div style={{ marginTop: 10 }}>
-                              <SyncedLyrics
-                                lyrics={version.lyrics}
-                                currentTime={audioTimes[version.taskId] || 0}
-                                isPlaying={playingTaskId === version.taskId}
-                              />
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+                  {isFailed && (
+                    <div style={failedMessageStyle}>
+                      {batch.errorMessage || '生成过程中出现错误，请调整内容后重试。'}
+                    </div>
+                  )}
                 </div>
 
-                {/* Action buttons */}
-                <div style={{ marginTop: 16, textAlign: 'right', display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                <div style={rowActionsStyle} onClick={(e) => e.stopPropagation()}>
+                  {!isFailed && (
+                    <span style={durationPillStyle}>{formatDuration(batch.durationSeconds || undefined)}</span>
+                  )}
+                  {!isFailed && (
+                    <button type="button" onClick={() => onReCreate(songId)} style={smallActionStyle}>
+                      重新创作
+                    </button>
+                  )}
+                  {batch.canEditSong && batch.taskId && (
+                    <>
+                      {batch.hasStemCache && <span style={stemCacheBadgeStyle}>分轨已缓存</span>}
+                      <Link
+                        href={buildStemEditorHref(batch.taskId, batch.stemJobId)}
+                        style={editSongLinkStyle}
+                      >
+                        编辑歌曲
+                      </Link>
+                    </>
+                  )}
                   {onDelete && (
                     <button
+                      type="button"
                       onClick={() => {
                         if (window.confirm('确定要删除这个创作吗？删除后无法恢复。')) {
                           onDelete(batch.batchId);
                         }
                       }}
-                      style={{
-                        padding: '8px 20px',
-                        borderRadius: 20,
-                        border: '1px solid rgba(220, 38, 38, 0.3)',
-                        background: 'transparent',
-                        color: '#ef4444',
-                        fontSize: 13,
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        fontFamily: "'Inter', sans-serif",
-                      }}
+                      style={{ ...smallActionStyle, color: '#ef4444' }}
                     >
                       删除
                     </button>
                   )}
-                  <button
-                    onClick={() => onReCreate(batch.batchId)}
-                    style={{
-                      padding: '8px 20px',
-                      borderRadius: 20,
-                      border: '1px solid #7536d5',
-                      background: 'transparent',
-                      color: '#7536d5',
-                      fontSize: 13,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      fontFamily: "'Inter', sans-serif",
-                    }}
-                  >
-                    重新创作
-                  </button>
                 </div>
               </div>
-            )}
+            );
+          })}
+        </div>
+      </section>
+
+      {showDetail && expandedBatch && (
+        <aside style={detailPanelStyle}>
+          <div style={detailHeaderStyle}>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#e8e8f0' }}>
+                {getBatchTitle(expandedBatch)}
+              </div>
+              <div style={{ fontSize: 12, color: '#8f96a3', marginTop: 4 }}>
+                {formatDate(expandedBatch.createdAt)}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => onExpand(expandedBatch.taskId || expandedBatch.batchId, expandedBatch.batchId)}
+              style={closeButtonStyle}
+            >
+              ×
+            </button>
           </div>
-        );
-      })}
+
+          {expandedBatchDetail?.prompt && (
+            <div style={promptBoxStyle}>{expandedBatchDetail.prompt}</div>
+          )}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {(expandedVersions || []).map((version) => {
+              const isSelected = version.status === 'selected';
+              return (
+                <div
+                  key={version.taskId}
+                  style={{
+                    ...versionCardStyle,
+                    borderColor: isSelected ? '#D4A574' : '#2f3540',
+                  }}
+                >
+                  <div style={versionHeaderStyle}>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: '#f4f4f5' }}>
+                        {version.title || `版本 ${version.versionNumber}`}
+                      </div>
+                      <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span style={durationPillStyle}>{formatDuration(version.durationSeconds)}</span>
+                        {isSelected && <span style={selectedBadgeStyle}>已选</span>}
+                        {(version.styleTags || []).slice(0, 3).map((tag) => (
+                          <span key={tag} style={tagStyle}>{tag}</span>
+                        ))}
+                        {version.hasStemCache && <span style={stemCacheBadgeStyle}>分轨已缓存</span>}
+                      </div>
+                    </div>
+                    {version.audioUrl && (
+                      <button
+                        type="button"
+                        onClick={() => handleDownload(version.taskId)}
+                        disabled={downloadingTaskId === version.taskId}
+                        style={downloadButtonStyle}
+                      >
+                        {downloadingTaskId === version.taskId ? '下载中' : '下载'}
+                      </button>
+                    )}
+                  </div>
+
+                  {version.audioUrl ? (
+                    <audio
+                      ref={(el) => { if (el) audioRefs.current[version.taskId] = el; }}
+                      controls
+                      src={version.audioUrl}
+                      onTimeUpdate={(e) =>
+                        setAudioTimes((prev) => ({
+                          ...prev,
+                          [version.taskId]: (e.target as HTMLAudioElement).currentTime,
+                        }))
+                      }
+                      onPlay={() => handleAudioPlay(version.taskId)}
+                      onPause={() => {
+                        if (playingTaskId === version.taskId) setPlayingTaskId(null);
+                      }}
+                      style={{ width: '100%', height: 36, marginTop: 12 }}
+                    />
+                  ) : (
+                    <div style={{ marginTop: 12, color: '#8f96a3', fontSize: 13 }}>音频加载中...</div>
+                  )}
+
+                  {version.lyrics ? (
+                    <div style={{ marginTop: 14 }}>
+                      <SyncedLyrics
+                        lyrics={version.lyrics}
+                        currentTime={audioTimes[version.taskId] || 0}
+                        isPlaying={playingTaskId === version.taskId}
+                      />
+                    </div>
+                  ) : (
+                    <div style={noLyricsStyle}>暂无歌词</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </aside>
+      )}
     </div>
   );
 }
+
+function buildStemEditorHref(taskId: string, stemJobId?: string | null) {
+  const params = new URLSearchParams({ generationTaskId: taskId });
+  if (stemJobId) params.set('jobId', stemJobId);
+  return `/studio/stem-editor?${params.toString()}`;
+}
+
+const emptyStyle: CSSProperties = {
+  textAlign: 'center',
+  padding: '80px 20px',
+  color: '#6b7280',
+  background: '#1b1f24',
+  border: '1px solid #2f3540',
+  borderRadius: 16,
+};
+
+const listPanelStyle: CSSProperties = {
+  background: '#1b1f24',
+  border: '1px solid #2f3540',
+  borderRadius: 16,
+  overflow: 'hidden',
+  boxShadow: '0 18px 50px rgba(0,0,0,0.24)',
+};
+
+const listHeaderStyle: CSSProperties = {
+  height: 58,
+  padding: '0 18px',
+  borderBottom: '1px solid #2f3540',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+};
+
+const rowStyle: CSSProperties = {
+  minHeight: 82,
+  padding: '13px 18px',
+  borderBottom: '1px solid #2a3038',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 14,
+  transition: 'background 0.18s ease',
+};
+
+const coverStyle: CSSProperties = {
+  width: 52,
+  height: 52,
+  borderRadius: 10,
+  flexShrink: 0,
+  background: 'linear-gradient(135deg, #2a2042, #1d2735)',
+  border: '1px solid rgba(255,255,255,0.08)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  color: '#D4A574',
+};
+
+const titleRowStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  color: '#f4f4f5',
+  fontSize: 14,
+  fontWeight: 700,
+  minWidth: 0,
+};
+
+const metaStyle: CSSProperties = {
+  color: '#8f96a3',
+  fontSize: 12,
+  marginTop: 3,
+};
+
+const summaryStyle: CSSProperties = {
+  color: '#8f96a3',
+  fontSize: 12,
+  marginTop: 3,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+};
+
+const rowActionsStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 10,
+  flexShrink: 0,
+};
+
+const durationPillStyle: CSSProperties = {
+  borderRadius: 999,
+  background: '#252a31',
+  color: '#c2c8d0',
+  padding: '4px 9px',
+  fontSize: 12,
+  lineHeight: 1,
+};
+
+const smallActionStyle: CSSProperties = {
+  border: 'none',
+  background: 'transparent',
+  color: '#d8dce3',
+  fontSize: 12,
+  cursor: 'pointer',
+  padding: '4px 2px',
+};
+
+const editSongLinkStyle: CSSProperties = {
+  border: '1px solid rgba(117, 54, 213, 0.42)',
+  background: 'rgba(117, 54, 213, 0.16)',
+  color: '#dccdff',
+  borderRadius: 8,
+  padding: '6px 10px',
+  fontSize: 12,
+  fontWeight: 700,
+  textDecoration: 'none',
+  whiteSpace: 'nowrap',
+};
+
+const stemCacheBadgeStyle: CSSProperties = {
+  border: '1px solid rgba(34, 197, 94, 0.34)',
+  background: 'rgba(34, 197, 94, 0.12)',
+  color: '#86efac',
+  borderRadius: 999,
+  padding: '4px 8px',
+  fontSize: 11,
+  fontWeight: 800,
+  whiteSpace: 'nowrap',
+};
+
+const iconButtonStyle: CSSProperties = {
+  border: 'none',
+  background: 'transparent',
+  color: '#7d8490',
+  cursor: 'pointer',
+  fontSize: 12,
+  padding: 0,
+};
+
+const editInputStyle: CSSProperties = {
+  fontSize: 14,
+  fontWeight: 600,
+  color: '#e8e8f0',
+  background: '#11151a',
+  border: '1px solid #D4A574',
+  borderRadius: 6,
+  padding: '4px 8px',
+  outline: 'none',
+  width: '100%',
+  maxWidth: 360,
+};
+
+const detailPanelStyle: CSSProperties = {
+  background: '#1b1f24',
+  border: '1px solid #2f3540',
+  borderRadius: 16,
+  padding: 18,
+  position: 'sticky',
+  top: 24,
+  maxHeight: '82vh',
+  overflowY: 'auto',
+  boxShadow: '0 18px 50px rgba(0,0,0,0.28)',
+};
+
+const detailHeaderStyle: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'flex-start',
+  gap: 12,
+  paddingBottom: 14,
+  borderBottom: '1px solid #2f3540',
+  marginBottom: 14,
+};
+
+const closeButtonStyle: CSSProperties = {
+  border: 'none',
+  background: 'transparent',
+  color: '#8f96a3',
+  fontSize: 26,
+  lineHeight: 1,
+  cursor: 'pointer',
+};
+
+const promptBoxStyle: CSSProperties = {
+  borderRadius: 10,
+  background: '#14181d',
+  border: '1px solid #2f3540',
+  color: '#aeb6c2',
+  fontSize: 12,
+  lineHeight: 1.7,
+  padding: 12,
+  marginBottom: 14,
+};
+
+const versionCardStyle: CSSProperties = {
+  border: '1px solid #2f3540',
+  borderRadius: 14,
+  padding: 14,
+  background: '#161a20',
+};
+
+const versionHeaderStyle: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'flex-start',
+  gap: 12,
+};
+
+const downloadButtonStyle: CSSProperties = {
+  border: '1px solid #3a414c',
+  background: '#20252d',
+  color: '#d8dce3',
+  borderRadius: 8,
+  padding: '6px 10px',
+  fontSize: 12,
+  cursor: 'pointer',
+};
+
+const selectedBadgeStyle: CSSProperties = {
+  borderRadius: 999,
+  background: 'rgba(212, 165, 116, 0.16)',
+  color: '#D4A574',
+  padding: '3px 8px',
+  fontSize: 11,
+  fontWeight: 700,
+};
+
+const tagStyle: CSSProperties = {
+  borderRadius: 999,
+  background: '#252a31',
+  color: '#D4A574',
+  padding: '3px 8px',
+  fontSize: 11,
+};
+
+const noLyricsStyle: CSSProperties = {
+  marginTop: 12,
+  padding: '12px 0 0',
+  color: '#737b86',
+  fontSize: 12,
+};
+
+const failedBadgeStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  borderRadius: 999,
+  padding: '2px 8px',
+  background: 'rgba(239, 68, 68, 0.14)',
+  border: '1px solid rgba(239, 68, 68, 0.32)',
+  color: '#fca5a5',
+  fontSize: 11,
+  fontWeight: 700,
+  whiteSpace: 'nowrap',
+};
+
+const failedMessageStyle: CSSProperties = {
+  marginTop: 6,
+  color: '#fca5a5',
+  fontSize: 12,
+  lineHeight: 1.5,
+};

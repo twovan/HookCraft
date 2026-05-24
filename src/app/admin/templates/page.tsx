@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import StatCard from '@/components/admin/StatCard';
 import DataTable, { Column } from '@/components/admin/DataTable';
 import FilterBar, { FilterConfig } from '@/components/admin/FilterBar';
@@ -15,7 +15,7 @@ interface TemplateItem {
   category: string;
   genre: string;
   genre_tags: string[];
-  producer_id: string;
+  producer_id: string | null;
   price: number;
   sales_count: number;
   status: string;
@@ -25,7 +25,20 @@ interface TemplateItem {
   analysis_status?: string;
   analysis_result?: string;
   lyria_prompt?: string;
+  suno_analysis_status?: string;
+  suno_analysis_result?: string;
+  suno_prompt?: string;
 }
+
+interface ProducerOption {
+  id: string;
+  name: string;
+  email: string;
+}
+
+const MAX_TEMPLATE_ANALYSIS_CHARS = 1000;
+type AnalysisType = 'lyria3' | 'suno';
+type AnalysisChoice = AnalysisType | 'both';
 
 const statusColorMap: Record<string, 'green' | 'blue' | 'orange' | 'red' | 'gray'> = {
   published: 'green',
@@ -57,9 +70,11 @@ function fileToBase64(file: File): Promise<string> {
 // Helper: call Gemini API directly from browser
 async function callGeminiFromBrowser(
   apiKey: string,
-  audioFiles: Array<{ base64: string; mimeType: string }>
+  audioFiles: Array<{ base64: string; mimeType: string }>,
+  analysisType: AnalysisType = 'lyria3'
 ): Promise<{ analysisResult: string; lyriaPrompt: string }> {
-  const prompt = audioFiles.length > 1
+  const prompt = buildBrowserAnalysisPrompt(analysisType, audioFiles.length);
+  const legacyPrompt = audioFiles.length > 1
     ? `我提供了${audioFiles.length}首参考音乐，请综合分析这些音乐的共同风格特征，用于生成一个 Lyria 3 音乐模板。请用中文输出分析结果，同时在最后附上一段详细的英文 Lyria 3 Prompt。\n\n请综合所有参考音乐，提取它们的共同特征：\n1. 🎵 共同的流派与子流派\n2. ⏱️ BPM 范围\n3. 🎹 常用调性与音阶\n4. 🎸 共同使用的乐器\n5. 🌙 整体情绪与氛围\n6. 📐 典型的歌曲结构\n7. 🔧 共同的制作技巧\n8. ⚡ 整体能量水平\n9. 🎤 人声特征\n\n最后，请用英文输出一段详细的 Lyria 3 音乐生成 prompt（200-400词），格式如下：\n[PROMPT]\nA [detailed genre] track at [BPM] BPM in [key].\nInstrumentation: [details].\nMood: [adjectives].\nStructure:\n[0:00 - 0:XX] Intro: [description]\n...\nVocal style: [description].\nProduction: [details].\n[/PROMPT]`
     : `请详细分析这段音乐，用于生成一个 Lyria 3 音乐模板。请用中文输出分析结果，同时在最后附上一段详细的英文 Lyria 3 Prompt。\n\n请包含以下内容：\n1. 🎵 流派与子流派\n2. ⏱️ BPM\n3. 🎹 调性与音阶\n4. 🎸 主要乐器\n5. 🌙 情绪与氛围\n6. 📐 歌曲结构\n7. 🔧 制作技巧\n8. ⚡ 能量水平\n9. 🎤 人声特征\n\n最后，请用英文输出一段详细的 Lyria 3 音乐生成 prompt（200-400词），格式如下：\n[PROMPT]\nA [detailed genre] track at [BPM] BPM in [key].\nInstrumentation: [details].\nMood: [adjectives].\nStructure:\n[0:00 - 0:XX] Intro: [description]\n...\nVocal style: [description].\nProduction: [details].\n[/PROMPT]`;
 
@@ -91,7 +106,7 @@ async function callGeminiFromBrowser(
       parts.push({ inline_data: { mime_type: file.mimeType, data: file.base64 } });
     }
   }
-  parts.push({ text: prompt });
+  parts.push({ text: analysisType === 'suno' ? prompt : legacyPrompt });
 
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
     method: 'POST',
@@ -109,9 +124,132 @@ async function callGeminiFromBrowser(
   if (!fullText) throw new Error('Gemini 未返回分析结果');
   const promptMatch = fullText.match(/\[PROMPT\]([\s\S]*?)\[\/PROMPT\]/);
   if (promptMatch) {
-    return { analysisResult: fullText.replace(/\[PROMPT\][\s\S]*?\[\/PROMPT\]/, '').trim(), lyriaPrompt: promptMatch[1].trim() };
+    const analysisResult = fullText.replace(/\[PROMPT\][\s\S]*?\[\/PROMPT\]/, '').trim();
+    const generationPrompt = promptMatch[1].trim();
+    return {
+      analysisResult: analysisType === 'suno' ? normalizeTemplateAnalysisText(analysisResult) : analysisResult,
+      lyriaPrompt: analysisType === 'suno' ? truncateTemplateAnalysis(generationPrompt) : generationPrompt,
+    };
   }
-  return { analysisResult: fullText, lyriaPrompt: fullText };
+  const fallback = analysisType === 'suno' ? normalizeTemplateAnalysisText(fullText) : fullText;
+  return {
+    analysisResult: fallback,
+    lyriaPrompt: analysisType === 'suno' ? truncateTemplateAnalysis(fullText) : fallback,
+  };
+}
+
+function buildBrowserAnalysisPrompt(analysisType: AnalysisType, audioCount: number) {
+  if (analysisType === 'suno') {
+    return `Analyze ${audioCount > 1 ? `these ${audioCount} reference tracks` : 'this reference track'} and create a SUNO-ready music generation description.
+Requirements:
+1. Only analyze arrangement and production. Do not analyze vocals, singer, voice, lyrics, lyric meaning, or singing style.
+2. Focus on genre/subgenre, tempo or BPM range, key/scale if detectable, core instruments, drum groove, bassline, chord or riff motifs, section structure, sound design, mix texture, mood, and energy changes.
+3. First output one complete Chinese arrangement analysis for human review, 500-900 Chinese characters. Keep musical details complete and readable.
+4. Then output one direct English SUNO style description inside [PROMPT]...[/PROMPT], 650-950 characters. This is passed to SUNO style, not lyrics.
+5. The SUNO style description must only describe music and arrangement. Do not include vocal, singer, voice, lyrics, lyric meaning, male/female vocal, rap, spoken word, or topline requests.
+6. Preserve musical accuracy by prioritizing, in order: genre/subgenre, BPM/tempo, key/scale, drums, bass, core instruments, harmonic/melodic motifs, section structure, sound design, mix texture, mood, and energy arc.
+7. Keep the English style description dense and concrete. Prefer complete short fields: Genre, Tempo, Key, Instruments, Groove, Bass, Structure, Production, Mood, Energy.
+8. Never end with an unfinished field label such as "Tempo:", "Key:", "Drums:", or "Structure:". If space is tight, omit the lower-priority field entirely and end on a complete phrase.
+Format:
+中文编曲分析：...
+[PROMPT] concise English SUNO style description here [/PROMPT]`;
+  }
+
+  return audioCount > 1
+    ? `Analyze these ${audioCount} reference tracks and extract their shared style for a Lyria 3 music template. Return a Chinese analysis and put the final English Lyria 3 prompt inside [PROMPT]...[/PROMPT].`
+    : `Analyze this reference track for a Lyria 3 music template. Return a Chinese analysis and put the final English Lyria 3 prompt inside [PROMPT]...[/PROMPT].`;
+}
+
+function truncateTemplateAnalysis(text: string) {
+  const normalized = normalizeTemplateAnalysisText(text);
+  const chars = Array.from(normalized);
+  if (chars.length <= MAX_TEMPLATE_ANALYSIS_CHARS) return normalized;
+  return trimAtMusicalBoundary(normalized, MAX_TEMPLATE_ANALYSIS_CHARS);
+}
+
+function normalizeTemplateAnalysisText(text: string) {
+  return text
+    .replace(/\s+/g, ' ')
+    .replace(/\s+([,.;:!?])/g, '$1')
+    .trim();
+}
+
+function trimAtMusicalBoundary(text: string, maxChars: number) {
+  const chars = Array.from(text);
+  if (chars.length <= maxChars) return text;
+  const limited = chars.slice(0, maxChars).join('');
+  const withoutDanglingLabel = stripIncompleteMusicalField(limited);
+  if (Array.from(withoutDanglingLabel).length >= Math.floor(maxChars * 0.78)) {
+    return withoutDanglingLabel;
+  }
+  const boundary = Math.max(
+    limited.lastIndexOf('. '),
+    limited.lastIndexOf('; '),
+    limited.lastIndexOf(', '),
+    limited.lastIndexOf('| '),
+    limited.lastIndexOf('，'),
+    limited.lastIndexOf('。'),
+  );
+  if (boundary >= Math.floor(maxChars * 0.82)) {
+    return stripIncompleteMusicalField(limited.slice(0, boundary + 1));
+  }
+  return stripIncompleteMusicalField(limited);
+}
+
+function stripIncompleteMusicalField(text: string) {
+  const musicalFieldLabels = [
+    'Genre',
+    'Subgenre',
+    'Tempo',
+    'BPM',
+    'Key',
+    'Scale',
+    'Instrumentation',
+    'Instruments',
+    'Drums',
+    'Drum groove',
+    'Bass',
+    'Bassline',
+    'Chords',
+    'Harmony',
+    'Motifs',
+    'Structure',
+    'Sound design',
+    'Mix',
+    'Texture',
+    'Mood',
+    'Energy',
+    'Production',
+    'Arrangement',
+  ].join('|');
+
+  return text
+    .replace(new RegExp(`(?:^|[\\s,.;|，。；])(?:${musicalFieldLabels})\\s*:\\s*$`, 'i'), '')
+    .replace(/[,;:|，。；\s-]+$/g, '')
+    .trim();
+}
+
+function formatAnalysisForDisplay(text?: string | null) {
+  return text ? stripIncompleteMusicalField(text) : '';
+}
+
+function getCharacterCount(text?: string | null) {
+  return text ? Array.from(text).length : 0;
+}
+
+function renderCharacterCount(text?: string | null, max?: number) {
+  const count = getCharacterCount(text);
+  const isOverLimit = Boolean(max && count > max);
+  return (
+    <span style={{
+      fontSize: 12,
+      fontWeight: 500,
+      color: isOverLimit ? '#dc2626' : '#6b7280',
+      marginLeft: 8,
+    }}>
+      {count}{max ? `/${max}` : ''} 字符
+    </span>
+  );
 }
 
 export default function AdminTemplatesPage() {
@@ -124,18 +262,22 @@ export default function AdminTemplatesPage() {
 
   // Stats
   const [stats, setStats] = useState({ total: 0, published: 0, pending: 0, unpublished: 0 });
+  const [producers, setProducers] = useState<ProducerOption[]>([]);
 
   // Modal state
   const [formOpen, setFormOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<TemplateItem | null>(null);
-  const [formData, setFormData] = useState({ name: '', description: '', category: '', genre_tags: '', price: 0 });
+  const [formData, setFormData] = useState({ name: '', description: '', category: '', genre_tags: '', price: 0, producer_id: '' });
   const [submitting, setSubmitting] = useState(false);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(null);
   const [audioFiles, setAudioFiles] = useState<File[]>([]);
+  const [audioChanged, setAudioChanged] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number; status: string } | null>(null);
+  const [analysisChoiceOpen, setAnalysisChoiceOpen] = useState(false);
+  const analysisChoiceResolver = useRef<((choice: AnalysisChoice | null) => void) | null>(null);
 
   // Confirm dialog
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -145,6 +287,19 @@ export default function AdminTemplatesPage() {
   // Analysis modal
   const [analysisOpen, setAnalysisOpen] = useState(false);
   const [analysisTemplate, setAnalysisTemplate] = useState<TemplateItem | null>(null);
+
+  function requestAnalysisChoice(): Promise<AnalysisChoice | null> {
+    setAnalysisChoiceOpen(true);
+    return new Promise((resolve) => {
+      analysisChoiceResolver.current = resolve;
+    });
+  }
+
+  function resolveAnalysisChoice(choice: AnalysisChoice | null) {
+    analysisChoiceResolver.current?.(choice);
+    analysisChoiceResolver.current = null;
+    setAnalysisChoiceOpen(false);
+  }
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -176,6 +331,20 @@ export default function AdminTemplatesPage() {
     fetchData();
   }, [fetchData]);
 
+  useEffect(() => {
+    async function fetchProducers() {
+      try {
+        const res = await fetch('/api/admin/producers?pageSize=200');
+        if (!res.ok) return;
+        const result = await res.json();
+        setProducers(result.data || []);
+      } catch {
+        setProducers([]);
+      }
+    }
+    fetchProducers();
+  }, []);
+
   // Poll analysis status for templates in 'analyzing' state
   useEffect(() => {
     const analyzingTemplates = data.filter(t => t.analysis_status === 'analyzing');
@@ -206,12 +375,13 @@ export default function AdminTemplatesPage() {
 
   function openCreateModal() {
     setEditingTemplate(null);
-    setFormData({ name: '', description: '', category: '', genre_tags: '', price: 0 });
+    setFormData({ name: '', description: '', category: '', genre_tags: '', price: 0, producer_id: '' });
     setCoverFile(null);
     setCoverPreview(null);
     setAudioFile(null);
     setAudioPreviewUrl(null);
     setAudioFiles([]);
+    setAudioChanged(false);
     setUploadProgress(null);
     setFormOpen(true);
   }
@@ -227,12 +397,14 @@ export default function AdminTemplatesPage() {
       category: template.category,
       genre_tags: genreTags,
       price: template.price || 0,
+      producer_id: template.producer_id || '',
     });
     setCoverFile(null);
     setCoverPreview(template.cover_url || null);
     setAudioFile(null);
     setAudioPreviewUrl(template.preview_url || null);
     setAudioFiles([]);
+    setAudioChanged(false);
     setUploadProgress(null);
     setFormOpen(true);
   }
@@ -248,6 +420,7 @@ export default function AdminTemplatesPage() {
         category: formData.category,
         genre_tags: formData.genre_tags.split(',').map((t) => t.trim()).filter(Boolean),
         price: formData.price,
+        producer_id: formData.producer_id || null,
       };
 
       const method = editingTemplate ? 'PUT' : 'POST';
@@ -285,8 +458,16 @@ export default function AdminTemplatesPage() {
       }
 
       // Upload audio files via signed URLs
-      const filesToUpload = audioFiles.length > 0 ? audioFiles : (audioFile ? [audioFile] : []);
+      const filesToUpload = audioChanged
+        ? (audioFiles.length > 0 ? audioFiles : (audioFile ? [audioFile] : []))
+        : [];
       if (filesToUpload.length > 0 && templateId) {
+        const analysisChoice = await requestAnalysisChoice();
+        if (!analysisChoice) {
+          setUploadProgress(null);
+          return;
+        }
+
         setUploadProgress({ current: 0, total: filesToUpload.length, status: '获取上传链接...' });
 
         // Get signed URLs
@@ -326,16 +507,13 @@ export default function AdminTemplatesPage() {
           }
         }
 
-        // After all uploads, call Gemini for analysis
-        setUploadProgress({ current: filesToUpload.length, total: filesToUpload.length, status: '🤖 AI 分析中...' });
+        setUploadProgress({ current: filesToUpload.length, total: filesToUpload.length, status: 'AI analyzing...' });
 
         try {
-          // Get Gemini API key
           const keyRes = await fetch('/api/admin/gemini-key');
-          if (!keyRes.ok) throw new Error('获取 Gemini Key 失败');
+          if (!keyRes.ok) throw new Error('Failed to get Gemini key');
           const { apiKey } = await keyRes.json();
 
-          // Convert files to base64 for Gemini
           const audioBase64Files = await Promise.all(
             filesToUpload.map(async (file) => ({
               base64: await fileToBase64(file),
@@ -343,21 +521,25 @@ export default function AdminTemplatesPage() {
             }))
           );
 
-          // Call Gemini from browser
-          const geminiResult = await callGeminiFromBrowser(apiKey, audioBase64Files);
+          const analysisTypes: AnalysisType[] = analysisChoice === 'both' ? ['suno', 'lyria3'] : [analysisChoice];
 
-          // Save analysis results
-          setUploadProgress({ current: filesToUpload.length, total: filesToUpload.length, status: '保存分析结果...' });
-          const saveRes = await fetch(`/api/admin/templates/${templateId}/save-analysis`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              analysisResult: geminiResult.analysisResult,
-              lyriaPrompt: geminiResult.lyriaPrompt,
-            }),
-          });
-          if (!saveRes.ok) {
-            console.error('保存分析结果失败');
+          for (const analysisType of analysisTypes) {
+            setUploadProgress({ current: filesToUpload.length, total: filesToUpload.length, status: `Generating ${analysisType.toUpperCase()} analysis...` });
+            const geminiResult = await callGeminiFromBrowser(apiKey, audioBase64Files, analysisType);
+
+            setUploadProgress({ current: filesToUpload.length, total: filesToUpload.length, status: `Saving ${analysisType.toUpperCase()} analysis...` });
+            const saveRes = await fetch(`/api/admin/templates/${templateId}/save-analysis`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                analysisType,
+                analysisResult: geminiResult.analysisResult,
+                lyriaPrompt: geminiResult.lyriaPrompt,
+              }),
+            });
+            if (!saveRes.ok) {
+              console.error(`Failed to save ${analysisType} analysis`);
+            }
           }
         } catch (geminiErr) {
           console.error('Gemini 分析失败:', geminiErr);
@@ -529,9 +711,15 @@ export default function AdminTemplatesPage() {
       title: '分析',
       render: (row) => {
         const s = row.analysis_status || 'pending';
-        const labelMap: Record<string, string> = { completed: '已完成', analyzing: '分析中', failed: '失败', pending: '待分析' };
+        const sunoStatus = row.suno_analysis_status || 'pending';
+        const labelMap: Record<string, string> = { completed: 'done', analyzing: 'running', failed: 'failed', pending: 'pending' };
         const colorMap: Record<string, 'green' | 'orange' | 'red' | 'gray'> = { completed: 'green', analyzing: 'orange', failed: 'red', pending: 'gray' };
-        return <Tag label={labelMap[s] || s} color={colorMap[s] || 'gray'} />;
+        return (
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            <Tag label={`Lyria ${labelMap[s] || s}`} color={colorMap[s] || 'gray'} />
+            <Tag label={`SUNO ${labelMap[sunoStatus] || sunoStatus}`} color={colorMap[sunoStatus] || 'gray'} />
+          </div>
+        );
       },
     },
     {
@@ -540,7 +728,7 @@ export default function AdminTemplatesPage() {
       render: (row) => (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <button onClick={() => openEditModal(row)} style={actionBtnStyle}>编辑</button>
-          {row.analysis_status === 'completed' && (
+          {(row.analysis_status === 'completed' || row.suno_analysis_status === 'completed') && (
             <button onClick={() => { setAnalysisTemplate(row); setAnalysisOpen(true); }} style={{ ...actionBtnStyle, color: '#7c3aed' }}>分析</button>
           )}
           {row.status === 'published' && (
@@ -676,6 +864,7 @@ export default function AdminTemplatesPage() {
                   const files = Array.from(e.target.files || []);
                   if (files.length > 0) {
                     setAudioFiles(prev => [...prev, ...files]);
+                    setAudioChanged(true);
                     // Also set single audioFile for backward compat
                     if (!audioFile) {
                       setAudioFile(files[0]);
@@ -712,6 +901,7 @@ export default function AdminTemplatesPage() {
                           if (audioFiles.length === 1) {
                             setAudioFile(null);
                             setAudioPreviewUrl(null);
+                            setAudioChanged(false);
                           }
                         }}
                         style={{
@@ -788,6 +978,24 @@ export default function AdminTemplatesPage() {
             </div>
           </div>
           <div>
+            <label style={labelStyle}>模板归属</label>
+            <select
+              value={formData.producer_id}
+              onChange={(e) => setFormData((p) => ({ ...p, producer_id: e.target.value }))}
+              style={inputStyle}
+            >
+              <option value="">公共模板</option>
+              {producers.map((producer) => (
+                <option key={producer.id} value={producer.id}>
+                  {producer.name || producer.email} {producer.email ? `(${producer.email})` : ''}
+                </option>
+              ))}
+            </select>
+            <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
+              默认公共模板；选择制作人后，该模板会归属到对应制作人。
+            </div>
+          </div>
+          <div>
             <label style={labelStyle}>风格标签（逗号分隔）</label>
             <input
               type="text"
@@ -799,6 +1007,42 @@ export default function AdminTemplatesPage() {
           </div>
         </div>
       </FormModal>
+
+      {analysisChoiceOpen && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.62)', zIndex: 20000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 24,
+        }} onClick={() => resolveAnalysisChoice(null)}>
+          <div style={{
+            background: '#fff', borderRadius: 14, width: '100%', maxWidth: 520,
+            padding: 24, boxShadow: '0 28px 80px rgba(0,0,0,0.35)',
+          }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ margin: '0 0 8px', fontSize: 18, color: '#111827' }}>选择分析结果</h3>
+            <p style={{ margin: '0 0 18px', fontSize: 13, lineHeight: 1.7, color: '#6b7280' }}>
+              上传音频后可以生成 SUNO、Lyria3，或两种都生成。两类结果会分别保存、分别查看。
+            </p>
+            <div style={{ display: 'grid', gap: 10 }}>
+              <button type="button" onClick={() => resolveAnalysisChoice('suno')} style={choiceBtnStyle}>
+                <strong>SUNO</strong>
+                <span>1000 字符内，只分析编曲与制作，供 SUNO style 使用</span>
+              </button>
+              <button type="button" onClick={() => resolveAnalysisChoice('lyria3')} style={choiceBtnStyle}>
+                <strong>Lyria3</strong>
+                <span>保留原模板分析逻辑，供 Lyria3 模板提示词使用</span>
+              </button>
+              <button type="button" onClick={() => resolveAnalysisChoice('both')} style={{ ...choiceBtnStyle, borderColor: '#D4A574', background: '#fffbeb' }}>
+                <strong>一起生成</strong>
+                <span>SUNO 和 Lyria3 各生成一份，并分别保存</span>
+              </button>
+            </div>
+            <button type="button" onClick={() => resolveAnalysisChoice(null)} style={{ ...actionBtnStyle, marginTop: 16 }}>
+              取消
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Confirm Dialog */}
       <ConfirmDialog
@@ -821,48 +1065,71 @@ export default function AdminTemplatesPage() {
           padding: 24,
         }} onClick={() => setAnalysisOpen(false)}>
           <div style={{
-            background: '#fff', borderRadius: 16, maxWidth: 640, width: '100%',
+            background: '#fff', borderRadius: 16, maxWidth: 720, width: '100%',
             maxHeight: '80vh', overflow: 'auto', padding: 32,
             boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
           }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <h2 style={{ fontSize: 18, fontWeight: 700, color: '#1f2937', margin: 0 }}>
-                分析结果 — {analysisTemplate.name}
+                Analysis - {analysisTemplate.name}
               </h2>
               <button onClick={() => setAnalysisOpen(false)} style={{
                 border: 'none', background: '#f3f4f6', borderRadius: 8,
                 width: 32, height: 32, cursor: 'pointer', fontSize: 16,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>✕</button>
+              }}>x</button>
             </div>
 
-            {analysisTemplate.analysis_result ? (
+            {analysisTemplate.analysis_result && (
               <div style={{ marginBottom: 24 }}>
-                <h3 style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 8 }}>📊 AI 分析</h3>
-                <div style={{
-                  background: '#f9fafb', borderRadius: 10, padding: 16,
-                  fontSize: 13, lineHeight: 1.8, color: '#374151',
-                  whiteSpace: 'pre-wrap', border: '1px solid #e5e7eb',
-                }}>
+                <h3 style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+                  Lyria3 Analysis {renderCharacterCount(analysisTemplate.analysis_result)}
+                </h3>
+                <div style={{ background: '#f9fafb', borderRadius: 10, padding: 16, fontSize: 13, lineHeight: 1.8, color: '#374151', whiteSpace: 'pre-wrap', border: '1px solid #e5e7eb' }}>
                   {analysisTemplate.analysis_result}
                 </div>
               </div>
-            ) : (
-              <div style={{ color: '#9ca3af', fontSize: 13, marginBottom: 24 }}>暂无分析结果</div>
             )}
 
             {analysisTemplate.lyria_prompt && (
-              <div>
-                <h3 style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 8 }}>🎵 Lyria Prompt</h3>
-                <div style={{
-                  background: '#f0fdf4', borderRadius: 10, padding: 16,
-                  fontSize: 13, lineHeight: 1.6, color: '#166534',
-                  fontFamily: 'monospace', border: '1px solid #bbf7d0',
-                  whiteSpace: 'pre-wrap',
-                }}>
+              <div style={{ marginBottom: 24 }}>
+                <h3 style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+                  Lyria3 Prompt {renderCharacterCount(analysisTemplate.lyria_prompt)}
+                </h3>
+                <div style={{ background: '#f0fdf4', borderRadius: 10, padding: 16, fontSize: 13, lineHeight: 1.6, color: '#166534', fontFamily: 'monospace', border: '1px solid #bbf7d0', whiteSpace: 'pre-wrap' }}>
                   {analysisTemplate.lyria_prompt}
                 </div>
               </div>
+            )}
+
+            {(analysisTemplate.suno_analysis_result || analysisTemplate.suno_prompt) && (
+              <div>
+                <h3 style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 8 }}>SUNO Analysis</h3>
+                {analysisTemplate.suno_analysis_result && (
+                  <>
+                    <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>
+                      中文编曲分析 {renderCharacterCount(formatAnalysisForDisplay(analysisTemplate.suno_analysis_result))}
+                    </div>
+                    <div style={{ background: '#fff7ed', borderRadius: 10, padding: 16, fontSize: 13, lineHeight: 1.8, color: '#9a3412', whiteSpace: 'pre-wrap', border: '1px solid #fed7aa', marginBottom: 12 }}>
+                      {formatAnalysisForDisplay(analysisTemplate.suno_analysis_result)}
+                    </div>
+                  </>
+                )}
+                {analysisTemplate.suno_prompt && (
+                  <>
+                    <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>
+                      SUNO style {renderCharacterCount(formatAnalysisForDisplay(analysisTemplate.suno_prompt), MAX_TEMPLATE_ANALYSIS_CHARS)}
+                    </div>
+                    <div style={{ background: '#fefce8', borderRadius: 10, padding: 16, fontSize: 13, lineHeight: 1.6, color: '#713f12', fontFamily: 'monospace', border: '1px solid #fde68a', whiteSpace: 'pre-wrap' }}>
+                      {formatAnalysisForDisplay(analysisTemplate.suno_prompt)}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {!analysisTemplate.analysis_result && !analysisTemplate.lyria_prompt && !analysisTemplate.suno_analysis_result && !analysisTemplate.suno_prompt && (
+              <div style={{ color: '#9ca3af', fontSize: 13 }}>No analysis yet</div>
             )}
           </div>
         </div>
@@ -901,6 +1168,22 @@ const actionBtnStyle: React.CSSProperties = {
   cursor: 'pointer',
   fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
   whiteSpace: 'nowrap',
+};
+
+const choiceBtnStyle: React.CSSProperties = {
+  width: '100%',
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'flex-start',
+  gap: 4,
+  padding: '12px 14px',
+  borderRadius: 10,
+  border: '1px solid #e5e7eb',
+  background: '#fff',
+  color: '#374151',
+  cursor: 'pointer',
+  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+  textAlign: 'left',
 };
 
 const labelStyle: React.CSSProperties = {

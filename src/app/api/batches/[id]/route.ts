@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '../../../../lib/supabase/server';
 import { getAuthUser } from '../../../../lib/supabase/auth-helpers';
+import { loadStemCacheByTaskId } from '@/lib/stems/stemCacheLookup';
+
+function canEditSong(task: any) {
+  return task.status === 'completed' && typeof task.model_id === 'string' && task.model_id.includes('kie');
+}
 
 /**
  * GET /api/batches/[id]
@@ -54,6 +59,8 @@ export async function GET(
       );
     }
 
+    const stemCacheByTaskId = await loadStemCacheByTaskId(supabaseAdmin, user.id, tasks ?? []);
+
     // Map response
     const batchSummary = {
       batchId: batch.id,
@@ -69,6 +76,7 @@ export async function GET(
     // Generate playable URLs for audio files
     const versions = await Promise.all((tasks ?? []).map(async (task) => {
       let audioUrl: string | undefined;
+      const stemCache = stemCacheByTaskId.get(task.id);
       if (task.audio_path) {
         if (task.audio_path.startsWith('http')) {
           // 已经是完整 URL（公开 URL 或 MiniMax 临时 URL）
@@ -89,10 +97,15 @@ export async function GET(
         lyrics: task.lyrics ?? undefined,
         durationSeconds: task.duration_seconds ?? undefined,
         creditsConsumed: task.credits_consumed,
+        errorMessage: task.error_message ?? undefined,
         createdAt: task.created_at,
         title: (task as any).title ?? null,
         authorName: (task as any).author_name ?? null,
         styleTags: (task as any).style_tags ?? [],
+        canEditSong: canEditSong(task),
+        hasStemCache: Boolean(stemCache),
+        hasReadableStemCache: stemCache?.hasStemCache === true,
+        stemJobId: stemCache?.jobId ?? null,
       };
     }));
 

@@ -31,7 +31,7 @@ export async function GET() {
 
     const { data: templates, error: templatesError } = await supabaseAdmin
       .from('templates')
-      .select('id, name, genre, cover_url, category')
+      .select('id, name, genre, cover_url, category, producer_id')
       .in('id', templateIds)
       .eq('status', 'published');
 
@@ -44,6 +44,23 @@ export async function GET() {
     const templateMap = new Map(
       (templates || []).map((t) => [t.id, t])
     );
+    const producerIds = Array.from(new Set((templates || []).map((t: any) => t.producer_id).filter(Boolean))) as string[];
+    let producerMap: Record<string, { name: string; avatarUrl?: string }> = {};
+
+    if (producerIds.length > 0) {
+      const { data: producers } = await supabaseAdmin
+        .from('producers')
+        .select('id, display_name, avatar_url')
+        .in('id', producerIds);
+
+      producerMap = (producers || []).reduce((acc: Record<string, { name: string; avatarUrl?: string }>, producer: any) => {
+        acc[producer.id] = {
+          name: producer.display_name,
+          avatarUrl: producer.avatar_url || undefined,
+        };
+        return acc;
+      }, {});
+    }
 
     const result = purchases
       .map((p) => {
@@ -55,6 +72,9 @@ export async function GET() {
           genre: tmpl.genre,
           cover_url: tmpl.cover_url,
           category: tmpl.category,
+          producer_id: (tmpl as any).producer_id,
+          producer_name: (tmpl as any).producer_id ? producerMap[(tmpl as any).producer_id]?.name : undefined,
+          producer_avatar_url: (tmpl as any).producer_id ? producerMap[(tmpl as any).producer_id]?.avatarUrl : undefined,
           purchased_at: p.purchased_at,
         };
       })

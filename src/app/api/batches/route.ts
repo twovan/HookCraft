@@ -1,6 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '../../../lib/supabase/server';
 import { getAuthUser } from '../../../lib/supabase/auth-helpers';
+import { loadStemCacheByTaskId } from '@/lib/stems/stemCacheLookup';
+
+function extractTitleFromPrompt(prompt?: string | null) {
+  if (!prompt) return null;
+
+  const titleLine = prompt
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find((line) => /^(标题|歌曲名称)\s*[:：]/.test(line));
+
+  if (!titleLine) return null;
+
+  const title = titleLine.replace(/^(标题|歌曲名称)\s*[:：]\s*/, '').trim();
+  return title || null;
+}
+
+function getDisplayTitle(task: any, batch: any, prompt?: string | null) {
+  return task.title || batch?.title || extractTitleFromPrompt(prompt) || null;
+}
+
+function canEditSong(task: any) {
+  return task.status === 'completed' && typeof task.model_id === 'string' && task.model_id.includes('kie');
+}
 
 /**
  * GET /api/batches
@@ -26,10 +49,11 @@ export async function GET(req: NextRequest) {
     const pageSize = Math.max(1, Math.min(100, parseInt(searchParams.get('pageSize') || '20', 10)));
     const offset = (page - 1) * pageSize;
 
-    // Build query
+    // Build query at song/version granularity. The page still calls this API for
+    // history, but each generation_task now represents one visible song row.
     let query = supabaseAdmin
-      .from('generation_batches')
-      .select('*, templates(name)', { count: 'exact' })
+      .from('generation_tasks')
+      .select('*', { count: 'exact' })
       .eq('user_id', user.id);
 
     // Apply time range filter
@@ -56,18 +80,58 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Map to BatchListResponse
-    const batches = (data ?? []).map((batch: any) => ({
-      batchId: batch.id,
-      createdAt: batch.created_at,
-      title: batch.title || null,
-      templateName: batch.templates?.name ?? null,
-      promptSummary: batch.prompt ? batch.prompt.slice(0, 50) : null,
-      generationType: batch.generation_type,
-      versionCount: batch.version_count,
-      selectedVersionId: batch.selected_task_id,
-      status: batch.status,
-    }));
+    const batchIds = Array.from(
+      new Set((data ?? []).map((task: any) => task.batch_id).filter(Boolean))
+    );
+    const batchMap = new Map<string, any>();
+
+    if (batchIds.length > 0) {
+      const { data: batchesData, error: batchesError } = await supabaseAdmin
+        .from('generation_batches')
+        .select('*, templates(name)')
+        .in('id', batchIds);
+
+      if (batchesError) {
+        console.error('song batches query error:', batchesError);
+      } else {
+        for (const batch of batchesData ?? []) {
+          batchMap.set(batch.id, batch);
+        }
+      }
+    }
+
+    const stemCacheByTaskId = await loadStemCacheByTaskId(supabaseAdmin, user.id, data ?? []);
+
+    // Keep the legacy "batches" response key for the existing client, but each
+    // item is now one song/version instead of one generation batch.
+    const batches = (data ?? []).map((task: any) => {
+      const batch = task.batch_id ? batchMap.get(task.batch_id) : null;
+      const prompt = batch?.prompt ?? task.prompt;
+      const stemCache = stemCacheByTaskId.get(task.id);
+      return {
+        batchId: task.batch_id || task.id,
+        taskId: task.id,
+        versionNumber: task.version_number,
+        createdAt: task.created_at,
+        title: getDisplayTitle(task, batch, prompt),
+        templateName: batch?.templates?.name ?? null,
+        promptSummary: prompt ? prompt.slice(0, 50) : null,
+        generationType: task.generation_type || batch?.generation_type,
+        versionCount: 1,
+        selectedVersionId: batch?.selected_task_id,
+        status: task.status,
+        errorMessage: task.error_message || null,
+        refundedCredits: task.status === 'failed' ? task.credits_consumed || 0 : 0,
+        durationSeconds: task.duration_seconds ?? null,
+        lyrics: task.lyrics ?? null,
+        authorName: task.author_name ?? null,
+        styleTags: task.style_tags ?? [],
+        canEditSong: canEditSong(task),
+        hasStemCache: Boolean(stemCache),
+        hasReadableStemCache: stemCache?.hasStemCache === true,
+        stemJobId: stemCache?.jobId ?? null,
+      };
+    });
 
     return NextResponse.json({
       batches,

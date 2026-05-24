@@ -23,6 +23,8 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData();
     const templateId = formData.get("templateId") as string | null;
     const audioFile = formData.get("audio") as File | null;
+    const analysisTypeValue = formData.get("analysisType");
+    const analysisType = analysisTypeValue === "suno" ? "suno" : "lyria3";
 
     if (!templateId) {
       return NextResponse.json(
@@ -44,7 +46,7 @@ export async function POST(req: NextRequest) {
     const mimeType = fileName.endsWith(".wav") ? "audio/wav" : "audio/mp3";
 
     const service = new TemplateAdminService(supabaseAdmin);
-    const result = await service.analyzeTemplate(templateId, audioBase64, mimeType);
+    const result = await service.analyzeTemplate(templateId, audioBase64, mimeType, analysisType);
 
     return NextResponse.json(result);
   } catch (error: any) {

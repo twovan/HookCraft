@@ -25,8 +25,8 @@ export interface CreditStore {
   isLoading: boolean;
 
   // Actions
-  fetchCredits: () => Promise<void>;
-  fetchPreviewCount: () => Promise<void>;
+  fetchCredits: (options?: { force?: boolean }) => Promise<void>;
+  fetchPreviewCount: (options?: { force?: boolean }) => Promise<void>;
   decrementCredits: (amount: number, monthlyCost: number, purchasedCost: number) => void;
   addPurchasedCredits: (amount: number) => void;
   decrementPreview: () => void;
@@ -39,14 +39,25 @@ export interface CreditStore {
   resetCountdown: () => string;
 }
 
+const CREDIT_FETCH_TTL_MS = 3000;
+let creditsFetchPromise: Promise<void> | null = null;
+let previewFetchPromise: Promise<void> | null = null;
+let lastCreditsFetchAt = 0;
+let lastPreviewFetchAt = 0;
+
 export const useCreditStore = create<CreditStore>((set, get) => ({
   credits: null,
   previewCount: null,
   isLoading: false,
 
-  fetchCredits: async () => {
+  fetchCredits: async (options) => {
+    const now = Date.now();
+    if (!options?.force && creditsFetchPromise) return creditsFetchPromise;
+    if (!options?.force && get().credits && now - lastCreditsFetchAt < CREDIT_FETCH_TTL_MS) return;
+
     set({ isLoading: true });
-    try {
+    creditsFetchPromise = (async () => {
+      try {
       const headers = await getAuthHeaders();
       const res = await fetch('/api/credits', { headers });
       if (!res.ok) {
@@ -66,14 +77,25 @@ export const useCreditStore = create<CreditStore>((set, get) => ({
         periodEnd: data.periodEnd ? new Date(data.periodEnd) : new Date(),
       };
       set({ credits, isLoading: false });
-    } catch {
-      set({ isLoading: false });
-    }
+      lastCreditsFetchAt = Date.now();
+      } catch {
+        set({ isLoading: false });
+      } finally {
+        creditsFetchPromise = null;
+      }
+    })();
+
+    return creditsFetchPromise;
   },
 
-  fetchPreviewCount: async () => {
+  fetchPreviewCount: async (options) => {
+    const now = Date.now();
+    if (!options?.force && previewFetchPromise) return previewFetchPromise;
+    if (!options?.force && get().previewCount && now - lastPreviewFetchAt < CREDIT_FETCH_TTL_MS) return;
+
     set({ isLoading: true });
-    try {
+    previewFetchPromise = (async () => {
+      try {
       const headers = await getAuthHeaders();
       const res = await fetch('/api/credits/preview', { headers });
       if (!res.ok) {
@@ -81,9 +103,15 @@ export const useCreditStore = create<CreditStore>((set, get) => ({
       }
       const data: PreviewCount = await res.json();
       set({ previewCount: data, isLoading: false });
-    } catch {
-      set({ isLoading: false });
-    }
+      lastPreviewFetchAt = Date.now();
+      } catch {
+        set({ isLoading: false });
+      } finally {
+        previewFetchPromise = null;
+      }
+    })();
+
+    return previewFetchPromise;
   },
 
   decrementCredits: (amount: number, monthlyCost: number, purchasedCost: number) => {

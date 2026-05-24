@@ -12,10 +12,12 @@ export interface UpgradeBannerProps {
  * - 付费用户：隐藏
  */
 export default function UpgradeBanner({ onUpgrade }: UpgradeBannerProps) {
+  const membership = useMembershipStore((s) => s.membership);
+  const isLoading = useMembershipStore((s) => s.isLoading);
   const isPaid = useMembershipStore((s) => s.isPaid());
 
-  // 付费用户不显示
-  if (isPaid) return null;
+  // 等会员状态明确后再展示，避免刷新瞬间误判为免费用户。
+  if (isLoading || !membership || isPaid) return null;
 
   return (
     <div
@@ -25,27 +27,27 @@ export default function UpgradeBanner({ onUpgrade }: UpgradeBannerProps) {
         left: 0,
         right: 0,
         zIndex: 900,
-        background: 'linear-gradient(135deg, rgba(253, 251, 247, 0.98) 0%, rgba(245, 230, 211, 0.98) 100%)',
+        background: 'linear-gradient(135deg, rgba(18, 18, 30, 0.96) 0%, rgba(31, 24, 50, 0.96) 100%)',
         backdropFilter: 'blur(12px)',
-        borderTop: '1px solid rgba(117, 54, 213, 0.2)',
+        borderTop: '1px solid rgba(117, 54, 213, 0.35)',
         padding: '12px 24px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         gap: '16px',
-        boxShadow: '0 -4px 20px rgba(117, 54, 213, 0.08)',
+        boxShadow: '0 -10px 30px rgba(0, 0, 0, 0.28), 0 -4px 20px rgba(117, 54, 213, 0.12)',
       }}
       role="banner"
       aria-label="升级提示"
     >
       {/* Icon */}
-      <span style={{ fontSize: '16px' }}>✨</span>
+      <span style={{ fontSize: '16px', color: '#c0a7fc' }}>✨</span>
 
       {/* Text */}
       <span
         style={{
           fontSize: '14px',
-          color: '#e8e8f0',
+          color: '#d8d9e6',
           fontWeight: 500,
           fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
         }}

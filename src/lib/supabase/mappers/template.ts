@@ -23,6 +23,10 @@ export function toTemplate(row: Tables<'templates'>): Template {
     referenceAudioUrl: r.reference_audio_url || undefined,
     analysisResult: r.analysis_result || undefined,
     lyriaPrompt: r.lyria_prompt || undefined,
+    sunoAnalysisResult: r.suno_analysis_result || undefined,
+    sunoPrompt: r.suno_prompt || undefined,
+    sunoAnalyzedAt: r.suno_analyzed_at ? new Date(r.suno_analyzed_at) : undefined,
+    sunoAnalysisStatus: r.suno_analysis_status || 'pending',
     analyzedAt: r.analyzed_at ? new Date(r.analyzed_at) : undefined,
     analysisStatus: r.analysis_status || 'pending',
   };
@@ -43,6 +47,10 @@ export function fromTemplate(info: Template): Partial<UpdateTables<'templates'>>
     reference_audio_url: info.referenceAudioUrl ?? null,
     analysis_result: info.analysisResult ?? null,
     lyria_prompt: info.lyriaPrompt ?? null,
+    suno_analysis_result: info.sunoAnalysisResult ?? null,
+    suno_prompt: info.sunoPrompt ?? null,
+    suno_analyzed_at: info.sunoAnalyzedAt ? info.sunoAnalyzedAt.toISOString() : null,
+    suno_analysis_status: info.sunoAnalysisStatus ?? 'pending',
     analyzed_at: info.analyzedAt ? info.analyzedAt.toISOString() : null,
     analysis_status: info.analysisStatus,
   };

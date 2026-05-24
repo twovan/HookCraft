@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'GEMINI_API_KEY 未配置' }, { status: 500 });
     }
 
-    return NextResponse.json({ key: apiKey });
+    return NextResponse.json({ apiKey, key: apiKey });
   } catch (error) {
     return NextResponse.json({ error: '获取失败' }, { status: 500 });
   }

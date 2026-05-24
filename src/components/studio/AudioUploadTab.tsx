@@ -249,7 +249,7 @@ export default function AudioUploadTab() {
             taskId,
           });
           setGenerationStatus('completed');
-          useCreditStore.getState().fetchCredits();
+          useCreditStore.getState().fetchCredits({ force: true });
         } else if (data.status === 'failed') {
           if (pollingRef.current) {
             clearInterval(pollingRef.current);
@@ -386,7 +386,7 @@ export default function AudioUploadTab() {
                 taskId: event.taskId,
               });
               setGenerationStatus('completed');
-              useCreditStore.getState().fetchCredits();
+              useCreditStore.getState().fetchCredits({ force: true });
               completed = true;
               return;
             } else if (event.type === 'error') {
@@ -417,7 +417,7 @@ export default function AudioUploadTab() {
                   taskId: event.taskId,
                 });
                 setGenerationStatus('completed');
-                useCreditStore.getState().fetchCredits();
+                useCreditStore.getState().fetchCredits({ force: true });
                 completed = true;
               } else if (event.type === 'error') {
                 throw new Error(event.error || '生成失败，请重试');

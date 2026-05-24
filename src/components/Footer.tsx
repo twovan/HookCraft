@@ -28,7 +28,7 @@ export default function Footer() {
           <div>
             <div style={{ fontSize: 28, fontWeight: 700, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", color: '#7536d5', marginBottom: 16 }}>HookCraft</div>
             <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, lineHeight: 1.8, maxWidth: 320 }}>
-              高质量音乐模板交易平台，连接优秀制作人与创作者，让每一段旋律都能找到归属。
+              用正版模板与 AI 工作流，让华语创作者快速完成可听 Demo。
             </p>
           </div>
           <div>

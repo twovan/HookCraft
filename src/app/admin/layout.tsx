@@ -16,6 +16,7 @@ const pageTitles: Record<string, { title: string; breadcrumb: string }> = {
   '/admin/orders': { title: '订单管理', breadcrumb: '首页 / 交易管理 / 订单管理' },
   '/admin/revenue': { title: '收入结算', breadcrumb: '首页 / 交易管理 / 收入结算' },
   '/admin/ai-tasks': { title: 'AI 任务监控', breadcrumb: '首页 / AI 管理 / AI 任务' },
+  '/admin/generated-songs': { title: '生成歌曲管理', breadcrumb: '首页 / AI 管理 / 生成歌曲' },
   '/admin/credits': { title: 'Credits 管理', breadcrumb: '首页 / AI 管理 / Credits' },
   '/admin/sensitive-words': { title: '敏感词管理', breadcrumb: '首页 / 内容管理 / 敏感词管理' },
   '/admin/settings': { title: '系统设置', breadcrumb: '首页 / 系统 / 系统设置' },

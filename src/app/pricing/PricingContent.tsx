@@ -67,7 +67,7 @@ export default function PricingContent({ tiers }: PricingContentProps) {
           monthly_credits: tierConfig?.monthlyCredits || 0,
         });
         // Refresh membership store
-        await fetchMembership();
+        await fetchMembership({ force: true });
       } else {
         setUpgradeError(data.error || '升级失败，请重试');
         setTimeout(() => setUpgradeError(null), 5000);
@@ -340,7 +340,7 @@ export default function PricingContent({ tiers }: PricingContentProps) {
                     const data = await res.json();
                     if (res.ok && data.success) {
                       // Refresh credit store after successful purchase
-                      fetchCredits();
+                      fetchCredits({ force: true });
                       alert(`充值成功！已增加 ${data.credits_added} Credits，当前剩余 ${data.remaining} Credits`);
                     } else {
                       alert(data.error || '充值失败');

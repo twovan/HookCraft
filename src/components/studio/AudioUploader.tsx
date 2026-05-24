@@ -16,10 +16,10 @@ export interface AudioUploaderProps {
   audioFile: File | null;
   status: 'idle' | 'validating' | 'ready' | 'error';
   error: string | null;
+  maxSizeMB?: number;
+  maxDurationSeconds?: number;
+  requirementText?: string;
 }
-
-/** 允许的 MIME 类型 */
-const ACCEPTED_TYPES = ['audio/mpeg', 'audio/wav', 'audio/x-wav'];
 
 /** 格式化文件大小 */
 function formatFileSize(bytes: number): string {
@@ -46,6 +46,9 @@ export default function AudioUploader({
   audioFile,
   status,
   error,
+  maxSizeMB,
+  maxDurationSeconds,
+  requirementText = '仅支持 MP3/WAV 格式，最大 50MB，时长 6秒-6分钟',
 }: AudioUploaderProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -56,7 +59,10 @@ export default function AudioUploader({
   const handleFile = useCallback(
     async (file: File) => {
       // 校验音频文件（格式 → 大小 → 时长）
-      const result = await validateAudioFile(file);
+      const result = await validateAudioFile(file, {
+        maxSizeMB,
+        maxDurationSeconds,
+      });
 
       if (!result.valid) {
         onError(result.error!);
@@ -71,7 +77,7 @@ export default function AudioUploader({
         onError('文件编码失败，请重试');
       }
     },
-    [onFileSelected, onError]
+    [maxDurationSeconds, maxSizeMB, onFileSelected, onError]
   );
 
   /**
@@ -196,7 +202,7 @@ export default function AudioUploader({
       <input
         ref={fileInputRef}
         type="file"
-        accept=".mp3,.wav,audio/mpeg,audio/wav"
+        accept=".mp3,.wav,audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/wave"
         onChange={handleInputChange}
         style={{ display: 'none' }}
         aria-hidden="true"
@@ -248,7 +254,7 @@ export default function AudioUploader({
               color: '#9ca3af',
             }}
           >
-            支持 MP3/WAV 格式，最大 50MB，时长 6秒-6分钟
+            {requirementText}
           </p>
         </>
       )}

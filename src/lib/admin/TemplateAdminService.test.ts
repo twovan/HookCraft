@@ -337,5 +337,14 @@ describe('TemplateAdminService', () => {
       expect(result.lyriaPrompt).toBe(plain);
       expect(result.analysisDisplay).toBe(plain);
     });
+
+    it('限制分析和 SUNO 描述在 1000 字符内', () => {
+      const longAnalysis = '编曲分析：' + '层次丰富，'.repeat(180);
+      const longPrompt = 'electronic pop arrangement, '.repeat(80);
+      const result = parseAnalysisResponse(`${longAnalysis}\n[PROMPT]${longPrompt}[/PROMPT]`, 1000);
+
+      expect(result.analysisDisplay.length).toBeLessThanOrEqual(1000);
+      expect(result.lyriaPrompt.length).toBeLessThanOrEqual(1000);
+    });
   });
 });

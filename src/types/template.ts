@@ -19,6 +19,8 @@ export interface Template {
   price?: number;
   /** 制作人 ID */
   producerId?: string;
+  producerName?: string;
+  producerAvatarUrl?: string;
   previewUrl?: string;
   coverUrl?: string;
   /** 参考音频文件 URL（管理员上传） */
@@ -27,6 +29,10 @@ export interface Template {
   analysisResult?: string;
   /** 缓存的英文 Lyria Prompt（直接用于 Lyria 3 生成） */
   lyriaPrompt?: string;
+  sunoAnalysisResult?: string;
+  sunoPrompt?: string;
+  sunoAnalyzedAt?: Date;
+  sunoAnalysisStatus?: TemplateAnalysisStatus;
   /** 分析完成时间 */
   analyzedAt?: Date;
   /** 分析状态 */

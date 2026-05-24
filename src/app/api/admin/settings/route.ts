@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
+import { normalizeStudioTabSettings } from '../../../../config/studioTabs';
 import { supabaseAdmin } from '../../../../lib/supabase/server';
 import { requireAdmin } from '../../../../lib/admin/auth';
+import {
+  isMissingPlatformSettingsError,
+  readStudioTabSettings,
+  writeStudioTabSettings,
+} from '../../../../lib/studio/StudioTabSettingsStore';
 
 /**
  * GET /api/admin/settings
@@ -15,7 +22,7 @@ export async function GET(req: NextRequest) {
       .from('platform_settings')
       .select('*');
 
-    if (error) throw error;
+    if (error && !isMissingPlatformSettingsError(error)) throw error;
 
     // Build settings object from rows
     const settingsMap: Record<string, any> = {};
@@ -49,6 +56,7 @@ export async function GET(req: NextRequest) {
         reviewTimeoutReminderHours: 24,
         notificationMethods: ['in_app', 'email'],
       },
+      studioTabs: await readStudioTabSettings(supabaseAdmin),
     };
 
     return NextResponse.json(result);
@@ -74,24 +82,40 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: '参数不完整' }, { status: 400 });
     }
 
-    const validSections = ['basic', 'transaction', 'ai_generation', 'review'];
+    const validSections = ['basic', 'transaction', 'ai_generation', 'review', 'studio_tabs'];
     if (!validSections.includes(section)) {
       return NextResponse.json({ error: '无效的设置分类' }, { status: 400 });
     }
 
+    if (section === 'studio_tabs') {
+      const settingValue = await writeStudioTabSettings(supabaseAdmin, value, {
+        id: admin.adminId,
+        name: admin.displayName || admin.username,
+      });
+
+      revalidatePath('/studio');
+      revalidatePath('/api/studio/settings');
+
+      return NextResponse.json({ success: true, settingValue });
+    }
+
     // Upsert the setting
+    const settingValue = section === 'studio_tabs'
+      ? normalizeStudioTabSettings(value)
+      : value;
+
     const { error } = await supabaseAdmin
       .from('platform_settings')
       .upsert({
         setting_key: section,
-        setting_value: value,
+        setting_value: settingValue,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'setting_key' });
 
     if (error) throw error;
 
     // Log operation
-    await supabaseAdmin.from('operation_logs').insert({
+    const { error: logError } = await supabaseAdmin.from('operation_logs').insert({
       operator_id: admin.adminId,
       operator_name: admin.displayName || admin.username,
       operation_type: 'system',
@@ -101,9 +125,13 @@ export async function PUT(req: NextRequest) {
       ip_address: req.headers.get('x-forwarded-for') || 'unknown',
     });
 
+    if (logError) {
+      console.error('[Admin Settings Audit Log Error]', logError);
+    }
+
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch (error: any) {
     console.error('[Admin Settings PUT Error]', error);
-    return NextResponse.json({ error: '保存设置失败' }, { status: 500 });
+    return NextResponse.json({ error: error?.message || '保存设置失败' }, { status: 500 });
   }
 }

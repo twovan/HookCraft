@@ -51,6 +51,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'AI 管理',
     items: [
       { label: 'AI 任务', icon: '🤖', href: '/admin/ai-tasks' },
+      { label: '生成歌曲', icon: '♪', href: '/admin/generated-songs' },
       { label: 'Credits', icon: '⚡', href: '/admin/credits' },
     ],
   },

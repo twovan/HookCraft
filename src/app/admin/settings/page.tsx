@@ -1,6 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import {
+  DEFAULT_STUDIO_TAB_SETTINGS,
+  STUDIO_TAB_OPTIONS,
+  type StudioTab,
+  type StudioTabSettings,
+} from '@/config/studioTabs';
 
 interface BasicSettings {
   platformName: string;
@@ -35,6 +41,7 @@ export default function AdminSettingsPage() {
   const [transaction, setTransaction] = useState<TransactionSettings>({ commissionRate: 30, minWithdrawalAmount: 100, settlementCycleDays: 30, enabledPaymentMethods: [] });
   const [ai, setAI] = useState<AISettings>({ modelVersion: '', maxConcurrentGenerations: 10, generationTimeoutSeconds: 300, creditsResetSchedule: '' });
   const [review, setReview] = useState<ReviewSettings>({ trustedProducerAutoApprove: false, aiContentSafetyPreCheck: true, reviewTimeoutReminderHours: 24, notificationMethods: [] });
+  const [studioTabs, setStudioTabs] = useState<StudioTabSettings>(DEFAULT_STUDIO_TAB_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [toast, setToast] = useState('');
@@ -51,6 +58,7 @@ export default function AdminSettingsPage() {
       setTransaction(data.transaction);
       setAI(data.aiGeneration);
       setReview(data.review);
+      setStudioTabs(data.studioTabs || DEFAULT_STUDIO_TAB_SETTINGS);
     } catch {
       // ignore
     } finally {
@@ -66,11 +74,12 @@ export default function AdminSettingsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ section, value }),
       });
-      if (!res.ok) throw new Error('保存失败');
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || '保存失败');
       setToast('设置已保存');
       setTimeout(() => setToast(''), 3000);
-    } catch {
-      alert('保存失败，请重试');
+    } catch (error) {
+      alert(error instanceof Error ? error.message : '保存失败，请重试');
     } finally {
       setSaving(null);
     }
@@ -92,6 +101,21 @@ export default function AdminSettingsPage() {
         ? prev.notificationMethods.filter((m) => m !== method)
         : [...prev.notificationMethods, method],
     }));
+  }
+
+  function toggleStudioTab(tab: StudioTab) {
+    setStudioTabs((prev) => {
+      const visibleTabs = prev.visibleTabs.includes(tab)
+        ? prev.visibleTabs.filter((item) => item !== tab)
+        : STUDIO_TAB_OPTIONS
+          .map((item) => item.id)
+          .filter((item) => item === tab || prev.visibleTabs.includes(item));
+      const defaultTab = visibleTabs.includes(prev.defaultTab)
+        ? prev.defaultTab
+        : visibleTabs[0] || prev.defaultTab;
+
+      return { visibleTabs, defaultTab };
+    });
   }
 
   if (loading) {
@@ -227,6 +251,46 @@ export default function AdminSettingsPage() {
           </div>
           <button onClick={() => saveSection('review', review)} disabled={saving === 'review'} style={saveBtnStyle}>
             {saving === 'review' ? '保存中...' : '保存设置'}
+          </button>
+        </div>
+        <div style={cardStyle}>
+          <h3 style={cardTitleStyle}>Studio Tab 设置</h3>
+          <div style={formGroupStyle}>
+            <label style={labelStyle}>显示 Tab</label>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {STUDIO_TAB_OPTIONS.map((tab) => (
+                <label key={tab.id} style={checkboxLabelStyle}>
+                  <input
+                    type="checkbox"
+                    checked={studioTabs.visibleTabs.includes(tab.id)}
+                    onChange={() => toggleStudioTab(tab.id)}
+                  />
+                  <span>{tab.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <div style={formGroupStyle}>
+            <label style={labelStyle}>默认 Tab</label>
+            <select
+              style={inputStyle}
+              value={studioTabs.defaultTab}
+              onChange={(e) => setStudioTabs((prev) => ({ ...prev, defaultTab: e.target.value as StudioTab }))}
+              disabled={studioTabs.visibleTabs.length === 0}
+            >
+              {STUDIO_TAB_OPTIONS
+                .filter((tab) => studioTabs.visibleTabs.includes(tab.id))
+                .map((tab) => (
+                  <option key={tab.id} value={tab.id}>{tab.label}</option>
+                ))}
+            </select>
+          </div>
+          <button
+            onClick={() => saveSection('studio_tabs', studioTabs)}
+            disabled={saving === 'studio_tabs' || studioTabs.visibleTabs.length === 0}
+            style={saveBtnStyle}
+          >
+            {saving === 'studio_tabs' ? '保存中...' : '保存设置'}
           </button>
         </div>
       </div>

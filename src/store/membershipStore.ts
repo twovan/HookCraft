@@ -19,7 +19,7 @@ export interface MembershipStore {
   error: string | null;
 
   // Actions
-  fetchMembership: () => Promise<void>;
+  fetchMembership: (options?: { force?: boolean }) => Promise<void>;
   setMembership: (info: MembershipInfo) => void;
   clearMembership: () => void;
 
@@ -29,14 +29,23 @@ export interface MembershipStore {
   isExpiringSoon: () => boolean;
 }
 
+const MEMBERSHIP_FETCH_TTL_MS = 3000;
+let membershipFetchPromise: Promise<void> | null = null;
+let lastMembershipFetchAt = 0;
+
 export const useMembershipStore = create<MembershipStore>((set, get) => ({
   membership: null,
   isLoading: false,
   error: null,
 
-  fetchMembership: async () => {
+  fetchMembership: async (options) => {
+    const now = Date.now();
+    if (!options?.force && membershipFetchPromise) return membershipFetchPromise;
+    if (!options?.force && get().membership && now - lastMembershipFetchAt < MEMBERSHIP_FETCH_TTL_MS) return;
+
     set({ isLoading: true, error: null });
-    try {
+    membershipFetchPromise = (async () => {
+      try {
       const headers = await getAuthHeaders();
       const res = await fetch('/api/membership', { headers });
       if (!res.ok) {
@@ -44,10 +53,16 @@ export const useMembershipStore = create<MembershipStore>((set, get) => ({
       }
       const data: MembershipInfo = await res.json();
       set({ membership: data, isLoading: false });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      set({ error: message, isLoading: false });
-    }
+      lastMembershipFetchAt = Date.now();
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        set({ error: message, isLoading: false });
+      } finally {
+        membershipFetchPromise = null;
+      }
+    })();
+
+    return membershipFetchPromise;
   },
 
   setMembership: (info: MembershipInfo) => {

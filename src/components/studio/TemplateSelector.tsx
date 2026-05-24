@@ -4,10 +4,15 @@ import { useState, useEffect } from 'react';
 import { useMembershipStore } from '@/store/membershipStore';
 import type { Template, TemplateCategory } from '@/types/template';
 
+const PUBLIC_PRODUCER_NAME = 'HOOKCRAFT';
+const PUBLIC_PRODUCER_AVATAR = '/icon.svg';
+
 export interface TemplateSelectorProps {
   templates: Template[];
   selectedTemplateId?: string;
   onSelect: (template: Template) => void;
+  loading?: boolean;
+  columns?: 2 | 3;
 }
 
 /**
@@ -21,6 +26,8 @@ export default function TemplateSelector({
   templates,
   selectedTemplateId,
   onSelect,
+  loading = false,
+  columns = 3,
 }: TemplateSelectorProps) {
   const [activeTab, setActiveTab] = useState<TemplateCategory | 'purchased'>('free_template');
   const isPaid = useMembershipStore((s) => s.isPaid());
@@ -40,13 +47,25 @@ export default function TemplateSelector({
         return { templates: [] };
       })
       .then((data) => {
-        const mapped: Template[] = (data.templates || []).map((t: { id: string; name: string; genre: string; cover_url: string | null; category: string }) => ({
+        const mapped: Template[] = (data.templates || []).map((t: {
+          id: string;
+          name: string;
+          genre: string;
+          cover_url: string | null;
+          category: string;
+          producer_id?: string | null;
+          producer_name?: string;
+          producer_avatar_url?: string;
+        }) => ({
           id: t.id,
           name: t.name,
           genre: t.genre,
           coverUrl: t.cover_url,
           category: t.category as TemplateCategory,
           description: '',
+          producerId: t.producer_id || undefined,
+          producerName: t.producer_name,
+          producerAvatarUrl: t.producer_avatar_url,
         }));
         setPurchasedTemplates(mapped);
       })
@@ -59,6 +78,7 @@ export default function TemplateSelector({
     : activeTab === 'paid_template'
       ? paidTemplates
       : purchasedTemplates;
+  const isLoading = loading || (purchasedLoading && activeTab === 'purchased');
 
   const isLocked = !isPaid && activeTab === 'paid_template';
   const isPurchasedTab = activeTab === 'purchased';
@@ -110,13 +130,36 @@ export default function TemplateSelector({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
+          gridTemplateColumns: `repeat(${columns}, 1fr)`,
           gap: '12px',
         }}
         role="listbox"
         aria-label="模板列表"
       >
-        {displayTemplates.map((template) => {
+        {isLoading && Array.from({ length: 6 }).map((_, index) => (
+          <div
+            key={`template-skeleton-${index}`}
+            style={{
+              aspectRatio: '1 / 1.45',
+              borderRadius: '12px',
+              border: '1px solid #2a2a40',
+              background: 'linear-gradient(135deg, rgba(117, 54, 213, 0.12), rgba(18, 18, 30, 0.95))',
+              position: 'relative',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent)',
+                animation: 'templateSkeleton 1.4s ease-in-out infinite',
+              }}
+            />
+          </div>
+        ))}
+
+        {!isLoading && displayTemplates.map((template) => {
           const isSelected = template.id === selectedTemplateId;
 
           return (
@@ -133,7 +176,7 @@ export default function TemplateSelector({
               aria-disabled={isLocked}
               style={{
                 position: 'relative',
-                aspectRatio: '2 / 3',
+                aspectRatio: '1 / 1.45',
                 borderRadius: '12px',
                 border: isSelected
                   ? '2px solid #7536d5'
@@ -186,8 +229,8 @@ export default function TemplateSelector({
                   bottom: 0,
                   left: 0,
                   right: 0,
-                  background: 'linear-gradient(transparent, rgba(0,0,0,0.6))',
-                  padding: '24px 10px 10px',
+                  background: 'linear-gradient(transparent, rgba(0,0,0,0.82))',
+                  padding: '34px 10px 10px',
                 }}
               >
                 <div
@@ -207,9 +250,46 @@ export default function TemplateSelector({
                     color: 'rgba(255,255,255,0.8)',
                     textAlign: 'left',
                     marginTop: '2px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   {template.genre}
+                </div>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    marginTop: 8,
+                    minWidth: 0,
+                  }}
+                >
+                  <img
+                    src={template.producerAvatarUrl || PUBLIC_PRODUCER_AVATAR}
+                    alt=""
+                    style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                      background: 'rgba(255,255,255,0.12)',
+                      flexShrink: 0,
+                    }}
+                  />
+                  <span
+                    style={{
+                      color: 'rgba(255,255,255,0.92)',
+                      fontSize: 10,
+                      fontWeight: 600,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {template.producerName || PUBLIC_PRODUCER_NAME}
+                  </span>
                 </div>
               </div>
 
@@ -240,7 +320,7 @@ export default function TemplateSelector({
       </div>
 
       {/* Empty state */}
-      {displayTemplates.length === 0 && !purchasedLoading && (
+      {displayTemplates.length === 0 && !isLoading && (
         <div
           style={{
             textAlign: 'center',
@@ -252,18 +332,12 @@ export default function TemplateSelector({
           {activeTab === 'purchased' ? '暂无已购模板，去模板中心看看吧' : '暂无模板'}
         </div>
       )}
-      {purchasedLoading && activeTab === 'purchased' && (
-        <div
-          style={{
-            textAlign: 'center',
-            padding: '32px 16px',
-            color: '#999',
-            fontSize: '13px',
-          }}
-        >
-          加载中...
-        </div>
-      )}
+      <style>{`
+        @keyframes templateSkeleton {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+      `}</style>
     </div>
   );
 }

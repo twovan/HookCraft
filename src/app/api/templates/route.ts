@@ -29,7 +29,32 @@ export async function GET(req: NextRequest) {
       tierFeatures.includes(t.category) && t.status === 'published'
     );
 
-    return NextResponse.json(accessibleTemplates);
+    const producerIds = Array.from(new Set(accessibleTemplates.map((t) => t.producerId).filter(Boolean))) as string[];
+    let producerMap: Record<string, { name: string; avatarUrl?: string }> = {};
+
+    if (producerIds.length > 0) {
+      const { data: producers } = await supabaseAdmin
+        .from('producers')
+        .select('id, display_name, avatar_url')
+        .in('id', producerIds);
+
+      producerMap = (producers || []).reduce((acc: Record<string, { name: string; avatarUrl?: string }>, producer: any) => {
+        acc[producer.id] = {
+          name: producer.display_name,
+          avatarUrl: producer.avatar_url || undefined,
+        };
+        return acc;
+      }, {});
+    }
+
+    return NextResponse.json(accessibleTemplates.map((template) => {
+      const producer = template.producerId ? producerMap[template.producerId] : undefined;
+      return {
+        ...template,
+        producerName: producer?.name,
+        producerAvatarUrl: producer?.avatarUrl,
+      };
+    }));
   } catch (error: any) {
     console.error('获取模板列表失败:', error);
     return NextResponse.json(

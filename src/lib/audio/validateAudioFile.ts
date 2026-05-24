@@ -3,17 +3,23 @@
 
 import type { ValidationResult } from '@/types/arrangement';
 
-/** 允许的音频 MIME 类型 */
-const ALLOWED_TYPES = ['audio/mpeg', 'audio/wav', 'audio/x-wav'];
+/** 允许的音频 MIME 类型和扩展名：产品侧仅开放 MP3/WAV。 */
+const ALLOWED_TYPES = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/wave'];
+const ALLOWED_EXTENSIONS = ['mp3', 'wav'];
 
 /** 最大文件大小：50MB */
-const MAX_SIZE = 50 * 1024 * 1024;
+const DEFAULT_MAX_SIZE_MB = 50;
 
 /** 最短音频时长：6 秒 */
 const MIN_DURATION = 6;
 
 /** 最长音频时长：360 秒（6 分钟，MiniMax API 上限） */
-const MAX_DURATION = 360;
+const DEFAULT_MAX_DURATION = 360;
+
+interface ValidateAudioFileOptions {
+  maxSizeMB?: number;
+  maxDurationSeconds?: number;
+}
 
 /**
  * 使用 Web Audio API 获取音频文件时长（秒）
@@ -62,15 +68,27 @@ export async function getAudioDuration(file: File): Promise<number> {
  * - 返回 { valid: false, error } 包含具体错误信息
  * - 不修改输入文件
  */
-export async function validateAudioFile(file: File): Promise<ValidationResult> {
+export async function validateAudioFile(
+  file: File,
+  options: ValidateAudioFileOptions = {}
+): Promise<ValidationResult> {
+  const maxSizeMB = options.maxSizeMB ?? DEFAULT_MAX_SIZE_MB;
+  const maxSize = maxSizeMB * 1024 * 1024;
+  const maxDurationSeconds = options.maxDurationSeconds ?? DEFAULT_MAX_DURATION;
+  const maxDurationMinutes = Math.round(maxDurationSeconds / 60);
+
+  const extension = file.name.split('.').pop()?.toLowerCase() || '';
+  const hasAllowedMime = !file.type || file.type === 'application/octet-stream' || ALLOWED_TYPES.includes(file.type);
+  const hasAllowedExtension = ALLOWED_EXTENSIONS.includes(extension);
+
   // Step 1: 格式校验
-  if (!ALLOWED_TYPES.includes(file.type)) {
+  if (!hasAllowedMime || !hasAllowedExtension) {
     return { valid: false, error: '仅支持 MP3/WAV 格式' };
   }
 
   // Step 2: 大小校验
-  if (file.size > MAX_SIZE) {
-    return { valid: false, error: '文件大小不能超过 50MB' };
+  if (file.size > maxSize) {
+    return { valid: false, error: `文件大小不能超过 ${maxSizeMB}MB` };
   }
 
   // Step 3: 时长校验（使用 Web Audio API 解码）
@@ -85,8 +103,8 @@ export async function validateAudioFile(file: File): Promise<ValidationResult> {
     return { valid: false, error: '音频时长不能少于 6 秒' };
   }
 
-  if (duration > MAX_DURATION) {
-    return { valid: false, error: '音频时长不能超过 6 分钟' };
+  if (duration > maxDurationSeconds) {
+    return { valid: false, error: `音频时长不能超过 ${maxDurationMinutes} 分钟` };
   }
 
   return { valid: true, duration };

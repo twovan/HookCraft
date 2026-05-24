@@ -15,18 +15,19 @@ export async function GET(req: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1');
     const pageSize = parseInt(searchParams.get('pageSize') || '10');
 
-    // Get accepted invitations as active producers
+    // Get active producer profiles first. Older flows only used accepted invitations,
+    // but templates belong to rows in `producers`.
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
 
-    const { data: producers, count, error } = await supabaseAdmin
-      .from('producer_invitations')
+    const { data: producerProfiles, count: profileCount, error: profileError } = await supabaseAdmin
+      .from('producers')
       .select('*', { count: 'exact' })
-      .eq('status', 'accepted')
-      .order('accepted_at', { ascending: false })
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
       .range(from, to);
 
-    if (error) throw error;
+    if (profileError) throw profileError;
 
     // Get all invitations for the invitations table
     const { data: invitations, count: invCount } = await supabaseAdmin
@@ -36,10 +37,10 @@ export async function GET(req: NextRequest) {
       .limit(50);
 
     // Stats
-    const { count: activeCount } = await supabaseAdmin
-      .from('producer_invitations')
+    const { count: activeProfileCount } = await supabaseAdmin
+      .from('producers')
       .select('*', { count: 'exact', head: true })
-      .eq('status', 'accepted');
+      .eq('status', 'active');
 
     const { count: pendingCount } = await supabaseAdmin
       .from('producer_invitations')
@@ -47,13 +48,13 @@ export async function GET(req: NextRequest) {
       .eq('status', 'pending');
 
     // Calculate average revenue share
-    const allAccepted = producers || [];
-    const avgShare = allAccepted.length > 0
-      ? allAccepted.reduce((sum: number, p: any) => sum + (p.revenue_share || 0.7), 0) / allAccepted.length
+    const allProfiles = producerProfiles || [];
+    const avgShare = allProfiles.length > 0
+      ? allProfiles.reduce((sum: number) => sum + 0.7, 0) / allProfiles.length
       : 0.7;
 
     // Calculate template count per producer
-    const producerIds = allAccepted.map((p: any) => p.id);
+    const producerIds = allProfiles.map((p: any) => p.id);
     let templateStats: Record<string, number> = {};
     if (producerIds.length > 0) {
       const { data: templateCounts } = await supabaseAdmin
@@ -71,17 +72,18 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({
-      data: (producers || []).map((p: any) => ({
+      data: allProfiles.map((p: any) => ({
         id: p.id,
-        name: p.invitee_name,
-        email: p.invitee_email,
-        expertiseTags: p.expertise_tags || [],
-        revenueShare: p.revenue_share,
+        name: p.display_name,
+        email: '',
+        avatarUrl: p.avatar_url,
+        expertiseTags: p.style_tags || [],
+        revenueShare: 0.7,
         status: 'active',
         templateCount: templateStats[p.id] || 0,
         totalSales: 0,
         totalEarnings: 0,
-        acceptedAt: p.accepted_at,
+        acceptedAt: p.joined_at || p.created_at,
       })),
       invitations: (invitations || []).map((inv: any) => ({
         id: inv.id,
@@ -93,12 +95,12 @@ export async function GET(req: NextRequest) {
         status: inv.status,
         createdAt: inv.created_at,
       })),
-      total: count || 0,
+      total: profileCount || 0,
       invitationsTotal: invCount || 0,
       page,
       pageSize,
       stats: {
-        activeProducers: activeCount || 0,
+        activeProducers: activeProfileCount || 0,
         pendingInvitations: pendingCount || 0,
         totalEarnings: 0,
         avgRevenueShare: Math.round(avgShare * 100),

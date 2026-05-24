@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
     if (response) return response;
 
     const body = await req.json();
-    const { name, description, category, genre_tags, price, status: templateStatus } = body;
+    const { name, description, category, genre_tags, price, status: templateStatus, producer_id } = body;
 
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
       return NextResponse.json({ error: '模板名称不能为空' }, { status: 400 });
@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
         genre_tags: genre_tags || [],
         price: price || 0,
         status: templateStatus || 'pending',
-        producer_id: admin.adminId,
+        producer_id: producer_id || null,
         sales_count: 0,
       } as any)
       .select()
