@@ -31,6 +31,8 @@ describe('resolveStemEditorShortcut', () => {
     expect(resolveStemEditorShortcut(keyEvent({ key: ']' }))).toBe('set-selected-trim-end');
     expect(resolveStemEditorShortcut(keyEvent({ key: '[', shiftKey: true }))).toBe('nudge-selected-trim-start-back');
     expect(resolveStemEditorShortcut(keyEvent({ key: ']', shiftKey: true }))).toBe('nudge-selected-trim-end-forward');
+    expect(resolveStemEditorShortcut(keyEvent({ key: 'x' }))).toBe('mute-selected-range');
+    expect(resolveStemEditorShortcut(keyEvent({ key: 'x', shiftKey: true }))).toBe('restore-selected-range');
     expect(resolveStemEditorShortcut(keyEvent({ key: 'Home' }))).toBe('seek-start');
     expect(resolveStemEditorShortcut(keyEvent({ key: 'End' }))).toBe('seek-end');
   });

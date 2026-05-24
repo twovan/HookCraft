@@ -12,6 +12,8 @@ export type StemEditorShortcutAction =
   | 'set-selected-trim-end'
   | 'nudge-selected-trim-start-back'
   | 'nudge-selected-trim-end-forward'
+  | 'mute-selected-range'
+  | 'restore-selected-range'
   | 'seek-start'
   | 'seek-end';
 
@@ -48,6 +50,7 @@ export function resolveStemEditorShortcut(event: KeyboardShortcutEvent): StemEdi
     if (event.key === 'ArrowDown') return 'select-next-track';
     if (event.key === '[') return 'set-selected-trim-start';
     if (event.key === ']') return 'set-selected-trim-end';
+    if (key === 'x') return 'mute-selected-range';
     if (event.key === 'Home') return 'seek-start';
     if (event.key === 'End') return 'seek-end';
   }
@@ -55,6 +58,7 @@ export function resolveStemEditorShortcut(event: KeyboardShortcutEvent): StemEdi
   if (!hasCommandModifier && event.shiftKey) {
     if (event.key === '[') return 'nudge-selected-trim-start-back';
     if (event.key === ']') return 'nudge-selected-trim-end-forward';
+    if (key === 'x') return 'restore-selected-range';
   }
 
   if (!hasCommandModifier) return null;
