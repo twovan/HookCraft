@@ -29,6 +29,58 @@ interface StemEditorJob {
   editState?: StemEditState | null;
 }
 
+const TEXT = {
+  emptyResult: '\u5206\u8f68\u7ed3\u679c\u4e3a\u7a7a\uff0c\u8bf7\u91cd\u65b0\u8bf7\u6c42 API \u5206\u6790\u3002',
+  loadStemFailed: '\u52a0\u8f7d\u5206\u8f68\u5931\u8d25',
+  missingTaskId: '\u7f3a\u5c11\u6b4c\u66f2\u4efb\u52a1 ID\uff0c\u65e0\u6cd5\u52a0\u8f7d\u7f16\u8f91\u9879\u76ee\u3002',
+  createJobFailed: '\u521b\u5efa\u5206\u8f68\u4efb\u52a1\u5931\u8d25',
+  loadEditorFailed: '\u52a0\u8f7d\u7f16\u8f91\u9879\u76ee\u5931\u8d25',
+  refreshFailed: '\u5237\u65b0\u5206\u8f68\u5931\u8d25',
+  backToStudio: '\u8fd4\u56de\u521b\u4f5c\u4e2d\u5fc3',
+  songEditor: '\u6b4c\u66f2\u7f16\u8f91',
+  stemSaved: '\u5206\u8f68\u5df2\u4fdd\u5b58',
+  stemCached: '\u5206\u8f68\u5df2\u7f13\u5b58',
+  editSaved: '\u7f16\u8f91\u72b6\u6001\u5df2\u4fdd\u5b58',
+  loaded: '\u5df2\u52a0\u8f7d',
+  tracksFrom: '\u6761\u5206\u8f68\uff0c\u6765\u6e90\uff1a',
+  rereadCache: '\u91cd\u65b0\u8bfb\u53d6\u7f13\u5b58',
+  retryApi: '\u91cd\u65b0\u8bf7\u6c42 API \u5206\u6790',
+  editorProject: '\u7f16\u8f91\u9879\u76ee',
+  noCache: '\u6ca1\u6709\u53ef\u7528\u7684\u5206\u8f68\u7f13\u5b58\u3002\u786e\u8ba4 KIE \u4f59\u989d\u5145\u8db3\u540e\uff0c\u53ef\u4ee5\u624b\u52a8\u91cd\u65b0\u8bf7\u6c42 API \u5206\u6790\u3002',
+  checkingCache: '\u68c0\u67e5\u7f13\u5b58',
+  readingStemFiles: '\u8bfb\u53d6\u5206\u8f68\u6587\u4ef6',
+  startingApi: '\u542f\u52a8 API \u5206\u6790',
+  waitingApi: '\u7b49\u5f85 API \u8fd4\u56de',
+  writingCache: '\u5199\u5165\u7f13\u5b58',
+  stemLoaded: '\u5206\u8f68\u5df2\u52a0\u8f7d',
+  stemNotStarted: '\u5206\u8f68\u6ca1\u6709\u6210\u529f\u542f\u52a8',
+  checkingCacheNow: '\u6b63\u5728\u68c0\u67e5\u7f13\u5b58',
+  readingCacheNow: '\u6b63\u5728\u8bfb\u53d6\u7f13\u5b58',
+  startingApiNow: '\u6b63\u5728\u542f\u52a8 API \u5206\u6790',
+  apiAnalyzing: 'API \u5206\u6790\u4e2d',
+  writingCacheNow: '\u6b63\u5728\u5199\u5165\u7f13\u5b58',
+  preparingEditor: '\u51c6\u5907\u6b4c\u66f2\u7f16\u8f91',
+  findingSavedStems: '\u6b63\u5728\u67e5\u627e\u5df2\u4fdd\u5b58\u7684\u5206\u8f68',
+  readingCachedStems: '\u6b63\u5728\u8bfb\u53d6\u7f13\u5b58\u5206\u8f68',
+  submittingKie: '\u6b63\u5728\u63d0\u4ea4 KIE \u5206\u8f68\u8bf7\u6c42',
+  kieAnalyzing: 'KIE \u6b63\u5728\u5206\u6790\u97f3\u9891',
+  savingAnalysis: '\u6b63\u5728\u4fdd\u5b58\u5206\u6790\u7ed3\u679c',
+  cacheHit: '\u7f13\u5b58\u5df2\u547d\u4e2d',
+  loadFailed: '\u5206\u8f68\u52a0\u8f7d\u5931\u8d25',
+  checkingCacheDesc: '\u4f18\u5148\u8bfb\u53d6 Supabase \u4e2d\u5df2\u4fdd\u5b58\u7684\u5206\u8f68\u7ed3\u679c\uff0c\u4e0d\u4f1a\u5148\u6d88\u8017 API \u989d\u5ea6\u3002',
+  readingCacheDesc: '\u6b63\u5728\u4ece\u5df2\u4fdd\u5b58\u8bb0\u5f55\u8bfb\u53d6\u5206\u8f68\u6587\u4ef6\uff1b\u5982\u679c\u7f13\u5b58\u7f3a\u5931\uff0c\u4f1a\u5c1d\u8bd5\u7528 KIE \u4efb\u52a1\u53f7\u8865\u8bfb\u4e00\u6b21\u3002',
+  startingApiDesc: '\u6ca1\u6709\u53ef\u7528\u7f13\u5b58\u6216\u4f60\u624b\u52a8\u9009\u62e9\u91cd\u8bd5\uff0c\u6b63\u5728\u8bf7\u6c42 KIE \u91cd\u65b0\u5206\u6790\u3002',
+  apiProcessingDesc: 'API \u5df2\u63a5\u6536\u4efb\u52a1\uff0c\u6b63\u5728\u7b49\u5f85\u5206\u8f68\u5b8c\u6210\uff1b\u5b8c\u6210\u540e\u4f1a\u81ea\u52a8\u5199\u5165\u7f13\u5b58\u3002',
+  hydratingCacheDesc: '\u5df2\u62ff\u5230\u5206\u8f68\u7ed3\u679c\uff0c\u6b63\u5728\u6574\u7406\u5e76\u8fdb\u5165\u6ce2\u5f62\u7f16\u8f91\u5668\u3002',
+  cacheReadyDesc: '\u5df2\u4ece\u7f13\u5b58\u8bfb\u53d6\u5206\u8f68\uff0c\u4e0d\u4f1a\u4ea7\u751f\u65b0\u7684 KIE \u6d88\u8017\u3002',
+  failedDesc: '\u5206\u8f68\u6ca1\u6709\u6210\u529f\u542f\u52a8\uff0c\u8bf7\u67e5\u770b\u9519\u8bef\u63d0\u793a\u540e\u91cd\u8bd5\u3002',
+  cache: '\u7f13\u5b58',
+  apiHydratedCache: 'API \u8865\u8bfb\u540e\u7f13\u5b58',
+  apiRefilled: 'API \u56de\u586b',
+  apiStateless: 'API \u4e34\u65f6\u7ed3\u679c',
+  savedResult: '\u5df2\u4fdd\u5b58\u7ed3\u679c',
+};
+
 export default function StemEditorPageClient() {
   const searchParams = useSearchParams();
   const generationTaskId = searchParams.get('generationTaskId')?.trim() || '';
@@ -51,11 +103,19 @@ export default function StemEditorPageClient() {
     });
 
     if (data.status === 'completed' && stems.length > 0) {
+      setError(null);
       setPhase(data.analysisSource === 'cache' ? 'cache-ready' : 'hydrating-cache');
       return;
     }
 
+    if (data.status === 'completed' && stems.length === 0) {
+      setError(data.errorMessage || TEXT.emptyResult);
+      setPhase('failed');
+      return;
+    }
+
     if (data.status === 'queued' || data.status === 'processing') {
+      setError(null);
       setPhase(data.analysisSource === 'cache' || data.analysisSource === 'existing-job'
         ? 'reading-cache'
         : 'api-processing');
@@ -72,7 +132,7 @@ export default function StemEditorPageClient() {
     const res = await fetch(`/api/stems/${encodeURIComponent(jobId)}`, { cache: 'no-store' });
     const data = await res.json();
     if (!res.ok) {
-      throw new Error(data.error || '加载分轨失败');
+      throw new Error(data.error || TEXT.loadStemFailed);
     }
 
     applyJobData(data);
@@ -80,7 +140,7 @@ export default function StemEditorPageClient() {
 
   const createJob = useCallback(async (force = false) => {
     if (!generationTaskId) {
-      setError('缺少歌曲任务 ID，无法加载编辑项目。');
+      setError(TEXT.missingTaskId);
       setPhase('failed');
       return;
     }
@@ -107,10 +167,10 @@ export default function StemEditorPageClient() {
           stems: [],
           errorMessage: data.errorMessage || data.error || null,
         });
-        setError(data.error || data.errorMessage || '创建分轨任务失败');
+        setError(data.error || data.errorMessage || TEXT.createJobFailed);
         return;
       }
-      throw new Error(data.error || '创建分轨任务失败');
+      throw new Error(data.error || TEXT.createJobFailed);
     }
 
     applyJobData({
@@ -135,7 +195,7 @@ export default function StemEditorPageClient() {
         }
         await createJob();
       } catch (err) {
-        setError(err instanceof Error ? err.message : '加载编辑项目失败');
+        setError(err instanceof Error ? err.message : TEXT.loadEditorFailed);
         setPhase('failed');
       }
     })();
@@ -146,7 +206,7 @@ export default function StemEditorPageClient() {
 
     const timer = window.setInterval(() => {
       void refreshJob(job.jobId).catch((err) => {
-        setError(err instanceof Error ? err.message : '刷新分轨失败');
+        setError(err instanceof Error ? err.message : TEXT.refreshFailed);
         setPhase('failed');
       });
     }, 5000);
@@ -169,10 +229,10 @@ export default function StemEditorPageClient() {
         }
       `}</style>
       <header style={headerStyle}>
-        <Link href="/studio" style={backLinkStyle}>返回创作中心</Link>
+        <Link href="/studio" style={backLinkStyle}>{TEXT.backToStudio}</Link>
         <div>
           <div style={eyebrowStyle}>HookCraft</div>
-          <h1 style={headingStyle}>歌曲编辑</h1>
+          <h1 style={headingStyle}>{TEXT.songEditor}</h1>
         </div>
       </header>
 
@@ -183,28 +243,28 @@ export default function StemEditorPageClient() {
               <span style={statusTitleStyle}>{formatEditorStatus(job?.status, phase)}</span>
               {hasLoadedStems && (
                 <span style={cacheBadgeStyle}>
-                  {job.analysisSource === 'cache' ? '分轨已保存' : '分轨已缓存'}
+                  {job.analysisSource === 'cache' ? TEXT.stemSaved : TEXT.stemCached}
                 </span>
               )}
               {job?.editState && (
-                <span style={editBadgeStyle}>编辑状态已保存</span>
+                <span style={editBadgeStyle}>{TEXT.editSaved}</span>
               )}
             </div>
             <div style={statusTextStyle}>
               {hasLoadedStems
-                ? `已加载 ${job.stems.length} 条分轨，来源：${formatAnalysisSource(job.analysisSource)}`
+                ? `${TEXT.loaded} ${job.stems.length} ${TEXT.tracksFrom}${formatAnalysisSource(job.analysisSource)}`
                 : formatPhaseDescription(phase)}
             </div>
           </div>
           <div style={actionGroupStyle}>
             {job?.jobId && job.status === 'completed' && (
               <button type="button" onClick={() => void refreshJob(job.jobId)} style={refreshButtonStyle}>
-                重新读取缓存
+                {TEXT.rereadCache}
               </button>
             )}
             {(job?.status === 'failed' || error) && generationTaskId && (
               <button type="button" onClick={() => void createJob(true)} style={refreshButtonStyle}>
-                重新请求 API 分析
+                {TEXT.retryApi}
               </button>
             )}
           </div>
@@ -218,13 +278,13 @@ export default function StemEditorPageClient() {
         {hasLoadedStems ? (
           <StemMixerEditor
             stems={job.stems}
-            versionLabel="编辑项目"
+            versionLabel={TEXT.editorProject}
             jobId={job.jobId}
             initialEditState={job.editState || null}
           />
         ) : job?.status === 'failed' || error ? (
           <div style={emptyStateStyle}>
-            没有可用的分轨缓存。确认 KIE 余额充足后，可以手动重新请求 API 分析。
+            {TEXT.noCache}
           </div>
         ) : null}
       </section>
@@ -234,13 +294,13 @@ export default function StemEditorPageClient() {
 
 function AnalysisLoadingPanel({ phase }: { phase: LoadingPhase }) {
   const steps = [
-    { id: 'checking-cache', label: '检查缓存' },
-    { id: 'reading-cache', label: '读取分轨文件' },
-    { id: 'starting-api', label: '启动 API 分析' },
-    { id: 'api-processing', label: '等待 API 返回' },
-    { id: 'hydrating-cache', label: '写入缓存' },
+    { id: 'checking-cache', label: TEXT.checkingCache },
+    { id: 'reading-cache', label: TEXT.readingStemFiles },
+    { id: 'starting-api', label: TEXT.startingApi },
+    { id: 'api-processing', label: TEXT.waitingApi },
+    { id: 'hydrating-cache', label: TEXT.writingCache },
   ];
-  const activeIndex = Math.max(0, steps.findIndex((step) => step.id === phase));
+  const activeIndex = steps.findIndex((step) => step.id === phase);
 
   return (
     <div style={loadingPanelStyle}>
@@ -257,7 +317,7 @@ function AnalysisLoadingPanel({ phase }: { phase: LoadingPhase }) {
           {steps.map((step, index) => (
             <div
               key={step.id}
-              style={stepPillStyle(index < activeIndex, index === activeIndex)}
+              style={stepPillStyle(activeIndex > -1 && index < activeIndex, index === activeIndex)}
             >
               {step.label}
             </div>
@@ -269,42 +329,42 @@ function AnalysisLoadingPanel({ phase }: { phase: LoadingPhase }) {
 }
 
 function formatEditorStatus(status?: StemEditorStatus, phase?: LoadingPhase) {
-  if (status === 'completed') return '分轨已加载';
-  if (status === 'failed') return '分轨没有成功启动';
-  if (phase === 'checking-cache') return '正在检查缓存';
-  if (phase === 'reading-cache') return '正在读取缓存';
-  if (phase === 'starting-api') return '正在启动 API 分析';
-  if (phase === 'api-processing') return 'API 分析中';
-  if (phase === 'hydrating-cache') return '正在写入缓存';
-  return '准备歌曲编辑';
+  if (status === 'completed') return TEXT.stemLoaded;
+  if (status === 'failed') return TEXT.stemNotStarted;
+  if (phase === 'checking-cache') return TEXT.checkingCacheNow;
+  if (phase === 'reading-cache') return TEXT.readingCacheNow;
+  if (phase === 'starting-api') return TEXT.startingApiNow;
+  if (phase === 'api-processing') return TEXT.apiAnalyzing;
+  if (phase === 'hydrating-cache') return TEXT.writingCacheNow;
+  return TEXT.preparingEditor;
 }
 
 function formatPhaseTitle(phase: LoadingPhase) {
-  if (phase === 'checking-cache') return '正在查找已保存的分轨';
-  if (phase === 'reading-cache') return '正在读取缓存分轨';
-  if (phase === 'starting-api') return '正在提交 KIE 分轨请求';
-  if (phase === 'api-processing') return 'KIE 正在分析音频';
-  if (phase === 'hydrating-cache') return '正在保存分析结果';
-  if (phase === 'cache-ready') return '缓存已命中';
-  return '分轨加载失败';
+  if (phase === 'checking-cache') return TEXT.findingSavedStems;
+  if (phase === 'reading-cache') return TEXT.readingCachedStems;
+  if (phase === 'starting-api') return TEXT.submittingKie;
+  if (phase === 'api-processing') return TEXT.kieAnalyzing;
+  if (phase === 'hydrating-cache') return TEXT.savingAnalysis;
+  if (phase === 'cache-ready') return TEXT.cacheHit;
+  return TEXT.loadFailed;
 }
 
 function formatPhaseDescription(phase: LoadingPhase) {
-  if (phase === 'checking-cache') return '优先读取 Supabase 中已保存的分轨结果，不会先消耗 API 额度。';
-  if (phase === 'reading-cache') return '正在从已保存记录读取分轨文件；如果缓存缺失，会尝试用 KIE 任务号补读一次。';
-  if (phase === 'starting-api') return '没有可用缓存或你手动选择重试，正在请求 KIE 重新分析。';
-  if (phase === 'api-processing') return 'API 已接收任务，正在等待分轨完成；完成后会自动写入缓存。';
-  if (phase === 'hydrating-cache') return '已拿到分轨结果，正在整理并进入波形编辑器。';
-  if (phase === 'cache-ready') return '已从缓存读取分轨，不会产生新的 KIE 消耗。';
-  return '分轨没有成功启动，请查看错误提示后重试。';
+  if (phase === 'checking-cache') return TEXT.checkingCacheDesc;
+  if (phase === 'reading-cache') return TEXT.readingCacheDesc;
+  if (phase === 'starting-api') return TEXT.startingApiDesc;
+  if (phase === 'api-processing') return TEXT.apiProcessingDesc;
+  if (phase === 'hydrating-cache') return TEXT.hydratingCacheDesc;
+  if (phase === 'cache-ready') return TEXT.cacheReadyDesc;
+  return TEXT.failedDesc;
 }
 
 function formatAnalysisSource(source?: string | null) {
-  if (source === 'cache') return '缓存';
-  if (source === 'api-hydrated-cache') return 'API 补读后缓存';
-  if (source === 'api-refreshed') return 'API 回填';
-  if (source === 'api-stateless') return 'API 临时结果';
-  return '已保存结果';
+  if (source === 'cache') return TEXT.cache;
+  if (source === 'api-hydrated-cache') return TEXT.apiHydratedCache;
+  if (source === 'api-refreshed') return TEXT.apiRefilled;
+  if (source === 'api-stateless') return TEXT.apiStateless;
+  return TEXT.savedResult;
 }
 
 const pageStyle: CSSProperties = {
