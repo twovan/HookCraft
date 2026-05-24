@@ -7,7 +7,11 @@ export type StemEditorShortcutAction =
   | 'toggle-selected-solo'
   | 'reset-selected-track'
   | 'select-previous-track'
-  | 'select-next-track';
+  | 'select-next-track'
+  | 'set-selected-trim-start'
+  | 'set-selected-trim-end'
+  | 'seek-start'
+  | 'seek-end';
 
 type KeyboardShortcutEvent = Pick<
   KeyboardEvent,
@@ -40,6 +44,10 @@ export function resolveStemEditorShortcut(event: KeyboardShortcutEvent): StemEdi
     if (key === 'r') return 'reset-selected-track';
     if (event.key === 'ArrowUp') return 'select-previous-track';
     if (event.key === 'ArrowDown') return 'select-next-track';
+    if (event.key === '[') return 'set-selected-trim-start';
+    if (event.key === ']') return 'set-selected-trim-end';
+    if (event.key === 'Home') return 'seek-start';
+    if (event.key === 'End') return 'seek-end';
   }
 
   if (!hasCommandModifier) return null;

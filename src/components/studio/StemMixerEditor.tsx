@@ -8,6 +8,8 @@ import {
   type StemMasterState,
 } from '@/lib/stems/stemMixState';
 import { resolveStemEditorShortcut } from '@/lib/stems/stemEditorShortcuts';
+import { resolveVisibleStemSelection } from '@/lib/stems/stemSelection';
+import { buildWaveformPeaksFromSamples } from '@/lib/stems/waveformPeaks';
 
 export interface EditableStem {
   type: string;
@@ -347,21 +349,9 @@ function sleep(ms: number, signal: AbortSignal) {
 }
 
 function calculateWaveform(buffer: AudioBuffer, bucketCount = 480): StemWaveform {
-  const channel = buffer.getChannelData(0);
-  const samplesPerBucket = Math.max(1, Math.floor(channel.length / bucketCount));
-  const peaks = Array.from({ length: bucketCount }, (_, index) => {
-    const start = index * samplesPerBucket;
-    const end = Math.min(channel.length, start + samplesPerBucket);
-    let peak = 0;
-    for (let sampleIndex = start; sampleIndex < end; sampleIndex += 1) {
-      peak = Math.max(peak, Math.abs(channel[sampleIndex] || 0));
-    }
-    return Number(Math.min(1, peak).toFixed(4));
-  });
-
   return {
     duration: Number(buffer.duration.toFixed(3)),
-    peaks,
+    peaks: buildWaveformPeaksFromSamples(buffer.getChannelData(0), bucketCount),
   };
 }
 
@@ -692,8 +682,14 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     return !state.muted && (!hasSoloTrack || state.solo) && state.volume > 0;
   }).length, [hasSoloTrack, stems, tracks]);
   const selectedTrack = useMemo(
-    () => stems.find((stem) => stem.type === selectedTrackType) || visibleStems[0] || null,
-    [selectedTrackType, stems, visibleStems],
+    () => {
+      const selectedVisibleType = resolveVisibleStemSelection(
+        visibleStems.map((stem) => stem.type),
+        selectedTrackType,
+      );
+      return visibleStems.find((stem) => stem.type === selectedVisibleType) || null;
+    },
+    [selectedTrackType, visibleStems],
   );
   const canUndo = historyVersion >= 0 && undoStackRef.current.length > 0;
   const canRedo = historyVersion >= 0 && redoStackRef.current.length > 0;
@@ -1312,6 +1308,14 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
         selectAdjacentTrack(1);
         return;
       }
+      if (action === 'seek-start') {
+        handleSeek(0);
+        return;
+      }
+      if (action === 'seek-end') {
+        handleSeek(duration);
+        return;
+      }
       if (!selectedTrack) return;
       if (action === 'toggle-selected-mute') {
         toggleTrackFlag(selectedTrack.type, 'muted');
@@ -1319,6 +1323,16 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
       }
       if (action === 'toggle-selected-solo') {
         toggleTrackFlag(selectedTrack.type, 'solo');
+        return;
+      }
+      if (action === 'set-selected-trim-start') {
+        setTrackTrim(selectedTrack.type, 'start', currentTime);
+        setSaveStatus(`已把“${getStemDisplayName(selectedTrack).zh}”入点设到 ${formatTime(currentTime)}。`);
+        return;
+      }
+      if (action === 'set-selected-trim-end') {
+        setTrackTrim(selectedTrack.type, 'end', currentTime);
+        setSaveStatus(`已把“${getStemDisplayName(selectedTrack).zh}”出点设到 ${formatTime(currentTime)}。`);
         return;
       }
       resetTrackEdit(selectedTrack.type);
@@ -1329,11 +1343,15 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [
     handleTogglePlayback,
+    handleSeek,
+    currentTime,
+    duration,
     redoTrackChange,
     resetTrackEdit,
     saveEditState,
     selectAdjacentTrack,
     selectedTrack,
+    setTrackTrim,
     toggleTrackFlag,
     undoTrackChange,
   ]);
@@ -1755,7 +1773,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
                 trimStart={state.trimStart}
                 trimEnd={trimEnd}
                 muted={!isAudible}
-                selected={state.solo}
+                selected={isSelectedTrack}
                 bufferVersion={bufferVersion}
                 onSeek={handleSeek}
                 onTrimChange={(edge, time) => setTrackTrim(stem.type, edge, time)}
@@ -2444,6 +2462,11 @@ function WaveformTrackCanvas({
   const trimDragRef = useRef<{ edge: 'start' | 'end'; moved: boolean } | null>(null);
   const pendingTrimTimeRef = useRef<number | null>(null);
   const trimFrameRef = useRef<number | null>(null);
+  const displayPeaks = useMemo(() => {
+    if (waveform?.peaks?.length) return waveform.peaks;
+    if (!buffer) return [];
+    return buildWaveformPeaksFromSamples(buffer.getChannelData(0), 720);
+  }, [buffer, bufferVersion, waveform?.peaks]);
 
   const timeFromPointer = useCallback((event: PointerEvent<HTMLCanvasElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -2507,12 +2530,12 @@ function WaveformTrackCanvas({
       context.lineTo(width, centerY);
       context.stroke();
 
-      if (!buffer && waveform?.peaks?.length && duration > 0) {
+      if (displayPeaks.length && duration > 0) {
         context.strokeStyle = muted ? 'rgba(148, 163, 184, 0.46)' : color;
         context.lineWidth = Math.max(1, ratio);
         context.beginPath();
-        const step = Math.max(1, Math.floor(width / waveform.peaks.length));
-        waveform.peaks.forEach((peak, index) => {
+        const step = displayPeaks.length > 1 ? width / (displayPeaks.length - 1) : width;
+        displayPeaks.forEach((peak, index) => {
           const x = index * step;
           const y = Math.max(1, Math.min(centerY, peak * centerY * 0.9));
           context.moveTo(x, centerY - y);
@@ -2521,7 +2544,7 @@ function WaveformTrackCanvas({
         context.stroke();
       }
 
-      if (!buffer && !waveform?.peaks?.length) {
+      if (!displayPeaks.length) {
         context.fillStyle = 'rgba(156, 108, 255, 0.13)';
         context.fillRect(0, 0, width, height);
         context.fillStyle = '#8f92aa';
@@ -2529,29 +2552,6 @@ function WaveformTrackCanvas({
         context.textAlign = 'center';
         context.fillText('正在准备波形', width / 2, centerY + 4 * ratio);
         return;
-      }
-
-      if (buffer) {
-        const samples = buffer.getChannelData(0);
-        const samplesPerPixel = Math.max(1, Math.floor(samples.length / width));
-        context.strokeStyle = muted ? 'rgba(148, 163, 184, 0.46)' : color;
-        context.lineWidth = Math.max(1, ratio);
-        context.beginPath();
-
-        for (let x = 0; x < width; x += Math.max(1, Math.floor(ratio))) {
-          const start = x * samplesPerPixel;
-          const end = Math.min(samples.length, start + samplesPerPixel);
-          let min = 0;
-          let max = 0;
-          for (let i = start; i < end; i += 1) {
-            const sample = samples[i] || 0;
-            if (sample < min) min = sample;
-            if (sample > max) max = sample;
-          }
-          context.moveTo(x, centerY + min * centerY * 0.9);
-          context.lineTo(x, centerY + max * centerY * 0.9);
-        }
-        context.stroke();
       }
 
       const startX = (Math.max(0, trimStart) / duration) * width;
@@ -2598,7 +2598,7 @@ function WaveformTrackCanvas({
     const observer = new ResizeObserver(draw);
     observer.observe(canvas);
     return () => observer.disconnect();
-  }, [buffer, bufferVersion, color, currentTime, duration, muted, selected, trimEnd, trimStart, waveform]);
+  }, [color, currentTime, displayPeaks, duration, muted, selected, trimEnd, trimStart]);
 
   const handlePointerDown = useCallback((event: PointerEvent<HTMLCanvasElement>) => {
     if (duration <= 0) return;

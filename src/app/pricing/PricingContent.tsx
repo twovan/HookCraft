@@ -6,26 +6,22 @@ import { useAuth } from '@/contexts/AuthContext';
 import { fetchWithAuth } from '@/lib/fetchWithAuth';
 import type { MembershipTier, BillingCycle } from '@/types/membership';
 import type { TierConfig } from '@/config/tierConfig';
+import type { PublicCreditsPack } from '@/config/creditsPack';
 import TierCard from '@/components/membership/TierCard';
 import { useMembershipStore } from '@/store/membershipStore';
 import { useCreditStore } from '@/store/creditStore';
 
 interface PricingContentProps {
   tiers: TierConfig[];
+  initialCreditsPacks: PublicCreditsPack[];
 }
 
-/** Credits 充值包配置 */
-const CREDITS_PACKS = [
-  { id: 'pack_50', credits: 50, price: 9900, discountPrice: 7900, label: '50 Credits' },
-  { id: 'pack_100', credits: 100, price: 17900, discountPrice: 14300, label: '100 Credits' },
-  { id: 'pack_200', credits: 200, price: 32900, discountPrice: 26300, label: '200 Credits' },
-];
-
-export default function PricingContent({ tiers }: PricingContentProps) {
+export default function PricingContent({ tiers, initialCreditsPacks }: PricingContentProps) {
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
   const [upgrading, setUpgrading] = useState(false);
   const [upgradeResult, setUpgradeResult] = useState<{ tier: string; tier_name: string; monthly_credits: number } | null>(null);
   const [upgradeError, setUpgradeError] = useState<string | null>(null);
+  const [creditsPacks, setCreditsPacks] = useState(initialCreditsPacks);
   const router = useRouter();
   const { user } = useAuth();
   const currentTier = useMembershipStore((s) => s.currentTier());
@@ -39,6 +35,23 @@ export default function PricingContent({ tiers }: PricingContentProps) {
       fetchMembership();
     }
   }, [user]);
+
+  useEffect(() => {
+    let active = true;
+
+    fetch('/api/payments/credits-pack', { cache: 'no-store' })
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (active && Array.isArray(data?.creditsPacks)) {
+          setCreditsPacks(data.creditsPacks);
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleSubscribe = async (tier: MembershipTier, cycle: BillingCycle) => {
     if (tier === 'free') return;
@@ -258,7 +271,7 @@ export default function PricingContent({ tiers }: PricingContentProps) {
             margin: '0 auto',
           }}
         >
-          {CREDITS_PACKS.map((pack) => (
+          {creditsPacks.map((pack) => (
             <div
               key={pack.id}
               className="credits-pack-card"

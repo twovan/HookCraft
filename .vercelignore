@@ -6,3 +6,5 @@ node_modules/
 .deploy-*/
 .rewrite-backup/
 *.zip
+**/*.test.ts
+**/*.test.tsx

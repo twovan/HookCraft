@@ -27,6 +27,10 @@ describe('resolveStemEditorShortcut', () => {
     expect(resolveStemEditorShortcut(keyEvent({ key: 'r' }))).toBe('reset-selected-track');
     expect(resolveStemEditorShortcut(keyEvent({ key: 'ArrowUp' }))).toBe('select-previous-track');
     expect(resolveStemEditorShortcut(keyEvent({ key: 'ArrowDown' }))).toBe('select-next-track');
+    expect(resolveStemEditorShortcut(keyEvent({ key: '[' }))).toBe('set-selected-trim-start');
+    expect(resolveStemEditorShortcut(keyEvent({ key: ']' }))).toBe('set-selected-trim-end');
+    expect(resolveStemEditorShortcut(keyEvent({ key: 'Home' }))).toBe('seek-start');
+    expect(resolveStemEditorShortcut(keyEvent({ key: 'End' }))).toBe('seek-end');
   });
 
   it('ignores text-entry fields and unrelated modified shortcuts', () => {
