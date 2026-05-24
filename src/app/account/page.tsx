@@ -7,6 +7,7 @@ import { useMembershipStore } from '@/store/membershipStore';
 import { useCreditStore } from '@/store/creditStore';
 import { fetchWithAuth } from '@/lib/fetchWithAuth';
 import SubscriptionPanel from '@/components/membership/SubscriptionPanel';
+import ProfileSettings from '@/components/account/ProfileSettings';
 import type { PaymentRecord } from '@/types/payment';
 import type { CreditHistory } from '@/types/credits';
 import type { MembershipTier } from '@/types/membership';
@@ -142,8 +143,8 @@ export default function AccountPage() {
         body: JSON.stringify({ targetTier }),
       });
       if (res.ok) {
-        fetchMembership();
-        fetchCredits();
+        fetchMembership({ force: true });
+        fetchCredits({ force: true });
       } else {
         const data = await res.json();
         setPaymentError(data.error || '升级失败');
@@ -161,7 +162,7 @@ export default function AccountPage() {
         body: JSON.stringify({ targetTier }),
       });
       if (res.ok) {
-        fetchMembership();
+        fetchMembership({ force: true });
       } else {
         const data = await res.json();
         setPaymentError(data.error || '降级失败');
@@ -175,7 +176,7 @@ export default function AccountPage() {
     try {
       const res = await fetchWithAuth('/api/membership/cancel', { method: 'POST' });
       if (res.ok) {
-        fetchMembership();
+        fetchMembership({ force: true });
       } else {
         const data = await res.json();
         setPaymentError(data.error || '取消订阅失败');
@@ -295,6 +296,8 @@ export default function AccountPage() {
             </button>
           </div>
         )}
+
+        <ProfileSettings />
 
         {/* Usage Stats Section */}
         <div

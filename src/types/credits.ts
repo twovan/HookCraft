@@ -51,6 +51,10 @@ export type CreditOperationType =
   | 'export_wav'          // WAV 导出
   | 'export_stems'        // 分轨导出
   | 'arrangement_generation' // 上传音频生成编曲
+  | 'cover_generation'    // AI 翻唱 / Upload Cover
+  | 'add_instrumental'    // AI 加伴奏
+  | 'stem_split'          // AI 分轨
+  | 'ai_preprocess'       // AI 预处理 / 分析
   | 'purchase';           // 购买入账
 
 /** Credits 消耗规则 */
@@ -58,6 +62,10 @@ export interface CreditsCostRule {
   operation: CreditOperationType;
   cost: number;
   description: string;
+  actualCostCents?: number;
+  profitMarginPercent?: number;
+  suggestedCost?: number;
+  enabled?: boolean;
 }
 
 /** 增强版 Credits 信息（含购买 Credits） */

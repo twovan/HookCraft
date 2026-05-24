@@ -566,7 +566,6 @@ Respond with JSON only: {"title": "中文歌名", "styleTags": ["tag1", "tag2"]}
     // ── Step 2: Credits/Preview 余额预检查 ────────────────
 
     const operations = this.getOperations(input);
-    const singleVersionCost = this.creditService.calculateTotalCost(operations);
 
     if (userTier === 'free') {
       // Free 用户使用 Preview 次数 - 多版本只消耗 1 次
@@ -578,11 +577,11 @@ Respond with JSON only: {"title": "中文歌名", "styleTags": ["tag1", "tag2"]}
       }
     } else {
       // 付费用户使用 Credits
-      const creditInfo = await this.creditService.getCredits(userId);
-      const totalCost = singleVersionCost * versionCount;
-      if (creditInfo.remaining < totalCost) {
+      const billableOperations = Array.from({ length: versionCount }, () => operations).flat();
+      const totalCost = await this.creditService.calculateTotalCostAsync(billableOperations);
+      if (!(await this.creditService.hasEnoughCredits(userId, billableOperations))) {
         throw new Error(
-          `Credits 余额不足，需要 ${totalCost} Credits，剩余 ${creditInfo.remaining} Credits`,
+          `Credits 余额不足，需要 ${totalCost} Credits`,
         );
       }
     }

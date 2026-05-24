@@ -2,6 +2,7 @@
 
 import type { Tables, UpdateTables } from '../types';
 import type { AdminFullConfig, ConfigChangeLog } from '../../../types/admin';
+import { CREDITS_COST_RULES } from '../../../config/creditsCost';
 
 /**
  * 将多条 admin_config 行组装为业务层 AdminFullConfig 对象
@@ -11,7 +12,7 @@ import type { AdminFullConfig, ConfigChangeLog } from '../../../types/admin';
 export function toAdminConfig(rows: Tables<'admin_config'>[]): AdminFullConfig {
   const config: AdminFullConfig = {
     creditQuotas: [],
-    costRules: [],
+    costRules: CREDITS_COST_RULES,
     pricing: [],
     creditsPacks: [],
   };
@@ -23,7 +24,12 @@ export function toAdminConfig(rows: Tables<'admin_config'>[]): AdminFullConfig {
         config.creditQuotas = data as unknown as AdminFullConfig['creditQuotas'];
         break;
       case 'cost_rule':
-        config.costRules = data as unknown as AdminFullConfig['costRules'];
+        config.costRules = CREDITS_COST_RULES.map((defaultRule) => ({
+          ...defaultRule,
+          ...((data as unknown as AdminFullConfig['costRules']).find(
+            (rule) => rule.operation === defaultRule.operation
+          ) || {}),
+        }));
         break;
       case 'pricing':
         config.pricing = data as unknown as AdminFullConfig['pricing'];

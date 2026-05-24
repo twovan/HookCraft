@@ -14,6 +14,10 @@ export interface AdminCostRule {
   operation: CreditOperationType;
   cost: number;
   description: string;
+  actualCostCents?: number;
+  profitMarginPercent?: number;
+  suggestedCost?: number;
+  enabled?: boolean;
 }
 
 /** 管理员价格配置 */

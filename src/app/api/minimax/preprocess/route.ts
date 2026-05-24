@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser } from '../../../../lib/supabase/auth-helpers';
 import { MiniMaxProvider } from '../../../../lib/generation/MiniMaxProvider';
+import { CreditService } from '../../../../lib/credits/CreditService';
+import { supabaseAdmin } from '../../../../lib/supabase/server';
 
 export const maxDuration = 60;
 
@@ -118,6 +120,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const creditService = new CreditService(supabaseAdmin);
+    if (!(await creditService.hasEnoughCredits(user.id, ['ai_preprocess']))) {
+      return NextResponse.json(
+        { error: 'Credits 余额不足，请先充值或升级套餐' },
+        { status: 402 }
+      );
+    }
+
     // Step 3: 解析请求体
     let body: { audioBase64?: string; audioUrl?: string; mimeType?: string };
     try {
@@ -144,6 +154,10 @@ export async function POST(req: NextRequest) {
       // Step 7: 直接调用 MiniMax 预处理 API（使用 URL）
       const provider = new MiniMaxProvider();
       const result = await provider.preprocess({ audioBase64: '', audioUrl });
+      const consumeResult = await creditService.consumeCredits(user.id, ['ai_preprocess']);
+      if (!consumeResult.success) {
+        return NextResponse.json({ error: 'Credits 扣减失败，请重试' }, { status: 402 });
+      }
 
       return NextResponse.json({
         coverFeatureId: result.coverFeatureId,
@@ -178,6 +192,10 @@ export async function POST(req: NextRequest) {
     // Step 7: 调用 MiniMax 预处理 API
     const provider = new MiniMaxProvider();
     const result = await provider.preprocess({ audioBase64: audioBase64! });
+    const consumeResult = await creditService.consumeCredits(user.id, ['ai_preprocess']);
+    if (!consumeResult.success) {
+      return NextResponse.json({ error: 'Credits 扣减失败，请重试' }, { status: 402 });
+    }
 
     // Step 8: 返回预处理结果
     return NextResponse.json({

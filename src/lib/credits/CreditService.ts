@@ -10,10 +10,11 @@ import type {
   CreditHistoryEnhanced,
   ConsumeResult,
   CreditOperationType,
+  CreditsCostRule,
   PreviewCountInfo,
   PurchaseResult,
 } from '../../types/credits';
-import { CREDITS_COST } from '../../config/creditsCost';
+import { CREDITS_COST, CREDITS_COST_RULES } from '../../config/creditsCost';
 import { TIER_CONFIGS } from '../../config/tierConfig';
 import { toCreditInfo, toCreditHistory, toCreditInfoEnhanced, toCreditHistoryEnhanced, toPreviewCount } from '../supabase/mappers/credits';
 import { toAppError } from '../supabase/errors';
@@ -28,6 +29,7 @@ import { toAppError } from '../supabase/errors';
 export class CreditService {
   /** Supabase 管理员客户端（绕过 RLS） */
   private supabase: SupabaseClient<Database>;
+  private costRulesCache: Map<CreditOperationType, CreditsCostRule> | null = null;
 
   constructor(supabase: SupabaseClient<Database>) {
     this.supabase = supabase;
@@ -101,7 +103,7 @@ export class CreditService {
     userId: string,
     operations: CreditOperationType[]
   ): Promise<ConsumeResult> {
-    const totalCost = this.calculateTotalCost(operations);
+    const totalCost = await this.calculateTotalCostAsync(operations);
 
     // 1. 读取当前 credits 及 version
     const { data: currentCredits, error: creditsReadError } = await this.supabase
@@ -143,6 +145,17 @@ export class CreditService {
     const result = rpcResult as Record<string, unknown>;
 
     if (!result.success) {
+      if (result.error === 'concurrent_limit') {
+        const monthlyRemaining = currentCredits.total - currentCredits.used;
+        const purchasedBalance = currentPurchased?.balance ?? 0;
+        return {
+          success: false,
+          remaining: monthlyRemaining + purchasedBalance,
+          consumed: 0,
+          error: 'concurrent_limit',
+        };
+      }
+
       // RPC failed (likely version mismatch) - try direct update as fallback
       const monthlyRemaining = currentCredits.total - currentCredits.used;
       const purchasedBalance = currentPurchased?.balance ?? 0;
@@ -310,7 +323,7 @@ export class CreditService {
     operations: CreditOperationType[]
   ): Promise<boolean> {
     const info = await this.getCreditsEnhanced(userId);
-    const totalCost = this.calculateTotalCost(operations);
+    const totalCost = await this.calculateTotalCostAsync(operations);
     return info.totalAvailable >= totalCost;
   }
 
@@ -624,5 +637,55 @@ export class CreditService {
    */
   calculateTotalCost(operations: CreditOperationType[]): number {
     return operations.reduce((sum, op) => sum + CREDITS_COST[op], 0);
+  }
+
+  async calculateTotalCostAsync(operations: CreditOperationType[]): Promise<number> {
+    const rules = await this.getCostRules();
+    return operations.reduce((sum, op) => {
+      const rule = rules.get(op);
+      if (rule?.enabled === false) return sum;
+      return sum + (rule?.cost ?? CREDITS_COST[op]);
+    }, 0);
+  }
+
+  private async getCostRules(): Promise<Map<CreditOperationType, CreditsCostRule>> {
+    if (this.costRulesCache) return this.costRulesCache;
+
+    const fallback = new Map<CreditOperationType, CreditsCostRule>(
+      CREDITS_COST_RULES.map((rule) => [rule.operation, rule])
+    );
+
+    try {
+      const table = this.supabase.from('admin_config' as any) as any;
+      if (typeof table?.select !== 'function') {
+        this.costRulesCache = fallback;
+        return fallback;
+      }
+
+      const { data, error } = await table
+        .select('config_data')
+        .eq('config_type', 'cost_rule')
+        .maybeSingle();
+
+      if (error || !Array.isArray(data?.config_data)) {
+        this.costRulesCache = fallback;
+        return fallback;
+      }
+
+      const merged = new Map(fallback);
+      for (const rule of data.config_data as CreditsCostRule[]) {
+        if (!rule?.operation || typeof rule.cost !== 'number') continue;
+        merged.set(rule.operation, {
+          ...fallback.get(rule.operation),
+          ...rule,
+        });
+      }
+
+      this.costRulesCache = merged;
+      return merged;
+    } catch {
+      this.costRulesCache = fallback;
+      return fallback;
+    }
   }
 }

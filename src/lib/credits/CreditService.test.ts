@@ -11,7 +11,7 @@ import { TIER_CONFIGS } from '../../config/tierConfig';
 function createMockSupabase() {
   // --- credits table mocks ---
   const creditsSingle = vi.fn().mockResolvedValue({ data: null, error: null });
-  const creditsSelectEq = vi.fn().mockReturnValue({ single: creditsSingle });
+  const creditsSelectEq = vi.fn().mockReturnValue({ single: creditsSingle, maybeSingle: creditsSingle });
   const creditsSelect = vi.fn().mockReturnValue({ eq: creditsSelectEq });
 
   // optimistic lock update chain: .update({}).eq('user_id', x).eq('version', v).select('*')
@@ -56,6 +56,16 @@ function createMockSupabase() {
   const txGte = vi.fn().mockReturnValue({ lt: txLt });
   const txSelectEq = vi.fn().mockReturnValue({ gte: txGte });
   const txSelect = vi.fn().mockReturnValue({ eq: txSelectEq });
+
+  // --- admin_config table mocks ---
+  const adminConfigMaybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
+  const adminConfigEq = vi.fn().mockReturnValue({ maybeSingle: adminConfigMaybeSingle });
+  const adminConfigSelect = vi.fn().mockReturnValue({ eq: adminConfigEq });
+
+  // --- memberships table mocks ---
+  const membershipMaybeSingle = vi.fn().mockResolvedValue({ data: { tier: 'pro' }, error: null });
+  const membershipEq = vi.fn().mockReturnValue({ maybeSingle: membershipMaybeSingle });
+  const membershipSelect = vi.fn().mockReturnValue({ eq: membershipEq });
 
   // --- RPC mock ---
   const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
@@ -116,6 +126,16 @@ function createMockSupabase() {
         insert: txInsert,
       };
     }
+    if (table === 'admin_config') {
+      return {
+        select: adminConfigSelect,
+      };
+    }
+    if (table === 'memberships') {
+      return {
+        select: membershipSelect,
+      };
+    }
     return {};
   });
 
@@ -164,6 +184,12 @@ function createMockSupabase() {
     txGte,
     txLt,
     txNeq,
+    adminConfigSelect,
+    adminConfigEq,
+    adminConfigMaybeSingle,
+    membershipSelect,
+    membershipEq,
+    membershipMaybeSingle,
   };
 }
 
@@ -907,6 +933,33 @@ describe('CreditService', () => {
 
     it('空操作列表成本为 0', () => {
       expect(service.calculateTotalCost([])).toBe(0);
+    });
+
+    it('uses admin configured operation costs for async billing', async () => {
+      mocks.adminConfigMaybeSingle.mockResolvedValue({
+        data: {
+          config_data: [
+            { operation: 'preview', cost: 4, description: 'Configured preview', enabled: true },
+            { operation: 'stem_split', cost: 12, description: 'Configured stem split', enabled: true },
+          ],
+        },
+        error: null,
+      });
+
+      await expect(service.calculateTotalCostAsync(['preview', 'stem_split'])).resolves.toBe(16);
+    });
+
+    it('treats disabled admin cost rules as free', async () => {
+      mocks.adminConfigMaybeSingle.mockResolvedValue({
+        data: {
+          config_data: [
+            { operation: 'ai_preprocess', cost: 2, description: 'Preprocess', enabled: false },
+          ],
+        },
+        error: null,
+      });
+
+      await expect(service.calculateTotalCostAsync(['ai_preprocess'])).resolves.toBe(0);
     });
   });
 });

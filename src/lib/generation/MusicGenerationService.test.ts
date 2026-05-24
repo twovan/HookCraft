@@ -107,6 +107,7 @@ function createMockCreditService(overrides?: {
       remaining: overrides?.previewRemaining ?? 3,
     }),
     calculateTotalCost: vi.fn().mockReturnValue(1),
+    calculateTotalCostAsync: vi.fn().mockResolvedValue(1),
   } as any;
 }
 
@@ -431,7 +432,7 @@ describe('MusicGenerationService - 生成完成（generation_tasks 表结果字�
 
     expect(result.success).toBe(true);
     expect(result.creditsConsumed).toBe(10);
-    expect(creditService.consumeCredits).toHaveBeenCalledWith('user-pro', ['full_demo_short']);
+    expect(creditService.consumeCredits).toHaveBeenCalledWith('user-pro', ['full_demo_long']);
   });
 
   it('Full Demo + Premium Singer 消耗额外 Credits', async () => {
@@ -451,7 +452,7 @@ describe('MusicGenerationService - 生成完成（generation_tasks 表结果字�
     expect(result.creditsConsumed).toBe(15);
     expect(creditService.consumeCredits).toHaveBeenCalledWith(
       'user-pro',
-      ['full_demo_short', 'premium_singer']
+      ['full_demo_long', 'premium_singer']
     );
   });
 
@@ -520,7 +521,9 @@ describe('MusicGenerationService.buildPrompt', () => {
       generationType: 'preview',
     });
 
-    expect(prompt).toBe('A pop track at 120 BPM in C major');
+    expect(prompt).toContain('A pop track at 120 BPM in C major');
+    expect(prompt).toContain('Include vocals with lyrics');
+    expect(prompt).toContain('Generate lyrics in Chinese');
   });
 
   it('仅用户 Prompt：直接使用 userPrompt', async () => {
@@ -531,7 +534,9 @@ describe('MusicGenerationService.buildPrompt', () => {
       generationType: 'preview',
     });
 
-    expect(prompt).toBe('A chill lofi beat');
+    expect(prompt).toContain('A chill lofi beat');
+    expect(prompt).toContain('Include vocals with lyrics');
+    expect(prompt).toContain('Generate lyrics in Chinese');
   });
 
   it('模板 + 用户 Prompt：合并为 reference style + additional instructions', async () => {
@@ -553,9 +558,11 @@ describe('MusicGenerationService.buildPrompt', () => {
       generationType: 'preview',
     });
 
-    expect(prompt).toBe(
+    expect(prompt).toContain(
       'Based on this reference style: A pop track at 120 BPM in C major\n\nUser\'s additional instructions: Make it more energetic'
     );
+    expect(prompt).toContain('Include vocals with lyrics');
+    expect(prompt).toContain('Generate lyrics in Chinese');
   });
 
   it('缓存缺失时降级为默认描述', async () => {
@@ -568,7 +575,9 @@ describe('MusicGenerationService.buildPrompt', () => {
       generationType: 'preview',
     });
 
-    expect(prompt).toBe(DEFAULT_TEMPLATE_DESCRIPTION);
+    expect(prompt).toContain(DEFAULT_TEMPLATE_DESCRIPTION);
+    expect(prompt).toContain('Include vocals with lyrics');
+    expect(prompt).toContain('Generate lyrics in Chinese');
   });
 
   it('缓存状态非 completed 时降级为默认描述', async () => {
@@ -589,7 +598,9 @@ describe('MusicGenerationService.buildPrompt', () => {
       generationType: 'preview',
     });
 
-    expect(prompt).toBe(DEFAULT_TEMPLATE_DESCRIPTION);
+    expect(prompt).toContain(DEFAULT_TEMPLATE_DESCRIPTION);
+    expect(prompt).toContain('Include vocals with lyrics');
+    expect(prompt).toContain('Generate lyrics in Chinese');
   });
 });
 

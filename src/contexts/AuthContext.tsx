@@ -8,6 +8,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  refreshUser: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -15,6 +16,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   session: null,
   loading: true,
+  refreshUser: async () => {},
   signOut: async () => {},
 });
 
@@ -95,8 +97,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.location.href = '/login';
   };
 
+  const refreshUser = async () => {
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    const { data: { session: currentSession } } = await supabase.auth.getSession();
+    setUser(currentUser ?? null);
+    setSession(currentSession ?? null);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, session, loading, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, refreshUser, signOut }}>
       {children}
     </AuthContext.Provider>
   );

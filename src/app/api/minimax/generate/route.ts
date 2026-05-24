@@ -144,8 +144,37 @@ async function processGenerationInBackground(
       }
     }
 
+    // ─── 扣减 Credits ────────────────────────────────
+    let creditsCost = 0;
+    try {
+      const creditService = new CreditService(supabaseAdmin);
+      const operations: CreditOperationType[] = ['arrangement_generation'];
+      const consumeResult = await creditService.consumeCredits(userId, operations);
+      if (!consumeResult.success) {
+        throw new Error(consumeResult.error || 'Credits deduction failed');
+      }
+      creditsCost = consumeResult.consumed;
+    } catch (err: any) {
+      console.error('[minimax/generate] Credits 扣减异常:', err?.message || err);
+      await supabaseAdmin
+        .from('generation_tasks')
+        .update({
+          status: 'failed',
+          error_code: 'CREDITS_NOT_ENOUGH',
+          error_message: 'Credits 扣减失败',
+          updated_at: new Date().toISOString(),
+        } as any)
+        .eq('id', taskId);
+
+      await supabaseAdmin
+        .from('generation_batches')
+        .update({ status: 'failed' } as any)
+        .eq('id', batchId);
+
+      return;
+    }
+
     // ─── 更新 task 和 batch 为 completed ─────────────────
-    const creditsCost = CREDITS_COST.arrangement_generation;
 
     await supabaseAdmin
       .from('generation_tasks')
@@ -163,17 +192,6 @@ async function processGenerationInBackground(
       .update({ status: 'completed', selected_task_id: taskId } as any)
       .eq('id', batchId);
 
-    // ─── 扣减 Credits ────────────────────────────────
-    try {
-      const creditService = new CreditService(supabaseAdmin);
-      const operations: CreditOperationType[] = ['arrangement_generation'];
-      const consumeResult = await creditService.consumeCredits(userId, operations);
-      if (!consumeResult.success) {
-        console.error('[minimax/generate] Credits 扣减失败:', consumeResult.error);
-      }
-    } catch (err: any) {
-      console.error('[minimax/generate] Credits 扣减异常:', err?.message || err);
-    }
   } catch (error: any) {
     console.error('[minimax/generate] 后台处理异常:', error);
 
@@ -274,6 +292,14 @@ export async function POST(req: NextRequest) {
       isInstrumental: isInstrumental || false,
       audioSetting,
     };
+
+    const creditService = new CreditService(supabaseAdmin);
+    if (!(await creditService.hasEnoughCredits(user.id, ['arrangement_generation']))) {
+      return NextResponse.json(
+        { error: 'Credits 余额不足，请先充值或升级套餐' },
+        { status: 402 }
+      );
+    }
 
     // ─── Step 5: 立即创建 task 记录（status='pending'）并返回 taskId ───
     const taskId = crypto.randomUUID();

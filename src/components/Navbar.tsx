@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useMembershipStore } from '@/store/membershipStore';
 import { useCreditStore } from '@/store/creditStore';
 import { useCartStore } from '@/store/cartStore';
+import { getAvatarInitial } from '@/lib/account/profile';
 
 const TIER_LABELS: Record<string, string> = {
   free: '免费版',
@@ -75,7 +76,16 @@ export default function Navbar() {
       : user.email
     : null;
 
-  const avatarInitial = user?.email ? user.email.charAt(0).toUpperCase() : '?';
+  const username = typeof user?.user_metadata?.username === 'string'
+    ? user.user_metadata.username
+    : typeof user?.user_metadata?.display_name === 'string'
+      ? user.user_metadata.display_name
+      : '';
+  const displayName = username || truncatedEmail;
+  const avatarUrl = typeof user?.user_metadata?.avatar_url === 'string'
+    ? user.user_metadata.avatar_url
+    : '';
+  const avatarInitial = getAvatarInitial({ username, email: user?.email });
 
   return (
     <nav style={{
@@ -142,7 +152,11 @@ export default function Navbar() {
                   transition: 'all 0.2s',
                 }}
               >
-                {avatarInitial}
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="头像" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                ) : (
+                  avatarInitial
+                )}
               </button>
 
               {/* Dropdown */}
@@ -166,8 +180,13 @@ export default function Navbar() {
                   {/* User info */}
                   <div style={{ marginBottom: 12, paddingBottom: 12, borderBottom: '1px solid #2a2a40' }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: '#e8e8f0', marginBottom: 4 }}>
-                      {truncatedEmail}
+                      {displayName}
                     </div>
+                    {username && (
+                      <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 8, overflowWrap: 'anywhere' }}>
+                        {truncatedEmail}
+                      </div>
+                    )}
                     <div style={{
                       display: 'inline-block',
                       padding: '3px 10px',
