@@ -571,6 +571,8 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
   const playbackOffsetRef = useRef(0);
   const playbackStopAtRef = useRef<number | null>(null);
   const previewStemTypeRef = useRef<string | null>(null);
+  const loopSelectionPreviewRef = useRef(false);
+  const loopPreviewTimerRef = useRef<number | null>(null);
   const frameRef = useRef<number | null>(null);
   const loadingCountRef = useRef(stems.length);
   const failedLoadCountRef = useRef(0);
@@ -602,6 +604,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
   const [exportReadiness, setExportReadiness] = useState<ExportReadiness>('wait-all');
   const [showAdvancedControls, setShowAdvancedControls] = useState(false);
   const [trackViewMode, setTrackViewMode] = useState<TrackViewMode>('all');
+  const [loopSelectionPreview, setLoopSelectionPreview] = useState(false);
   const [historyVersion, setHistoryVersion] = useState(0);
   const [selectedTrackType, setSelectedTrackType] = useState<string | null>(() => stems[0]?.type ?? null);
 
@@ -665,6 +668,10 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
   useEffect(() => {
     failedLoadCountRef.current = failedLoadCount;
   }, [failedLoadCount]);
+
+  useEffect(() => {
+    loopSelectionPreviewRef.current = loopSelectionPreview;
+  }, [loopSelectionPreview]);
 
   useEffect(() => {
     const preferences = loadEditorPreferences();
@@ -839,6 +846,17 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     }
   }, []);
 
+  const clearLoopPreviewTimer = useCallback(() => {
+    if (loopPreviewTimerRef.current !== null) {
+      window.clearTimeout(loopPreviewTimerRef.current);
+      loopPreviewTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => () => {
+    clearLoopPreviewTimer();
+  }, [clearLoopPreviewTimer]);
+
   const getAudioContext = useCallback(() => {
     if (!audioContextRef.current) {
       audioContextRef.current = new AudioContext();
@@ -992,6 +1010,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
   }, [masterState.volume]);
 
   const pauseAll = useCallback(() => {
+    clearLoopPreviewTimer();
     const context = audioContextRef.current;
     if (context && playbackStartedAtRef.current > 0) {
       playbackOffsetRef.current = Math.min(
@@ -1004,7 +1023,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     stopSources();
     stopFrame();
     setIsPlaying(false);
-  }, [duration, stopFrame, stopSources]);
+  }, [clearLoopPreviewTimer, duration, stopFrame, stopSources]);
 
   const playAll = useCallback(async () => {
     if (!masterStem) return;
@@ -1111,10 +1130,11 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
       return;
     }
 
+    clearLoopPreviewTimer();
     playbackStopAtRef.current = null;
     previewStemTypeRef.current = null;
     void playAll();
-  }, [isPlaying, pauseAll, playAll]);
+  }, [clearLoopPreviewTimer, isPlaying, pauseAll, playAll]);
 
   const copyProjectLink = useCallback(async () => {
     try {
@@ -1295,6 +1315,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
 
   const handleSeek = useCallback((nextTime: number) => {
     const safeTime = Math.max(0, Math.min(duration || nextTime, nextTime));
+    clearLoopPreviewTimer();
     playbackStopAtRef.current = null;
     previewStemTypeRef.current = null;
     playbackOffsetRef.current = safeTime;
@@ -1304,7 +1325,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
       stopSources();
       void playAll();
     }
-  }, [duration, isPlaying, playAll, stopSources]);
+  }, [clearLoopPreviewTimer, duration, isPlaying, playAll, stopSources]);
 
   const toggleTrackFlag = useCallback((type: string, flag: 'muted' | 'solo') => {
     commitTrackChange((current) => ({
@@ -1424,8 +1445,23 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     playbackStopAtRef.current = trimEnd;
     previewStemTypeRef.current = selectedTrack.type;
     setCurrentTime(trimStart);
-    setSaveStatus(`正在预听“${getStemDisplayName(selectedTrack).zh}”选区。`);
+    setSaveStatus(loopSelectionPreviewRef.current
+      ? `正在循环预听“${getStemDisplayName(selectedTrack).zh}”选区。`
+      : `正在预听“${getStemDisplayName(selectedTrack).zh}”选区。`);
     void playAll();
+
+    if (loopSelectionPreviewRef.current) {
+      const loopDelayMs = Math.max(160, (trimEnd - trimStart) * 1000 + 120);
+      loopPreviewTimerRef.current = window.setTimeout(() => {
+        loopPreviewTimerRef.current = null;
+        if (!loopSelectionPreviewRef.current) return;
+        playbackOffsetRef.current = trimStart;
+        playbackStopAtRef.current = trimEnd;
+        previewStemTypeRef.current = selectedTrack.type;
+        setCurrentTime(trimStart);
+        void playAll();
+      }, loopDelayMs);
+    }
   }, [pauseAll, playAll, selectedTrack, selectedTrackBuffer, selectedTrackState]);
 
   const setMasterVolume = useCallback((volume: number) => {
@@ -1940,6 +1976,13 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
                       onClick={previewSelectedTrackRange}
                     >
                       预听选区
+                    </button>
+                    <button
+                      type="button"
+                      style={exportModeButtonStyle(loopSelectionPreview)}
+                      onClick={() => setLoopSelectionPreview((value) => !value)}
+                    >
+                      循环预听 {loopSelectionPreview ? '开' : '关'}
                     </button>
                     <button
                       type="button"
