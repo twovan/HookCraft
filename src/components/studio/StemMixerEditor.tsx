@@ -21,6 +21,13 @@ import {
   type StemEditorReadinessLevel,
 } from '@/lib/stems/stemEditorReadiness';
 import { nudgeStemTrimEdge, resolveStemTrimControlValues } from '@/lib/stems/stemTrackControls';
+import {
+  addStemMutedRange,
+  buildAudibleStemSegments,
+  clearStemMutedRangesInRange,
+  normalizeStemMutedRanges,
+  type StemMutedRange,
+} from '@/lib/stems/stemMuteRanges';
 
 export interface EditableStem {
   type: string;
@@ -43,6 +50,7 @@ interface StemTrackState {
   trimEnd: number | null;
   fadeIn: number;
   fadeOut: number;
+  mutedRanges: StemMutedRange[];
 }
 
 export interface StemEditState {
@@ -72,7 +80,7 @@ interface StemMixerEditorProps {
 }
 
 function defaultTrackState(): StemTrackState {
-  return { volume: 1, pan: 0, muted: false, solo: false, trimStart: 0, trimEnd: null, fadeIn: 0, fadeOut: 0 };
+  return { volume: 1, pan: 0, muted: false, solo: false, trimStart: 0, trimEnd: null, fadeIn: 0, fadeOut: 0, mutedRanges: [] };
 }
 
 function normalizeTrackState(value: Partial<StemTrackState> | undefined | null): StemTrackState {
@@ -85,6 +93,7 @@ function normalizeTrackState(value: Partial<StemTrackState> | undefined | null):
     trimEnd: typeof value?.trimEnd === 'number' ? Math.max(0, value.trimEnd) : null,
     fadeIn: typeof value?.fadeIn === 'number' ? Math.max(0, value.fadeIn) : 0,
     fadeOut: typeof value?.fadeOut === 'number' ? Math.max(0, value.fadeOut) : 0,
+    mutedRanges: normalizeStemMutedRanges(value?.mutedRanges, typeof value?.trimEnd === 'number' ? value.trimEnd : Number.MAX_SAFE_INTEGER),
   };
 }
 
@@ -529,6 +538,24 @@ function connectWithPan(
   return null;
 }
 
+function connectGainWithPan(
+  context: BaseAudioContext,
+  gain: GainNode,
+  destination: AudioNode,
+  pan: number,
+) {
+  if ('createStereoPanner' in context) {
+    const panner = context.createStereoPanner();
+    panner.pan.value = Math.max(-1, Math.min(1, pan));
+    gain.connect(panner);
+    panner.connect(destination);
+    return panner;
+  }
+
+  gain.connect(destination);
+  return null;
+}
+
 function configureLimiter(compressor: DynamicsCompressorNode) {
   compressor.threshold.value = -12;
   compressor.knee.value = 20;
@@ -569,7 +596,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
   const panNodesRef = useRef<Record<string, StereoPannerNode>>({});
   const masterGainNodeRef = useRef<GainNode | null>(null);
   const masterCompressorNodeRef = useRef<DynamicsCompressorNode | null>(null);
-  const sourceNodesRef = useRef<Record<string, AudioBufferSourceNode>>({});
+  const sourceNodesRef = useRef<Record<string, AudioBufferSourceNode[]>>({});
   const playbackStartedAtRef = useRef(0);
   const playbackOffsetRef = useRef(0);
   const playbackStopAtRef = useRef<number | null>(null);
@@ -802,18 +829,20 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
   }, []);
 
   const stopSources = useCallback(() => {
-    Object.values(sourceNodesRef.current).forEach((source) => {
-      source.onended = null;
-      try {
-        source.stop();
-      } catch {
-        // The source may already be stopped by the audio clock.
-      }
-      try {
-        source.disconnect();
-      } catch {
-        // Already disconnected.
-      }
+    Object.values(sourceNodesRef.current).forEach((sources) => {
+      sources.forEach((source) => {
+        source.onended = null;
+        try {
+          source.stop();
+        } catch {
+          // The source may already be stopped by the audio clock.
+        }
+        try {
+          source.disconnect();
+        } catch {
+          // Already disconnected.
+        }
+      });
     });
     sourceNodesRef.current = {};
 
@@ -1060,24 +1089,25 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
 
       const startAt = context.currentTime + 0.04;
       playableStems.forEach((stem) => {
-        const source = context.createBufferSource();
         const gain = context.createGain();
         const state = tracks[stem.type] || defaultTrackState();
         const isAudible = previewStemType ? state.volume > 0 : !state.muted && (!hasSoloTrack || state.solo);
         const trimStart = Math.max(0, Math.min(duration, state.trimStart));
         const trimEnd = Math.max(trimStart, Math.min(duration, state.trimEnd ?? duration));
         const cursor = playbackOffsetRef.current;
-        const isInClip = cursor < trimEnd;
-        const startDelay = Math.max(0, trimStart - cursor);
         const bufferOffset = Math.max(trimStart, cursor);
-        const playableDuration = Math.max(0, trimEnd - bufferOffset);
+        const gainScheduleStartAt = startAt + Math.max(0, trimStart - cursor);
+        const segments = buildAudibleStemSegments({
+          start: bufferOffset,
+          end: trimEnd,
+          mutedRanges: state.mutedRanges,
+        });
 
-        source.buffer = audioBuffersRef.current[stem.type];
         if (isAudible) {
           scheduleTrackGain({
             gain: gain.gain,
             baseVolume: state.volume,
-            startAt: startAt + startDelay,
+            startAt: gainScheduleStartAt,
             playbackFrom: bufferOffset,
             trimStart,
             trimEnd,
@@ -1087,15 +1117,18 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
         } else {
           gain.gain.value = 0;
         }
-        const panner = connectWithPan(context, source, gain, masterOutput.input, state.pan);
+        const panner = connectGainWithPan(context, gain, masterOutput.input, state.pan);
         gainNodesRef.current[stem.type] = gain;
         if (panner) {
           panNodesRef.current[stem.type] = panner;
         }
-        sourceNodesRef.current[stem.type] = source;
-        if (isInClip && playableDuration > 0) {
-          source.start(startAt + startDelay, bufferOffset, playableDuration);
-        }
+        sourceNodesRef.current[stem.type] = segments.map((segment) => {
+          const source = context.createBufferSource();
+          source.buffer = audioBuffersRef.current[stem.type];
+          source.connect(gain);
+          source.start(startAt + Math.max(0, segment.start - cursor), segment.start, Math.max(0, segment.end - segment.start));
+          return source;
+        });
       });
 
       playbackStartedAtRef.current = startAt;
@@ -1444,6 +1477,48 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     setSaveStatus(`已微调“${getStemDisplayName(selectedTrack).zh}”${edge === 'start' ? '入点' : '出点'}到 ${formatTime(nextValue)}。`);
   }, [duration, selectedTrack, selectedTrackState, setTrackTrim]);
 
+  const muteSelectedTrackRange = useCallback(() => {
+    if (!selectedTrack || !selectedTrackState) return;
+    const trimStart = selectedTrackTrimControls?.trimStart ?? selectedTrackState.trimStart;
+    const trimEnd = selectedTrackTrimControls?.trimEnd ?? duration;
+    if (trimEnd - trimStart <= 0.001) {
+      setPlaybackError('当前选区为空，先调整入点和出点再静音。');
+      return;
+    }
+
+    commitTrackChange((current) => {
+      const state = current[selectedTrack.type] || defaultTrackState();
+      return {
+        ...current,
+        [selectedTrack.type]: {
+          ...state,
+          mutedRanges: addStemMutedRange(state.mutedRanges, { start: trimStart, end: trimEnd }, duration),
+        },
+      };
+    });
+    setPlaybackError(null);
+    setSaveStatus(`已把“${getStemDisplayName(selectedTrack).zh}”当前选区设为静音。`);
+  }, [commitTrackChange, duration, selectedTrack, selectedTrackState, selectedTrackTrimControls]);
+
+  const restoreSelectedTrackRange = useCallback(() => {
+    if (!selectedTrack || !selectedTrackState) return;
+    const trimStart = selectedTrackTrimControls?.trimStart ?? selectedTrackState.trimStart;
+    const trimEnd = selectedTrackTrimControls?.trimEnd ?? duration;
+
+    commitTrackChange((current) => {
+      const state = current[selectedTrack.type] || defaultTrackState();
+      return {
+        ...current,
+        [selectedTrack.type]: {
+          ...state,
+          mutedRanges: clearStemMutedRangesInRange(state.mutedRanges, { start: trimStart, end: trimEnd }, duration),
+        },
+      };
+    });
+    setPlaybackError(null);
+    setSaveStatus(`已恢复“${getStemDisplayName(selectedTrack).zh}”当前选区声音。`);
+  }, [commitTrackChange, duration, selectedTrack, selectedTrackState, selectedTrackTrimControls]);
+
   const resetTrackEdit = useCallback((type: string) => {
     commitTrackChange((current) => ({
       ...current,
@@ -1453,6 +1528,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
         trimEnd: duration,
         fadeIn: 0,
         fadeOut: 0,
+        mutedRanges: [],
       },
     }));
   }, [commitTrackChange, duration]);
@@ -1818,12 +1894,11 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
         const state = tracks[stem.type] || defaultTrackState();
         const trimStart = Math.max(0, Math.min(renderDuration, state.trimStart));
         const trimEnd = Math.max(trimStart, Math.min(renderDuration, state.trimEnd ?? renderDuration));
-        const clipDuration = Math.max(0, Math.min(audioBuffer.duration, trimEnd) - trimStart);
+        const segmentEnd = Math.min(audioBuffer.duration, trimEnd);
+        const clipDuration = Math.max(0, segmentEnd - trimStart);
         if (clipDuration <= 0) return;
 
-        const source = offlineContext.createBufferSource();
         const gain = offlineContext.createGain();
-        source.buffer = audioBuffer;
         scheduleTrackGain({
           gain: gain.gain,
           baseVolume: state.volume,
@@ -1834,8 +1909,17 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
           fadeIn: state.fadeIn,
           fadeOut: state.fadeOut,
         });
-        connectWithPan(offlineContext, source, gain, masterOutput.input, state.pan);
-        source.start(trimStart, trimStart, clipDuration);
+        connectGainWithPan(offlineContext, gain, masterOutput.input, state.pan);
+        buildAudibleStemSegments({
+          start: trimStart,
+          end: segmentEnd,
+          mutedRanges: state.mutedRanges,
+        }).forEach((segment) => {
+          const source = offlineContext.createBufferSource();
+          source.buffer = audioBuffer;
+          source.connect(gain);
+          source.start(segment.start, segment.start, Math.max(0, segment.end - segment.start));
+        });
       });
 
       const rendered = await offlineContext.startRendering();
@@ -1879,10 +1963,8 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
       const sampleRate = audioBuffer.sampleRate || 44100;
       const frameCount = Math.max(1, Math.ceil(clipDuration * sampleRate));
       const offlineContext = new OfflineAudioContext(2, frameCount, sampleRate);
-      const source = offlineContext.createBufferSource();
       const gain = offlineContext.createGain();
 
-      source.buffer = audioBuffer;
       scheduleTrackGain({
         gain: gain.gain,
         baseVolume: state.volume,
@@ -1893,8 +1975,17 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
         fadeIn: state.fadeIn,
         fadeOut: state.fadeOut,
       });
-      connectWithPan(offlineContext, source, gain, offlineContext.destination, state.pan);
-      source.start(0, trimStart, clipDuration);
+      connectGainWithPan(offlineContext, gain, offlineContext.destination, state.pan);
+      buildAudibleStemSegments({
+        start: trimStart,
+        end: trimEnd,
+        mutedRanges: state.mutedRanges,
+      }).forEach((segment) => {
+        const source = offlineContext.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(gain);
+        source.start(segment.start - trimStart, segment.start, Math.max(0, segment.end - segment.start));
+      });
 
       const rendered = await offlineContext.startRendering();
       const blob = encodeWav(rendered);
@@ -2053,6 +2144,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
                   <span>声像 {formatPan(selectedTrackState.pan)}</span>
                   <span>淡入 {selectedTrackState.fadeIn.toFixed(2)}s</span>
                   <span>淡出 {selectedTrackState.fadeOut.toFixed(2)}s</span>
+                  <span>静音片段 {selectedTrackState.mutedRanges.length}</span>
                 </div>
                 <div style={selectedTrackControlsGridStyle}>
                   <label style={selectedTrackControlStyle}>
@@ -2183,6 +2275,12 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
                   </button>
                 </div>
                 <div style={selectedTrackActionsStyle}>
+                  <button type="button" style={presetButtonStyle} onClick={muteSelectedTrackRange}>
+                    静音选区
+                  </button>
+                  <button type="button" style={presetButtonStyle} onClick={restoreSelectedTrackRange}>
+                    恢复选区
+                  </button>
                   <button type="button" style={presetButtonStyle} onClick={() => setTrackTrim(selectedTrack.type, 'start', currentTime)}>
                     入点到播放头
                   </button>
