@@ -1695,6 +1695,14 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
         setSaveStatus(`已把“${getStemDisplayName(selectedTrack).zh}”出点设到 ${formatTime(currentTime)}。`);
         return;
       }
+      if (action === 'nudge-selected-trim-start-back') {
+        nudgeSelectedTrackTrim('start', -SELECTED_TRIM_NUDGE_SECONDS);
+        return;
+      }
+      if (action === 'nudge-selected-trim-end-forward') {
+        nudgeSelectedTrackTrim('end', SELECTED_TRIM_NUDGE_SECONDS);
+        return;
+      }
       resetTrackEdit(selectedTrack.type);
       setSaveStatus(`已重置“${getStemDisplayName(selectedTrack).zh}”的裁剪和淡入淡出。`);
     };
@@ -1708,6 +1716,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     duration,
     redoTrackChange,
     resetTrackEdit,
+    nudgeSelectedTrackTrim,
     saveEditState,
     selectAdjacentTrack,
     selectedTrack,
@@ -2183,7 +2192,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
                   <button type="button" style={presetButtonStyle} onClick={() => resetTrackEdit(selectedTrack.type)}>
                     重置当前轨裁剪
                   </button>
-                  <span style={selectedTrackShortcutStyle}>快捷键：↑/↓ 选轨，M 静音，S 独奏，[ / ] 设置入出点</span>
+                  <span style={selectedTrackShortcutStyle}>快捷键：↑/↓ 选轨，M 静音，S 独奏，[ / ] 设置入出点，Shift+[ / Shift+] 微调</span>
                 </div>
               </>
             ) : (
