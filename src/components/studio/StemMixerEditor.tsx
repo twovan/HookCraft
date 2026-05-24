@@ -15,6 +15,10 @@ import {
   resolveStemTrackAudioStatus,
   type StemTrackAudioStatus,
 } from '@/lib/stems/stemTrackAudioStatus';
+import {
+  buildStemEditorReadiness,
+  type StemEditorReadinessLevel,
+} from '@/lib/stems/stemEditorReadiness';
 
 export interface EditableStem {
   type: string;
@@ -633,6 +637,23 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
       canExport: !isExporting && (exportReadiness === 'wait-all' ? plannedStems.length > 0 : selectedStems.length > 0),
     };
   }, [bufferVersion, exportMode, exportReadiness, hasSoloTrack, isExporting, stems, tracks]);
+  const editorReadiness = useMemo(() => buildStemEditorReadiness({
+    loadableStemCount,
+    readyStemCount,
+    loadingStemCount: loadingStemTypes.size,
+    failedStemCount: failedStemTypes.size,
+    skippedStemCount: skippedEmptyCount,
+    exportSelectedCount: exportSummary.selectedCount,
+    exportMissingCount: exportSummary.missingCount,
+  }), [
+    exportSummary.missingCount,
+    exportSummary.selectedCount,
+    failedStemTypes,
+    loadableStemCount,
+    loadingStemTypes,
+    readyStemCount,
+    skippedEmptyCount,
+  ]);
 
   useEffect(() => {
     loadingCountRef.current = loadingCount;
@@ -1793,6 +1814,18 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
             </span>
             {skippedEmptyCount > 0 && <span>已跳过空轨 {skippedEmptyCount}</span>}
           </div>
+          <div style={readinessPanelStyle(editorReadiness.level)}>
+            <div>
+              <div style={readinessTitleStyle}>{editorReadiness.title}</div>
+              <div style={readinessDetailStyle}>{editorReadiness.detail}</div>
+            </div>
+            <div style={readinessMetricsStyle}>
+              <span style={readinessMetricStyle}>就绪 {readyStemCount}/{loadableStemCount}</span>
+              <span style={readinessMetricStyle}>加载 {loadingStemTypes.size}</span>
+              <span style={readinessMetricStyle}>失败 {failedStemTypes.size}</span>
+              <span style={readinessMetricStyle}>导出 {exportSummary.selectedCount}</span>
+            </div>
+          </div>
         </div>
 
         <div style={controlGridStyle}>
@@ -2275,6 +2308,69 @@ const mixerSummaryStyle: CSSProperties = {
   marginTop: 12,
   color: '#9ca3af',
   fontSize: 11,
+};
+
+function readinessPanelStyle(level: StemEditorReadinessLevel): CSSProperties {
+  const palette: Record<StemEditorReadinessLevel, { border: string; background: string }> = {
+    ready: {
+      border: '1px solid rgba(34, 197, 94, 0.28)',
+      background: 'rgba(22, 163, 74, 0.1)',
+    },
+    loading: {
+      border: '1px solid rgba(96, 165, 250, 0.28)',
+      background: 'rgba(37, 99, 235, 0.1)',
+    },
+    attention: {
+      border: '1px solid rgba(251, 191, 36, 0.3)',
+      background: 'rgba(217, 119, 6, 0.1)',
+    },
+    blocked: {
+      border: '1px solid rgba(248, 113, 113, 0.3)',
+      background: 'rgba(185, 28, 28, 0.11)',
+    },
+  };
+
+  return {
+    marginTop: 12,
+    borderRadius: 10,
+    ...palette[level],
+    padding: '10px 12px',
+    display: 'grid',
+    gridTemplateColumns: 'minmax(0, 1fr) auto',
+    gap: 12,
+    alignItems: 'center',
+  };
+}
+
+const readinessTitleStyle: CSSProperties = {
+  color: '#f0f1fb',
+  fontSize: 13,
+  fontWeight: 900,
+};
+
+const readinessDetailStyle: CSSProperties = {
+  color: '#aeb2c9',
+  fontSize: 11,
+  marginTop: 3,
+  lineHeight: 1.45,
+};
+
+const readinessMetricsStyle: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  justifyContent: 'flex-end',
+  gap: 6,
+};
+
+const readinessMetricStyle: CSSProperties = {
+  borderRadius: 999,
+  border: '1px solid rgba(148, 163, 184, 0.24)',
+  background: 'rgba(15, 18, 32, 0.72)',
+  color: '#d7d9e8',
+  padding: '3px 8px',
+  fontSize: 11,
+  fontWeight: 800,
+  whiteSpace: 'nowrap',
 };
 
 const controlGridStyle: CSSProperties = {
