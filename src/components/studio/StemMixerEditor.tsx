@@ -1316,6 +1316,27 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     }));
   }, [commitTrackChange]);
 
+  const soloOnlyTrack = useCallback((type: string) => {
+    commitTrackChange((current) => Object.fromEntries(stems.map((stem) => {
+      const existing = current[stem.type] || defaultTrackState();
+      const isTarget = stem.type === type;
+      return [
+        stem.type,
+        {
+          ...existing,
+          muted: false,
+          solo: isTarget,
+          volume: isTarget ? Math.max(existing.volume, 0.75) : existing.volume,
+        },
+      ];
+    })) as Record<string, StemTrackState>);
+
+    const stem = stems.find((candidate) => candidate.type === type);
+    setSaveStatus(stem
+      ? `已切换为只听“${getStemDisplayName(stem).zh}”。`
+      : '已切换为只听当前轨道。');
+  }, [commitTrackChange, stems]);
+
   const setTrackVolume = useCallback((type: string, volume: number) => {
     commitTrackChange((current) => ({
       ...current,
@@ -1908,6 +1929,9 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
                     </button>
                     <button type="button" style={presetButtonStyle} onClick={() => toggleTrackFlag(selectedTrack.type, 'solo')}>
                       {selectedTrackState.solo ? '取消独奏' : '独奏'}
+                    </button>
+                    <button type="button" style={presetButtonStyle} onClick={() => soloOnlyTrack(selectedTrack.type)}>
+                      只听当前
                     </button>
                     <button
                       type="button"
