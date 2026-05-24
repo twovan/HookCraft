@@ -11,6 +11,10 @@ import { resolveStemEditorShortcut } from '@/lib/stems/stemEditorShortcuts';
 import { resolveVisibleStemSelection } from '@/lib/stems/stemSelection';
 import { buildWaveformPeaksFromSamples } from '@/lib/stems/waveformPeaks';
 import { selectStemTypesForAudioLoad } from '@/lib/stems/stemAudioLoadPlan';
+import {
+  resolveStemTrackAudioStatus,
+  type StemTrackAudioStatus,
+} from '@/lib/stems/stemTrackAudioStatus';
 
 export interface EditableStem {
   type: string;
@@ -576,6 +580,8 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
   const [failedLoadCount, setFailedLoadCount] = useState(0);
   const [cachedLoadCount, setCachedLoadCount] = useState(0);
   const [skippedEmptyCount, setSkippedEmptyCount] = useState(0);
+  const [loadingStemTypes, setLoadingStemTypes] = useState<Set<string>>(() => new Set(stems.map((stem) => stem.type)));
+  const [failedStemTypes, setFailedStemTypes] = useState<Set<string>>(() => new Set());
   const [bufferVersion, setBufferVersion] = useState(0);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<string | null>(initialEditState?.savedAt ? '已读取上次保存的编辑状态。' : null);
@@ -808,6 +814,8 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     setFailedLoadCount(0);
     loadingCountRef.current = stemsToLoad.length;
     failedLoadCountRef.current = 0;
+    setLoadingStemTypes(new Set(stemsToLoad.map((stem) => stem.type)));
+    setFailedStemTypes(new Set());
     setCachedLoadCount(0);
     setSkippedEmptyCount(knownEmptyCount);
     setBufferVersion(0);
@@ -855,6 +863,16 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
         }
 
         audioBuffersRef.current[stem.type] = loaded.audioBuffer;
+        setLoadingStemTypes((current) => {
+          const next = new Set(current);
+          next.delete(stem.type);
+          return next;
+        });
+        setFailedStemTypes((current) => {
+          const next = new Set(current);
+          next.delete(stem.type);
+          return next;
+        });
         setBufferVersion((version) => version + 1);
         setDuration((current) => Math.max(current, loaded.audioBuffer.duration || 0));
 
@@ -864,9 +882,20 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
       } catch {
         if (!abortController.signal.aborted) {
           setFailedLoadCount((count) => count + 1);
+          setFailedStemTypes((current) => new Set(current).add(stem.type));
+          setLoadingStemTypes((current) => {
+            const next = new Set(current);
+            next.delete(stem.type);
+            return next;
+          });
         }
       } finally {
         if (!abortController.signal.aborted) {
+          setLoadingStemTypes((current) => {
+            const next = new Set(current);
+            next.delete(stem.type);
+            return next;
+          });
           setLoadingCount((count) => Math.max(0, count - 1));
           await loadNextStem();
         }
@@ -940,8 +969,9 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
       return;
     }
 
-    setPlaybackError(loadingCount > 0
-      ? `仍有 ${loadingCount} 条分轨在后台缓存，当前先播放已就绪的 ${playableStems.length} 条。`
+    const unavailableCount = Math.max(0, loadableStemCount - playableStems.length);
+    setPlaybackError(unavailableCount > 0
+      ? `当前先播放已就绪的 ${playableStems.length} 条，自动跳过 ${unavailableCount} 条未就绪分轨。`
       : null);
 
     try {
@@ -1021,7 +1051,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
       pauseAll();
       setPlaybackError('分轨混音启动失败，请刷新页面后重试。');
     }
-  }, [duration, getAudioContext, hasSoloTrack, loadingCount, masterState, masterStem, pauseAll, stems, stopFrame, stopSources, tracks]);
+  }, [duration, getAudioContext, hasSoloTrack, loadableStemCount, masterState, masterStem, pauseAll, stems, stopFrame, stopSources, tracks]);
 
   const handleTogglePlayback = useCallback(() => {
     if (isPlaying) {
@@ -1069,6 +1099,8 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     failedLoadCountRef.current = 0;
     setLoadingCount(stemsToLoad.length);
     loadingCountRef.current = stemsToLoad.length;
+    setLoadingStemTypes(new Set(stemsToLoad.map((stem) => stem.type)));
+    setFailedStemTypes(new Set());
 
     const context = getAudioContext();
     const abortController = new AbortController();
@@ -1091,6 +1123,16 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
 
         loadedCount += 1;
         audioBuffersRef.current[stem.type] = loaded.audioBuffer;
+        setLoadingStemTypes((current) => {
+          const next = new Set(current);
+          next.delete(stem.type);
+          return next;
+        });
+        setFailedStemTypes((current) => {
+          const next = new Set(current);
+          next.delete(stem.type);
+          return next;
+        });
         setBufferVersion((version) => version + 1);
         setDuration((current) => Math.max(current, loaded.audioBuffer.duration || 0));
 
@@ -1101,9 +1143,20 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
         if (!abortController.signal.aborted) {
           failedCount += 1;
           setFailedLoadCount((count) => count + 1);
+          setFailedStemTypes((current) => new Set(current).add(stem.type));
+          setLoadingStemTypes((current) => {
+            const next = new Set(current);
+            next.delete(stem.type);
+            return next;
+          });
         }
       } finally {
         if (!abortController.signal.aborted) {
+          setLoadingStemTypes((current) => {
+            const next = new Set(current);
+            next.delete(stem.type);
+            return next;
+          });
           setLoadingCount((count) => Math.max(0, count - 1));
           await loadNextStem();
         }
@@ -1122,6 +1175,69 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
       loadingCountRef.current = 0;
     }
   }, [getAudioContext, isAudioRetrying, jobId, pauseAll, stems]);
+
+  const retrySingleStemAudio = useCallback(async (stem: EditableStem) => {
+    if (stemHasKnownEmptyWaveform(stem)) {
+      setSaveStatus(`“${getStemDisplayName(stem).zh}”是空轨，无需加载音频。`);
+      return;
+    }
+    if (audioBuffersRef.current[stem.type]) {
+      setSaveStatus(`“${getStemDisplayName(stem).zh}”音频已就绪。`);
+      return;
+    }
+    if (loadingStemTypes.has(stem.type) || isAudioRetrying) {
+      setSaveStatus(`“${getStemDisplayName(stem).zh}”正在加载中，请稍等。`);
+      return;
+    }
+
+    pauseAll();
+    setIsAudioRetrying(true);
+    setPlaybackError(null);
+    setSaveStatus(`正在重试“${getStemDisplayName(stem).zh}”音频。`);
+    setLoadingCount((count) => count + 1);
+    loadingCountRef.current += 1;
+    if (failedStemTypes.has(stem.type)) {
+      setFailedLoadCount((count) => Math.max(0, count - 1));
+      failedLoadCountRef.current = Math.max(0, failedLoadCountRef.current - 1);
+    }
+    setFailedStemTypes((current) => {
+      const next = new Set(current);
+      next.delete(stem.type);
+      return next;
+    });
+    setLoadingStemTypes((current) => new Set(current).add(stem.type));
+
+    try {
+      const context = getAudioContext();
+      const loaded = await readAndDecodeStemAudio(context, stem, new AbortController().signal);
+      if (loaded.source === 'browser-cache') {
+        setCachedLoadCount((count) => count + 1);
+      }
+
+      audioBuffersRef.current[stem.type] = loaded.audioBuffer;
+      setBufferVersion((version) => version + 1);
+      setDuration((current) => Math.max(current, loaded.audioBuffer.duration || 0));
+      setSaveStatus(`“${getStemDisplayName(stem).zh}”音频已就绪。`);
+
+      if (!stem.waveform?.peaks?.length) {
+        void persistWaveform(jobId, stem.type, calculateWaveform(loaded.audioBuffer));
+      }
+    } catch {
+      setFailedLoadCount((count) => count + 1);
+      failedLoadCountRef.current += 1;
+      setFailedStemTypes((current) => new Set(current).add(stem.type));
+      setPlaybackError(`“${getStemDisplayName(stem).zh}”音频暂时不可用，可以稍后再重试。`);
+    } finally {
+      setLoadingCount((count) => Math.max(0, count - 1));
+      loadingCountRef.current = Math.max(0, loadingCountRef.current - 1);
+      setLoadingStemTypes((current) => {
+        const next = new Set(current);
+        next.delete(stem.type);
+        return next;
+      });
+      setIsAudioRetrying(false);
+    }
+  }, [failedStemTypes, getAudioContext, isAudioRetrying, jobId, loadingStemTypes, pauseAll]);
 
   const handleSeek = useCallback((nextTime: number) => {
     const safeTime = Math.max(0, Math.min(duration || nextTime, nextTime));
@@ -1813,6 +1929,13 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
           const isAudible = !state.muted && (!hasSoloTrack || state.solo);
           const displayName = getStemDisplayName(stem);
           const isSelectedTrack = selectedTrack?.type === stem.type;
+          const audioBuffer = audioBuffersRef.current[stem.type] || null;
+          const audioStatus = resolveStemTrackAudioStatus({
+            knownEmpty: stemHasKnownEmptyWaveform(stem),
+            loaded: Boolean(audioBuffer),
+            loading: loadingStemTypes.has(stem.type),
+            failed: failedStemTypes.has(stem.type),
+          });
           return (
             <div
               key={`${stem.type}-${stem.url}`}
@@ -1825,13 +1948,14 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
                   <div style={stemLabelRowStyle}>
                     <span style={stemLabelStyle}>{displayName.zh}</span>
                     {isSelectedTrack && <span style={selectedTrackBadgeStyle}>已选</span>}
+                    <span style={stemAudioStatusBadgeStyle(audioStatus)}>{stemAudioStatusLabel(audioStatus)}</span>
                   </div>
                   <div style={stemTypeStyle}>{displayName.en}</div>
                 </div>
               </div>
 
               <WaveformTrackCanvas
-                buffer={audioBuffersRef.current[stem.type] || null}
+                buffer={audioBuffer}
                 waveform={stem.waveform || null}
                 color={stemColorForType(stem.type)}
                 currentTime={currentTime}
@@ -1864,12 +1988,22 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
                 </button>
                 <button
                   type="button"
-                  disabled={!audioBuffersRef.current[stem.type] || exportingStemType === stem.type}
+                  disabled={!audioBuffer || exportingStemType === stem.type}
                   onClick={() => void exportSingleStem(stem)}
                   style={trackToggleStyle(exportingStemType === stem.type)}
                 >
                   {exportingStemType === stem.type ? '导出中' : '导出'}
                 </button>
+                {(audioStatus === 'failed' || audioStatus === 'pending') && (
+                  <button
+                    type="button"
+                    disabled={isAudioRetrying || loadingCount > 0}
+                    onClick={() => void retrySingleStemAudio(stem)}
+                    style={trackToggleStyle(audioStatus === 'failed')}
+                  >
+                    重试
+                  </button>
+                )}
               </div>
 
               <label style={volumeStyle}>
@@ -2392,6 +2526,53 @@ const selectedTrackBadgeStyle: CSSProperties = {
   whiteSpace: 'nowrap',
 };
 
+function stemAudioStatusLabel(status: StemTrackAudioStatus) {
+  if (status === 'ready') return '已就绪';
+  if (status === 'loading') return '加载中';
+  if (status === 'failed') return '失败';
+  if (status === 'skipped') return '空轨';
+  return '待加载';
+}
+
+function stemAudioStatusBadgeStyle(status: StemTrackAudioStatus): CSSProperties {
+  const palette: Record<StemTrackAudioStatus, { border: string; background: string; color: string }> = {
+    ready: {
+      border: '1px solid rgba(52, 211, 153, 0.42)',
+      background: 'rgba(16, 185, 129, 0.14)',
+      color: '#86efac',
+    },
+    loading: {
+      border: '1px solid rgba(96, 165, 250, 0.42)',
+      background: 'rgba(37, 99, 235, 0.16)',
+      color: '#bfdbfe',
+    },
+    failed: {
+      border: '1px solid rgba(248, 113, 113, 0.48)',
+      background: 'rgba(185, 28, 28, 0.18)',
+      color: '#fecaca',
+    },
+    skipped: {
+      border: '1px solid rgba(148, 163, 184, 0.34)',
+      background: 'rgba(71, 85, 105, 0.16)',
+      color: '#cbd5e1',
+    },
+    pending: {
+      border: '1px solid rgba(251, 191, 36, 0.42)',
+      background: 'rgba(217, 119, 6, 0.14)',
+      color: '#fde68a',
+    },
+  };
+
+  return {
+    borderRadius: 999,
+    ...palette[status],
+    padding: '1px 6px',
+    fontSize: 10,
+    fontWeight: 800,
+    whiteSpace: 'nowrap',
+  };
+}
+
 const stemTypeStyle: CSSProperties = {
   color: '#717791',
   fontSize: 11,
@@ -2406,8 +2587,9 @@ const stemButtonsStyle: CSSProperties = {
 
 function trackToggleStyle(active: boolean): CSSProperties {
   return {
-    width: 42,
+    minWidth: 42,
     minHeight: 30,
+    padding: '0 9px',
     borderRadius: 7,
     border: active ? '1px solid rgba(156, 108, 255, 0.75)' : '1px solid #30344c',
     background: active ? 'rgba(117, 54, 213, 0.28)' : '#171a2c',
