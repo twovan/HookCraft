@@ -569,6 +569,8 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
   const sourceNodesRef = useRef<Record<string, AudioBufferSourceNode>>({});
   const playbackStartedAtRef = useRef(0);
   const playbackOffsetRef = useRef(0);
+  const playbackStopAtRef = useRef<number | null>(null);
+  const previewStemTypeRef = useRef<string | null>(null);
   const frameRef = useRef<number | null>(null);
   const loadingCountRef = useRef(stems.length);
   const failedLoadCountRef = useRef(0);
@@ -872,6 +874,8 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     setHistoryVersion((version) => version + 1);
     playbackStartedAtRef.current = 0;
     playbackOffsetRef.current = 0;
+    playbackStopAtRef.current = null;
+    previewStemTypeRef.current = null;
     audioBuffersRef.current = {};
     stopSources();
     stopFrame();
@@ -1005,13 +1009,16 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
   const playAll = useCallback(async () => {
     if (!masterStem) return;
 
-    const playableStems = stems.filter((stem) => audioBuffersRef.current[stem.type]);
+    const previewStemType = previewStemTypeRef.current;
+    const playableStems = stems.filter((stem) => (
+      audioBuffersRef.current[stem.type] && (!previewStemType || stem.type === previewStemType)
+    ));
     if (playableStems.length === 0) {
       setPlaybackError('分轨正在缓存中，第一条轨道完成后即可开始预听。');
       return;
     }
 
-    const unavailableCount = Math.max(0, loadableStemCount - playableStems.length);
+    const unavailableCount = previewStemType ? 0 : Math.max(0, loadableStemCount - playableStems.length);
     setPlaybackError(unavailableCount > 0
       ? `当前先播放已就绪的 ${playableStems.length} 条，自动跳过 ${unavailableCount} 条未就绪分轨。`
       : null);
@@ -1029,7 +1036,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
         const source = context.createBufferSource();
         const gain = context.createGain();
         const state = tracks[stem.type] || defaultTrackState();
-        const isAudible = !state.muted && (!hasSoloTrack || state.solo);
+        const isAudible = previewStemType ? state.volume > 0 : !state.muted && (!hasSoloTrack || state.solo);
         const trimStart = Math.max(0, Math.min(duration, state.trimStart));
         const trimEnd = Math.max(trimStart, Math.min(duration, state.trimEnd ?? duration));
         const cursor = playbackOffsetRef.current;
@@ -1076,10 +1083,13 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
         );
         setCurrentTime(nextTime);
 
-        if (duration > 0 && nextTime >= duration) {
-          playbackOffsetRef.current = 0;
-          setCurrentTime(0);
+        const stopAt = playbackStopAtRef.current ?? duration;
+        if (stopAt > 0 && nextTime >= stopAt) {
+          playbackOffsetRef.current = playbackStopAtRef.current === null ? 0 : stopAt;
+          setCurrentTime(playbackStopAtRef.current === null ? 0 : stopAt);
           playbackStartedAtRef.current = 0;
+          playbackStopAtRef.current = null;
+          previewStemTypeRef.current = null;
           stopSources();
           setIsPlaying(false);
           return;
@@ -1101,6 +1111,8 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
       return;
     }
 
+    playbackStopAtRef.current = null;
+    previewStemTypeRef.current = null;
     void playAll();
   }, [isPlaying, pauseAll, playAll]);
 
@@ -1283,6 +1295,8 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
 
   const handleSeek = useCallback((nextTime: number) => {
     const safeTime = Math.max(0, Math.min(duration || nextTime, nextTime));
+    playbackStopAtRef.current = null;
+    previewStemTypeRef.current = null;
     playbackOffsetRef.current = safeTime;
     setCurrentTime(safeTime);
     if (isPlaying) {
@@ -1370,6 +1384,28 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
       },
     }));
   }, [commitTrackChange, duration]);
+
+  const previewSelectedTrackRange = useCallback(() => {
+    if (!selectedTrack || !selectedTrackState || !selectedTrackBuffer) {
+      setPlaybackError('当前轨道还没有音频，等缓存完成后再预听。');
+      return;
+    }
+
+    const trimStart = Math.max(0, Math.min(selectedTrackBuffer.duration, selectedTrackState.trimStart));
+    const trimEnd = Math.max(trimStart, Math.min(selectedTrackBuffer.duration, selectedTrackState.trimEnd ?? selectedTrackBuffer.duration));
+    if (trimEnd - trimStart <= 0.05) {
+      setPlaybackError('当前轨道的裁剪区间太短，请先调整入点和出点。');
+      return;
+    }
+
+    pauseAll();
+    playbackOffsetRef.current = trimStart;
+    playbackStopAtRef.current = trimEnd;
+    previewStemTypeRef.current = selectedTrack.type;
+    setCurrentTime(trimStart);
+    setSaveStatus(`正在预听“${getStemDisplayName(selectedTrack).zh}”选区。`);
+    void playAll();
+  }, [pauseAll, playAll, selectedTrack, selectedTrackBuffer, selectedTrackState]);
 
   const setMasterVolume = useCallback((volume: number) => {
     setMasterState((current) => normalizeStemMasterState({
@@ -1872,6 +1908,14 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
                     </button>
                     <button type="button" style={presetButtonStyle} onClick={() => toggleTrackFlag(selectedTrack.type, 'solo')}>
                       {selectedTrackState.solo ? '取消独奏' : '独奏'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!selectedTrackBuffer}
+                      style={presetButtonStyle}
+                      onClick={previewSelectedTrackRange}
+                    >
+                      预听选区
                     </button>
                     <button
                       type="button"
