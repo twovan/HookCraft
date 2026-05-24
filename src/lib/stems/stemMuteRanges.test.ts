@@ -5,6 +5,7 @@ import {
   clearStemMutedRangesInRange,
   mapStemMutedRangesToPixels,
   normalizeStemMutedRanges,
+  removeStemMutedRangeAtIndex,
 } from './stemMuteRanges';
 
 describe('stem mute ranges', () => {
@@ -37,6 +38,26 @@ describe('stem mute ranges', () => {
     ], { start: 8, end: 22 }, 30)).toEqual([
       { start: 5, end: 8 },
       { start: 22, end: 25 },
+    ]);
+  });
+
+  it('removes one normalized muted range by index', () => {
+    expect(removeStemMutedRangeAtIndex([
+      { start: 18, end: 22 },
+      { start: 4, end: 6 },
+      { start: 5.5, end: 8 },
+    ], 1, 30)).toEqual([
+      { start: 4, end: 8 },
+    ]);
+  });
+
+  it('ignores invalid muted range indexes', () => {
+    expect(removeStemMutedRangeAtIndex([
+      { start: 2, end: 4 },
+      { start: 8, end: 10 },
+    ], 5, 30)).toEqual([
+      { start: 2, end: 4 },
+      { start: 8, end: 10 },
     ]);
   });
 

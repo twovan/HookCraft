@@ -27,6 +27,7 @@ import {
   clearStemMutedRangesInRange,
   mapStemMutedRangesToPixels,
   normalizeStemMutedRanges,
+  removeStemMutedRangeAtIndex,
   type StemMutedRange,
 } from '@/lib/stems/stemMuteRanges';
 
@@ -773,6 +774,9 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     : null;
   const selectedTrackTrimEnd = selectedTrackTrimControls?.trimEnd ?? duration;
   const selectedTrackClipDuration = selectedTrackTrimControls?.clipDuration ?? 0;
+  const selectedTrackMutedRanges = selectedTrackState
+    ? normalizeStemMutedRanges(selectedTrackState.mutedRanges, duration)
+    : [];
   const selectedTrackBuffer = selectedTrack
     ? (audioBuffersRef.current[selectedTrack.type] || null)
     : null;
@@ -1520,6 +1524,23 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     setSaveStatus(`已恢复“${getStemDisplayName(selectedTrack).zh}”当前选区声音。`);
   }, [commitTrackChange, duration, selectedTrack, selectedTrackState, selectedTrackTrimControls]);
 
+  const restoreSelectedTrackMutedRange = useCallback((index: number) => {
+    if (!selectedTrack) return;
+
+    commitTrackChange((current) => {
+      const state = current[selectedTrack.type] || defaultTrackState();
+      return {
+        ...current,
+        [selectedTrack.type]: {
+          ...state,
+          mutedRanges: removeStemMutedRangeAtIndex(state.mutedRanges, index, duration),
+        },
+      };
+    });
+    setPlaybackError(null);
+    setSaveStatus(`已恢复“${getStemDisplayName(selectedTrack).zh}”第 ${index + 1} 个静音片段。`);
+  }, [commitTrackChange, duration, selectedTrack]);
+
   const resetTrackEdit = useCallback((type: string) => {
     commitTrackChange((current) => ({
       ...current,
@@ -2155,7 +2176,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
                   <span>声像 {formatPan(selectedTrackState.pan)}</span>
                   <span>淡入 {selectedTrackState.fadeIn.toFixed(2)}s</span>
                   <span>淡出 {selectedTrackState.fadeOut.toFixed(2)}s</span>
-                  <span>静音片段 {selectedTrackState.mutedRanges.length}</span>
+                  <span>静音片段 {selectedTrackMutedRanges.length}</span>
                 </div>
                 <div style={selectedTrackControlsGridStyle}>
                   <label style={selectedTrackControlStyle}>
@@ -2303,6 +2324,24 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
                   </button>
                   <span style={selectedTrackShortcutStyle}>快捷键：↑/↓ 选轨，M 静音，S 独奏，[ / ] 设置入出点，Shift+[ / Shift+] 微调，X 静音选区，Shift+X 恢复</span>
                 </div>
+                {selectedTrackMutedRanges.length > 0 && (
+                  <div style={mutedRangeListStyle} aria-label={`${getStemDisplayName(selectedTrack).zh} 静音片段`}>
+                    {selectedTrackMutedRanges.map((range, index) => (
+                      <div key={`${range.start}-${range.end}-${index}`} style={mutedRangeItemStyle}>
+                        <span style={mutedRangeTimeStyle}>
+                          静音 {index + 1}: {formatTime(range.start)} - {formatTime(range.end)}
+                        </span>
+                        <button
+                          type="button"
+                          style={mutedRangeRestoreButtonStyle}
+                          onClick={() => restoreSelectedTrackMutedRange(index)}
+                        >
+                          恢复
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </>
             ) : (
               <div style={emptyTrackNoticeStyle}>当前筛选下没有选中的轨道。</div>
@@ -2904,6 +2943,47 @@ const selectedTrackActionsStyle: CSSProperties = {
   flexWrap: 'wrap',
   gap: 7,
   alignItems: 'center',
+};
+
+const mutedRangeListStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+  gap: 7,
+  marginTop: 10,
+};
+
+const mutedRangeItemStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 8,
+  minHeight: 30,
+  border: '1px solid rgba(248, 113, 113, 0.35)',
+  borderRadius: 7,
+  background: 'rgba(127, 29, 29, 0.2)',
+  padding: '5px 7px',
+};
+
+const mutedRangeTimeStyle: CSSProperties = {
+  minWidth: 0,
+  color: '#fecaca',
+  fontSize: 11,
+  fontVariantNumeric: 'tabular-nums',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+};
+
+const mutedRangeRestoreButtonStyle: CSSProperties = {
+  minHeight: 22,
+  borderRadius: 7,
+  border: '1px solid rgba(248, 113, 113, 0.5)',
+  background: 'rgba(127, 29, 29, 0.3)',
+  padding: '3px 8px',
+  cursor: 'pointer',
+  color: '#fee2e2',
+  fontSize: 11,
+  fontWeight: 800,
 };
 
 const selectedTrackStatsStyle: CSSProperties = {

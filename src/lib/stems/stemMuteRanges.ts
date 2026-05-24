@@ -68,6 +68,15 @@ export function clearStemMutedRangesInRange(current: StemMutedRange[] | undefine
   return normalizeStemMutedRanges(remaining, duration);
 }
 
+export function removeStemMutedRangeAtIndex(current: StemMutedRange[] | undefined | null, index: number, duration: number) {
+  const normalized = normalizeStemMutedRanges(current, duration);
+  if (!Number.isInteger(index) || index < 0 || index >= normalized.length) {
+    return normalized;
+  }
+
+  return normalized.filter((_, mutedRangeIndex) => mutedRangeIndex !== index);
+}
+
 export function buildAudibleStemSegments({
   start,
   end,
