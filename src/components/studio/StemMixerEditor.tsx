@@ -1935,6 +1935,56 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
                   <span>淡入 {selectedTrackState.fadeIn.toFixed(2)}s</span>
                   <span>淡出 {selectedTrackState.fadeOut.toFixed(2)}s</span>
                 </div>
+                <div style={selectedTrackControlsGridStyle}>
+                  <label style={selectedTrackControlStyle}>
+                    <span>音量 {Math.round(selectedTrackState.volume * 100)}%</span>
+                    <input
+                      aria-label={`${getStemDisplayName(selectedTrack).zh} 音量`}
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={selectedTrackState.volume}
+                      onChange={(event) => setTrackVolume(selectedTrack.type, Number(event.target.value))}
+                    />
+                  </label>
+                  <label style={selectedTrackControlStyle}>
+                    <span>声像 {formatPan(selectedTrackState.pan)}</span>
+                    <input
+                      aria-label={`${getStemDisplayName(selectedTrack).zh} 声像`}
+                      type="range"
+                      min={-1}
+                      max={1}
+                      step={0.01}
+                      value={selectedTrackState.pan}
+                      onChange={(event) => setTrackPan(selectedTrack.type, Number(event.target.value))}
+                    />
+                  </label>
+                  <label style={selectedTrackControlStyle}>
+                    <span>淡入 {Math.min(selectedTrackState.fadeIn, selectedTrackClipDuration).toFixed(2)}s</span>
+                    <input
+                      aria-label={`${getStemDisplayName(selectedTrack).zh} 淡入`}
+                      type="range"
+                      min={0}
+                      max={Math.max(selectedTrackClipDuration, 0.1)}
+                      step={0.05}
+                      value={Math.min(selectedTrackState.fadeIn, selectedTrackClipDuration)}
+                      onChange={(event) => setTrackFade(selectedTrack.type, 'in', Number(event.target.value))}
+                    />
+                  </label>
+                  <label style={selectedTrackControlStyle}>
+                    <span>淡出 {Math.min(selectedTrackState.fadeOut, selectedTrackClipDuration).toFixed(2)}s</span>
+                    <input
+                      aria-label={`${getStemDisplayName(selectedTrack).zh} 淡出`}
+                      type="range"
+                      min={0}
+                      max={Math.max(selectedTrackClipDuration, 0.1)}
+                      step={0.05}
+                      value={Math.min(selectedTrackState.fadeOut, selectedTrackClipDuration)}
+                      onChange={(event) => setTrackFade(selectedTrack.type, 'out', Number(event.target.value))}
+                    />
+                  </label>
+                </div>
                 <div style={selectedTrackActionsStyle}>
                   <button type="button" style={presetButtonStyle} onClick={() => setTrackTrim(selectedTrack.type, 'start', currentTime)}>
                     入点到播放头
@@ -2555,6 +2605,21 @@ const selectedTrackStatsStyle: CSSProperties = {
   gap: 7,
   marginTop: 10,
   color: '#d8d9e6',
+  fontSize: 11,
+  fontVariantNumeric: 'tabular-nums',
+};
+
+const selectedTrackControlsGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  gap: 10,
+  marginTop: 10,
+};
+
+const selectedTrackControlStyle: CSSProperties = {
+  display: 'grid',
+  gap: 4,
+  color: '#cfd0dc',
   fontSize: 11,
   fontVariantNumeric: 'tabular-nums',
 };
