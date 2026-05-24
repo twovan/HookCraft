@@ -20,7 +20,7 @@ import {
   buildStemEditorReadiness,
   type StemEditorReadinessLevel,
 } from '@/lib/stems/stemEditorReadiness';
-import { resolveStemTrimControlValues } from '@/lib/stems/stemTrackControls';
+import { nudgeStemTrimEdge, resolveStemTrimControlValues } from '@/lib/stems/stemTrackControls';
 
 export interface EditableStem {
   type: string;
@@ -61,6 +61,8 @@ type EditorPreferences = {
   showAdvancedControls?: boolean;
   trackViewMode?: TrackViewMode;
 };
+
+const SELECTED_TRIM_NUDGE_SECONDS = 0.1;
 
 interface StemMixerEditorProps {
   stems: EditableStem[];
@@ -1420,6 +1422,28 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     });
   }, [commitTrackChange, duration]);
 
+  const nudgeSelectedTrackTrim = useCallback((edge: 'start' | 'end', delta: number) => {
+    if (!selectedTrack || !selectedTrackState) return;
+
+    const trimControls = resolveStemTrimControlValues({
+      duration,
+      trimStart: selectedTrackState.trimStart,
+      trimEnd: selectedTrackState.trimEnd,
+      fadeIn: selectedTrackState.fadeIn,
+      fadeOut: selectedTrackState.fadeOut,
+    });
+    const nextValue = nudgeStemTrimEdge({
+      edge,
+      delta,
+      duration,
+      trimStart: trimControls.trimStart,
+      trimEnd: trimControls.trimEnd,
+    });
+
+    setTrackTrim(selectedTrack.type, edge, nextValue);
+    setSaveStatus(`已微调“${getStemDisplayName(selectedTrack).zh}”${edge === 'start' ? '入点' : '出点'}到 ${formatTime(nextValue)}。`);
+  }, [duration, selectedTrack, selectedTrackState, setTrackTrim]);
+
   const resetTrackEdit = useCallback((type: string) => {
     commitTrackChange((current) => ({
       ...current,
@@ -2119,6 +2143,36 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
                     />
                   </label>
                 </div>
+                <div style={selectedTrackNudgeGridStyle}>
+                  <button
+                    type="button"
+                    style={presetButtonStyle}
+                    onClick={() => nudgeSelectedTrackTrim('start', -SELECTED_TRIM_NUDGE_SECONDS)}
+                  >
+                    入点 -0.1s
+                  </button>
+                  <button
+                    type="button"
+                    style={presetButtonStyle}
+                    onClick={() => nudgeSelectedTrackTrim('start', SELECTED_TRIM_NUDGE_SECONDS)}
+                  >
+                    入点 +0.1s
+                  </button>
+                  <button
+                    type="button"
+                    style={presetButtonStyle}
+                    onClick={() => nudgeSelectedTrackTrim('end', -SELECTED_TRIM_NUDGE_SECONDS)}
+                  >
+                    出点 -0.1s
+                  </button>
+                  <button
+                    type="button"
+                    style={presetButtonStyle}
+                    onClick={() => nudgeSelectedTrackTrim('end', SELECTED_TRIM_NUDGE_SECONDS)}
+                  >
+                    出点 +0.1s
+                  </button>
+                </div>
                 <div style={selectedTrackActionsStyle}>
                   <button type="button" style={presetButtonStyle} onClick={() => setTrackTrim(selectedTrack.type, 'start', currentTime)}>
                     入点到播放头
@@ -2775,6 +2829,13 @@ const selectedTrackNumberInputStyle: CSSProperties = {
   padding: '2px 5px',
   fontSize: 11,
   fontVariantNumeric: 'tabular-nums',
+};
+
+const selectedTrackNudgeGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+  gap: 7,
+  marginTop: 10,
 };
 
 const selectedTrackShortcutStyle: CSSProperties = {
