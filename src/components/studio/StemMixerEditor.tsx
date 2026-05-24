@@ -719,6 +719,26 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     },
     [selectedTrackType, visibleStems],
   );
+  const selectedTrackState = selectedTrack
+    ? (tracks[selectedTrack.type] || defaultTrackState())
+    : null;
+  const selectedTrackTrimEnd = selectedTrackState
+    ? (selectedTrackState.trimEnd ?? duration)
+    : duration;
+  const selectedTrackClipDuration = selectedTrackState
+    ? Math.max(0, selectedTrackTrimEnd - selectedTrackState.trimStart)
+    : 0;
+  const selectedTrackBuffer = selectedTrack
+    ? (audioBuffersRef.current[selectedTrack.type] || null)
+    : null;
+  const selectedTrackAudioStatus = selectedTrack
+    ? resolveStemTrackAudioStatus({
+        knownEmpty: stemHasKnownEmptyWaveform(selectedTrack),
+        loaded: Boolean(selectedTrackBuffer),
+        loading: loadingStemTypes.has(selectedTrack.type),
+        failed: failedStemTypes.has(selectedTrack.type),
+      })
+    : null;
   const canUndo = historyVersion >= 0 && undoStackRef.current.length > 0;
   const canRedo = historyVersion >= 0 && redoStackRef.current.length > 0;
 
@@ -1830,6 +1850,65 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
         </div>
 
         <div style={controlGridStyle}>
+          <div style={selectedTrackPanelStyle}>
+            {selectedTrack && selectedTrackState ? (
+              <>
+                <div style={selectedTrackHeaderStyle}>
+                  <div style={selectedTrackTitleGroupStyle}>
+                    <span style={stemColorStyle(selectedTrack.type)} />
+                    <div>
+                      <div style={selectedTrackNameStyle}>{getStemDisplayName(selectedTrack).zh}</div>
+                      <div style={selectedTrackSubStyle}>{getStemDisplayName(selectedTrack).en}</div>
+                    </div>
+                    {selectedTrackAudioStatus && (
+                      <span style={stemAudioStatusBadgeStyle(selectedTrackAudioStatus)}>
+                        {stemAudioStatusLabel(selectedTrackAudioStatus)}
+                      </span>
+                    )}
+                  </div>
+                  <div style={selectedTrackActionsStyle}>
+                    <button type="button" style={presetButtonStyle} onClick={() => toggleTrackFlag(selectedTrack.type, 'muted')}>
+                      {selectedTrackState.muted ? '取消静音' : '静音'}
+                    </button>
+                    <button type="button" style={presetButtonStyle} onClick={() => toggleTrackFlag(selectedTrack.type, 'solo')}>
+                      {selectedTrackState.solo ? '取消独奏' : '独奏'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!selectedTrackBuffer || exportingStemType === selectedTrack.type}
+                      style={presetButtonStyle}
+                      onClick={() => void exportSingleStem(selectedTrack)}
+                    >
+                      {exportingStemType === selectedTrack.type ? '导出中' : '导出单轨'}
+                    </button>
+                  </div>
+                </div>
+                <div style={selectedTrackStatsStyle}>
+                  <span>范围 {formatTime(selectedTrackState.trimStart)} - {formatTime(selectedTrackTrimEnd)}</span>
+                  <span>片段 {formatTime(selectedTrackClipDuration)}</span>
+                  <span>音量 {Math.round(selectedTrackState.volume * 100)}%</span>
+                  <span>声像 {formatPan(selectedTrackState.pan)}</span>
+                  <span>淡入 {selectedTrackState.fadeIn.toFixed(2)}s</span>
+                  <span>淡出 {selectedTrackState.fadeOut.toFixed(2)}s</span>
+                </div>
+                <div style={selectedTrackActionsStyle}>
+                  <button type="button" style={presetButtonStyle} onClick={() => setTrackTrim(selectedTrack.type, 'start', currentTime)}>
+                    入点到播放头
+                  </button>
+                  <button type="button" style={presetButtonStyle} onClick={() => setTrackTrim(selectedTrack.type, 'end', currentTime)}>
+                    出点到播放头
+                  </button>
+                  <button type="button" style={presetButtonStyle} onClick={() => resetTrackEdit(selectedTrack.type)}>
+                    重置当前轨裁剪
+                  </button>
+                  <span style={selectedTrackShortcutStyle}>快捷键：↑/↓ 选轨，M 静音，S 独奏，[ / ] 设置入出点</span>
+                </div>
+              </>
+            ) : (
+              <div style={emptyTrackNoticeStyle}>当前筛选下没有选中的轨道。</div>
+            )}
+          </div>
+
           <div style={controlPanelStyle}>
             <span style={presetLabelStyle}>混音预设</span>
             <div style={buttonWrapStyle}>
@@ -2381,6 +2460,65 @@ const controlGridStyle: CSSProperties = {
   gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
   gap: 10,
   minWidth: 0,
+};
+
+const selectedTrackPanelStyle: CSSProperties = {
+  gridColumn: '1 / -1',
+  borderRadius: 10,
+  border: '1px solid rgba(156, 108, 255, 0.28)',
+  background: 'rgba(12, 15, 29, 0.72)',
+  padding: 12,
+  minWidth: 0,
+};
+
+const selectedTrackHeaderStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 10,
+  flexWrap: 'wrap',
+};
+
+const selectedTrackTitleGroupStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 9,
+  minWidth: 0,
+};
+
+const selectedTrackNameStyle: CSSProperties = {
+  color: '#f5f3ff',
+  fontSize: 14,
+  fontWeight: 900,
+};
+
+const selectedTrackSubStyle: CSSProperties = {
+  color: '#858aa3',
+  fontSize: 11,
+  marginTop: 2,
+};
+
+const selectedTrackActionsStyle: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 7,
+  alignItems: 'center',
+};
+
+const selectedTrackStatsStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+  gap: 7,
+  marginTop: 10,
+  color: '#d8d9e6',
+  fontSize: 11,
+  fontVariantNumeric: 'tabular-nums',
+};
+
+const selectedTrackShortcutStyle: CSSProperties = {
+  color: '#858aa3',
+  fontSize: 11,
+  lineHeight: 1.35,
 };
 
 const controlPanelStyle: CSSProperties = {
