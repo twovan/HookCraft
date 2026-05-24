@@ -4,6 +4,7 @@ import { getAuthUser } from '@/lib/supabase/auth-helpers';
 import { KieSunoProvider } from '@/lib/generation/KieSunoProvider';
 import { readNormalizedStems } from '@/lib/stems/kieStemResult';
 import { TimedPromiseCache } from '@/lib/stems/stemRefreshCache';
+import { createStemAudioFetchTimeout } from '@/lib/stems/stemAudioFetchTimeout';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import type { KieStemSplitDetails } from '@/types/kie';
 
@@ -45,6 +46,7 @@ function isUsableAudioResponse(response: Response) {
 
 async function fetchStemAudio(sourceUrl: string) {
   let upstream: Response;
+  const timeout = createStemAudioFetchTimeout();
 
   try {
     upstream = await fetch(sourceUrl, {
@@ -52,10 +54,13 @@ async function fetchStemAudio(sourceUrl: string) {
       headers: {
         Accept: 'audio/*,*/*;q=0.8',
       },
+      signal: timeout.signal,
     });
   } catch (error) {
     console.warn('[stems/audio] Stem source fetch failed:', error);
     return null;
+  } finally {
+    timeout.cancel();
   }
 
   return upstream.ok && upstream.body && isUsableAudioResponse(upstream) ? upstream : null;

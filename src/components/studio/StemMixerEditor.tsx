@@ -10,6 +10,7 @@ import {
 import { resolveStemEditorShortcut } from '@/lib/stems/stemEditorShortcuts';
 import { resolveVisibleStemSelection } from '@/lib/stems/stemSelection';
 import { buildWaveformPeaksFromSamples } from '@/lib/stems/waveformPeaks';
+import { selectStemTypesForAudioLoad } from '@/lib/stems/stemAudioLoadPlan';
 
 export interface EditableStem {
   type: string;
@@ -232,7 +233,6 @@ const STEM_LOAD_CONCURRENCY = 3;
 const INITIAL_STEM_LOAD_COUNT = 6;
 const DEFERRED_STEM_LOAD_DELAY_MS = 2200;
 const STEM_AUDIO_CACHE_NAME = 'hookcraft-stem-audio-v2';
-const LEGACY_STEM_AUDIO_CACHE_NAMES = ['hookcraft-stem-audio-v1', STEM_AUDIO_CACHE_NAME];
 const PRIORITY_STEM_TYPES = [
   'vocals',
   'drums',
@@ -583,12 +583,12 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
   const [isSaving, setIsSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [exportingStemType, setExportingStemType] = useState<string | null>(null);
+  const [isAudioRetrying, setIsAudioRetrying] = useState(false);
   const [editorPreferencesLoaded, setEditorPreferencesLoaded] = useState(false);
   const [exportMode, setExportMode] = useState<ExportMode>('current-mix');
   const [exportReadiness, setExportReadiness] = useState<ExportReadiness>('wait-all');
   const [showAdvancedControls, setShowAdvancedControls] = useState(false);
   const [trackViewMode, setTrackViewMode] = useState<TrackViewMode>('all');
-  const [audioReloadNonce, setAudioReloadNonce] = useState(0);
   const [historyVersion, setHistoryVersion] = useState(0);
   const [selectedTrackType, setSelectedTrackType] = useState<string | null>(() => stems[0]?.type ?? null);
 
@@ -881,7 +881,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     return () => {
       abortController.abort();
     };
-  }, [audioReloadNonce, getAudioContext, initialEditState, jobId, stems, stopFrame, stopSources]);
+  }, [getAudioContext, initialEditState, jobId, stems, stopFrame, stopSources]);
 
   useEffect(() => () => {
     if (autoSaveTimerRef.current !== null) {
@@ -1043,19 +1043,85 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
   }, []);
 
   const reloadAudioCache = useCallback(async () => {
-    pauseAll();
-    setPlaybackError(null);
-    setSaveStatus('正在重新加载音频缓存。');
-
-    if ('caches' in window) {
-      await Promise.all(LEGACY_STEM_AUDIO_CACHE_NAMES.map(async (cacheName) => {
-        const cache = await caches.open(cacheName);
-        await Promise.all(stems.map((stem) => cache.delete(stem.url).catch(() => false)));
-      }));
+    if (loadingCountRef.current > 0 || isAudioRetrying) {
+      setSaveStatus('音频仍在加载中，请稍等当前队列完成。');
+      return;
     }
 
-    setAudioReloadNonce((value) => value + 1);
-  }, [pauseAll, stems]);
+    const stemTypesToLoad = new Set(selectStemTypesForAudioLoad(stems.map((stem) => ({
+      type: stem.type,
+      knownEmpty: stemHasKnownEmptyWaveform(stem),
+      loaded: Boolean(audioBuffersRef.current[stem.type]),
+    }))));
+
+    const stemsToLoad = stems.filter((stem) => stemTypesToLoad.has(stem.type));
+    if (stemsToLoad.length === 0) {
+      setPlaybackError(null);
+      setSaveStatus('音频检查完成：所有可用分轨都已就绪，无需重新加载。');
+      return;
+    }
+
+    pauseAll();
+    setIsAudioRetrying(true);
+    setPlaybackError(null);
+    setSaveStatus(`正在检查音频，只补载 ${stemsToLoad.length} 条未就绪分轨。`);
+    setFailedLoadCount(0);
+    failedLoadCountRef.current = 0;
+    setLoadingCount(stemsToLoad.length);
+    loadingCountRef.current = stemsToLoad.length;
+
+    const context = getAudioContext();
+    const abortController = new AbortController();
+    const prioritizedStems = sortStemsByLoadPriority(stemsToLoad);
+    let nextStemIndex = 0;
+    let loadedCount = 0;
+    let failedCount = 0;
+
+    const loadNextStem = async (): Promise<void> => {
+      const stem = prioritizedStems[nextStemIndex];
+      nextStemIndex += 1;
+      if (!stem || abortController.signal.aborted) return;
+
+      try {
+        const loaded = await readAndDecodeStemAudio(context, stem, abortController.signal);
+        if (abortController.signal.aborted) return;
+        if (loaded.source === 'browser-cache') {
+          setCachedLoadCount((count) => count + 1);
+        }
+
+        loadedCount += 1;
+        audioBuffersRef.current[stem.type] = loaded.audioBuffer;
+        setBufferVersion((version) => version + 1);
+        setDuration((current) => Math.max(current, loaded.audioBuffer.duration || 0));
+
+        if (!stem.waveform?.peaks?.length) {
+          void persistWaveform(jobId, stem.type, calculateWaveform(loaded.audioBuffer));
+        }
+      } catch {
+        if (!abortController.signal.aborted) {
+          failedCount += 1;
+          setFailedLoadCount((count) => count + 1);
+        }
+      } finally {
+        if (!abortController.signal.aborted) {
+          setLoadingCount((count) => Math.max(0, count - 1));
+          await loadNextStem();
+        }
+      }
+    };
+
+    try {
+      await Promise.all(Array.from({ length: Math.min(STEM_LOAD_CONCURRENCY, prioritizedStems.length) }, () => loadNextStem()));
+      setSaveStatus(
+        failedCount > 0
+          ? `音频检查完成：补载成功 ${loadedCount} 条，仍有 ${failedCount} 条暂不可用。`
+          : `音频检查完成：已补载 ${loadedCount} 条分轨。`,
+      );
+    } finally {
+      setIsAudioRetrying(false);
+      loadingCountRef.current = 0;
+    }
+  }, [getAudioContext, isAudioRetrying, jobId, pauseAll, stems]);
 
   const handleSeek = useCallback((nextTime: number) => {
     const safeTime = Math.max(0, Math.min(duration || nextTime, nextTime));
@@ -1571,8 +1637,8 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
           <button type="button" onClick={copyProjectLink} style={ghostButtonStyle}>
             复制链接
           </button>
-          <button type="button" onClick={() => void reloadAudioCache()} style={ghostButtonStyle}>
-            重载音频
+          <button type="button" onClick={() => void reloadAudioCache()} disabled={loadingCount > 0 || isAudioRetrying} style={ghostButtonStyle}>
+            {loadingCount > 0 || isAudioRetrying ? '检查中' : '检查音频'}
           </button>
           <button type="button" onClick={resetMix} style={ghostButtonStyle}>
             重置混音
@@ -1730,8 +1796,8 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
       {failedLoadCount > 0 && (
         <div style={playbackErrorStyle}>
           {failedLoadCount} 条分轨加载失败，系统已自动清理坏缓存并跳过不可用轨道。
-          <button type="button" onClick={() => void reloadAudioCache()} style={inlineRetryButtonStyle}>
-            重试加载
+          <button type="button" onClick={() => void reloadAudioCache()} disabled={loadingCount > 0 || isAudioRetrying} style={inlineRetryButtonStyle}>
+            {loadingCount > 0 || isAudioRetrying ? '检查中' : '重试音频'}
           </button>
         </div>
       )}

@@ -4,6 +4,7 @@ node_modules/
 .env*.local
 .vercel/
 .deploy-*/
+.hotfix-deploy-*/
 .rewrite-backup/
 *.zip
 **/*.test.ts
