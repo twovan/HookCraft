@@ -848,7 +848,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
 
   const clearLoopPreviewTimer = useCallback(() => {
     if (loopPreviewTimerRef.current !== null) {
-      window.clearTimeout(loopPreviewTimerRef.current);
+      window.clearInterval(loopPreviewTimerRef.current);
       loopPreviewTimerRef.current = null;
     }
   }, []);
@@ -1452,9 +1452,11 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
 
     if (loopSelectionPreviewRef.current) {
       const loopDelayMs = Math.max(160, (trimEnd - trimStart) * 1000 + 120);
-      loopPreviewTimerRef.current = window.setTimeout(() => {
-        loopPreviewTimerRef.current = null;
-        if (!loopSelectionPreviewRef.current) return;
+      loopPreviewTimerRef.current = window.setInterval(() => {
+        if (!loopSelectionPreviewRef.current) {
+          clearLoopPreviewTimer();
+          return;
+        }
         playbackOffsetRef.current = trimStart;
         playbackStopAtRef.current = trimEnd;
         previewStemTypeRef.current = selectedTrack.type;
@@ -1462,7 +1464,18 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
         void playAll();
       }, loopDelayMs);
     }
-  }, [pauseAll, playAll, selectedTrack, selectedTrackBuffer, selectedTrackState]);
+  }, [clearLoopPreviewTimer, pauseAll, playAll, selectedTrack, selectedTrackBuffer, selectedTrackState]);
+
+  const toggleLoopSelectionPreview = useCallback(() => {
+    setLoopSelectionPreview((current) => {
+      const next = !current;
+      loopSelectionPreviewRef.current = next;
+      if (!next) {
+        clearLoopPreviewTimer();
+      }
+      return next;
+    });
+  }, [clearLoopPreviewTimer]);
 
   const setMasterVolume = useCallback((volume: number) => {
     setMasterState((current) => normalizeStemMasterState({
@@ -1980,7 +1993,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
                     <button
                       type="button"
                       style={exportModeButtonStyle(loopSelectionPreview)}
-                      onClick={() => setLoopSelectionPreview((value) => !value)}
+                      onClick={toggleLoopSelectionPreview}
                     >
                       循环预听 {loopSelectionPreview ? '开' : '关'}
                     </button>
