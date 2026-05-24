@@ -3,6 +3,11 @@ export interface StemMutedRange {
   end: number;
 }
 
+export interface StemMutedRangePixelRect {
+  x: number;
+  width: number;
+}
+
 function clamp(value: number, min: number, max: number) {
   if (!Number.isFinite(value)) return min;
   return Math.max(min, Math.min(max, value));
@@ -93,4 +98,29 @@ export function buildAudibleStemSegments({
   }
 
   return segments;
+}
+
+export function mapStemMutedRangesToPixels({
+  mutedRanges,
+  duration,
+  width,
+}: {
+  mutedRanges?: StemMutedRange[] | null;
+  duration: number;
+  width: number;
+}): StemMutedRangePixelRect[] {
+  const safeDuration = Number.isFinite(duration) ? Math.max(0, duration) : 0;
+  const safeWidth = Number.isFinite(width) ? Math.max(0, width) : 0;
+  if (safeDuration <= 0 || safeWidth <= 0) return [];
+
+  return normalizeStemMutedRanges(mutedRanges, safeDuration)
+    .map((range) => {
+      const start = clamp(range.start, 0, safeDuration);
+      const end = clamp(range.end, 0, safeDuration);
+      return {
+        x: roundTime((start / safeDuration) * safeWidth),
+        width: roundTime(((end - start) / safeDuration) * safeWidth),
+      };
+    })
+    .filter((rect) => rect.width > 0.5);
 }

@@ -25,6 +25,7 @@ import {
   addStemMutedRange,
   buildAudibleStemSegments,
   clearStemMutedRangesInRange,
+  mapStemMutedRangesToPixels,
   normalizeStemMutedRanges,
   type StemMutedRange,
 } from '@/lib/stems/stemMuteRanges';
@@ -2464,6 +2465,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
                 duration={duration}
                 trimStart={state.trimStart}
                 trimEnd={trimEnd}
+                mutedRanges={state.mutedRanges}
                 muted={!isAudible}
                 selected={isSelectedTrack}
                 editable={isSelectedTrack}
@@ -3353,6 +3355,7 @@ function WaveformTrackCanvas({
   duration,
   trimStart,
   trimEnd,
+  mutedRanges,
   muted,
   selected,
   editable,
@@ -3368,6 +3371,7 @@ function WaveformTrackCanvas({
   duration: number;
   trimStart: number;
   trimEnd: number;
+  mutedRanges: StemMutedRange[];
   muted: boolean;
   selected: boolean;
   editable: boolean;
@@ -3482,6 +3486,15 @@ function WaveformTrackCanvas({
       context.fillStyle = selected ? 'rgba(156, 108, 255, 0.11)' : 'rgba(255,255,255,0.04)';
       context.fillRect(startX, 0, Math.max(0, endX - startX), height);
 
+      const mutedRects = mapStemMutedRangesToPixels({ mutedRanges, duration, width });
+      mutedRects.forEach((rect) => {
+        context.fillStyle = selected ? 'rgba(244, 63, 94, 0.34)' : 'rgba(244, 63, 94, 0.22)';
+        context.fillRect(rect.x, 0, rect.width, height);
+        context.fillStyle = 'rgba(255,255,255,0.17)';
+        context.fillRect(rect.x, 0, Math.max(1, ratio), height);
+        context.fillRect(rect.x + rect.width - Math.max(1, ratio), 0, Math.max(1, ratio), height);
+      });
+
       const handleColor = selected ? '#d8c9ff' : 'rgba(148, 163, 184, 0.42)';
       const handleWidth = selected ? 10 * ratio : 4 * ratio;
       context.strokeStyle = handleColor;
@@ -3506,6 +3519,11 @@ function WaveformTrackCanvas({
         context.textAlign = 'center';
         context.fillText('入', Math.max(10 * ratio, Math.min(width - 10 * ratio, startX)), 12 * ratio);
         context.fillText('出', Math.max(10 * ratio, Math.min(width - 10 * ratio, endX)), height - 6 * ratio);
+        if (mutedRects.length > 0) {
+          context.fillStyle = 'rgba(255,255,255,0.88)';
+          context.textAlign = 'left';
+          context.fillText(`静音 ${mutedRects.length}`, 8 * ratio, height - 8 * ratio);
+        }
       }
 
       const playheadX = (Math.min(duration, Math.max(0, currentTime)) / duration) * width;
@@ -3521,7 +3539,7 @@ function WaveformTrackCanvas({
     const observer = new ResizeObserver(draw);
     observer.observe(canvas);
     return () => observer.disconnect();
-  }, [color, currentTime, displayPeaks, duration, muted, selected, trimEnd, trimStart]);
+  }, [color, currentTime, displayPeaks, duration, muted, mutedRanges, selected, trimEnd, trimStart]);
 
   const handlePointerDown = useCallback((event: PointerEvent<HTMLCanvasElement>) => {
     if (duration <= 0) return;

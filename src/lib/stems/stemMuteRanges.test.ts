@@ -3,6 +3,7 @@ import {
   addStemMutedRange,
   buildAudibleStemSegments,
   clearStemMutedRangesInRange,
+  mapStemMutedRangesToPixels,
   normalizeStemMutedRanges,
 } from './stemMuteRanges';
 
@@ -50,6 +51,33 @@ describe('stem mute ranges', () => {
     })).toEqual([
       { start: 4, end: 6 },
       { start: 8, end: 10 },
+    ]);
+  });
+
+  it('maps muted ranges to visible waveform pixel rectangles', () => {
+    expect(mapStemMutedRangesToPixels({
+      mutedRanges: [
+        { start: 5, end: 10 },
+        { start: 30, end: 45 },
+      ],
+      duration: 60,
+      width: 600,
+    })).toEqual([
+      { x: 50, width: 50 },
+      { x: 300, width: 150 },
+    ]);
+  });
+
+  it('drops muted range pixel rectangles that are outside the visible duration', () => {
+    expect(mapStemMutedRangesToPixels({
+      mutedRanges: [
+        { start: 8, end: 20 },
+        { start: 30, end: 35 },
+      ],
+      duration: 10,
+      width: 100,
+    })).toEqual([
+      { x: 80, width: 20 },
     ]);
   });
 });
