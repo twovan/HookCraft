@@ -20,6 +20,7 @@ import {
   buildStemEditorReadiness,
   type StemEditorReadinessLevel,
 } from '@/lib/stems/stemEditorReadiness';
+import { resolveStemTrimControlValues } from '@/lib/stems/stemTrackControls';
 
 export interface EditableStem {
   type: string;
@@ -731,12 +732,17 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
   const selectedTrackState = selectedTrack
     ? (tracks[selectedTrack.type] || defaultTrackState())
     : null;
-  const selectedTrackTrimEnd = selectedTrackState
-    ? (selectedTrackState.trimEnd ?? duration)
-    : duration;
-  const selectedTrackClipDuration = selectedTrackState
-    ? Math.max(0, selectedTrackTrimEnd - selectedTrackState.trimStart)
-    : 0;
+  const selectedTrackTrimControls = selectedTrackState
+    ? resolveStemTrimControlValues({
+      duration,
+      trimStart: selectedTrackState.trimStart,
+      trimEnd: selectedTrackState.trimEnd,
+      fadeIn: selectedTrackState.fadeIn,
+      fadeOut: selectedTrackState.fadeOut,
+    })
+    : null;
+  const selectedTrackTrimEnd = selectedTrackTrimControls?.trimEnd ?? duration;
+  const selectedTrackClipDuration = selectedTrackTrimControls?.clipDuration ?? 0;
   const selectedTrackBuffer = selectedTrack
     ? (audioBuffersRef.current[selectedTrack.type] || null)
     : null;
@@ -2017,6 +2023,54 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
                 </div>
                 <div style={selectedTrackControlsGridStyle}>
                   <label style={selectedTrackControlStyle}>
+                    <span>入点 {formatTime(selectedTrackTrimControls?.trimStart ?? 0)}</span>
+                    <div style={selectedTrackInlineControlStyle}>
+                      <input
+                        aria-label={`${getStemDisplayName(selectedTrack).zh} 精确入点`}
+                        type="range"
+                        min={0}
+                        max={selectedTrackTrimControls?.durationMax ?? Math.max(duration, 0.1)}
+                        step={0.05}
+                        value={selectedTrackTrimControls?.trimStart ?? 0}
+                        onChange={(event) => setTrackTrim(selectedTrack.type, 'start', Number(event.target.value))}
+                      />
+                      <input
+                        aria-label={`${getStemDisplayName(selectedTrack).zh} 入点秒数`}
+                        type="number"
+                        min={0}
+                        max={selectedTrackTrimControls?.durationMax ?? Math.max(duration, 0.1)}
+                        step={0.05}
+                        value={Number((selectedTrackTrimControls?.trimStart ?? 0).toFixed(2))}
+                        onChange={(event) => setTrackTrim(selectedTrack.type, 'start', Number(event.target.value))}
+                        style={selectedTrackNumberInputStyle}
+                      />
+                    </div>
+                  </label>
+                  <label style={selectedTrackControlStyle}>
+                    <span>出点 {formatTime(selectedTrackTrimControls?.trimEnd ?? duration)}</span>
+                    <div style={selectedTrackInlineControlStyle}>
+                      <input
+                        aria-label={`${getStemDisplayName(selectedTrack).zh} 精确出点`}
+                        type="range"
+                        min={0}
+                        max={selectedTrackTrimControls?.durationMax ?? Math.max(duration, 0.1)}
+                        step={0.05}
+                        value={selectedTrackTrimControls?.trimEnd ?? duration}
+                        onChange={(event) => setTrackTrim(selectedTrack.type, 'end', Number(event.target.value))}
+                      />
+                      <input
+                        aria-label={`${getStemDisplayName(selectedTrack).zh} 出点秒数`}
+                        type="number"
+                        min={0}
+                        max={selectedTrackTrimControls?.durationMax ?? Math.max(duration, 0.1)}
+                        step={0.05}
+                        value={Number((selectedTrackTrimControls?.trimEnd ?? duration).toFixed(2))}
+                        onChange={(event) => setTrackTrim(selectedTrack.type, 'end', Number(event.target.value))}
+                        style={selectedTrackNumberInputStyle}
+                      />
+                    </div>
+                  </label>
+                  <label style={selectedTrackControlStyle}>
                     <span>音量 {Math.round(selectedTrackState.volume * 100)}%</span>
                     <input
                       aria-label={`${getStemDisplayName(selectedTrack).zh} 音量`}
@@ -2041,26 +2095,26 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
                     />
                   </label>
                   <label style={selectedTrackControlStyle}>
-                    <span>淡入 {Math.min(selectedTrackState.fadeIn, selectedTrackClipDuration).toFixed(2)}s</span>
+                    <span>淡入 {(selectedTrackTrimControls?.fadeIn ?? 0).toFixed(2)}s</span>
                     <input
                       aria-label={`${getStemDisplayName(selectedTrack).zh} 淡入`}
                       type="range"
                       min={0}
                       max={Math.max(selectedTrackClipDuration, 0.1)}
                       step={0.05}
-                      value={Math.min(selectedTrackState.fadeIn, selectedTrackClipDuration)}
+                      value={selectedTrackTrimControls?.fadeIn ?? 0}
                       onChange={(event) => setTrackFade(selectedTrack.type, 'in', Number(event.target.value))}
                     />
                   </label>
                   <label style={selectedTrackControlStyle}>
-                    <span>淡出 {Math.min(selectedTrackState.fadeOut, selectedTrackClipDuration).toFixed(2)}s</span>
+                    <span>淡出 {(selectedTrackTrimControls?.fadeOut ?? 0).toFixed(2)}s</span>
                     <input
                       aria-label={`${getStemDisplayName(selectedTrack).zh} 淡出`}
                       type="range"
                       min={0}
                       max={Math.max(selectedTrackClipDuration, 0.1)}
                       step={0.05}
-                      value={Math.min(selectedTrackState.fadeOut, selectedTrackClipDuration)}
+                      value={selectedTrackTrimControls?.fadeOut ?? 0}
                       onChange={(event) => setTrackFade(selectedTrack.type, 'out', Number(event.target.value))}
                     />
                   </label>
@@ -2700,6 +2754,25 @@ const selectedTrackControlStyle: CSSProperties = {
   display: 'grid',
   gap: 4,
   color: '#cfd0dc',
+  fontSize: 11,
+  fontVariantNumeric: 'tabular-nums',
+};
+
+const selectedTrackInlineControlStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr) 64px',
+  gap: 8,
+  alignItems: 'center',
+};
+
+const selectedTrackNumberInputStyle: CSSProperties = {
+  width: '100%',
+  minHeight: 26,
+  borderRadius: 6,
+  border: '1px solid #30344c',
+  background: '#0f1220',
+  color: '#cfd0dc',
+  padding: '2px 5px',
   fontSize: 11,
   fontVariantNumeric: 'tabular-nums',
 };
