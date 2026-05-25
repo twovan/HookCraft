@@ -9,6 +9,8 @@ import type {
 } from '../../types/membership';
 import type { UpgradeResult, DowngradeResult, CancelResult } from '../../types/payment';
 import { TIER_CONFIGS, type TierConfig } from '../../config/tierConfig';
+import { AdminConfigService } from '../admin/AdminConfigService';
+import { mergeTierConfigsWithAdminConfig } from '../pricing/publicPricingConfig';
 import { toMembershipInfo } from '../supabase/mappers/membership';
 import { toAppError } from '../supabase/errors';
 
@@ -85,11 +87,17 @@ export class MembershipService {
 
     // 计算差价
     const remainingDays = this.getRemainingDays(current);
-    const proratedAmount = this.calculateProration(current.tier, targetTier, remainingDays);
+    const tierConfigs = await this.getEffectiveTierConfigs();
+    const proratedAmount = this.calculateProrationWithConfigs(
+      current.tier,
+      targetTier,
+      remainingDays,
+      tierConfigs,
+    );
 
     // 调用 RPC 函数执行事务性升级
     const billingCycle = current.billingCycle ?? 'monthly';
-    const monthlyCredits = TIER_CONFIGS[targetTier].monthlyCredits;
+    const monthlyCredits = tierConfigs[targetTier].monthlyCredits;
 
     const { error } = await this.supabase.rpc('upgrade_membership', {
       p_user_id: userId,
@@ -286,8 +294,29 @@ export class MembershipService {
     targetTier: MembershipTier,
     remainingDays: number
   ): number {
-    const currentConfig = TIER_CONFIGS[currentTier];
-    const targetConfig = TIER_CONFIGS[targetTier];
+    return this.calculateProrationWithConfigs(currentTier, targetTier, remainingDays, TIER_CONFIGS);
+  }
+
+  private async getEffectiveTierConfigs(): Promise<Record<MembershipTier, TierConfig>> {
+    try {
+      const configService = new AdminConfigService(this.supabase);
+      const adminConfig = await configService.getCurrentConfig();
+      const mergedTiers = mergeTierConfigsWithAdminConfig(Object.values(TIER_CONFIGS), adminConfig);
+      return Object.fromEntries(mergedTiers.map((config) => [config.tier, config])) as Record<MembershipTier, TierConfig>;
+    } catch (error) {
+      console.error('[membership] Failed to load admin pricing config, using default tiers:', error);
+      return TIER_CONFIGS;
+    }
+  }
+
+  private calculateProrationWithConfigs(
+    currentTier: MembershipTier,
+    targetTier: MembershipTier,
+    remainingDays: number,
+    tierConfigs: Record<MembershipTier, TierConfig>,
+  ): number {
+    const currentConfig = tierConfigs[currentTier];
+    const targetConfig = tierConfigs[targetTier];
 
     const currentDailyRate = currentConfig.monthlyPrice / 30;
     const targetDailyRate = targetConfig.monthlyPrice / 30;
