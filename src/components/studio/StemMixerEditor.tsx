@@ -2536,6 +2536,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
                 selected={isSelectedTrack}
                 editable={isSelectedTrack}
                 bufferVersion={bufferVersion}
+                liveSeekOnDrag={!isPlaying}
                 onSelect={() => setSelectedTrackType(stem.type)}
                 onSeek={handleSeek}
                 onTrimChange={(edge, time) => setTrackTrim(stem.type, edge, time)}
@@ -3516,6 +3517,7 @@ function WaveformTrackCanvas({
   selected,
   editable,
   bufferVersion,
+  liveSeekOnDrag,
   onSelect,
   onSeek,
   onTrimChange,
@@ -3532,15 +3534,18 @@ function WaveformTrackCanvas({
   selected: boolean;
   editable: boolean;
   bufferVersion: number;
+  liveSeekOnDrag: boolean;
   onSelect: () => void;
   onSeek: (time: number) => void;
   onTrimChange: (edge: 'start' | 'end', time: number) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const pendingSeekRef = useRef<{ x: number; time: number; moved: boolean } | null>(null);
+  const pendingSeekRef = useRef<{ x: number; time: number; moved: boolean; mode: 'click' | 'playhead' } | null>(null);
   const trimDragRef = useRef<{ edge: 'start' | 'end'; moved: boolean } | null>(null);
   const pendingTrimTimeRef = useRef<number | null>(null);
+  const pendingSeekTimeRef = useRef<number | null>(null);
   const trimFrameRef = useRef<number | null>(null);
+  const seekFrameRef = useRef<number | null>(null);
   const displayPeaks = useMemo(() => {
     if (waveform?.peaks?.length) return waveform.peaks;
     if (!buffer) return [];
@@ -3577,9 +3582,32 @@ function WaveformTrackCanvas({
     pendingTrimTimeRef.current = null;
   }, []);
 
+  const scheduleSeekChange = useCallback((time: number) => {
+    pendingSeekTimeRef.current = time;
+    if (seekFrameRef.current !== null) return;
+
+    seekFrameRef.current = window.requestAnimationFrame(() => {
+      seekFrameRef.current = null;
+      const pendingSeek = pendingSeekRef.current;
+      const nextTime = pendingSeekTimeRef.current;
+      pendingSeekTimeRef.current = null;
+      if (!pendingSeek || pendingSeek.mode !== 'playhead' || nextTime === null) return;
+      onSeek(nextTime);
+    });
+  }, [onSeek]);
+
+  const cancelScheduledSeekChange = useCallback(() => {
+    if (seekFrameRef.current !== null) {
+      window.cancelAnimationFrame(seekFrameRef.current);
+      seekFrameRef.current = null;
+    }
+    pendingSeekTimeRef.current = null;
+  }, []);
+
   useEffect(() => () => {
     cancelScheduledTrimChange();
-  }, [cancelScheduledTrimChange]);
+    cancelScheduledSeekChange();
+  }, [cancelScheduledSeekChange, cancelScheduledTrimChange]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -3689,6 +3717,15 @@ function WaveformTrackCanvas({
       context.moveTo(playheadX, 0);
       context.lineTo(playheadX, height);
       context.stroke();
+      if (selected) {
+        context.fillStyle = 'rgba(255,255,255,0.96)';
+        context.beginPath();
+        context.arc(playheadX, 8 * ratio, 4.5 * ratio, 0, Math.PI * 2);
+        context.fill();
+        context.strokeStyle = 'rgba(156, 108, 255, 0.92)';
+        context.lineWidth = Math.max(1, ratio);
+        context.stroke();
+      }
     };
 
     draw();
@@ -3708,6 +3745,7 @@ function WaveformTrackCanvas({
       duration,
       trimStart,
       trimEnd,
+      currentTime,
     });
 
     onSelect();
@@ -3720,11 +3758,19 @@ function WaveformTrackCanvas({
       pendingSeekRef.current = null;
       event.preventDefault();
     } else {
-      pendingSeekRef.current = { x: event.clientX, time: intent.time, moved: false };
+      pendingSeekRef.current = {
+        x: event.clientX,
+        time: intent.time,
+        moved: false,
+        mode: intent.kind === 'playhead' ? 'playhead' : 'click',
+      };
       trimDragRef.current = null;
+      if (intent.kind === 'playhead') {
+        event.preventDefault();
+      }
     }
     event.currentTarget.setPointerCapture(event.pointerId);
-  }, [duration, editable, onSelect, trimEnd, trimStart]);
+  }, [currentTime, duration, editable, onSelect, trimEnd, trimStart]);
 
   const handlePointerMove = useCallback((event: PointerEvent<HTMLCanvasElement>) => {
     if (trimDragRef.current) {
@@ -3734,10 +3780,19 @@ function WaveformTrackCanvas({
       return;
     }
 
-    if (pendingSeekRef.current && Math.abs(event.clientX - pendingSeekRef.current.x) > 4) {
-      pendingSeekRef.current.moved = true;
+    const pendingSeek = pendingSeekRef.current;
+    if (pendingSeek) {
+      if (Math.abs(event.clientX - pendingSeek.x) > 4) {
+        pendingSeek.moved = true;
+      }
+      if (pendingSeek.mode === 'playhead') {
+        if (liveSeekOnDrag) {
+          scheduleSeekChange(timeFromPointer(event));
+        }
+        event.preventDefault();
+      }
     }
-  }, [scheduleTrimChange, timeFromPointer]);
+  }, [liveSeekOnDrag, scheduleSeekChange, scheduleTrimChange, timeFromPointer]);
 
   const handlePointerUp = useCallback((event: PointerEvent<HTMLCanvasElement>) => {
     try {
@@ -3759,16 +3814,21 @@ function WaveformTrackCanvas({
     }
 
     const pendingSeek = pendingSeekRef.current;
+    cancelScheduledSeekChange();
     pendingSeekRef.current = null;
+    if (pendingSeek?.mode === 'playhead') {
+      onSeek(timeFromPointer(event));
+      return;
+    }
     if (pendingSeek && !pendingSeek.moved) {
       onSeek(pendingSeek.time);
     }
-  }, [cancelScheduledTrimChange, onSeek, onTrimChange, timeFromPointer]);
+  }, [cancelScheduledSeekChange, cancelScheduledTrimChange, onSeek, onTrimChange, timeFromPointer]);
 
   return (
     <canvas
       ref={canvasRef}
-      aria-label="Stem waveform. Click to seek, drag trim handles to edit this track."
+      aria-label="Stem waveform. Click to seek, drag the playhead, or drag trim handles to edit this track."
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -3785,7 +3845,7 @@ function waveformCanvasStyle(selected: boolean, muted: boolean, editable: boolea
     borderRadius: 8,
     border: selected ? '1px solid rgba(156, 108, 255, 0.78)' : '1px solid rgba(48, 52, 76, 0.86)',
     background: '#0b0e1c',
-    cursor: editable ? 'ew-resize' : 'pointer',
+    cursor: editable ? 'grab' : 'pointer',
     opacity: muted ? 0.72 : 1,
     touchAction: 'none',
     userSelect: 'none',

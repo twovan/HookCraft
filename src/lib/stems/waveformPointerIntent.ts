@@ -1,5 +1,6 @@
 export type WaveformPointerIntent =
   | { kind: 'seek'; time: number }
+  | { kind: 'playhead'; time: number }
   | { kind: 'trim'; edge: 'start' | 'end'; time: number };
 
 export interface WaveformPointerIntentInput {
@@ -9,7 +10,9 @@ export interface WaveformPointerIntentInput {
   duration: number;
   trimStart: number;
   trimEnd: number;
+  currentTime?: number;
   hitSize?: number;
+  playheadHitSize?: number;
 }
 
 export function resolveWaveformPointerIntent(input: WaveformPointerIntentInput): WaveformPointerIntent {
@@ -36,6 +39,15 @@ export function resolveWaveformPointerIntent(input: WaveformPointerIntentInput):
       edge: startDistance <= endDistance ? 'start' : 'end',
       time,
     };
+  }
+
+  if (typeof input.currentTime === 'number') {
+    const currentTime = Math.max(0, Math.min(duration, input.currentTime));
+    const playheadX = (currentTime / duration) * width;
+    const playheadHitSize = input.playheadHitSize ?? 8;
+    if (Math.abs(input.pointerX - playheadX) <= playheadHitSize) {
+      return { kind: 'playhead', time };
+    }
   }
 
   return { kind: 'seek', time };
