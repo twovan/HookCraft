@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatStemTimecode, parseStemTimecode } from './stemTimecode';
+import { clampStemTimecodeInput, formatStemTimecode, parseStemTimecode } from './stemTimecode';
 
 describe('stem timecode', () => {
   it('formats seconds as minute timecode with centiseconds', () => {
@@ -19,5 +19,14 @@ describe('stem timecode', () => {
   it('returns null for invalid timecode text', () => {
     expect(parseStemTimecode('abc')).toBeNull();
     expect(parseStemTimecode('1:xx')).toBeNull();
+  });
+
+  it('clamps parsed timecode to the available duration', () => {
+    expect(clampStemTimecodeInput('2:00', 90)).toEqual({ ok: true, time: 90 });
+    expect(clampStemTimecodeInput('12.5', 90)).toEqual({ ok: true, time: 12.5 });
+  });
+
+  it('keeps invalid clamped timecode explicit', () => {
+    expect(clampStemTimecodeInput('nope', 90)).toEqual({ ok: false });
   });
 });

@@ -26,3 +26,14 @@ export function parseStemTimecode(value: string) {
 
   return minutes * 60 + seconds;
 }
+
+export function clampStemTimecodeInput(value: string, duration: number) {
+  const parsedTime = parseStemTimecode(value);
+  if (parsedTime === null) return { ok: false as const };
+
+  const safeDuration = Number.isFinite(duration) ? Math.max(0, duration) : parsedTime;
+  return {
+    ok: true as const,
+    time: Math.max(0, Math.min(safeDuration, parsedTime)),
+  };
+}

@@ -21,7 +21,7 @@ import {
   buildStemEditorReadiness,
   type StemEditorReadinessLevel,
 } from '@/lib/stems/stemEditorReadiness';
-import { formatStemTimecode, parseStemTimecode } from '@/lib/stems/stemTimecode';
+import { clampStemTimecodeInput, formatStemTimecode, parseStemTimecode } from '@/lib/stems/stemTimecode';
 import { nudgeStemTrimEdge, resolveStemTrimControlValues } from '@/lib/stems/stemTrackControls';
 import {
   addStemMutedRange,
@@ -609,6 +609,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
   const loopPreviewTimerRef = useRef<number | null>(null);
   const frameRef = useRef<number | null>(null);
   const skipNextTimeInputCommitRef = useRef(false);
+  const skipNextTrimInputCommitRef = useRef(false);
   const loadingCountRef = useRef(stems.length);
   const failedLoadCountRef = useRef(0);
   const autoSaveTimerRef = useRef<number | null>(null);
@@ -644,6 +645,11 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
   const [historyVersion, setHistoryVersion] = useState(0);
   const [selectedTrackType, setSelectedTrackType] = useState<string | null>(() => stems[0]?.type ?? null);
   const [currentTimeInputDraft, setCurrentTimeInputDraft] = useState<string | null>(null);
+  const [selectedTrimInputDraft, setSelectedTrimInputDraft] = useState<{
+    edge: 'start' | 'end';
+    type: string;
+    value: string;
+  } | null>(null);
 
   const masterStem = stems[0] || null;
   const hasSoloTrack = useMemo(
@@ -1485,6 +1491,21 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     });
   }, [commitTrackChange, duration]);
 
+  const commitSelectedTrimInput = useCallback((edge: 'start' | 'end', value: string) => {
+    if (!selectedTrack) return;
+
+    const parsed = clampStemTimecodeInput(value, duration);
+    if (!parsed.ok) {
+      setPlaybackError('裁剪时间格式不正确，可以输入秒数或 1:23.45。');
+      setSelectedTrimInputDraft(null);
+      return;
+    }
+
+    setTrackTrim(selectedTrack.type, edge, parsed.time);
+    setPlaybackError(null);
+    setSelectedTrimInputDraft(null);
+  }, [duration, selectedTrack, setTrackTrim]);
+
   const nudgeSelectedTrackTrim = useCallback((edge: 'start' | 'end', delta: number) => {
     if (!selectedTrack || !selectedTrackState) return;
 
@@ -2251,13 +2272,40 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
                         onChange={(event) => setTrackTrim(selectedTrack.type, 'start', Number(event.target.value))}
                       />
                       <input
-                        aria-label={`${getStemDisplayName(selectedTrack).zh} 入点秒数`}
-                        type="number"
-                        min={0}
-                        max={selectedTrackTrimControls?.durationMax ?? Math.max(duration, 0.1)}
-                        step={0.05}
-                        value={Number((selectedTrackTrimControls?.trimStart ?? 0).toFixed(2))}
-                        onChange={(event) => setTrackTrim(selectedTrack.type, 'start', Number(event.target.value))}
+                        aria-label={`${getStemDisplayName(selectedTrack).zh} 入点时间码`}
+                        type="text"
+                        inputMode="decimal"
+                        value={selectedTrimInputDraft?.type === selectedTrack.type && selectedTrimInputDraft.edge === 'start'
+                          ? selectedTrimInputDraft.value
+                          : formatStemTimecode(selectedTrackTrimControls?.trimStart ?? 0)}
+                        onFocus={() => setSelectedTrimInputDraft({
+                          edge: 'start',
+                          type: selectedTrack.type,
+                          value: formatStemTimecode(selectedTrackTrimControls?.trimStart ?? 0),
+                        })}
+                        onChange={(event) => setSelectedTrimInputDraft({
+                          edge: 'start',
+                          type: selectedTrack.type,
+                          value: event.target.value,
+                        })}
+                        onBlur={(event) => {
+                          if (skipNextTrimInputCommitRef.current) {
+                            skipNextTrimInputCommitRef.current = false;
+                            setSelectedTrimInputDraft(null);
+                            return;
+                          }
+                          commitSelectedTrimInput('start', event.target.value);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.currentTarget.blur();
+                          }
+                          if (event.key === 'Escape') {
+                            skipNextTrimInputCommitRef.current = true;
+                            setSelectedTrimInputDraft(null);
+                            event.currentTarget.blur();
+                          }
+                        }}
                         style={selectedTrackNumberInputStyle}
                       />
                     </div>
@@ -2275,13 +2323,40 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
                         onChange={(event) => setTrackTrim(selectedTrack.type, 'end', Number(event.target.value))}
                       />
                       <input
-                        aria-label={`${getStemDisplayName(selectedTrack).zh} 出点秒数`}
-                        type="number"
-                        min={0}
-                        max={selectedTrackTrimControls?.durationMax ?? Math.max(duration, 0.1)}
-                        step={0.05}
-                        value={Number((selectedTrackTrimControls?.trimEnd ?? duration).toFixed(2))}
-                        onChange={(event) => setTrackTrim(selectedTrack.type, 'end', Number(event.target.value))}
+                        aria-label={`${getStemDisplayName(selectedTrack).zh} 出点时间码`}
+                        type="text"
+                        inputMode="decimal"
+                        value={selectedTrimInputDraft?.type === selectedTrack.type && selectedTrimInputDraft.edge === 'end'
+                          ? selectedTrimInputDraft.value
+                          : formatStemTimecode(selectedTrackTrimControls?.trimEnd ?? duration)}
+                        onFocus={() => setSelectedTrimInputDraft({
+                          edge: 'end',
+                          type: selectedTrack.type,
+                          value: formatStemTimecode(selectedTrackTrimControls?.trimEnd ?? duration),
+                        })}
+                        onChange={(event) => setSelectedTrimInputDraft({
+                          edge: 'end',
+                          type: selectedTrack.type,
+                          value: event.target.value,
+                        })}
+                        onBlur={(event) => {
+                          if (skipNextTrimInputCommitRef.current) {
+                            skipNextTrimInputCommitRef.current = false;
+                            setSelectedTrimInputDraft(null);
+                            return;
+                          }
+                          commitSelectedTrimInput('end', event.target.value);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.currentTarget.blur();
+                          }
+                          if (event.key === 'Escape') {
+                            skipNextTrimInputCommitRef.current = true;
+                            setSelectedTrimInputDraft(null);
+                            event.currentTarget.blur();
+                          }
+                        }}
                         style={selectedTrackNumberInputStyle}
                       />
                     </div>
@@ -3136,7 +3211,7 @@ const selectedTrackControlStyle: CSSProperties = {
 
 const selectedTrackInlineControlStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1fr) 64px',
+  gridTemplateColumns: 'minmax(0, 1fr) 78px',
   gap: 8,
   alignItems: 'center',
 };
@@ -3151,6 +3226,7 @@ const selectedTrackNumberInputStyle: CSSProperties = {
   padding: '2px 5px',
   fontSize: 11,
   fontVariantNumeric: 'tabular-nums',
+  textAlign: 'center',
 };
 
 const selectedTrackNudgeGridStyle: CSSProperties = {
