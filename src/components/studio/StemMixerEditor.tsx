@@ -26,6 +26,12 @@ import {
   type StemExportMode,
 } from '@/lib/stems/stemExportPreflight';
 import {
+  appendStemExportRecord,
+  createStemExportRecord,
+  formatStemExportRecord,
+  type StemExportRecord,
+} from '@/lib/stems/stemExportHistory';
+import {
   resolveStemExportStatus,
   type StemExportStatusInput,
   type StemExportStatusTone,
@@ -651,6 +657,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
   const [isExporting, setIsExporting] = useState(false);
   const [exportingStemType, setExportingStemType] = useState<string | null>(null);
   const [exportStatusInput, setExportStatusInput] = useState<StemExportStatusInput>({ phase: 'idle' });
+  const [exportRecords, setExportRecords] = useState<StemExportRecord[]>([]);
   const [isAudioRetrying, setIsAudioRetrying] = useState(false);
   const [editorPreferencesLoaded, setEditorPreferencesLoaded] = useState(false);
   const [exportMode, setExportMode] = useState<ExportMode>('current-mix');
@@ -676,6 +683,10 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
   const loadableStemCount = Math.max(0, stems.length - skippedEmptyCount);
   const readyStemCount = Math.max(0, loadableStemCount - loadingCount - failedLoadCount);
   const exportStatus = useMemo(() => resolveStemExportStatus(exportStatusInput), [exportStatusInput]);
+  const recentExportRecords = useMemo(
+    () => exportRecords.map((record) => ({ ...record, view: formatStemExportRecord(record) })),
+    [exportRecords],
+  );
   const exportSummary = useMemo(() => {
     const preflight = buildStemExportPreflight({
       tracks: stems.map((stem) => {
@@ -971,6 +982,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     setHasPendingEditChanges(false);
     setExportingStemType(null);
     setExportStatusInput({ phase: 'idle' });
+    setExportRecords([]);
     setSelectedTrackType(stems[0]?.type ?? null);
     skipNextAutoSaveRef.current = true;
     undoStackRef.current = [];
@@ -2061,6 +2073,12 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
       link.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
       setExportStatusInput({ phase: 'done', fileType: 'WAV', exportedCount: exportableStems.length });
+      setExportRecords((records) => appendStemExportRecord(records, createStemExportRecord({
+        scope: 'mix',
+        label: exportModeLabel(exportMode),
+        trackCount: exportableStems.length,
+        fileType: 'WAV',
+      })));
       setSaveStatus(`“${exportModeLabel(exportMode)}”WAV 已导出。`);
     } catch (error) {
       const message = error instanceof Error ? error.message : '导出混音失败，请稍后重试。';
@@ -2139,6 +2157,12 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
       link.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
       setExportStatusInput({ phase: 'done', fileType: 'WAV', exportedCount: 1 });
+      setExportRecords((records) => appendStemExportRecord(records, createStemExportRecord({
+        scope: 'stem',
+        label: getStemDisplayName(stem).zh,
+        trackCount: 1,
+        fileType: 'WAV',
+      })));
       setSaveStatus(`“${getStemDisplayName(stem).zh}”单轨 WAV 已导出。`);
     } catch (error) {
       const message = error instanceof Error ? error.message : '导出单轨失败，请稍后重试。';
@@ -2684,6 +2708,22 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
               </div>
               <div style={exportStatusDetailStyle}>{exportStatus.detail}</div>
             </div>
+            {recentExportRecords.length > 0 && (
+              <div style={exportHistoryStyle}>
+                <div style={exportHistoryHeaderStyle}>
+                  <span>最近导出</span>
+                  <span>保留 {recentExportRecords.length}/3</span>
+                </div>
+                <div style={exportHistoryListStyle}>
+                  {recentExportRecords.map((record) => (
+                    <div key={record.id} style={exportHistoryItemStyle}>
+                      <span style={exportHistoryTitleStyle}>{record.view.title}</span>
+                      <span style={exportHistoryDetailStyle}>{record.view.detail}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -3547,6 +3587,57 @@ const exportStatusDetailStyle: CSSProperties = {
   color: '#9ca3af',
   fontSize: 11,
   lineHeight: 1.45,
+};
+
+const exportHistoryStyle: CSSProperties = {
+  marginTop: 10,
+  padding: '8px 10px',
+  borderRadius: 8,
+  border: '1px solid rgba(48, 52, 76, 0.72)',
+  background: 'rgba(17, 20, 35, 0.78)',
+};
+
+const exportHistoryHeaderStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 10,
+  color: '#cfd3e6',
+  fontSize: 12,
+  fontWeight: 900,
+};
+
+const exportHistoryListStyle: CSSProperties = {
+  display: 'grid',
+  gap: 6,
+  marginTop: 8,
+};
+
+const exportHistoryItemStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 10,
+  minWidth: 0,
+  paddingTop: 6,
+  borderTop: '1px solid rgba(48, 52, 76, 0.58)',
+};
+
+const exportHistoryTitleStyle: CSSProperties = {
+  minWidth: 0,
+  color: '#edf0ff',
+  fontSize: 11,
+  fontWeight: 800,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+};
+
+const exportHistoryDetailStyle: CSSProperties = {
+  flexShrink: 0,
+  color: '#8f92aa',
+  fontSize: 11,
+  fontWeight: 700,
 };
 
 const playbackErrorStyle: CSSProperties = {
