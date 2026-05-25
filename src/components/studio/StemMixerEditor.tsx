@@ -40,6 +40,7 @@ import {
   type StemExportStatusInput,
   type StemExportStatusTone,
 } from '@/lib/stems/stemExportStatus';
+import { resolveStemExportSaveIntent } from '@/lib/stems/stemExportSaveIntent';
 import { clampStemTimecodeInput, formatStemTimecode, parseStemTimecode } from '@/lib/stems/stemTimecode';
 import { nudgeStemTrimEdge, resolveStemTrimControlValues } from '@/lib/stems/stemTrackControls';
 import {
@@ -1792,17 +1793,19 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     setSaveStatus(`已应用“${actionLabel}”，自动保存后下次进入会恢复。`);
   }, [bufferVersion, commitTrackChange, stems]);
 
-  const persistEditState = useCallback(async (source: 'manual' | 'auto') => {
+  const persistEditState = useCallback(async (source: 'manual' | 'auto' | 'export') => {
     if (!jobId) {
       if (source === 'manual') {
         setSaveStatus('当前分轨任务还没有缓存 ID，暂时不能保存编辑状态。');
       }
-      return;
+      return false;
     }
 
     if (source === 'manual') {
       setIsSaving(true);
       setSaveStatus(null);
+    } else if (source === 'export') {
+      setAutoSaveStatus('导出前保存编辑中...');
     } else {
       setAutoSaveStatus('自动保存中...');
     }
@@ -1819,17 +1822,24 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
       }
       if (source === 'manual') {
         setSaveStatus('编辑状态已保存，下次进入会自动恢复。');
+      } else if (source === 'export') {
+        setAutoSaveStatus(`导出前已保存 ${new Date().toLocaleTimeString('zh-CN', { hour12: false })}`);
+      } else {
+        setAutoSaveStatus(`已自动保存 ${new Date().toLocaleTimeString('zh-CN', { hour12: false })}`);
       }
       setHasPendingEditChanges(false);
-      setAutoSaveStatus(`已自动保存 ${new Date().toLocaleTimeString('zh-CN', { hour12: false })}`);
+      return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : '保存编辑状态失败';
       setHasPendingEditChanges(true);
       if (source === 'manual') {
         setSaveStatus(message);
+      } else if (source === 'export') {
+        setAutoSaveStatus(`导出前保存失败：${message}，仍按当前页面状态导出。`);
       } else {
         setAutoSaveStatus(`自动保存失败：${message}`);
       }
+      return false;
     } finally {
       if (source === 'manual') {
         setIsSaving(false);
@@ -1840,6 +1850,27 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
   const saveEditState = useCallback(async () => {
     await persistEditState('manual');
   }, [persistEditState]);
+
+  const savePendingEditsBeforeExport = useCallback(async () => {
+    const intent = resolveStemExportSaveIntent({
+      hasPendingChanges: hasPendingEditChanges,
+      canPersist: Boolean(jobId),
+    });
+
+    if (intent.status === 'cannot-save') {
+      setAutoSaveStatus('当前分轨任务还没有缓存 ID，本次导出只使用当前页面状态。');
+      return false;
+    }
+
+    if (!intent.shouldSave) return true;
+
+    if (autoSaveTimerRef.current !== null) {
+      window.clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+
+    return persistEditState('export');
+  }, [hasPendingEditChanges, jobId, persistEditState]);
 
   const selectAdjacentTrack = useCallback((direction: -1 | 1) => {
     setSelectedTrackType((currentType) => {
@@ -2007,6 +2038,8 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     });
 
     try {
+      await savePendingEditsBeforeExport();
+
       if (exportReadiness === 'wait-all' && loadingCountRef.current > 0) {
         await waitForStemLoadingToSettle();
       }
@@ -2117,7 +2150,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     } finally {
       setIsExporting(false);
     }
-  }, [duration, exportMode, exportReadiness, masterState, stems, tracks, waitForStemLoadingToSettle]);
+  }, [duration, exportMode, exportReadiness, masterState, savePendingEditsBeforeExport, stems, tracks, waitForStemLoadingToSettle]);
 
   const exportSingleStem = useCallback(async (stem: EditableStem) => {
     setExportingStemType(stem.type);
@@ -2129,6 +2162,8 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     });
 
     try {
+      await savePendingEditsBeforeExport();
+
       const audioBuffer = audioBuffersRef.current[stem.type];
       if (!audioBuffer) {
         throw new Error('这条分轨还没有缓存完成，请稍后再导出。');
@@ -2201,7 +2236,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     } finally {
       setExportingStemType(null);
     }
-  }, [tracks]);
+  }, [savePendingEditsBeforeExport, tracks]);
 
   return (
     <section style={editorStyle}>
