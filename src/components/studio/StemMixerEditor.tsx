@@ -8,6 +8,7 @@ import {
   type StemMasterState,
 } from '@/lib/stems/stemMixState';
 import { resolveStemEditorShortcut } from '@/lib/stems/stemEditorShortcuts';
+import { resolveStemEditSaveBadge, type StemEditSaveBadgeTone } from '@/lib/stems/stemEditSaveBadge';
 import { resolveVisibleStemSelection } from '@/lib/stems/stemSelection';
 import { buildWaveformPeaksFromSamples } from '@/lib/stems/waveformPeaks';
 import { selectStemTypesForAudioLoad } from '@/lib/stems/stemAudioLoadPlan';
@@ -627,6 +628,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<string | null>(initialEditState?.savedAt ? '已读取上次保存的编辑状态。' : null);
   const [autoSaveStatus, setAutoSaveStatus] = useState<string | null>(null);
+  const [hasPendingEditChanges, setHasPendingEditChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [exportingStemType, setExportingStemType] = useState<string | null>(null);
@@ -790,6 +792,12 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     : null;
   const canUndo = historyVersion >= 0 && undoStackRef.current.length > 0;
   const canRedo = historyVersion >= 0 && redoStackRef.current.length > 0;
+  const saveBadge = resolveStemEditSaveBadge({
+    hasPendingChanges: hasPendingEditChanges,
+    isSaving,
+    autoSaveStatus,
+    jobId,
+  });
 
   const commitTrackChange = useCallback((
     updater: Record<string, StemTrackState> | ((current: Record<string, StemTrackState>) => Record<string, StemTrackState>),
@@ -926,6 +934,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     setPlaybackError(null);
     setSaveStatus(initialEditState?.savedAt ? '已读取上次保存的编辑状态。' : null);
     setAutoSaveStatus(null);
+    setHasPendingEditChanges(false);
     setExportingStemType(null);
     setSelectedTrackType(stems[0]?.type ?? null);
     skipNextAutoSaveRef.current = true;
@@ -1706,9 +1715,11 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
       if (source === 'manual') {
         setSaveStatus('编辑状态已保存，下次进入会自动恢复。');
       }
+      setHasPendingEditChanges(false);
       setAutoSaveStatus(`已自动保存 ${new Date().toLocaleTimeString('zh-CN', { hour12: false })}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : '保存编辑状态失败';
+      setHasPendingEditChanges(true);
       if (source === 'manual') {
         setSaveStatus(message);
       } else {
@@ -1839,6 +1850,9 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
       skipNextAutoSaveRef.current = false;
       return;
     }
+
+    setHasPendingEditChanges(true);
+    setAutoSaveStatus('有未保存编辑，稍后自动保存...');
 
     if (autoSaveTimerRef.current !== null) {
       window.clearTimeout(autoSaveTimerRef.current);
@@ -2041,7 +2055,10 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     <section style={editorStyle}>
       <div style={editorHeaderStyle}>
         <div>
-          <div style={editorEyebrowStyle}>{versionLabel}</div>
+          <div style={editorEyebrowRowStyle}>
+            <span style={editorEyebrowStyle}>{versionLabel}</span>
+            <span style={saveBadgeStyle(saveBadge.tone)}>{saveBadge.label}</span>
+          </div>
           <h4 style={editorTitleStyle}>分轨编辑</h4>
         </div>
         <div style={editorActionStyle}>
@@ -2744,11 +2761,60 @@ const primarySmallButtonStyle: CSSProperties = {
   fontWeight: 800,
 };
 
+const editorEyebrowRowStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  flexWrap: 'wrap',
+  gap: 8,
+};
+
 const editorEyebrowStyle: CSSProperties = {
   color: '#8f92aa',
   fontSize: 11,
   fontWeight: 700,
 };
+
+function saveBadgeStyle(tone: StemEditSaveBadgeTone): CSSProperties {
+  const palette: Record<StemEditSaveBadgeTone, { border: string; background: string; color: string }> = {
+    idle: {
+      border: 'rgba(148, 163, 184, 0.32)',
+      background: 'rgba(148, 163, 184, 0.1)',
+      color: '#cbd5e1',
+    },
+    pending: {
+      border: 'rgba(250, 204, 21, 0.45)',
+      background: 'rgba(113, 63, 18, 0.28)',
+      color: '#fde68a',
+    },
+    saving: {
+      border: 'rgba(96, 165, 250, 0.5)',
+      background: 'rgba(30, 64, 175, 0.24)',
+      color: '#bfdbfe',
+    },
+    saved: {
+      border: 'rgba(74, 222, 128, 0.38)',
+      background: 'rgba(20, 83, 45, 0.24)',
+      color: '#bbf7d0',
+    },
+    error: {
+      border: 'rgba(248, 113, 113, 0.5)',
+      background: 'rgba(127, 29, 29, 0.28)',
+      color: '#fecaca',
+    },
+  };
+
+  return {
+    border: `1px solid ${palette[tone].border}`,
+    background: palette[tone].background,
+    color: palette[tone].color,
+    borderRadius: 999,
+    padding: '2px 8px',
+    fontSize: 11,
+    fontWeight: 900,
+    lineHeight: 1.45,
+    whiteSpace: 'nowrap',
+  };
+}
 
 const editorTitleStyle: CSSProperties = {
   margin: '4px 0 0',
