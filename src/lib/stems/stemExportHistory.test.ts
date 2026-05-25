@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   appendStemExportRecord,
   buildStemExportHistoryStorageKey,
+  clearStemExportRecords,
   createStemExportRecord,
   formatStemExportRecord,
   parseStemExportRecords,
@@ -78,5 +79,17 @@ describe('stem export history', () => {
   it('returns an empty history when stored data is malformed', () => {
     expect(parseStemExportRecords('{bad json')).toEqual([]);
     expect(parseStemExportRecords(null)).toEqual([]);
+  });
+
+  it('clears export records', () => {
+    const record = createStemExportRecord({
+      scope: 'mix',
+      label: '当前混音',
+      trackCount: 2,
+      fileType: 'WAV',
+      finishedAt: '2026-05-25T10:30:04.000Z',
+    });
+
+    expect(clearStemExportRecords([record])).toEqual([]);
   });
 });

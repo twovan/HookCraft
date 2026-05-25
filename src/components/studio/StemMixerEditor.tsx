@@ -28,6 +28,7 @@ import {
 import {
   appendStemExportRecord,
   buildStemExportHistoryStorageKey,
+  clearStemExportRecords,
   createStemExportRecord,
   formatStemExportRecord,
   parseStemExportRecords,
@@ -1269,6 +1270,12 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     } catch {
       setPlaybackError('复制链接失败，可以直接复制浏览器地址栏。');
     }
+  }, []);
+
+  const clearExportHistory = useCallback(() => {
+    setExportRecords((records) => clearStemExportRecords(records));
+    setSaveStatus('最近导出记录已清空。');
+    setPlaybackError(null);
   }, []);
 
   const reloadAudioCache = useCallback(async () => {
@@ -2735,7 +2742,12 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
               <div style={exportHistoryStyle}>
                 <div style={exportHistoryHeaderStyle}>
                   <span>最近导出</span>
-                  <span>保留 {recentExportRecords.length}/3</span>
+                  <span style={exportHistoryHeaderActionsStyle}>
+                    <span>保留 {recentExportRecords.length}/3</span>
+                    <button type="button" style={exportHistoryClearButtonStyle} onClick={clearExportHistory}>
+                      清空
+                    </button>
+                  </span>
                 </div>
                 <div style={exportHistoryListStyle}>
                   {recentExportRecords.map((record) => (
@@ -3628,6 +3640,26 @@ const exportHistoryHeaderStyle: CSSProperties = {
   color: '#cfd3e6',
   fontSize: 12,
   fontWeight: 900,
+};
+
+const exportHistoryHeaderActionsStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 8,
+  flexShrink: 0,
+  color: '#8f92aa',
+};
+
+const exportHistoryClearButtonStyle: CSSProperties = {
+  minHeight: 24,
+  borderRadius: 7,
+  border: '1px solid rgba(48, 52, 76, 0.9)',
+  background: '#141727',
+  color: '#cfd3e6',
+  padding: '3px 7px',
+  cursor: 'pointer',
+  fontSize: 11,
+  fontWeight: 800,
 };
 
 const exportHistoryListStyle: CSSProperties = {

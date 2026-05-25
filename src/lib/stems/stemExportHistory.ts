@@ -46,6 +46,10 @@ export function appendStemExportRecord(records: StemExportRecord[], record: Stem
   return [record, ...records].slice(0, Math.max(1, limit));
 }
 
+export function clearStemExportRecords(_records: StemExportRecord[] = []): StemExportRecord[] {
+  return [];
+}
+
 export function buildStemExportHistoryStorageKey(projectId: string | undefined | null) {
   const normalizedProjectId = typeof projectId === 'string' && projectId.trim()
     ? projectId.trim()
