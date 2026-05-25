@@ -27,8 +27,11 @@ import {
 } from '@/lib/stems/stemExportPreflight';
 import {
   appendStemExportRecord,
+  buildStemExportHistoryStorageKey,
   createStemExportRecord,
   formatStemExportRecord,
+  parseStemExportRecords,
+  serializeStemExportRecords,
   type StemExportRecord,
 } from '@/lib/stems/stemExportHistory';
 import {
@@ -658,6 +661,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
   const [exportingStemType, setExportingStemType] = useState<string | null>(null);
   const [exportStatusInput, setExportStatusInput] = useState<StemExportStatusInput>({ phase: 'idle' });
   const [exportRecords, setExportRecords] = useState<StemExportRecord[]>([]);
+  const [exportHistoryLoadedKey, setExportHistoryLoadedKey] = useState<string | null>(null);
   const [isAudioRetrying, setIsAudioRetrying] = useState(false);
   const [editorPreferencesLoaded, setEditorPreferencesLoaded] = useState(false);
   const [exportMode, setExportMode] = useState<ExportMode>('current-mix');
@@ -682,6 +686,10 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
 
   const loadableStemCount = Math.max(0, stems.length - skippedEmptyCount);
   const readyStemCount = Math.max(0, loadableStemCount - loadingCount - failedLoadCount);
+  const exportHistoryStorageKey = useMemo(
+    () => buildStemExportHistoryStorageKey(jobId || versionLabel),
+    [jobId, versionLabel],
+  );
   const exportStatus = useMemo(() => resolveStemExportStatus(exportStatusInput), [exportStatusInput]);
   const recentExportRecords = useMemo(
     () => exportRecords.map((record) => ({ ...record, view: formatStemExportRecord(record) })),
@@ -743,6 +751,22 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
   useEffect(() => {
     loadingCountRef.current = loadingCount;
   }, [loadingCount]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    setExportRecords(parseStemExportRecords(window.localStorage.getItem(exportHistoryStorageKey)));
+    setExportHistoryLoadedKey(exportHistoryStorageKey);
+  }, [exportHistoryStorageKey]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (exportHistoryLoadedKey !== exportHistoryStorageKey) return;
+    if (exportRecords.length === 0) {
+      window.localStorage.removeItem(exportHistoryStorageKey);
+      return;
+    }
+    window.localStorage.setItem(exportHistoryStorageKey, serializeStemExportRecords(exportRecords));
+  }, [exportHistoryLoadedKey, exportHistoryStorageKey, exportRecords]);
 
   useEffect(() => {
     failedLoadCountRef.current = failedLoadCount;
@@ -982,7 +1006,6 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     setHasPendingEditChanges(false);
     setExportingStemType(null);
     setExportStatusInput({ phase: 'idle' });
-    setExportRecords([]);
     setSelectedTrackType(stems[0]?.type ?? null);
     skipNextAutoSaveRef.current = true;
     undoStackRef.current = [];

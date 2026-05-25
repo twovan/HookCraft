@@ -22,6 +22,8 @@ export interface StemExportRecordView {
   detail: string;
 }
 
+const STEM_EXPORT_HISTORY_STORAGE_PREFIX = 'hookcraft-stem-export-history';
+
 function normalizeFinishedAt(value: string | Date | undefined) {
   if (value instanceof Date) return value.toISOString();
   if (typeof value === 'string' && value.trim()) return value;
@@ -42,6 +44,44 @@ export function createStemExportRecord(input: StemExportRecordInput): StemExport
 
 export function appendStemExportRecord(records: StemExportRecord[], record: StemExportRecord, limit = 3) {
   return [record, ...records].slice(0, Math.max(1, limit));
+}
+
+export function buildStemExportHistoryStorageKey(projectId: string | undefined | null) {
+  const normalizedProjectId = typeof projectId === 'string' && projectId.trim()
+    ? projectId.trim()
+    : 'draft';
+  return `${STEM_EXPORT_HISTORY_STORAGE_PREFIX}:${normalizedProjectId}`;
+}
+
+function isStemExportRecord(value: unknown): value is StemExportRecord {
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Partial<StemExportRecord>;
+  return typeof record.id === 'string'
+    && record.id.length > 0
+    && (record.scope === 'mix' || record.scope === 'stem')
+    && typeof record.label === 'string'
+    && record.label.length > 0
+    && typeof record.trackCount === 'number'
+    && Number.isFinite(record.trackCount)
+    && typeof record.fileType === 'string'
+    && record.fileType.length > 0
+    && typeof record.finishedAt === 'string'
+    && record.finishedAt.length > 0;
+}
+
+export function parseStemExportRecords(value: string | null | undefined, limit = 3): StemExportRecord[] {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(isStemExportRecord).slice(0, Math.max(1, limit));
+  } catch {
+    return [];
+  }
+}
+
+export function serializeStemExportRecords(records: StemExportRecord[]) {
+  return JSON.stringify(records.filter(isStemExportRecord));
 }
 
 export function formatStemExportRecord(record: StemExportRecord, locale = 'zh-CN'): StemExportRecordView {
