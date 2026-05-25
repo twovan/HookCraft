@@ -21,6 +21,10 @@ import {
   buildStemEditorReadiness,
   type StemEditorReadinessLevel,
 } from '@/lib/stems/stemEditorReadiness';
+import {
+  buildStemExportPreflight,
+  type StemExportMode,
+} from '@/lib/stems/stemExportPreflight';
 import { clampStemTimecodeInput, formatStemTimecode, parseStemTimecode } from '@/lib/stems/stemTimecode';
 import { nudgeStemTrimEdge, resolveStemTrimControlValues } from '@/lib/stems/stemTrackControls';
 import {
@@ -64,7 +68,7 @@ export interface StemEditState {
 }
 
 type MixPreset = 'balanced' | 'vocal-focus' | 'instrumental-wide';
-type ExportMode = 'current-mix' | 'all-tracks' | 'solo-only';
+type ExportMode = StemExportMode;
 type ExportReadiness = 'ready-only' | 'wait-all';
 type TrackViewMode = 'all' | 'active' | 'audible';
 type EditorPreferences = {
@@ -239,6 +243,12 @@ function exportModeFileLabel(mode: ExportMode) {
   if (mode === 'all-tracks') return 'full-mix';
   if (mode === 'solo-only') return 'solo-only';
   return 'current-mix';
+}
+
+function formatExportPreflightLabels(labels: string[]) {
+  if (labels.length === 0) return '无';
+  const visibleLabels = labels.slice(0, 4).join(' / ');
+  return labels.length > 4 ? `${visibleLabels} / +${labels.length - 4}` : visibleLabels;
 }
 
 function formatExportTimestamp(date: Date) {
@@ -660,30 +670,38 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
   const loadableStemCount = Math.max(0, stems.length - skippedEmptyCount);
   const readyStemCount = Math.max(0, loadableStemCount - loadingCount - failedLoadCount);
   const exportSummary = useMemo(() => {
-    const exportSourceStems = stems.filter((stem) => !stemHasKnownEmptyWaveform(stem));
-    const loadedStems = exportSourceStems.filter((stem) => audioBuffersRef.current[stem.type]);
-    const plannedStems = exportSourceStems.filter((stem) => {
-      const state = tracks[stem.type] || defaultTrackState();
-      if (exportMode === 'all-tracks') return state.volume > 0;
-      if (exportMode === 'solo-only') return state.solo && state.volume > 0;
-      return !state.muted && (!hasSoloTrack || state.solo) && state.volume > 0;
+    const preflight = buildStemExportPreflight({
+      tracks: stems.map((stem) => {
+        const state = tracks[stem.type] || defaultTrackState();
+        return {
+          type: stem.type,
+          label: getStemDisplayName(stem).zh,
+          loaded: Boolean(audioBuffersRef.current[stem.type]),
+          knownEmpty: stemHasKnownEmptyWaveform(stem),
+          muted: state.muted,
+          solo: state.solo,
+          volume: state.volume,
+        };
+      }),
+      mode: exportMode,
+      hasSoloTrack,
+      waitForAll: exportReadiness === 'wait-all',
     });
-    const selectedStems = loadedStems.filter((stem) => {
-      const state = tracks[stem.type] || defaultTrackState();
-      if (exportMode === 'all-tracks') return state.volume > 0;
-      if (exportMode === 'solo-only') return state.solo && state.volume > 0;
-      return !state.muted && (!hasSoloTrack || state.solo) && state.volume > 0;
-    });
-    const missingCount = Math.max(0, plannedStems.length - selectedStems.length);
-    const mutedOrSkippedCount = Math.max(0, loadedStems.length - selectedStems.length);
 
     return {
-      selectedCount: selectedStems.length,
-      plannedCount: plannedStems.length,
-      loadedCount: loadedStems.length,
-      missingCount,
-      mutedOrSkippedCount,
-      canExport: !isExporting && (exportReadiness === 'wait-all' ? plannedStems.length > 0 : selectedStems.length > 0),
+      selectedCount: preflight.exportableTypes.length,
+      plannedCount: preflight.plannedTypes.length,
+      loadedCount: preflight.loadedCount,
+      missingCount: preflight.missingTypes.length,
+      mutedOrSkippedCount: preflight.skippedTypes.length,
+      emptyCount: preflight.emptyTypes.length,
+      plannedLabels: preflight.plannedLabels,
+      exportableLabels: preflight.exportableLabels,
+      missingLabels: preflight.missingLabels,
+      skippedLabels: preflight.skippedLabels,
+      emptyLabels: preflight.emptyLabels,
+      summary: preflight.summary,
+      canExport: !isExporting && preflight.canExport,
     };
   }, [bufferVersion, exportMode, exportReadiness, hasSoloTrack, isExporting, stems, tracks]);
   const editorReadiness = useMemo(() => buildStemEditorReadiness({
@@ -2585,6 +2603,34 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
               {exportSummary.missingCount > 0 && exportReadiness === 'ready-only' && ` 还有 ${exportSummary.missingCount} 条未加载，本次只导出已就绪轨道。`}
               {exportSummary.mutedOrSkippedCount > 0 && exportMode !== 'all-tracks' && ` 当前模式会跳过 ${exportSummary.mutedOrSkippedCount} 条轨道。`}
             </div>
+            <div style={exportPreflightStyle}>
+              <div style={exportPreflightRowStyle}>
+                <span style={exportPreflightLabelStyle}>导出预检</span>
+                <span style={exportPreflightValueStyle}>{exportSummary.summary}</span>
+              </div>
+              <div style={exportPreflightRowStyle}>
+                <span style={exportPreflightLabelStyle}>将导出</span>
+                <span style={exportPreflightValueStyle}>{formatExportPreflightLabels(exportSummary.exportableLabels)}</span>
+              </div>
+              {exportSummary.missingCount > 0 && (
+                <div style={exportPreflightRowStyle}>
+                  <span style={exportPreflightLabelStyle}>等待缓存</span>
+                  <span style={exportPreflightWarningStyle}>{formatExportPreflightLabels(exportSummary.missingLabels)}</span>
+                </div>
+              )}
+              {exportSummary.mutedOrSkippedCount > 0 && (
+                <div style={exportPreflightRowStyle}>
+                  <span style={exportPreflightLabelStyle}>当前跳过</span>
+                  <span style={exportPreflightValueStyle}>{formatExportPreflightLabels(exportSummary.skippedLabels)}</span>
+                </div>
+              )}
+              {exportSummary.emptyCount > 0 && (
+                <div style={exportPreflightRowStyle}>
+                  <span style={exportPreflightLabelStyle}>空轨跳过</span>
+                  <span style={exportPreflightValueStyle}>{formatExportPreflightLabels(exportSummary.emptyLabels)}</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -3348,6 +3394,43 @@ const exportHintStyle: CSSProperties = {
   color: '#8f92aa',
   fontSize: 11,
   lineHeight: 1.6,
+};
+
+const exportPreflightStyle: CSSProperties = {
+  display: 'grid',
+  gap: 6,
+  marginTop: 10,
+  padding: '8px 10px',
+  borderRadius: 8,
+  border: '1px solid rgba(48, 52, 76, 0.72)',
+  background: 'rgba(17, 20, 35, 0.82)',
+};
+
+const exportPreflightRowStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '64px minmax(0, 1fr)',
+  gap: 8,
+  alignItems: 'start',
+  minWidth: 0,
+  fontSize: 11,
+  lineHeight: 1.45,
+};
+
+const exportPreflightLabelStyle: CSSProperties = {
+  color: '#8f92aa',
+  fontWeight: 800,
+  whiteSpace: 'nowrap',
+};
+
+const exportPreflightValueStyle: CSSProperties = {
+  color: '#cfd3e6',
+  fontWeight: 700,
+  overflowWrap: 'anywhere',
+};
+
+const exportPreflightWarningStyle: CSSProperties = {
+  ...exportPreflightValueStyle,
+  color: '#f7c873',
 };
 
 const playbackErrorStyle: CSSProperties = {
