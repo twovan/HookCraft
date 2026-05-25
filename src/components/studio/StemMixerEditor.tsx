@@ -25,6 +25,11 @@ import {
   buildStemExportPreflight,
   type StemExportMode,
 } from '@/lib/stems/stemExportPreflight';
+import {
+  resolveStemExportStatus,
+  type StemExportStatusInput,
+  type StemExportStatusTone,
+} from '@/lib/stems/stemExportStatus';
 import { clampStemTimecodeInput, formatStemTimecode, parseStemTimecode } from '@/lib/stems/stemTimecode';
 import { nudgeStemTrimEdge, resolveStemTrimControlValues } from '@/lib/stems/stemTrackControls';
 import {
@@ -645,6 +650,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
   const [isSaving, setIsSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [exportingStemType, setExportingStemType] = useState<string | null>(null);
+  const [exportStatusInput, setExportStatusInput] = useState<StemExportStatusInput>({ phase: 'idle' });
   const [isAudioRetrying, setIsAudioRetrying] = useState(false);
   const [editorPreferencesLoaded, setEditorPreferencesLoaded] = useState(false);
   const [exportMode, setExportMode] = useState<ExportMode>('current-mix');
@@ -669,6 +675,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
 
   const loadableStemCount = Math.max(0, stems.length - skippedEmptyCount);
   const readyStemCount = Math.max(0, loadableStemCount - loadingCount - failedLoadCount);
+  const exportStatus = useMemo(() => resolveStemExportStatus(exportStatusInput), [exportStatusInput]);
   const exportSummary = useMemo(() => {
     const preflight = buildStemExportPreflight({
       tracks: stems.map((stem) => {
@@ -963,6 +970,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     setAutoSaveStatus(null);
     setHasPendingEditChanges(false);
     setExportingStemType(null);
+    setExportStatusInput({ phase: 'idle' });
     setSelectedTrackType(stems[0]?.type ?? null);
     skipNextAutoSaveRef.current = true;
     undoStackRef.current = [];
@@ -1933,6 +1941,11 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     while (loadingCountRef.current > 0) {
       const loadedCount = Object.keys(audioBuffersRef.current).length;
       const targetCount = Math.max(0, stems.length - skippedEmptyCount);
+      setExportStatusInput({
+        phase: 'waiting-cache',
+        loadedCount,
+        totalCount: targetCount,
+      });
       setSaveStatus(`等待分轨缓存完成：已加载 ${loadedCount}/${targetCount}，剩余 ${loadingCountRef.current} 条。`);
       await new Promise((resolve) => { window.setTimeout(resolve, 500); });
 
@@ -1946,6 +1959,10 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     setIsExporting(true);
     setPlaybackError(null);
     setSaveStatus(null);
+    setExportStatusInput({
+      phase: 'preparing',
+      message: `正在准备“${exportModeLabel(exportMode)}”导出。`,
+    });
 
     try {
       if (exportReadiness === 'wait-all' && loadingCountRef.current > 0) {
@@ -1977,6 +1994,10 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
         ? `还有 ${missingCount} 条分轨未加载，本次以“${exportModeLabel(exportMode)}”导出已就绪的 ${exportableStems.length} 条。`
         : null);
       setSaveStatus(`正在准备“${exportModeLabel(exportMode)}”导出，共 ${exportableStems.length} 条轨道。`);
+      setExportStatusInput({
+        phase: 'preparing',
+        message: `已选中 ${exportableStems.length} 条轨道，正在建立离线渲染。`,
+      });
 
       const sampleRate = exportableStems
         .map((stem) => audioBuffersRef.current[stem.type]?.sampleRate)
@@ -2023,19 +2044,28 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
         });
       });
 
+      setExportStatusInput({
+        phase: 'rendering',
+        message: `正在渲染 ${exportableStems.length} 条轨道。`,
+      });
       const rendered = await offlineContext.startRendering();
+      setExportStatusInput({ phase: 'encoding', fileType: 'WAV' });
       const blob = encodeWav(rendered);
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.download = `hookcraft-${exportModeFileLabel(exportMode)}-${formatExportTimestamp(new Date())}.wav`;
       document.body.appendChild(link);
+      setExportStatusInput({ phase: 'downloading', fileType: 'WAV' });
       link.click();
       link.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setExportStatusInput({ phase: 'done', fileType: 'WAV', exportedCount: exportableStems.length });
       setSaveStatus(`“${exportModeLabel(exportMode)}”WAV 已导出。`);
     } catch (error) {
-      setPlaybackError(error instanceof Error ? error.message : '导出混音失败，请稍后重试。');
+      const message = error instanceof Error ? error.message : '导出混音失败，请稍后重试。';
+      setExportStatusInput({ phase: 'error', message });
+      setPlaybackError(message);
     } finally {
       setIsExporting(false);
     }
@@ -2045,6 +2075,10 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     setExportingStemType(stem.type);
     setPlaybackError(null);
     setSaveStatus(null);
+    setExportStatusInput({
+      phase: 'preparing',
+      message: `正在准备导出“${getStemDisplayName(stem).zh}”单轨。`,
+    });
 
     try {
       const audioBuffer = audioBuffersRef.current[stem.type];
@@ -2061,6 +2095,10 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
       }
 
       setSaveStatus(`正在导出“${getStemDisplayName(stem).zh}”单轨。`);
+      setExportStatusInput({
+        phase: 'rendering',
+        message: `正在渲染“${getStemDisplayName(stem).zh}”单轨。`,
+      });
       const sampleRate = audioBuffer.sampleRate || 44100;
       const frameCount = Math.max(1, Math.ceil(clipDuration * sampleRate));
       const offlineContext = new OfflineAudioContext(2, frameCount, sampleRate);
@@ -2089,18 +2127,23 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
       });
 
       const rendered = await offlineContext.startRendering();
+      setExportStatusInput({ phase: 'encoding', fileType: 'WAV' });
       const blob = encodeWav(rendered);
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.download = `hookcraft-${normalizeStemType(stem.type)}-${formatExportTimestamp(new Date())}.wav`;
       document.body.appendChild(link);
+      setExportStatusInput({ phase: 'downloading', fileType: 'WAV' });
       link.click();
       link.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setExportStatusInput({ phase: 'done', fileType: 'WAV', exportedCount: 1 });
       setSaveStatus(`“${getStemDisplayName(stem).zh}”单轨 WAV 已导出。`);
     } catch (error) {
-      setPlaybackError(error instanceof Error ? error.message : '导出单轨失败，请稍后重试。');
+      const message = error instanceof Error ? error.message : '导出单轨失败，请稍后重试。';
+      setExportStatusInput({ phase: 'error', message });
+      setPlaybackError(message);
     } finally {
       setExportingStemType(null);
     }
@@ -2630,6 +2673,16 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
                   <span style={exportPreflightValueStyle}>{formatExportPreflightLabels(exportSummary.emptyLabels)}</span>
                 </div>
               )}
+            </div>
+            <div style={exportStatusStyle(exportStatus.tone)}>
+              <div style={exportStatusHeaderStyle}>
+                <span>{exportStatus.label}</span>
+                <span>{exportStatus.progress}%</span>
+              </div>
+              <div style={exportStatusTrackStyle}>
+                <div style={exportStatusProgressStyle(exportStatus.progress, exportStatus.tone)} />
+              </div>
+              <div style={exportStatusDetailStyle}>{exportStatus.detail}</div>
             </div>
           </div>
         </div>
@@ -3431,6 +3484,69 @@ const exportPreflightValueStyle: CSSProperties = {
 const exportPreflightWarningStyle: CSSProperties = {
   ...exportPreflightValueStyle,
   color: '#f7c873',
+};
+
+function exportStatusStyle(tone: StemExportStatusTone): CSSProperties {
+  const color = tone === 'success'
+    ? 'rgba(52, 211, 153, 0.58)'
+    : tone === 'error'
+      ? 'rgba(248, 113, 113, 0.52)'
+      : tone === 'warning'
+        ? 'rgba(251, 191, 36, 0.48)'
+        : tone === 'info'
+          ? 'rgba(96, 165, 250, 0.48)'
+          : 'rgba(75, 85, 99, 0.64)';
+
+  return {
+    marginTop: 10,
+    padding: '8px 10px',
+    borderRadius: 8,
+    border: `1px solid ${color}`,
+    background: 'rgba(10, 13, 24, 0.82)',
+  };
+}
+
+const exportStatusHeaderStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 10,
+  color: '#edf0ff',
+  fontSize: 12,
+  fontWeight: 900,
+};
+
+const exportStatusTrackStyle: CSSProperties = {
+  height: 5,
+  marginTop: 7,
+  overflow: 'hidden',
+  borderRadius: 999,
+  background: 'rgba(48, 52, 76, 0.78)',
+};
+
+function exportStatusProgressStyle(progress: number, tone: StemExportStatusTone): CSSProperties {
+  const color = tone === 'success'
+    ? '#34d399'
+    : tone === 'error'
+      ? '#f87171'
+      : tone === 'warning'
+        ? '#fbbf24'
+        : '#8b5cf6';
+
+  return {
+    width: `${Math.max(0, Math.min(100, progress))}%`,
+    height: '100%',
+    borderRadius: 999,
+    background: color,
+    transition: 'width 180ms ease',
+  };
+}
+
+const exportStatusDetailStyle: CSSProperties = {
+  marginTop: 6,
+  color: '#9ca3af',
+  fontSize: 11,
+  lineHeight: 1.45,
 };
 
 const playbackErrorStyle: CSSProperties = {
