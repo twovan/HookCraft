@@ -21,6 +21,7 @@ import {
   buildStemEditorReadiness,
   type StemEditorReadinessLevel,
 } from '@/lib/stems/stemEditorReadiness';
+import { formatStemTimecode, parseStemTimecode } from '@/lib/stems/stemTimecode';
 import { nudgeStemTrimEdge, resolveStemTrimControlValues } from '@/lib/stems/stemTrackControls';
 import {
   addStemMutedRange,
@@ -607,6 +608,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
   const loopSelectionPreviewRef = useRef(false);
   const loopPreviewTimerRef = useRef<number | null>(null);
   const frameRef = useRef<number | null>(null);
+  const skipNextTimeInputCommitRef = useRef(false);
   const loadingCountRef = useRef(stems.length);
   const failedLoadCountRef = useRef(0);
   const autoSaveTimerRef = useRef<number | null>(null);
@@ -641,6 +643,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
   const [loopSelectionPreview, setLoopSelectionPreview] = useState(false);
   const [historyVersion, setHistoryVersion] = useState(0);
   const [selectedTrackType, setSelectedTrackType] = useState<string | null>(() => stems[0]?.type ?? null);
+  const [currentTimeInputDraft, setCurrentTimeInputDraft] = useState<string | null>(null);
 
   const masterStem = stems[0] || null;
   const hasSoloTrack = useMemo(
@@ -1382,6 +1385,19 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     }
   }, [clearLoopPreviewTimer, duration, isPlaying, playAll, stopSources]);
 
+  const commitCurrentTimeInput = useCallback((value: string) => {
+    const parsedTime = parseStemTimecode(value);
+    if (parsedTime === null) {
+      setPlaybackError('播放头时间格式不正确，可以输入秒数或 1:23.45。');
+      setCurrentTimeInputDraft(formatStemTimecode(currentTime));
+      return;
+    }
+
+    handleSeek(parsedTime);
+    setPlaybackError(null);
+    setCurrentTimeInputDraft(null);
+  }, [currentTime, handleSeek]);
+
   const toggleTrackFlag = useCallback((type: string, flag: 'muted' | 'solo') => {
     commitTrackChange((current) => ({
       ...current,
@@ -2095,7 +2111,33 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
             <button type="button" onClick={handleTogglePlayback} style={playButtonStyle}>
               {isPlaying ? '暂停' : '播放'}
             </button>
-            <span style={timeStyle}>{formatTime(currentTime)}</span>
+            <input
+              aria-label="播放头时间"
+              type="text"
+              inputMode="decimal"
+              value={currentTimeInputDraft ?? formatStemTimecode(currentTime)}
+              onFocus={() => setCurrentTimeInputDraft(formatStemTimecode(currentTime))}
+              onChange={(event) => setCurrentTimeInputDraft(event.target.value)}
+              onBlur={(event) => {
+                if (skipNextTimeInputCommitRef.current) {
+                  skipNextTimeInputCommitRef.current = false;
+                  setCurrentTimeInputDraft(null);
+                  return;
+                }
+                commitCurrentTimeInput(event.target.value);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.currentTarget.blur();
+                }
+                if (event.key === 'Escape') {
+                  skipNextTimeInputCommitRef.current = true;
+                  setCurrentTimeInputDraft(null);
+                  event.currentTarget.blur();
+                }
+              }}
+              style={timeInputStyle}
+            />
             <input
               aria-label="分轨播放进度"
               type="range"
@@ -2106,7 +2148,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
               onChange={(event) => handleSeek(Number(event.target.value))}
               style={timelineStyle}
             />
-            <span style={timeStyle}>{formatTime(duration)}</span>
+            <span style={timeStyle}>{formatStemTimecode(duration)}</span>
           </div>
           <div style={mixerSummaryStyle}>
             <span>{stems.length} 条分轨</span>
@@ -2862,7 +2904,7 @@ const transportPanelStyle: CSSProperties = {
 
 const transportStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: '72px 50px minmax(0, 1fr) 50px',
+  gridTemplateColumns: '72px 74px minmax(0, 1fr) 62px',
   gap: 10,
   alignItems: 'center',
 };
@@ -2881,6 +2923,20 @@ const playButtonStyle: CSSProperties = {
 const timeStyle: CSSProperties = {
   color: '#cfd0dc',
   fontSize: 12,
+  fontVariantNumeric: 'tabular-nums',
+  textAlign: 'center',
+};
+
+const timeInputStyle: CSSProperties = {
+  width: '100%',
+  minHeight: 30,
+  borderRadius: 7,
+  border: '1px solid rgba(48, 52, 76, 0.9)',
+  background: '#0f1220',
+  color: '#f4f4fb',
+  padding: '4px 6px',
+  fontSize: 12,
+  fontWeight: 800,
   fontVariantNumeric: 'tabular-nums',
   textAlign: 'center',
 };
