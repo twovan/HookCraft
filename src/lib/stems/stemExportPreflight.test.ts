@@ -22,6 +22,8 @@ describe('buildStemExportPreflight', () => {
       skippedTypes: ['bass'],
       emptyTypes: ['fx'],
       canExport: true,
+      disabledReason: null,
+      summary: '将导出 1/2 条，等待 1 条缓存',
     });
   });
 
@@ -38,6 +40,7 @@ describe('buildStemExportPreflight', () => {
       exportableTypes: [],
       missingTypes: ['vocals'],
       canExport: true,
+      disabledReason: null,
     });
   });
 
@@ -55,6 +58,35 @@ describe('buildStemExportPreflight', () => {
       exportableTypes: ['vocals'],
       skippedTypes: ['drums'],
       canExport: true,
+      disabledReason: null,
+    });
+  });
+
+  it('explains when solo export has no selected solo track', () => {
+    expect(buildStemExportPreflight({
+      tracks: [
+        { type: 'vocals', label: '人声', loaded: true, muted: false, solo: false, volume: 1 },
+      ],
+      mode: 'solo-only',
+      hasSoloTrack: false,
+      waitForAll: false,
+    })).toMatchObject({
+      canExport: false,
+      disabledReason: '请先选择至少一条独奏轨道。',
+    });
+  });
+
+  it('explains when ready-only export has no loaded selected track yet', () => {
+    expect(buildStemExportPreflight({
+      tracks: [
+        { type: 'vocals', label: '人声', loaded: false, muted: false, solo: false, volume: 1 },
+      ],
+      mode: 'current-mix',
+      hasSoloTrack: false,
+      waitForAll: false,
+    })).toMatchObject({
+      canExport: false,
+      disabledReason: '还没有已加载的可导出轨道。',
     });
   });
 });

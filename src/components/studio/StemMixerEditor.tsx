@@ -728,6 +728,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
       missingLabels: preflight.missingLabels,
       skippedLabels: preflight.skippedLabels,
       emptyLabels: preflight.emptyLabels,
+      disabledReason: preflight.disabledReason,
       summary: preflight.summary,
       canExport: !isExporting && preflight.canExport,
     };
@@ -2258,7 +2259,13 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
           <button type="button" onClick={saveEditState} disabled={isSaving} style={primarySmallButtonStyle}>
             {isSaving ? '保存中' : '保存编辑'}
           </button>
-          <button type="button" onClick={() => void exportMix()} disabled={!exportSummary.canExport} style={primarySmallButtonStyle}>
+          <button
+            type="button"
+            onClick={() => void exportMix()}
+            disabled={!exportSummary.canExport}
+            title={exportSummary.disabledReason || '导出当前设置为 WAV'}
+            style={primarySmallButtonStyle}
+          >
             {isExporting ? '导出中' : '导出 WAV'}
           </button>
           <button type="button" onClick={() => setShowAdvancedControls((value) => !value)} style={ghostButtonStyle}>
@@ -2734,6 +2741,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
               {exportSummary.missingCount > 0 && exportReadiness === 'wait-all' && ` 还有 ${exportSummary.missingCount} 条未加载，点击导出后会等待缓存完成。`}
               {exportSummary.missingCount > 0 && exportReadiness === 'ready-only' && ` 还有 ${exportSummary.missingCount} 条未加载，本次只导出已就绪轨道。`}
               {exportSummary.mutedOrSkippedCount > 0 && exportMode !== 'all-tracks' && ` 当前模式会跳过 ${exportSummary.mutedOrSkippedCount} 条轨道。`}
+              {exportSummary.disabledReason && ` 暂不能导出：${exportSummary.disabledReason}`}
             </div>
             <div style={exportPreflightStyle}>
               <div style={exportPreflightRowStyle}>
