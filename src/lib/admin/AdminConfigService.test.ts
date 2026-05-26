@@ -137,9 +137,11 @@ describe('AdminConfigService', () => {
 
       const config = await service.getCurrentConfig();
 
-      expect(config.costRules).toHaveLength(2);
+      expect(config.costRules.length).toBeGreaterThanOrEqual(2);
       const preview = config.costRules.find((r) => r.operation === 'preview');
       expect(preview!.cost).toBe(1);
+      const fullDemoShort = config.costRules.find((r) => r.operation === 'full_demo_short');
+      expect(fullDemoShort!.cost).toBe(10);
     });
 
     it('正确解析 JSONB pricing 数据', async () => {
@@ -166,13 +168,13 @@ describe('AdminConfigService', () => {
       expect(pack10!.businessDiscount).toBe(0.8);
     });
 
-    it('数据库返回空数组时返回空配置', async () => {
+    it('数据库返回空数组时返回默认成本规则和空业务配置', async () => {
       mocks.adminConfigSelect.mockResolvedValue({ data: [], error: null });
 
       const config = await service.getCurrentConfig();
 
       expect(config.creditQuotas).toEqual([]);
-      expect(config.costRules).toEqual([]);
+      expect(config.costRules.length).toBeGreaterThan(0);
       expect(config.pricing).toEqual([]);
       expect(config.creditsPacks).toEqual([]);
     });

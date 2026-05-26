@@ -5,7 +5,13 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { getAuthUser } from '@/lib/supabase/auth-helpers';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
   try {
     const cookieStore = await cookies();
     const allCookies = cookieStore.getAll();

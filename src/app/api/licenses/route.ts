@@ -4,6 +4,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { LicenseService } from '../../../lib/license/LicenseService';
 import type { MembershipTier } from '../../../types/membership';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);

@@ -51,7 +51,7 @@ interface MiniMaxProviderConfig {
 const PREPROCESS_TIMEOUT_MS = 60_000;
 
 /** 生成超时时间（毫秒）- Vercel Pro 支持 300s */
-const GENERATION_TIMEOUT_MS = 290_000;
+const GENERATION_TIMEOUT_MS = 300_000;
 
 /** MiniMax music-cover 模型提供方实现 */
 export class MiniMaxProvider {
@@ -61,7 +61,7 @@ export class MiniMaxProvider {
 
   constructor(config?: MiniMaxProviderConfig) {
     this.apiKey = config?.apiKey || process.env.MINIMAX_API_KEY || '';
-    this.baseUrl = config?.baseUrl || 'https://api.minimaxi.com';
+    this.baseUrl = config?.baseUrl || 'https://api.minimax.io';
 
     if (!this.apiKey) {
       throw new Error('MiniMax API Key 未配置');
@@ -121,7 +121,8 @@ export class MiniMaxProvider {
 
     const body: Record<string, unknown> = {
       model: input.model,
-      lyrics: input.lyrics || undefined,
+      lyrics: input.isInstrumental ? '' : (input.lyrics || undefined),
+      is_instrumental: input.isInstrumental,
       audio_setting: {
         sample_rate: input.audioSetting.sampleRate,
         bitrate: input.audioSetting.bitrate,

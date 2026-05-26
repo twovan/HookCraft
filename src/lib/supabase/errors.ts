@@ -42,9 +42,11 @@ export function toAppError(
   table: string,
   operation: string
 ): AppError {
-  const code = error.code || 'UNKNOWN';
-  const mappedMessage = error.code ? ERROR_CODE_MAP[error.code] : undefined;
-  const message = mappedMessage || error.message || '数据库操作失败';
+  const code = error.code?.trim() || 'UNKNOWN';
+  const mappedMessage = Object.prototype.hasOwnProperty.call(ERROR_CODE_MAP, code)
+    ? ERROR_CODE_MAP[code]
+    : undefined;
+  const message = mappedMessage || error.message?.trim() || '数据库操作失败';
 
   return {
     code,

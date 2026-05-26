@@ -171,32 +171,47 @@ describe('Property 2: Credits 乐观锁并发安全', () => {
             updated_at: '2025-01-01T00:00:00Z',
           };
 
-          // Mock: select returns current row
-          const mockSingle = vi.fn().mockResolvedValue({ data: row, error: null });
-          const mockSelectEq = vi.fn().mockReturnValue({ single: mockSingle });
-          const mockSelect = vi.fn().mockReturnValue({ eq: mockSelectEq });
+          const makeMaybeSingleQuery = (data: unknown) => ({
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                maybeSingle: vi.fn().mockResolvedValue({ data, error: null }),
+              }),
+            }),
+          });
 
-          // Mock: optimistic lock update
-          // If versionMatches=true, update returns the updated row (success)
-          // If versionMatches=false, update returns empty array (concurrent conflict)
-          const mockUpdateSelect = vi.fn().mockResolvedValue({
+          const mockFrom = vi.fn().mockImplementation((table: string) => {
+            if (table === 'credits') return makeMaybeSingleQuery(row);
+            if (table === 'purchased_credits') return makeMaybeSingleQuery(null);
+            return {};
+          });
+          const mockRpc = vi.fn().mockResolvedValue({
             data: versionMatches
-              ? [{ ...row, used: state.used + cost, version: state.version + 1 }]
-              : [],
+              ? {
+                  success: true,
+                  monthly_cost: cost,
+                  purchased_cost: 0,
+                  monthly_remaining: state.total - state.used - cost,
+                  purchased_remaining: 0,
+                }
+              : {
+                  success: false,
+                  error: 'concurrent_limit',
+                },
             error: null,
           });
-          const mockUpdateEq2 = vi.fn().mockReturnValue({ select: mockUpdateSelect });
-          const mockUpdateEq = vi.fn().mockReturnValue({ eq: mockUpdateEq2 });
 
-          const mockFrom = vi.fn().mockReturnValue({
-            select: mockSelect,
-            update: () => ({ eq: mockUpdateEq }),
-          });
-
-          const supabase = { from: mockFrom } as any;
+          const supabase = { from: mockFrom, rpc: mockRpc } as any;
           const service = new CreditService(supabase);
 
           const result = await service.consumeCredits(userId, ['preview']);
+
+          expect(mockRpc).toHaveBeenCalledWith('consume_credits_with_priority', {
+            p_user_id: userId,
+            p_total_cost: cost,
+            p_operation_type: 'preview',
+            p_credits_version: state.version,
+            p_purchased_version: 0,
+          });
 
           if (versionMatches) {
             // Version matches + sufficient balance → success with version+1
