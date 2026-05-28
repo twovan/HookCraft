@@ -6,77 +6,61 @@ export interface UpgradeBannerProps {
   onUpgrade?: () => void;
 }
 
-/**
- * 升级横幅组件
- * - Free 用户：底部非侵入式横幅"升级到专业版解锁完整 Demo 生成"
- * - 付费用户：隐藏
- */
 export default function UpgradeBanner({ onUpgrade }: UpgradeBannerProps) {
   const membership = useMembershipStore((s) => s.membership);
   const isLoading = useMembershipStore((s) => s.isLoading);
   const isPaid = useMembershipStore((s) => s.isPaid());
 
-  // 等会员状态明确后再展示，避免刷新瞬间误判为免费用户。
   if (isLoading || !membership || isPaid) return null;
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        zIndex: 900,
-        background: 'linear-gradient(135deg, rgba(18, 18, 30, 0.96) 0%, rgba(31, 24, 50, 0.96) 100%)',
-        backdropFilter: 'blur(12px)',
-        borderTop: '1px solid rgba(117, 54, 213, 0.35)',
-        padding: '12px 24px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '16px',
-        boxShadow: '0 -10px 30px rgba(0, 0, 0, 0.28), 0 -4px 20px rgba(117, 54, 213, 0.12)',
-      }}
-      role="banner"
-      aria-label="升级提示"
-    >
-      {/* Icon */}
-      <span style={{ fontSize: '16px', color: '#c0a7fc' }}>✨</span>
+    <div className="upgrade-banner" role="banner" aria-label="升级提示">
+      <span>升级到专业版解锁完整生成</span>
+      {onUpgrade && <button onClick={onUpgrade}>了解更多</button>}
+      <style>{`
+        .upgrade-banner {
+          position: fixed;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          z-index: 900;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 14px;
+          padding: 12px 20px;
+          border-top: 1px solid rgba(206,255,53,.28);
+          background: rgba(13,15,20,.94);
+          backdrop-filter: blur(12px);
+          box-shadow: 0 -16px 40px rgba(0,0,0,.28);
+        }
 
-      {/* Text */}
-      <span
-        style={{
-          fontSize: '14px',
-          color: '#d8d9e6',
-          fontWeight: 500,
-          fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-        }}
-      >
-        升级到专业版解锁完整 Demo 生成
-      </span>
+        .upgrade-banner span {
+          color: var(--hc-text);
+          font-size: 14px;
+          font-weight: 800;
+        }
 
-      {/* CTA Button */}
-      {onUpgrade && (
-        <button
-          onClick={onUpgrade}
-          style={{
-            padding: '8px 20px',
-            borderRadius: '20px',
-            border: 'none',
-            background: 'linear-gradient(135deg, #7536d5 0%, #5a2db8 100%)',
-            color: 'white',
-            fontSize: '13px',
-            fontWeight: 600,
-            cursor: 'pointer',
-            fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-            transition: 'all 0.2s ease',
-            boxShadow: '0 2px 8px rgba(117, 54, 213, 0.3)',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          了解更多
-        </button>
-      )}
+        .upgrade-banner button {
+          border: none;
+          border-radius: 999px;
+          background: linear-gradient(135deg, var(--hc-lime), var(--hc-cyan));
+          color: #08090c;
+          padding: 8px 16px;
+          font-size: 13px;
+          font-weight: 950;
+          cursor: pointer;
+          white-space: nowrap;
+        }
+
+        @media (max-width: 560px) {
+          .upgrade-banner {
+            align-items: stretch;
+            flex-direction: column;
+            text-align: center;
+          }
+        }
+      `}</style>
     </div>
   );
 }

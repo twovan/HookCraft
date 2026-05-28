@@ -1,27 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import type { CSSProperties } from 'react';
 
 export interface SensitivityConfirmDialogProps {
-  /** 是否显示弹窗 */
   open: boolean;
-  /** 风格标签列表，动态插入提示信息中 */
   styleTags: string[];
-  /** 用户点击【是】时的回调（使用改写 Prompt 调用生成 API） */
   onConfirm: () => void;
-  /** 用户点击【否】时的回调（关闭弹窗返回编辑） */
   onCancel: () => void;
 }
 
-/**
- * 敏感词确认弹窗组件（rewrite 类型）
- *
- * 当 Sensitivity_Filter 检测到创作描述中包含明星名字或歌曲名称时，
- * 展示确认弹窗，告知用户系统将使用改写后的风格标签生成歌曲，
- * 用户可选择继续生成或返回编辑。
- *
- * Validates: Requirements 3.1, 3.2, 3.3, 3.4, 3.5, 3.6
- */
 export default function SensitivityConfirmDialog({
   open,
   styleTags,
@@ -30,181 +18,160 @@ export default function SensitivityConfirmDialog({
 }: SensitivityConfirmDialogProps) {
   const [visible, setVisible] = useState(false);
 
-  // 控制淡入动画：open 变为 true 时延迟一帧触发 CSS transition
   useEffect(() => {
-    if (open) {
-      // 使用 requestAnimationFrame 确保 DOM 先渲染再触发动画
-      const raf = requestAnimationFrame(() => {
-        setVisible(true);
-      });
-      return () => cancelAnimationFrame(raf);
-    } else {
+    if (!open) {
       setVisible(false);
+      return undefined;
     }
+
+    const raf = requestAnimationFrame(() => setVisible(true));
+    return () => cancelAnimationFrame(raf);
   }, [open]);
 
   if (!open) return null;
 
-  const styleTagsText = styleTags.join('/');
+  const tags = styleTags.length > 0 ? styleTags.join(' / ') : '相近风格';
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="sensitivity-confirm-title"
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 9999,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        opacity: visible ? 1 : 0,
-        transition: 'opacity 0.3s ease',
-      }}
-    >
-      {/* 遮罩层 */}
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background: 'rgba(0, 0, 0, 0.6)',
-          backdropFilter: 'blur(4px)',
-        }}
-        onClick={onCancel}
-      />
-
-      {/* 弹窗内容 */}
-      <div
-        style={{
-          position: 'relative',
-          background: '#1a1a2e',
-          borderRadius: 20,
-          padding: '32px 28px',
-          border: '1px solid #2a2a40',
-          boxShadow: '0 8px 32px rgba(117, 54, 213, 0.15)',
-          maxWidth: 440,
-          width: '90%',
-          transform: visible ? 'scale(1)' : 'scale(0.95)',
-          transition: 'transform 0.3s ease, opacity 0.3s ease',
-        }}
-      >
-        {/* 图标 */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            marginBottom: 20,
-          }}
-        >
-          <div
-            style={{
-              width: 48,
-              height: 48,
-              borderRadius: '50%',
-              background: 'linear-gradient(135deg, rgba(117, 54, 213, 0.2), rgba(90, 45, 184, 0.2))',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 24,
-            }}
-          >
-            🎵
-          </div>
+    <div role="dialog" aria-modal="true" aria-labelledby="sensitivity-confirm-title" style={rootStyle(visible)}>
+      <button type="button" aria-label="关闭弹窗" onClick={onCancel} style={backdropStyle} />
+      <div style={dialogStyle(visible)}>
+        <div style={iconWrapStyle}>
+          <SparkIcon />
         </div>
 
-        {/* 提示信息 */}
-        <p
-          id="sensitivity-confirm-title"
-          style={{
-            fontSize: 15,
-            lineHeight: 1.7,
-            color: '#e8e8f0',
-            textAlign: 'center',
-            margin: '0 0 28px 0',
-            fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-          }}
-        >
-          非常抱歉，因版权保护，我们暂时无法直接模仿和引用TA的作品，但我们能为你生成
-          <span
-            style={{
-              color: '#7536d5',
-              fontWeight: 600,
-            }}
-          >
-            【{styleTagsText}】
-          </span>
-          的歌曲，是否继续生成歌曲？
-        </p>
+        <div style={copyStyle}>
+          <h2 id="sensitivity-confirm-title" style={titleStyle}>使用风格改写继续生成？</h2>
+          <p style={messageStyle}>
+            为了避免直接模仿或引用具体作品，系统会把输入改写为
+            <span style={highlightStyle}> {tags} </span>
+            等风格标签，再继续生成歌曲。
+          </p>
+        </div>
 
-        {/* 按钮区域 */}
-        <div
-          style={{
-            display: 'flex',
-            gap: 12,
-            justifyContent: 'center',
-          }}
-        >
-          {/* 否 - 次要按钮 */}
-          <button
-            type="button"
-            onClick={onCancel}
-            style={{
-              flex: 1,
-              padding: '12px 24px',
-              borderRadius: 12,
-              border: '1px solid #2a2a40',
-              background: 'transparent',
-              color: '#9ca3af',
-              fontSize: 15,
-              fontWeight: 500,
-              cursor: 'pointer',
-              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-              transition: 'all 0.2s ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = '#7536d5';
-              e.currentTarget.style.color = '#e8e8f0';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = '#2a2a40';
-              e.currentTarget.style.color = '#9ca3af';
-            }}
-          >
-            否
+        <div style={buttonRowStyle}>
+          <button type="button" onClick={onCancel} style={secondaryButtonStyle}>
+            返回编辑
           </button>
-
-          {/* 是 - 主要按钮 */}
-          <button
-            type="button"
-            onClick={onConfirm}
-            style={{
-              flex: 1,
-              padding: '12px 24px',
-              borderRadius: 12,
-              border: 'none',
-              background: 'linear-gradient(135deg, #7536d5, #5a2db8)',
-              color: '#ffffff',
-              fontSize: 15,
-              fontWeight: 600,
-              cursor: 'pointer',
-              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-              transition: 'all 0.2s ease',
-              boxShadow: '0 4px 12px rgba(117, 54, 213, 0.3)',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = '0 6px 20px rgba(117, 54, 213, 0.5)';
-              e.currentTarget.style.transform = 'translateY(-1px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(117, 54, 213, 0.3)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
-            是
+          <button type="button" onClick={onConfirm} style={primaryButtonStyle}>
+            继续生成
           </button>
         </div>
       </div>
     </div>
   );
 }
+
+function SparkIcon() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 3 13.7 8.2 19 10l-5.3 1.8L12 17l-1.7-5.2L5 10l5.3-1.8L12 3Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="m18 15 .7 2.2L21 18l-2.3.8L18 21l-.7-2.2L15 18l2.3-.8L18 15Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function rootStyle(visible: boolean): CSSProperties {
+  return {
+    position: 'fixed',
+    inset: 0,
+    zIndex: 9999,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+    opacity: visible ? 1 : 0,
+    transition: 'opacity 0.22s ease',
+  };
+}
+
+const backdropStyle: CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  border: 'none',
+  background: 'rgba(3, 5, 7, 0.76)',
+  backdropFilter: 'blur(10px)',
+  cursor: 'pointer',
+};
+
+function dialogStyle(visible: boolean): CSSProperties {
+  return {
+    position: 'relative',
+    width: 'min(92vw, 470px)',
+    borderRadius: 20,
+    border: '1px solid rgba(208,255,90,0.24)',
+    background: 'linear-gradient(180deg, rgba(31,35,36,0.98), rgba(12,15,17,0.98))',
+    boxShadow: '0 30px 90px rgba(0,0,0,0.5)',
+    padding: 26,
+    transform: visible ? 'translateY(0) scale(1)' : 'translateY(8px) scale(0.98)',
+    transition: 'transform 0.22s ease',
+  };
+}
+
+const iconWrapStyle: CSSProperties = {
+  display: 'grid',
+  placeItems: 'center',
+  width: 56,
+  height: 56,
+  borderRadius: 18,
+  color: 'var(--hc-lime)',
+  background: 'rgba(208,255,90,0.1)',
+  border: '1px solid rgba(208,255,90,0.24)',
+  margin: '0 auto 18px',
+};
+
+const copyStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 8,
+  textAlign: 'center',
+};
+
+const titleStyle: CSSProperties = {
+  color: 'var(--hc-text)',
+  fontSize: 20,
+  lineHeight: 1.25,
+  fontWeight: 900,
+  margin: 0,
+};
+
+const messageStyle: CSSProperties = {
+  color: 'var(--hc-muted)',
+  fontSize: 14,
+  lineHeight: 1.75,
+  margin: 0,
+};
+
+const highlightStyle: CSSProperties = {
+  color: 'var(--hc-lime)',
+  fontWeight: 900,
+};
+
+const buttonRowStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  gap: 12,
+  marginTop: 24,
+};
+
+const secondaryButtonStyle: CSSProperties = {
+  minHeight: 46,
+  borderRadius: 12,
+  border: '1px solid var(--hc-line)',
+  background: 'rgba(255,255,255,0.04)',
+  color: 'var(--hc-text)',
+  fontSize: 14,
+  fontWeight: 850,
+  cursor: 'pointer',
+};
+
+const primaryButtonStyle: CSSProperties = {
+  minHeight: 46,
+  borderRadius: 12,
+  border: '1px solid rgba(208,255,90,0.9)',
+  background: 'var(--hc-lime)',
+  color: '#0e1212',
+  fontSize: 14,
+  fontWeight: 900,
+  cursor: 'pointer',
+};

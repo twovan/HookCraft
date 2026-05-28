@@ -24,7 +24,6 @@ export default function VersionPanel({
   const [playingTaskId, setPlayingTaskId] = useState<string | null>(null);
 
   const handlePlay = (taskId: string) => {
-    // Play mutex: stop any currently playing version
     setPlayingTaskId(taskId);
   };
 
@@ -32,62 +31,14 @@ export default function VersionPanel({
     setPlayingTaskId(null);
   };
 
-  const containerStyle: React.CSSProperties = {
-    background: '#1a1a2e',
-    borderRadius: 20,
-    padding: 24,
-    border: '1px solid #2a2a40',
-    boxShadow: '0 4px 20px rgba(117, 54, 213, 0.06)',
-  };
-
-  const headerStyle: React.CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  };
-
-  const titleStyle: React.CSSProperties = {
-    fontSize: 18,
-    fontWeight: 600,
-    color: '#e8e8f0',
-    fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-  };
-
-  const gridStyle: React.CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(3, 1fr)',
-    gap: 16,
-    marginBottom: 20,
-  };
-
-  const confirmButtonStyle: React.CSSProperties = {
-    width: '100%',
-    padding: '14px 24px',
-    borderRadius: 24,
-    border: 'none',
-    background: selectedVersionId
-      ? 'linear-gradient(135deg, #7536d5, #5a2db8)'
-      : '#E2E8F0',
-    color: selectedVersionId ? 'white' : '#A0AEC0',
-    fontSize: 15,
-    fontWeight: 700,
-    cursor: selectedVersionId && !isLoading ? 'pointer' : 'not-allowed',
-    fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-    boxShadow: selectedVersionId
-      ? '0 4px 16px rgba(117, 54, 213, 0.3)'
-      : 'none',
-    transition: 'all 0.2s ease',
-    opacity: isLoading ? 0.7 : 1,
-  };
-
   return (
-    <div style={containerStyle}>
+    <section style={containerStyle}>
       <div style={headerStyle}>
-        <h3 style={titleStyle}>选择版本</h3>
-        <span style={{ fontSize: 12, color: '#999' }}>
-          批次 ID: {batchId.slice(0, 8)}...
-        </span>
+        <div>
+          <span style={eyebrowStyle}>Generated Takes</span>
+          <h3 style={titleStyle}>选择版本</h3>
+        </div>
+        <span style={batchStyle}>批次 ID: {batchId.slice(0, 8)}...</span>
       </div>
 
       <div style={gridStyle}>
@@ -107,10 +58,74 @@ export default function VersionPanel({
       <button
         onClick={onConfirm}
         disabled={!selectedVersionId || isLoading}
-        style={confirmButtonStyle}
+        style={{
+          ...confirmButtonStyle,
+          background: selectedVersionId
+            ? 'linear-gradient(135deg, var(--hc-lime), var(--hc-cyan))'
+            : 'rgba(255,255,255,.07)',
+          color: selectedVersionId ? '#08090c' : 'var(--hc-muted)',
+          cursor: selectedVersionId && !isLoading ? 'pointer' : 'not-allowed',
+          opacity: isLoading ? 0.7 : 1,
+        }}
       >
         {isLoading ? '确认中...' : '确认选择'}
       </button>
-    </div>
+    </section>
   );
 }
+
+const containerStyle: React.CSSProperties = {
+  border: '1px solid var(--hc-line)',
+  borderRadius: 'var(--hc-radius-lg)',
+  padding: 24,
+  background: 'rgba(24,26,34,.88)',
+  boxShadow: 'var(--hc-shadow)',
+};
+
+const headerStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'flex-start',
+  justifyContent: 'space-between',
+  gap: 16,
+  marginBottom: 20,
+};
+
+const eyebrowStyle: React.CSSProperties = {
+  display: 'block',
+  color: 'var(--hc-lime)',
+  fontSize: 11,
+  fontWeight: 950,
+  letterSpacing: '.1em',
+  textTransform: 'uppercase',
+  marginBottom: 6,
+};
+
+const titleStyle: React.CSSProperties = {
+  margin: 0,
+  color: 'var(--hc-text)',
+  fontSize: 20,
+  fontWeight: 950,
+};
+
+const batchStyle: React.CSSProperties = {
+  color: 'var(--hc-muted)',
+  fontSize: 12,
+  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+};
+
+const gridStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+  gap: 16,
+  marginBottom: 18,
+};
+
+const confirmButtonStyle: React.CSSProperties = {
+  width: '100%',
+  padding: '14px 24px',
+  borderRadius: 999,
+  border: 'none',
+  fontSize: 15,
+  fontWeight: 950,
+  transition: 'all .2s ease',
+};

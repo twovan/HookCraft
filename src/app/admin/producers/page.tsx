@@ -11,6 +11,8 @@ interface Producer {
   id: string;
   name: string;
   email: string;
+  avatarUrl?: string;
+  bio?: string;
   expertiseTags: string[];
   revenueShare: number;
   status: string;
@@ -58,6 +60,12 @@ export default function AdminProducersPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [addForm, setAddForm] = useState({ name: '', email: '', expertiseTags: '', revenueShare: '70', personalNote: '' });
   const [adding, setAdding] = useState(false);
+
+  // Edit producer modal
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingProducer, setEditingProducer] = useState<Producer | null>(null);
+  const [editForm, setEditForm] = useState({ name: '', bio: '', avatarUrl: '', expertiseTags: '', revenueShare: '70' });
+  const [updating, setUpdating] = useState(false);
 
   // Confirm dialog
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -158,6 +166,48 @@ export default function AdminProducersPage() {
     }
   }
 
+  function openEditProducer(producer: Producer) {
+    setEditingProducer(producer);
+    setEditForm({
+      name: producer.name || '',
+      bio: producer.bio || '',
+      avatarUrl: producer.avatarUrl || '',
+      expertiseTags: (producer.expertiseTags || []).join(', '),
+      revenueShare: String(Math.round((producer.revenueShare || 0.7) * 100)),
+    });
+    setEditOpen(true);
+  }
+
+  async function handleUpdateProducer() {
+    if (!editingProducer) return;
+    if (!editForm.name.trim()) {
+      alert('请填写制作人姓名');
+      return;
+    }
+    setUpdating(true);
+    try {
+      const res = await fetch(`/api/admin/producers/${editingProducer.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          displayName: editForm.name.trim(),
+          bio: editForm.bio,
+          avatarUrl: editForm.avatarUrl,
+          styleTags: editForm.expertiseTags.split(',').map((tag) => tag.trim()).filter(Boolean),
+          revenueShare: parseFloat(editForm.revenueShare) / 100,
+        }),
+      });
+      if (!res.ok) throw new Error('更新失败');
+      setEditOpen(false);
+      setEditingProducer(null);
+      await fetchData();
+    } catch {
+      alert('更新失败，请重试');
+    } finally {
+      setUpdating(false);
+    }
+  }
+
   async function handleConfirm() {
     if (!confirmTarget) return;
     setConfirming(true);
@@ -211,6 +261,15 @@ export default function AdminProducersPage() {
       key: 'status',
       title: '状态',
       render: () => <Tag label="活跃" color="green" />,
+    },
+    {
+      key: 'actions',
+      title: '操作',
+      render: (row) => (
+        <button onClick={() => openEditProducer(row)} style={actionBtnStyle}>
+          编辑
+        </button>
+      ),
     },
   ];
 
@@ -478,6 +537,66 @@ export default function AdminProducersPage() {
               value={addForm.personalNote}
               onChange={(e) => setAddForm((f) => ({ ...f, personalNote: e.target.value }))}
               placeholder="可选备注..."
+            />
+          </div>
+        </div>
+      </FormModal>
+
+      {/* Edit Producer Modal */}
+      <FormModal
+        open={editOpen}
+        title="编辑制作人"
+        onClose={() => { setEditOpen(false); setEditingProducer(null); }}
+        onSubmit={handleUpdateProducer}
+        submitLabel="保存"
+        loading={updating}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div>
+            <label style={labelStyle}>姓名 *</label>
+            <input
+              style={inputStyle}
+              value={editForm.name}
+              onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+              placeholder="制作人姓名"
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>头像 URL</label>
+            <input
+              style={inputStyle}
+              value={editForm.avatarUrl}
+              onChange={(e) => setEditForm((f) => ({ ...f, avatarUrl: e.target.value }))}
+              placeholder="https://..."
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>专长标签（逗号分隔）</label>
+            <input
+              style={inputStyle}
+              value={editForm.expertiseTags}
+              onChange={(e) => setEditForm((f) => ({ ...f, expertiseTags: e.target.value }))}
+              placeholder="电子, 流行, 嘻哈"
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>分成比例 (%)</label>
+            <input
+              style={inputStyle}
+              type="number"
+              min={0}
+              max={100}
+              value={editForm.revenueShare}
+              onChange={(e) => setEditForm((f) => ({ ...f, revenueShare: e.target.value }))}
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>简介</label>
+            <textarea
+              style={{ ...inputStyle, minHeight: 88, resize: 'vertical' }}
+              value={editForm.bio}
+              onChange={(e) => setEditForm((f) => ({ ...f, bio: e.target.value }))}
+              placeholder="制作人介绍、风格说明等"
             />
           </div>
         </div>

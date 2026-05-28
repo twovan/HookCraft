@@ -12,15 +12,15 @@ export default function ProducerCard({ producer }: ProducerCardProps) {
   const [hovered, setHovered] = useState(false);
 
   const cardStyle: React.CSSProperties = {
-    background: '#1a1a2e',
-    borderRadius: 20,
-    padding: 24,
-    border: '1px solid #2a2a40',
+    background: 'var(--hc-panel)',
+    borderRadius: 14,
+    padding: 20,
+    border: hovered ? '1px solid var(--hc-border-strong)' : '1px solid var(--hc-border)',
     boxShadow: hovered
-      ? '0 12px 40px rgba(117, 54, 213,0.2)'
-      : '0 4px 20px rgba(0,0,0,0.04)',
-    transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
-    transform: hovered ? 'translateY(-4px)' : 'none',
+      ? '0 18px 44px rgba(0,0,0,0.22)'
+      : 'none',
+    transition: 'transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease',
+    transform: hovered ? 'translateY(-3px)' : 'none',
     cursor: 'pointer',
     textDecoration: 'none',
     color: 'inherit',
@@ -33,22 +33,22 @@ export default function ProducerCard({ producer }: ProducerCardProps) {
     borderRadius: '50%',
     background: producer.avatarUrl
       ? `url(${producer.avatarUrl}) center/cover`
-      : 'linear-gradient(135deg, #7536d5, #5a2db8)',
+      : 'linear-gradient(135deg, #ceff35, #52d6c6)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     fontSize: 22,
-    color: 'white',
+    color: '#08090c',
     marginBottom: 12,
     flexShrink: 0,
   };
 
   const nameStyle: React.CSSProperties = {
     fontSize: 16,
-    fontWeight: 700,
-    color: '#e8e8f0',
+    fontWeight: 850,
+    color: 'var(--hc-text)',
     marginBottom: 8,
-    fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+    fontFamily: 'var(--hc-font)',
   };
 
   const tagsContainerStyle: React.CSSProperties = {
@@ -60,8 +60,8 @@ export default function ProducerCard({ producer }: ProducerCardProps) {
 
   const tagStyle: React.CSSProperties = {
     padding: '3px 10px',
-    background: 'rgba(117, 54, 213, 0.15)',
-    color: '#7536d5',
+    background: 'rgba(255,255,255,0.06)',
+    color: 'var(--hc-text-muted)',
     fontSize: 11,
     fontWeight: 600,
     borderRadius: 10,
@@ -69,8 +69,8 @@ export default function ProducerCard({ producer }: ProducerCardProps) {
 
   const metaStyle: React.CSSProperties = {
     fontSize: 12,
-    color: '#999',
-    fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+    color: 'var(--hc-text-weak)',
+    fontFamily: 'var(--hc-font)',
   };
 
   return (

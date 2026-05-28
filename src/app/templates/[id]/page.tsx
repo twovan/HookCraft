@@ -32,21 +32,28 @@ interface RelatedTemplate {
   price?: number;
 }
 
-// 根据模板名称生成一个稳定的渐变色
+const TEMPLATE_GRADIENTS = [
+  'linear-gradient(135deg, #ceff35 0%, #52d6c6 48%, #15181f 100%)',
+  'linear-gradient(135deg, #ff5a3d 0%, #f5c542 44%, #15181f 100%)',
+  'linear-gradient(135deg, #52d6c6 0%, #8b5cf6 48%, #15181f 100%)',
+  'linear-gradient(135deg, #f5c542 0%, #ceff35 42%, #15181f 100%)',
+  'linear-gradient(135deg, #ff5a3d 0%, #52d6c6 50%, #15181f 100%)',
+];
+
 function getGradient(name: string): string {
-  const gradients = [
-    'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-    'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-    'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
-    'linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)',
-    'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
-    'linear-gradient(135deg, #0f0c29 0%, #302b63 100%)',
-    'linear-gradient(135deg, #2d1b69 0%, #11998e 100%)',
-  ];
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  return gradients[Math.abs(hash) % gradients.length];
+  return TEMPLATE_GRADIENTS[Math.abs(hash) % TEMPLATE_GRADIENTS.length];
+}
+
+async function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit, timeout = 10000) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeout);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timer);
+  }
 }
 
 export default function TemplateDetailPage() {
@@ -61,54 +68,47 @@ export default function TemplateDetailPage() {
   const [related, setRelated] = useState<RelatedTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [hoveredRelated, setHoveredRelated] = useState<string | null>(null);
   const [isPurchased, setIsPurchased] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
   const [purchaseMessage, setPurchaseMessage] = useState<string | null>(null);
   const [cartMessage, setCartMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function fetchTemplate() {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await fetch(`/api/templates/${id}`);
-        if (!res.ok) {
-          if (res.status === 404) {
-            setError('模板不存在');
-          } else {
-            setError('加载失败，请重试');
-          }
-          return;
-        }
-        const data = await res.json();
-        setTemplate(data.template);
-        setRelated(data.related || []);
-      } catch {
-        setError('网络错误，请重试');
-      } finally {
-        setLoading(false);
+  const loadTemplate = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetchWithTimeout(`/api/templates/${id}`);
+      if (!res.ok) {
+        setError(res.status === 404 ? '模板不存在' : '加载失败，请重试');
+        return;
       }
+      const data = await res.json();
+      setTemplate(data.template);
+      setRelated(data.related || []);
+    } catch {
+      setError('网络错误，请重试');
+    } finally {
+      setLoading(false);
     }
-    if (id) fetchTemplate();
+  };
+
+  useEffect(() => {
+    if (id) loadTemplate();
   }, [id]);
 
-  // Check if user has purchased this template
   useEffect(() => {
     async function checkPurchased() {
       if (!user || !id) return;
       try {
-        const res = await fetch('/api/templates/purchased');
+        const res = await fetchWithTimeout('/api/templates/purchased');
         if (res.ok) {
           const data = await res.json();
-          const purchased = (data.templates || []).some(
-            (t: { id: string }) => t.id === id
-          );
+          const purchased = (data.templates || []).some((t: { id: string }) => t.id === id);
           setIsPurchased(purchased);
         }
       } catch {
-        // Silently fail
+        // Purchase state is a convenience check; the primary actions still guard on the server.
       }
     }
     checkPurchased();
@@ -122,21 +122,19 @@ export default function TemplateDetailPage() {
     setPurchasing(true);
     setPurchaseMessage(null);
     try {
-      const res = await fetch(`/api/templates/${id}/purchase`, { method: 'POST' });
+      const res = await fetchWithTimeout(`/api/templates/${id}/purchase`, { method: 'POST' });
       const data = await res.json();
       if (res.ok) {
         setIsPurchased(true);
-        setPurchaseMessage('购买成功！');
-        setTimeout(() => setPurchaseMessage(null), 3000);
+        setPurchaseMessage('购买成功，已解锁模板');
       } else {
         setPurchaseMessage(data.error || '购买失败');
-        setTimeout(() => setPurchaseMessage(null), 3000);
       }
     } catch {
       setPurchaseMessage('网络错误，请重试');
-      setTimeout(() => setPurchaseMessage(null), 3000);
     } finally {
       setPurchasing(false);
+      window.setTimeout(() => setPurchaseMessage(null), 3000);
     }
   };
 
@@ -151,309 +149,596 @@ export default function TemplateDetailPage() {
       added_at: new Date().toISOString(),
     });
     setCartMessage(result.message || null);
-    setTimeout(() => setCartMessage(null), 3000);
+    window.setTimeout(() => setCartMessage(null), 3000);
   };
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', background: '#0d0d14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ color: '#999', fontSize: 14 }}>加载中...</span>
-      </div>
+      <main className="template-detail-page">
+        <div className="state-card">
+          <div className="state-kicker">正在加载模板</div>
+          <p>正在加载模板详情...</p>
+          <div className="state-bar" />
+        </div>
+        <TemplateDetailStyles />
+      </main>
     );
   }
 
-  const retryFetch = () => {
-    setLoading(true);
-    setError(null);
-    fetch(`/api/templates/${id}`)
-      .then((res) => {
-        if (!res.ok) {
-          if (res.status === 404) setError('模板不存在');
-          else setError('加载失败，请重试');
-          return null;
-        }
-        return res.json();
-      })
-      .then((data) => {
-        if (data) {
-          setTemplate(data.template);
-          setRelated(data.related || []);
-        }
-      })
-      .catch(() => setError('网络错误，请重试'))
-      .finally(() => setLoading(false));
-  };
-
   if (error || !template) {
     return (
-      <div style={{ minHeight: '100vh', background: '#0d0d14', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
-        <span style={{ fontSize: 48 }}>🎵</span>
-        <span style={{ color: '#999', fontSize: 16 }}>{error || '模板不存在'}</span>
-        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-          <button
-            onClick={retryFetch}
-            style={{
-              padding: '10px 24px', borderRadius: 24, border: 'none',
-              background: 'linear-gradient(135deg, #7536d5, #5a2db8)', color: 'white',
-              fontSize: 14, fontWeight: 600, cursor: 'pointer',
-              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-            }}
-          >
-            重试
-          </button>
-          <Link href="/templates" style={{ color: '#7536d5', textDecoration: 'none', fontWeight: 600 }}>← 返回模板列表</Link>
+      <main className="template-detail-page">
+        <div className="state-card">
+          <div className="state-kicker">模板暂不可用</div>
+          <h1>{error || '模板不存在'}</h1>
+          <p>请稍后重试，或返回模板市场继续浏览。</p>
+          <div className="state-actions">
+            <button className="hc-button hc-button-primary" onClick={loadTemplate}>
+              重试
+            </button>
+            <Link className="hc-button hc-button-ghost" href="/templates">
+              返回模板市场
+            </Link>
+          </div>
         </div>
-      </div>
+        <TemplateDetailStyles />
+      </main>
     );
   }
 
   const gradient = getGradient(template.name);
-  const tags = [template.category === 'free_template' ? '免费' : '付费', template.genre].filter(Boolean);
   const price = template.price ? Math.round(template.price / 100) : 0;
   const isPaidTemplate = template.category === 'paid_template' && price > 0;
   const inCart = hasItem(template.id);
+  const tags = [template.category === 'free_template' ? '免费模板' : '付费模板', template.genre].filter(Boolean);
+  const successMessage = purchaseMessage?.includes('成功') || cartMessage?.includes('加入') || cartMessage?.includes('已在');
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0d0d14' }}>
-      <div style={{
-        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-        background: 'radial-gradient(circle at 20% 50%, rgba(117, 54, 213,0.03) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(117, 54, 213,0.03) 0%, transparent 50%)',
-        pointerEvents: 'none', zIndex: 0,
-      }} />
-
-      <main style={{ maxWidth: 1400, margin: '0 auto', padding: 48, position: 'relative', zIndex: 1 }}>
-        {/* Breadcrumb */}
-        <nav style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 24, fontSize: 13 }}>
-          <Link href="/" style={{ color: '#999', textDecoration: 'none' }}>首页</Link>
-          <span style={{ color: '#ccc' }}>›</span>
-          <Link href="/templates" style={{ color: '#999', textDecoration: 'none' }}>模板列表</Link>
-          <span style={{ color: '#ccc' }}>›</span>
-          <span style={{ color: '#e8e8f0', fontWeight: 500 }}>{template.name}</span>
+    <main className="template-detail-page">
+      <div className="detail-container">
+        <nav className="breadcrumb" aria-label="当前位置">
+          <Link href="/">首页</Link>
+          <span>/</span>
+          <Link href="/templates">模板市场</Link>
+          <span>/</span>
+          <strong>{template.name}</strong>
         </nav>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 48 }}>
-          {/* Left - Cover + Player */}
-          <div style={{ position: 'sticky', top: 140, height: 'fit-content' }}>
-            <div style={{
-              width: '100%', aspectRatio: '1', borderRadius: 24, overflow: 'hidden',
-              marginBottom: 24, boxShadow: '0 8px 32px rgba(0,0,0,0.12)', position: 'relative',
-            }}>
+        <section className="hero-grid">
+          <aside className="cover-panel">
+            <div className="cover-frame">
               {template.coverUrl ? (
-                <Image src={template.coverUrl} alt={template.name} fill style={{ objectFit: 'cover' }} sizes="50vw" />
+                <Image src={template.coverUrl} alt={template.name} fill style={{ objectFit: 'cover' }} sizes="(max-width: 900px) 100vw, 45vw" />
               ) : (
-                <div style={{ width: '100%', height: '100%', background: gradient }} />
+                <div className="gradient-cover" style={{ background: gradient }} />
               )}
+              <div className="cover-overlay">
+                <span>{template.genre || '模板风格'}</span>
+                <strong>{price > 0 ? `¥${price}` : '免费'}</strong>
+              </div>
             </div>
-
-          </div>
-
-          {/* Right - Details */}
-          <div>
-            <h1 style={{ fontSize: 36, fontWeight: 700, marginBottom: 16, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", color: '#e8e8f0' }}>
-              {template.name}
-            </h1>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
-              {tags.map((tag) => (
-                <span key={tag} style={{ padding: '5px 14px', background: 'rgba(117, 54, 213, 0.15)', color: '#7536d5', fontSize: 11, fontWeight: 600, borderRadius: 12 }}>{tag}</span>
+            <div className="signal-strip" aria-hidden="true">
+              {Array.from({ length: 32 }).map((_, i) => (
+                <span key={i} style={{ height: `${28 + ((i * 17) % 54)}%` }} />
               ))}
             </div>
+          </aside>
 
-            {/* Description */}
-            <div style={{ background: '#1a1a2e', padding: 24, borderRadius: 16, marginBottom: 24 }}>
-              <h3 style={{ marginBottom: 12, fontSize: 16, fontWeight: 600, color: '#e8e8f0' }}>描述</h3>
-              <p style={{ color: '#9ca3af', lineHeight: 1.8, margin: 0 }}>{template.description}</p>
+          <section className="detail-stack">
+            <div className="label-row">
+              {tags.map((tag) => (
+                <span key={tag}>{tag}</span>
+              ))}
             </div>
+            <h1>{template.name}</h1>
+            <p className="lead">{template.description}</p>
 
-            {/* Analysis Result - hidden from public view */}
-
-            {/* Template Info */}
-            <div style={{
-              background: '#1a1a2e', padding: 28, borderRadius: 20, marginBottom: 24,
-              boxShadow: '0 4px 20px rgba(0,0,0,0.04)', border: '1px solid rgba(117, 54, 213,0.1)',
-            }}>
-              <h3 style={{ marginBottom: 16, fontSize: 16, fontWeight: 600, color: '#e8e8f0' }}>模板信息</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div style={{ padding: 12, background: '#0d0d14', borderRadius: 8 }}>
-                  <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>风格</div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: '#e8e8f0' }}>{template.genre}</div>
-                </div>
-                <div style={{ padding: 12, background: '#0d0d14', borderRadius: 8 }}>
-                  <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>分类</div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: '#e8e8f0' }}>{template.category === 'free_template' ? '免费模板' : '付费模板'}</div>
-                </div>
-                <div style={{ padding: 12, background: '#0d0d14', borderRadius: 8 }}>
-                  <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>销量</div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: '#e8e8f0' }}>{template.salesCount || 0}</div>
-                </div>
+            <div className="action-panel">
+              <div>
+                <div className="price">{price > 0 ? `¥${price}` : '免费'}</div>
+                <p>{isPaidTemplate && !isPurchased ? '购买后可在工作台直接套用模板生成。' : '已可直接进入工作台创作。'}</p>
               </div>
-            </div>
-
-            {/* Producer Info */}
-            {template.producerId && template.producerName && (
-              <div style={{
-                background: '#1a1a2e', padding: 20, borderRadius: 20, marginBottom: 24,
-                boxShadow: '0 4px 20px rgba(0,0,0,0.04)', border: '1px solid rgba(117, 54, 213,0.1)',
-              }}>
-                <h3 style={{ marginBottom: 12, fontSize: 16, fontWeight: 600, color: '#e8e8f0' }}>制作人</h3>
-                <Link
-                  href={`/producers/${template.producerId}`}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 12,
-                    textDecoration: 'none',
-                    color: 'inherit',
-                    padding: 8,
-                    borderRadius: 12,
-                    transition: 'background 0.2s',
-                  }}
-                >
-                  <div style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: '50%',
-                    background: template.producerAvatarUrl
-                      ? `url(${template.producerAvatarUrl}) center/cover`
-                      : 'linear-gradient(135deg, #7536d5, #5a2db8)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 16,
-                    color: 'white',
-                    flexShrink: 0,
-                  }}>
-                    {!template.producerAvatarUrl && template.producerName.charAt(0)}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: '#e8e8f0' }}>
-                      {template.producerName}
-                    </div>
-                    <div style={{ fontSize: 12, color: '#7536d5' }}>查看主页 →</div>
-                  </div>
-                </Link>
-              </div>
-            )}
-
-            {/* Price + Actions */}
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              background: '#1a1a2e', padding: 24, borderRadius: 16, flexWrap: 'wrap', gap: 12,
-            }}>
-              <div style={{ fontSize: 36, fontWeight: 700, color: '#7536d5' }}>
-                {price > 0 ? `￥${price}` : '免费'}
-              </div>
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div className="action-buttons">
                 {isPaidTemplate && !isPurchased ? (
                   <>
-                    <button
-                      onClick={handlePurchase}
-                      disabled={purchasing}
-                      style={{
-                        padding: '12px 28px', borderRadius: 24, border: 'none',
-                        background: 'linear-gradient(135deg, #7536d5, #5a2db8)', color: 'white',
-                        fontSize: 14, fontWeight: 600, cursor: purchasing ? 'not-allowed' : 'pointer',
-                        fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-                        opacity: purchasing ? 0.7 : 1,
-                      }}
-                    >
+                    <button className="hc-button hc-button-primary" onClick={handlePurchase} disabled={purchasing}>
                       {purchasing ? '购买中...' : '购买模板'}
                     </button>
-                    <button
-                      onClick={handleAddToCart}
-                      disabled={inCart}
-                      style={{
-                        padding: '12px 28px', borderRadius: 24,
-                        border: '1px solid #7536d5',
-                        background: 'transparent', color: '#7536d5',
-                        fontSize: 14, fontWeight: 600,
-                        cursor: inCart ? 'not-allowed' : 'pointer',
-                        fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-                        opacity: inCart ? 0.6 : 1,
-                      }}
-                    >
+                    <button className="hc-button hc-button-ghost" onClick={handleAddToCart} disabled={inCart}>
                       {inCart ? '已在购物车' : '加入购物车'}
                     </button>
                   </>
                 ) : (
-                  <Link href={`/studio?templateId=${template.id}`} style={{
-                    padding: '12px 28px', borderRadius: 24, border: 'none',
-                    background: 'linear-gradient(135deg, #7536d5, #5a2db8)', color: 'white',
-                    fontSize: 14, fontWeight: 600, textDecoration: 'none',
-                    display: 'flex', alignItems: 'center',
-                  }}>
+                  <Link className="hc-button hc-button-primary" href={`/studio?templateId=${template.id}`}>
                     使用此模板创作
                   </Link>
                 )}
               </div>
             </div>
 
-            {/* Purchase/Cart message */}
             {(purchaseMessage || cartMessage) && (
-              <div style={{
-                marginTop: 12, padding: '10px 16px', borderRadius: 12,
-                background: (purchaseMessage === '购买成功！' || cartMessage?.includes('已加入'))
-                  ? '#f0fdf4' : '#fef2f2',
-                color: (purchaseMessage === '购买成功！' || cartMessage?.includes('已加入'))
-                  ? '#16a34a' : '#dc2626',
-                fontSize: 14, fontWeight: 500,
-              }}>
+              <div className={successMessage ? 'message success' : 'message error'}>
                 {purchaseMessage || cartMessage}
               </div>
             )}
-          </div>
-        </div>
 
-        {/* Related Templates */}
-        {related.length > 0 && (
-          <section style={{ marginTop: 64 }}>
-            <h2 style={{
-              fontSize: 24, fontWeight: 700, marginBottom: 32, color: '#e8e8f0',
-              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", position: 'relative', display: 'inline-block',
-            }}>
-              更多模板
-              <span style={{ position: 'absolute', bottom: -12, left: 0, width: 60, height: 3, background: 'linear-gradient(90deg, #7536d5, transparent)', borderRadius: 2 }} />
-            </h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 24 }}>
-              {related.map((r) => (
-                <Link
-                  key={r.id}
-                  href={`/templates/${r.id}`}
-                  style={{
-                    background: '#1a1a2e', borderRadius: 20, overflow: 'hidden',
-                    boxShadow: hoveredRelated === r.id ? '0 12px 40px rgba(117, 54, 213,0.25)' : '0 4px 20px rgba(0,0,0,0.06)',
-                    transition: 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                    cursor: 'pointer', textDecoration: 'none', color: 'inherit',
-                    transform: hoveredRelated === r.id ? 'translateY(-8px) scale(1.02)' : 'none',
-                    display: 'block',
-                  }}
-                  onMouseEnter={() => setHoveredRelated(r.id)}
-                  onMouseLeave={() => setHoveredRelated(null)}
+            <div className="info-grid">
+              <InfoCell label="风格" value={template.genre || '未标记'} />
+              <InfoCell label="分类" value={template.category === 'free_template' ? '免费模板' : '付费模板'} />
+              <InfoCell label="销量" value={`${template.salesCount || 0}`} />
+              <InfoCell label="分析状态" value={template.analysisStatus || 'ready'} />
+            </div>
+
+            {template.producerId && template.producerName && (
+              <Link href={`/producers/${template.producerId}`} className="producer-card">
+                <div
+                  className="producer-avatar"
+                  style={template.producerAvatarUrl ? { backgroundImage: `url(${template.producerAvatarUrl})` } : undefined}
                 >
-                  <div style={{ position: 'relative', width: '100%', paddingTop: '56.25%' }}>
-                    <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: getGradient(r.name) }} />
-                  </div>
-                  <div style={{ padding: 20 }}>
-                    <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, color: '#e8e8f0' }}>{r.name}</div>
-                    <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                      <span style={{ padding: '3px 10px', background: 'rgba(117, 54, 213, 0.15)', color: '#7536d5', fontSize: 11, fontWeight: 600, borderRadius: 10 }}>{r.genre}</span>
-                    </div>
-                    <div style={{ fontSize: 20, fontWeight: 700, color: '#7536d5' }}>
-                      {r.price && r.price > 0 ? `￥${Math.round(r.price / 100)}` : '免费'}
-                    </div>
+                  {!template.producerAvatarUrl && template.producerName.charAt(0)}
+                </div>
+                <div>
+                  <span>制作人</span>
+                  <strong>{template.producerName}</strong>
+                </div>
+                <b>查看主页</b>
+              </Link>
+            )}
+          </section>
+        </section>
+
+        {related.length > 0 && (
+          <section className="related-section">
+            <div className="section-heading">
+              <span>相关模板</span>
+              <h2>更多可用模板</h2>
+            </div>
+            <div className="related-grid">
+              {related.map((item) => (
+                <Link
+                  key={item.id}
+                  href={`/templates/${item.id}`}
+                  className="related-card"
+                  onMouseEnter={() => setHoveredRelated(item.id)}
+                  onMouseLeave={() => setHoveredRelated(null)}
+                  style={{ transform: hoveredRelated === item.id ? 'translateY(-4px)' : 'none' }}
+                >
+                  <div className="related-cover" style={{ background: getGradient(item.name) }} />
+                  <div className="related-body">
+                    <span>{item.genre}</span>
+                    <strong>{item.name}</strong>
+                    <b>{item.price && item.price > 0 ? `¥${Math.round(item.price / 100)}` : '免费'}</b>
                   </div>
                 </Link>
               ))}
             </div>
           </section>
         )}
-      </main>
+      </div>
+      <TemplateDetailStyles />
+    </main>
+  );
+}
 
-      <style>{`
-        @keyframes wave {
-          0%, 100% { transform: scaleY(0.33); }
-          50% { transform: scaleY(1); }
-        }
-      `}</style>
+function InfoCell({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="info-cell">
+      <span>{label}</span>
+      <strong>{value}</strong>
     </div>
+  );
+}
+
+function TemplateDetailStyles() {
+  return (
+    <style>{`
+      .template-detail-page {
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at 8% 12%, rgba(206, 255, 53, 0.10), transparent 280px),
+          radial-gradient(circle at 92% 18%, rgba(82, 214, 198, 0.09), transparent 320px),
+          var(--hc-bg);
+        color: var(--hc-text);
+        padding: 42px 22px 72px;
+      }
+
+      .detail-container {
+        max-width: 1240px;
+        margin: 0 auto;
+      }
+
+      .breadcrumb {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 24px;
+        color: var(--hc-muted);
+        font-size: 13px;
+        overflow: hidden;
+        white-space: nowrap;
+      }
+
+      .breadcrumb a {
+        color: var(--hc-muted);
+        text-decoration: none;
+      }
+
+      .breadcrumb strong {
+        color: var(--hc-text);
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .hero-grid {
+        display: grid;
+        grid-template-columns: minmax(300px, 0.88fr) minmax(0, 1.12fr);
+        gap: 34px;
+        align-items: start;
+      }
+
+      .cover-panel {
+        position: sticky;
+        top: 98px;
+        display: grid;
+        gap: 14px;
+      }
+
+      .cover-frame {
+        position: relative;
+        aspect-ratio: 1 / 1;
+        border: 1px solid var(--hc-line);
+        border-radius: var(--hc-radius-lg);
+        overflow: hidden;
+        background: var(--hc-panel);
+        box-shadow: var(--hc-shadow);
+      }
+
+      .gradient-cover {
+        position: absolute;
+        inset: 0;
+      }
+
+      .cover-overlay {
+        position: absolute;
+        left: 18px;
+        right: 18px;
+        bottom: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        color: white;
+        text-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      }
+
+      .cover-overlay span {
+        border: 1px solid rgba(255, 255, 255, 0.32);
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 999px;
+        padding: 7px 12px;
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .cover-overlay strong {
+        color: var(--hc-lime);
+        font-size: 30px;
+      }
+
+      .signal-strip {
+        height: 70px;
+        display: grid;
+        grid-template-columns: repeat(32, 1fr);
+        align-items: end;
+        gap: 4px;
+        padding: 14px;
+        border-radius: var(--hc-radius);
+        border: 1px solid var(--hc-line);
+        background: rgba(24, 26, 34, 0.72);
+      }
+
+      .signal-strip span {
+        min-height: 8px;
+        border-radius: 999px 999px 0 0;
+        background: linear-gradient(180deg, var(--hc-lime), rgba(82, 214, 198, 0.4));
+        opacity: 0.78;
+      }
+
+      .detail-stack h1 {
+        margin: 12px 0 14px;
+        font-size: clamp(34px, 5vw, 64px);
+        line-height: 0.96;
+        letter-spacing: 0;
+      }
+
+      .lead {
+        margin: 0 0 22px;
+        color: var(--hc-muted);
+        font-size: 16px;
+        line-height: 1.9;
+      }
+
+      .label-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .label-row span,
+      .related-body span {
+        border: 1px solid rgba(206, 255, 53, 0.26);
+        background: rgba(206, 255, 53, 0.1);
+        color: var(--hc-lime);
+        border-radius: 999px;
+        padding: 6px 10px;
+        font-size: 11px;
+        font-weight: 900;
+        text-transform: uppercase;
+      }
+
+      .action-panel,
+      .info-cell,
+      .producer-card,
+      .state-card,
+      .related-card {
+        border: 1px solid var(--hc-line);
+        background: rgba(24, 26, 34, 0.86);
+        box-shadow: var(--hc-shadow);
+      }
+
+      .action-panel {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        border-radius: var(--hc-radius-lg);
+        padding: 22px;
+        margin-bottom: 14px;
+      }
+
+      .price {
+        color: var(--hc-lime);
+        font-size: 38px;
+        font-weight: 950;
+        line-height: 1;
+      }
+
+      .action-panel p {
+        margin: 8px 0 0;
+        color: var(--hc-muted);
+        font-size: 13px;
+      }
+
+      .action-buttons {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+
+      .message {
+        margin-bottom: 14px;
+        border-radius: var(--hc-radius);
+        padding: 12px 14px;
+        font-size: 13px;
+        font-weight: 800;
+      }
+
+      .message.success {
+        border: 1px solid rgba(206, 255, 53, 0.3);
+        color: var(--hc-lime);
+        background: rgba(206, 255, 53, 0.09);
+      }
+
+      .message.error {
+        border: 1px solid rgba(255, 90, 61, 0.34);
+        color: #ff8b76;
+        background: rgba(255, 90, 61, 0.1);
+      }
+
+      .info-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .info-cell {
+        border-radius: var(--hc-radius);
+        padding: 16px;
+      }
+
+      .info-cell span,
+      .producer-card span,
+      .section-heading span,
+      .state-kicker {
+        display: block;
+        color: var(--hc-muted);
+        font-size: 11px;
+        font-weight: 900;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+      }
+
+      .info-cell strong {
+        display: block;
+        margin-top: 8px;
+        color: var(--hc-text);
+        font-size: 15px;
+      }
+
+      .producer-card {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 12px;
+        border-radius: var(--hc-radius);
+        padding: 14px;
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .producer-avatar {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        flex: 0 0 auto;
+        background: linear-gradient(135deg, var(--hc-lime), var(--hc-cyan));
+        background-size: cover;
+        background-position: center;
+        color: #08090c;
+        font-weight: 950;
+      }
+
+      .producer-card div:nth-child(2) {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .producer-card strong {
+        display: block;
+        margin-top: 4px;
+        color: var(--hc-text);
+      }
+
+      .producer-card b {
+        color: var(--hc-lime);
+        font-size: 12px;
+        white-space: nowrap;
+      }
+
+      .related-section {
+        margin-top: 72px;
+      }
+
+      .section-heading {
+        margin-bottom: 20px;
+      }
+
+      .section-heading h2 {
+        margin: 6px 0 0;
+        font-size: 28px;
+      }
+
+      .related-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .related-card {
+        display: block;
+        border-radius: var(--hc-radius);
+        overflow: hidden;
+        color: inherit;
+        text-decoration: none;
+        transition: transform .2s ease, border-color .2s ease;
+      }
+
+      .related-card:hover {
+        border-color: rgba(206, 255, 53, 0.36);
+      }
+
+      .related-cover {
+        aspect-ratio: 16 / 10;
+      }
+
+      .related-body {
+        padding: 14px;
+      }
+
+      .related-body strong {
+        display: block;
+        margin: 12px 0 8px;
+        color: var(--hc-text);
+        font-size: 15px;
+      }
+
+      .related-body b {
+        color: var(--hc-lime);
+      }
+
+      .state-card {
+        width: min(520px, calc(100vw - 40px));
+        margin: 14vh auto 0;
+        border-radius: var(--hc-radius-lg);
+        padding: 30px;
+        text-align: center;
+      }
+
+      .state-card h1 {
+        margin: 10px 0;
+        font-size: 28px;
+      }
+
+      .state-card p {
+        margin: 8px 0 0;
+        color: var(--hc-muted);
+      }
+
+      .state-actions {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin-top: 18px;
+        flex-wrap: wrap;
+      }
+
+      .state-bar {
+        height: 4px;
+        margin-top: 20px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: linear-gradient(90deg, rgba(255,255,255,.08), var(--hc-lime), var(--hc-cyan), rgba(255,255,255,.08));
+        background-size: 240% 100%;
+        animation: detail-load 1.1s ease-in-out infinite alternate;
+      }
+
+      @keyframes detail-load {
+        from { background-position: 0% 50%; }
+        to { background-position: 100% 50%; }
+      }
+
+      @media (max-width: 900px) {
+        .template-detail-page {
+          padding: 26px 16px 56px;
+        }
+
+        .hero-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .cover-panel {
+          position: relative;
+          top: auto;
+        }
+
+        .action-panel {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .action-buttons,
+        .action-buttons .hc-button {
+          width: 100%;
+        }
+
+        .related-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 560px) {
+        .info-grid,
+        .related-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .detail-stack h1 {
+          font-size: 36px;
+        }
+      }
+    `}</style>
   );
 }

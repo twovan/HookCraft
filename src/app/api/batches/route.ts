@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '../../../lib/supabase/server';
-import { getAuthUser } from '../../../lib/supabase/auth-helpers';
+import { getServerSupabaseClient } from '../../../lib/supabase/server';
+import { getAuthAccessToken, getAuthUser } from '../../../lib/supabase/auth-helpers';
 import { loadStemCacheByTaskId } from '@/lib/stems/stemCacheLookup';
 
 function extractTitleFromPrompt(prompt?: string | null) {
@@ -42,6 +42,8 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    const supabase = getServerSupabaseClient(await getAuthAccessToken());
+
     // Parse query params
     const { searchParams } = new URL(req.url);
     const range = searchParams.get('range') || 'all';
@@ -51,7 +53,7 @@ export async function GET(req: NextRequest) {
 
     // Build query at song/version granularity. The page still calls this API for
     // history, but each generation_task now represents one visible song row.
-    let query = supabaseAdmin
+    let query = supabase
       .from('generation_tasks')
       .select('*', { count: 'exact' })
       .eq('user_id', user.id);
@@ -86,7 +88,7 @@ export async function GET(req: NextRequest) {
     const batchMap = new Map<string, any>();
 
     if (batchIds.length > 0) {
-      const { data: batchesData, error: batchesError } = await supabaseAdmin
+      const { data: batchesData, error: batchesError } = await supabase
         .from('generation_batches')
         .select('*, templates(name)')
         .in('id', batchIds);
@@ -100,7 +102,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const stemCacheByTaskId = await loadStemCacheByTaskId(supabaseAdmin, user.id, data ?? []);
+    const stemCacheByTaskId = await loadStemCacheByTaskId(supabase, user.id, data ?? []);
 
     // Keep the legacy "batches" response key for the existing client, but each
     // item is now one song/version instead of one generation batch.

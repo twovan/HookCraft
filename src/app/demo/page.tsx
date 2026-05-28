@@ -1,14 +1,33 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useRef, useState } from "react";
+import type { CSSProperties } from "react";
 
 const PRESETS = [
-  { label: "🎮 RPG 史诗战斗", prompt: "Epic orchestral battle theme for RPG game, dramatic strings, brass fanfare, timpani, 140 BPM, D minor. Instrumental only." },
-  { label: "🌙 Lo-Fi 放松", prompt: "Lo-fi hip hop chill beat, warm piano chords, vinyl crackle, soft drums, relaxing, 85 BPM. Instrumental only." },
-  { label: "⚡ EDM Drop", prompt: "Energetic EDM track with massive synth drop, driving bass, electronic drums, 128 BPM. Instrumental only." },
-  { label: "🎬 电影配乐", prompt: "Cinematic orchestral score, emotional strings, gentle piano, building to a powerful climax. Instrumental only." },
-  { label: "🎸 摇滚吉他", prompt: "Rock guitar riff, distorted electric guitar, powerful drums, bass groove, 120 BPM. Instrumental only." },
-  { label: "🌸 日系动漫", prompt: "Japanese anime opening theme, upbeat pop rock, bright synths, catchy melody, 160 BPM." },
+  {
+    label: "RPG 史诗战斗",
+    prompt: "Epic orchestral battle theme for RPG game, dramatic strings, brass fanfare, timpani, 140 BPM, D minor. Instrumental only.",
+  },
+  {
+    label: "Lo-Fi 放松",
+    prompt: "Lo-fi hip hop chill beat, warm piano chords, vinyl crackle, soft drums, relaxing, 85 BPM. Instrumental only.",
+  },
+  {
+    label: "EDM Drop",
+    prompt: "Energetic EDM track with massive synth drop, driving bass, electronic drums, 128 BPM. Instrumental only.",
+  },
+  {
+    label: "电影配乐",
+    prompt: "Cinematic orchestral score, emotional strings, gentle piano, building to a powerful climax. Instrumental only.",
+  },
+  {
+    label: "摇滚吉他",
+    prompt: "Rock guitar riff, distorted electric guitar, powerful drums, bass groove, 120 BPM. Instrumental only.",
+  },
+  {
+    label: "日系动画",
+    prompt: "Japanese anime opening theme, upbeat pop rock, bright synths, catchy melody, 160 BPM.",
+  },
 ];
 
 interface Track {
@@ -17,7 +36,7 @@ interface Track {
   mimeType: string;
 }
 
-export default function Home() {
+export default function DemoPage() {
   const [prompt, setPrompt] = useState("");
   const [mode, setMode] = useState<"clip" | "pro">("clip");
   const [loading, setLoading] = useState(false);
@@ -41,52 +60,48 @@ export default function Home() {
       const formData = new FormData();
       formData.append("prompt", prompt.trim());
       formData.append("mode", mode);
-      if (audioFile) {
-        formData.append("audio", audioFile);
-      }
+      if (audioFile) formData.append("audio", audioFile);
 
       const res = await fetch("/api/generate", {
         method: "POST",
         body: formData,
       });
 
-      // 处理非 JSON 响应（比如 413 Request Entity Too Large）
       const contentType = res.headers.get("content-type") || "";
       if (!contentType.includes("application/json")) {
         const text = await res.text();
-        setError(res.status === 413 ? "文件太大，请上传小于 4MB 的音频" : `服务器错误 (${res.status}): ${text.slice(0, 100)}`);
+        setError(res.status === 413 ? "文件过大，请上传小于 4MB 的音频。" : `服务端错误 (${res.status})：${text.slice(0, 100)}`);
         return;
       }
 
       const data = await res.json();
-
       if (!res.ok) {
-        setError(data.error || "生成失败");
+        setError(data.error || "生成失败，请稍后重试。");
         return;
       }
 
       setTracks(data.tracks || []);
       setLyrics(data.lyrics || "");
       setAnalysis(data.analysis || "");
-    } catch (e: any) {
-      setError(e.message || "网络错误，请重试");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "网络错误，请重试。");
     } finally {
       setLoading(false);
     }
   }
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (file) {
-      // Vercel 限制 4.5MB，留点余量
-      if (file.size > 4 * 1024 * 1024) {
-        setError("音频文件不能超过 4MB，请压缩后重试");
-        return;
-      }
-      setError("");
-      setAudioFile(file);
-      setAudioFileName(file.name);
+  function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 4 * 1024 * 1024) {
+      setError("音频文件不能超过 4MB，请压缩后重试。");
+      return;
     }
+
+    setError("");
+    setAudioFile(file);
+    setAudioFileName(file.name);
   }
 
   function clearFile() {
@@ -96,195 +111,428 @@ export default function Home() {
   }
 
   return (
-    <div style={styles.container}>
-      <div style={styles.card}>
-        <div style={styles.header}>
-          <h1 style={styles.logo}>HookCraft</h1>
-          <p style={styles.subtitle}>AI Music Generation Demo</p>
-          <p style={styles.badge}>Powered by Google Lyria 3</p>
-        </div>
-
-        {/* 参考音频上传 */}
-        <div style={styles.section}>
-          <p style={styles.sectionLabel}>📎 参考音频（可选）：</p>
-          <div style={styles.uploadArea}>
-            {audioFileName ? (
-              <div style={styles.fileInfo}>
-                <span>🎵 {audioFileName}</span>
-                <button onClick={clearFile} style={styles.clearBtn}>✕</button>
-              </div>
-            ) : (
-              <button onClick={() => fileInputRef.current?.click()} style={styles.uploadBtn}>
-                点击上传参考音乐（MP3/WAV）
-              </button>
-            )}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".mp3,.wav,audio/mpeg,audio/wav"
-              onChange={handleFileChange}
-              style={{ display: "none" }}
-            />
+    <main style={styles.page}>
+      <section style={styles.shell}>
+        <header style={styles.header}>
+          <div>
+            <span style={styles.kicker}>HookCraft Demo</span>
+            <h1 style={styles.title}>快速生成音乐片段</h1>
+            <p style={styles.subtitle}>用自然语言描述风格，或上传参考音频，让系统生成可试听的 demo 版本。</p>
           </div>
-          {audioFileName && (
-            <p style={styles.hint}>AI 将分析这段音乐的风格，基于它生成新的音乐</p>
-          )}
-        </div>
-
-        {/* 模型选择 */}
-        <div style={styles.section}>
-          <p style={styles.sectionLabel}>🎛️ 生成模式：</p>
-          <div style={styles.modeToggle}>
-            <button
-              onClick={() => setMode("clip")}
-              style={{ ...styles.modeBtn, ...(mode === "clip" ? styles.modeBtnActive : {}) }}
-            >
-              🎵 Clip（30秒）
-            </button>
-            <button
-              onClick={() => setMode("pro")}
-              style={{ ...styles.modeBtn, ...(mode === "pro" ? styles.modeBtnActive : {}) }}
-            >
-              🎶 Pro（完整歌曲）
-            </button>
+          <div style={styles.statusCard}>
+            <span>MODE</span>
+            <strong>{mode === "pro" ? "完整歌曲" : "短片段"}</strong>
           </div>
-        </div>
+        </header>
 
-        {/* 预设风格 */}
-        <div style={styles.section}>
-          <p style={styles.sectionLabel}>⚡ 快速选择风格：</p>
-          <div style={styles.presetGrid}>
-            {PRESETS.map((p) => (
-              <button
-                key={p.label}
-                onClick={() => setPrompt(p.prompt)}
-                style={{ ...styles.presetBtn, ...(prompt === p.prompt ? styles.presetBtnActive : {}) }}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-        </div>
+        <div style={styles.grid}>
+          <section style={styles.panel}>
+            <FieldTitle title="参考音频" description="可选。上传 MP3/WAV 后，系统会尝试分析参考音频风格。" />
+            <div style={styles.uploadArea}>
+              {audioFileName ? (
+                <div style={styles.fileInfo}>
+                  <span>{audioFileName}</span>
+                  <button type="button" onClick={clearFile} style={styles.clearButton}>
+                    移除
+                  </button>
+                </div>
+              ) : (
+                <button type="button" onClick={() => fileInputRef.current?.click()} style={styles.uploadButton}>
+                  选择参考音频
+                </button>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".mp3,.wav,audio/mpeg,audio/wav"
+                onChange={handleFileChange}
+                style={{ display: "none" }}
+              />
+            </div>
 
-        {/* 描述输入 */}
-        <div style={styles.section}>
-          <textarea
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder={audioFileName
-              ? "描述你想要的变化，例如：保持这个风格但改变配器，加入更多弦乐..."
-              : "描述你想要的音乐风格，例如：一首适合 RPG 游戏的史诗管弦乐，140 BPM，D 小调..."}
-            style={styles.textarea}
-            rows={3}
-          />
-          <button
-            onClick={handleGenerate}
-            disabled={loading || !prompt.trim()}
-            style={{ ...styles.generateBtn, ...(loading || !prompt.trim() ? styles.generateBtnDisabled : {}) }}
-          >
-            {loading ? "🎵 生成中..." : audioFileName ? "✨ 基于参考音乐生成" : "✨ 生成音乐"}
-          </button>
-        </div>
+            <FieldTitle title="生成模式" />
+            <div style={styles.modeToggle}>
+              <ModeButton active={mode === "clip"} onClick={() => setMode("clip")} title="Clip" detail="约 30 秒" />
+              <ModeButton active={mode === "pro"} onClick={() => setMode("pro")} title="Pro" detail="完整歌曲" />
+            </div>
 
-        {/* Loading */}
-        {loading && (
-          <div style={styles.loadingBox}>
-            <div style={styles.waveContainer}>
-              {[...Array(12)].map((_, i) => (
-                <div key={i} style={{ ...styles.waveBar, animationDelay: `${i * 0.1}s` }} />
+            <FieldTitle title="快速预设" />
+            <div style={styles.presetGrid}>
+              {PRESETS.map((preset) => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() => setPrompt(preset.prompt)}
+                  style={preset.prompt === prompt ? { ...styles.presetButton, ...styles.presetButtonActive } : styles.presetButton}
+                >
+                  {preset.label}
+                </button>
               ))}
             </div>
-            <p style={styles.loadingText}>
-              {mode === "pro" ? "AI 正在创作完整歌曲，大约需要 1-2 分钟..." : "AI 正在创作中，大约需要 30-60 秒..."}
+          </section>
+
+          <section style={styles.panel}>
+            <FieldTitle title="音乐描述" description="写清风格、情绪、速度、乐器和使用场景，结果会更稳定。" />
+            <textarea
+              value={prompt}
+              onChange={(event) => setPrompt(event.target.value)}
+              placeholder={
+                audioFileName
+                  ? "例如：保留参考音频的氛围，但改成更适合夜间聆听的电子流行版本，鼓组更克制。"
+                  : "例如：一首适合 RPG 游戏战斗场景的史诗管弦乐，140 BPM，D 小调，铜管和定音鼓更突出。"
+              }
+              style={styles.textarea}
+              rows={5}
+            />
+            <button
+              type="button"
+              onClick={handleGenerate}
+              disabled={loading || !prompt.trim()}
+              style={loading || !prompt.trim() ? { ...styles.generateButton, ...styles.generateButtonDisabled } : styles.generateButton}
+            >
+              {loading ? "生成中..." : audioFileName ? "基于参考音频生成" : "生成音乐"}
+            </button>
+          </section>
+        </div>
+
+        {loading && (
+          <section style={styles.loadingPanel}>
+            <div style={styles.waveContainer}>
+              {Array.from({ length: 14 }).map((_, index) => (
+                <span key={index} style={{ ...styles.waveBar, animationDelay: `${index * 0.08}s` }} />
+              ))}
+            </div>
+            <p style={styles.mutedText}>
+              {mode === "pro" ? "正在生成完整歌曲，通常需要 1-2 分钟。" : "正在生成短片段，通常需要 30-60 秒。"}
             </p>
-          </div>
+          </section>
         )}
 
-        {/* Error */}
-        {error && <div style={styles.errorBox}>❌ {error}</div>}
+        {error && <section style={styles.errorBox}>{error}</section>}
 
-        {/* 音频分析结果 */}
-        {analysis && (
-          <div style={styles.lyricsBox}>
-            <p style={styles.sectionLabel}>🔍 参考音频分析：</p>
-            <pre style={styles.lyricsText}>{analysis}</pre>
-          </div>
-        )}
+        {analysis && <TextResult title="参考音频分析" content={analysis} />}
+        {lyrics && <TextResult title="歌词 / 结构" content={lyrics} />}
 
-        {/* 歌词 */}
-        {lyrics && (
-          <div style={styles.lyricsBox}>
-            <p style={styles.sectionLabel}>📝 歌词 / 结构：</p>
-            <pre style={styles.lyricsText}>{lyrics}</pre>
-          </div>
-        )}
-
-        {/* 音轨播放器 */}
         {tracks.length > 0 && (
-          <div style={styles.tracksBox}>
-            <p style={styles.tracksTitle}>🎶 生成完成 — {tracks.length} 个音轨</p>
-            {tracks.map((track, i) => (
-              <div key={i} style={styles.trackItem}>
+          <section style={styles.resultsPanel}>
+            <div style={styles.resultsHeader}>
+              <h2>生成完成</h2>
+              <span>{tracks.length} 个音轨</span>
+            </div>
+            {tracks.map((track, index) => (
+              <article key={`${track.name}-${index}`} style={styles.trackItem}>
                 <div style={styles.trackHeader}>
-                  <span style={styles.trackName}>{track.name}</span>
+                  <strong>{track.name || `Track ${index + 1}`}</strong>
                   <a
                     href={`data:${track.mimeType};base64,${track.audio}`}
-                    download={`hookcraft-${track.name}-${Date.now()}.mp3`}
-                    style={styles.downloadBtn}
+                    download={`hookcraft-${track.name || index + 1}-${Date.now()}.mp3`}
+                    style={styles.downloadButton}
                   >
-                    📥 下载
+                    下载
                   </a>
                 </div>
-                <audio
-                  controls
-                  autoPlay={i === 0}
-                  src={`data:${track.mimeType};base64,${track.audio}`}
-                  style={styles.audio}
-                />
-              </div>
+                <audio controls autoPlay={index === 0} src={`data:${track.mimeType};base64,${track.audio}`} style={styles.audio} />
+              </article>
             ))}
-          </div>
+          </section>
         )}
-      </div>
+      </section>
+
+      <style>{`
+        @keyframes demo-wave {
+          0%, 100% { transform: scaleY(.32); opacity: .45; }
+          50% { transform: scaleY(1); opacity: 1; }
+        }
+      `}</style>
+    </main>
+  );
+}
+
+function FieldTitle({ title, description }: { title: string; description?: string }) {
+  return (
+    <div style={styles.fieldTitle}>
+      <h2>{title}</h2>
+      {description && <p>{description}</p>}
     </div>
   );
 }
 
-const styles: Record<string, React.CSSProperties> = {
-  container: { minHeight: "100vh", background: "linear-gradient(135deg, #0d0d14 0%, rgba(117, 54, 213, 0.15) 100%)", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" },
-  card: { background: "#1a1a2e", borderRadius: "24px", padding: "36px", maxWidth: "680px", width: "100%", boxShadow: "0 8px 40px rgba(117, 54, 213,0.15)" },
-  header: { textAlign: "center" as const, marginBottom: "28px" },
-  logo: { fontSize: "36px", fontWeight: 700, color: "#7536d5", fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", margin: "0 0 6px" },
-  subtitle: { fontSize: "15px", color: "#9ca3af", margin: "0 0 8px" },
-  badge: { display: "inline-block", fontSize: "12px", color: "#999", background: "#F8F5F0", padding: "4px 12px", borderRadius: "12px" },
-  section: { marginBottom: "20px" },
-  sectionLabel: { fontSize: "13px", color: "#999", marginBottom: "8px", fontWeight: 500 },
-  uploadArea: { border: "2px dashed #2a2a40", borderRadius: "14px", padding: "16px", textAlign: "center" as const },
-  uploadBtn: { background: "none", border: "none", color: "#7536d5", fontSize: "14px", cursor: "pointer", fontWeight: 500, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" },
-  fileInfo: { display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", fontSize: "14px", color: "#e8e8f0" },
-  clearBtn: { background: "none", border: "none", color: "#999", cursor: "pointer", fontSize: "16px" },
-  hint: { fontSize: "12px", color: "#7536d5", marginTop: "6px", textAlign: "center" as const },
-  modeToggle: { display: "flex", gap: "8px" },
-  modeBtn: { flex: 1, padding: "10px", borderRadius: "12px", border: "1.5px solid #2a2a40", background: "#1a1a2e", fontSize: "13px", cursor: "pointer", fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", fontWeight: 500, color: "#9ca3af", transition: "all 0.2s" },
-  modeBtnActive: { borderColor: "#7536d5", background: "rgba(117, 54, 213, 0.1)", color: "#7536d5", fontWeight: 600 },
-  presetGrid: { display: "flex", flexWrap: "wrap" as const, gap: "8px" },
-  presetBtn: { padding: "7px 14px", borderRadius: "18px", border: "1.5px solid #2a2a40", background: "#1a1a2e", fontSize: "13px", cursor: "pointer", color: "#e8e8f0", transition: "all 0.2s" },
-  presetBtnActive: { borderColor: "#7536d5", background: "rgba(117, 54, 213, 0.1)", color: "#7536d5", fontWeight: 600 },
-  textarea: { width: "100%", padding: "14px 16px", borderRadius: "14px", border: "1.5px solid #2a2a40", fontSize: "14px", fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", resize: "vertical" as const, marginBottom: "12px", outline: "none", boxSizing: "border-box" as const },
-  generateBtn: { width: "100%", padding: "14px", borderRadius: "14px", border: "none", background: "linear-gradient(135deg, #7536d5, #5a2db8)", color: "white", fontSize: "15px", fontWeight: 600, cursor: "pointer", fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" },
-  generateBtnDisabled: { opacity: 0.5, cursor: "not-allowed" },
-  loadingBox: { textAlign: "center" as const, padding: "28px 0" },
-  waveContainer: { display: "flex", alignItems: "flex-end", justifyContent: "center", gap: "4px", height: "50px", marginBottom: "14px" },
-  waveBar: { width: "5px", height: "100%", background: "linear-gradient(180deg, #7536d5, #5a2db8)", borderRadius: "3px", animation: "wave 1.2s ease-in-out infinite" },
-  loadingText: { fontSize: "13px", color: "#999" },
-  errorBox: { background: "rgba(229, 57, 53, 0.1)", border: "1px solid rgba(229, 57, 53, 0.3)", borderRadius: "12px", padding: "14px 16px", color: "#E53935", fontSize: "13px", marginBottom: "16px", whiteSpace: "pre-wrap" as const },
-  lyricsBox: { background: "#FAFAF8", borderRadius: "14px", padding: "16px", marginBottom: "16px" },
-  lyricsText: { fontSize: "13px", color: "#e8e8f0", lineHeight: 1.7, whiteSpace: "pre-wrap" as const, margin: 0, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" },
-  tracksBox: { background: "#FAFAF8", borderRadius: "16px", padding: "20px" },
-  tracksTitle: { fontSize: "16px", fontWeight: 600, color: "#e8e8f0", marginBottom: "16px", textAlign: "center" as const },
-  trackItem: { background: "#1a1a2e", borderRadius: "12px", padding: "14px", marginBottom: "10px", border: "1px solid #f0f0f0" },
-  trackHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" },
-  trackName: { fontSize: "14px", fontWeight: 600, color: "#e8e8f0" },
-  downloadBtn: { padding: "6px 14px", borderRadius: "10px", background: "linear-gradient(135deg, #7536d5, #5a2db8)", color: "white", textDecoration: "none", fontSize: "12px", fontWeight: 600 },
-  audio: { width: "100%", height: "36px" },
+function ModeButton({
+  active,
+  onClick,
+  title,
+  detail,
+}: {
+  active: boolean;
+  onClick: () => void;
+  title: string;
+  detail: string;
+}) {
+  return (
+    <button type="button" onClick={onClick} style={active ? { ...styles.modeButton, ...styles.modeButtonActive } : styles.modeButton}>
+      <strong>{title}</strong>
+      <span>{detail}</span>
+    </button>
+  );
+}
+
+function TextResult({ title, content }: { title: string; content: string }) {
+  return (
+    <section style={styles.textResult}>
+      <h2>{title}</h2>
+      <pre>{content}</pre>
+    </section>
+  );
+}
+
+const styles: Record<string, CSSProperties> = {
+  page: {
+    minHeight: "100vh",
+    background:
+      "radial-gradient(circle at 12% 12%, rgba(208,255,90,.10), transparent 300px), radial-gradient(circle at 88% 18%, rgba(115,247,215,.08), transparent 340px), var(--hc-bg)",
+    color: "var(--hc-text)",
+    padding: "42px 22px 72px",
+  },
+  shell: {
+    maxWidth: 1040,
+    margin: "0 auto",
+  },
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+    gap: 20,
+    marginBottom: 24,
+  },
+  kicker: {
+    color: "var(--hc-lime)",
+    fontSize: 12,
+    fontWeight: 950,
+    letterSpacing: ".1em",
+    textTransform: "uppercase",
+  },
+  title: {
+    margin: "8px 0",
+    fontSize: "clamp(40px, 6vw, 72px)",
+    lineHeight: 1,
+  },
+  subtitle: {
+    margin: 0,
+    color: "var(--hc-muted)",
+    fontSize: 15,
+    lineHeight: 1.7,
+    maxWidth: 620,
+  },
+  statusCard: {
+    minWidth: 128,
+    border: "1px solid var(--hc-line)",
+    borderRadius: "var(--hc-radius)",
+    background: "rgba(24,26,34,.86)",
+    padding: 14,
+  },
+  grid: {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, .86fr) minmax(0, 1.14fr)",
+    gap: 18,
+  },
+  panel: {
+    border: "1px solid var(--hc-line)",
+    borderRadius: "var(--hc-radius-lg)",
+    background: "rgba(24,26,34,.88)",
+    boxShadow: "var(--hc-shadow)",
+    padding: 24,
+  },
+  fieldTitle: {
+    margin: "0 0 12px",
+  },
+  uploadArea: {
+    border: "1px dashed rgba(208,255,90,.34)",
+    borderRadius: "var(--hc-radius)",
+    background: "rgba(208,255,90,.06)",
+    padding: 18,
+    marginBottom: 22,
+    textAlign: "center",
+  },
+  uploadButton: {
+    border: "none",
+    background: "transparent",
+    color: "var(--hc-lime)",
+    fontSize: 14,
+    fontWeight: 900,
+    cursor: "pointer",
+  },
+  fileInfo: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    color: "var(--hc-text)",
+    fontSize: 13,
+  },
+  clearButton: {
+    border: "1px solid var(--hc-line)",
+    borderRadius: 999,
+    background: "rgba(255,255,255,.04)",
+    color: "var(--hc-muted)",
+    padding: "7px 10px",
+    cursor: "pointer",
+  },
+  modeToggle: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: 8,
+    marginBottom: 22,
+  },
+  modeButton: {
+    minHeight: 58,
+    border: "1px solid var(--hc-line)",
+    borderRadius: 14,
+    background: "rgba(255,255,255,.04)",
+    color: "var(--hc-text)",
+    cursor: "pointer",
+  },
+  modeButtonActive: {
+    borderColor: "rgba(208,255,90,.58)",
+    background: "rgba(208,255,90,.12)",
+    color: "var(--hc-lime)",
+  },
+  presetGrid: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  presetButton: {
+    border: "1px solid var(--hc-line)",
+    borderRadius: 999,
+    background: "rgba(255,255,255,.04)",
+    color: "var(--hc-text)",
+    padding: "8px 12px",
+    fontSize: 12,
+    fontWeight: 850,
+    cursor: "pointer",
+  },
+  presetButtonActive: {
+    borderColor: "rgba(208,255,90,.58)",
+    background: "rgba(208,255,90,.12)",
+    color: "var(--hc-lime)",
+  },
+  textarea: {
+    width: "100%",
+    minHeight: 156,
+    border: "1px solid var(--hc-line)",
+    borderRadius: 14,
+    background: "#0d0f14",
+    color: "var(--hc-text)",
+    padding: "14px 16px",
+    fontSize: 14,
+    lineHeight: 1.7,
+    resize: "vertical",
+    outline: "none",
+    boxSizing: "border-box",
+    marginBottom: 14,
+  },
+  generateButton: {
+    width: "100%",
+    minHeight: 52,
+    border: "1px solid rgba(208,255,90,.9)",
+    borderRadius: 999,
+    background: "linear-gradient(135deg, var(--hc-lime), var(--hc-cyan))",
+    color: "#08090c",
+    fontSize: 15,
+    fontWeight: 950,
+    cursor: "pointer",
+  },
+  generateButtonDisabled: {
+    opacity: 0.5,
+    cursor: "not-allowed",
+  },
+  loadingPanel: {
+    marginTop: 18,
+    border: "1px solid var(--hc-line)",
+    borderRadius: "var(--hc-radius-lg)",
+    background: "rgba(24,26,34,.88)",
+    padding: "28px 20px",
+    textAlign: "center",
+  },
+  waveContainer: {
+    display: "flex",
+    alignItems: "flex-end",
+    justifyContent: "center",
+    gap: 5,
+    height: 54,
+    marginBottom: 12,
+  },
+  waveBar: {
+    width: 6,
+    height: "100%",
+    borderRadius: 999,
+    background: "linear-gradient(180deg, var(--hc-lime), var(--hc-cyan))",
+    animation: "demo-wave 1.1s ease-in-out infinite",
+    transformOrigin: "bottom",
+  },
+  mutedText: {
+    margin: 0,
+    color: "var(--hc-muted)",
+    fontSize: 13,
+  },
+  errorBox: {
+    marginTop: 18,
+    border: "1px solid rgba(255,90,61,.34)",
+    borderRadius: 14,
+    background: "rgba(255,90,61,.1)",
+    color: "#ff8b76",
+    padding: "14px 16px",
+    fontSize: 14,
+    fontWeight: 800,
+    whiteSpace: "pre-wrap",
+  },
+  textResult: {
+    marginTop: 18,
+    border: "1px solid var(--hc-line)",
+    borderRadius: "var(--hc-radius-lg)",
+    background: "rgba(24,26,34,.88)",
+    padding: 20,
+  },
+  resultsPanel: {
+    marginTop: 18,
+    border: "1px solid var(--hc-line)",
+    borderRadius: "var(--hc-radius-lg)",
+    background: "rgba(24,26,34,.88)",
+    padding: 20,
+  },
+  resultsHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 14,
+  },
+  trackItem: {
+    border: "1px solid var(--hc-line)",
+    borderRadius: 14,
+    background: "rgba(8,9,12,.44)",
+    padding: 14,
+    marginBottom: 10,
+  },
+  trackHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 10,
+  },
+  downloadButton: {
+    border: "1px solid rgba(208,255,90,.34)",
+    borderRadius: 999,
+    background: "rgba(208,255,90,.1)",
+    color: "var(--hc-lime)",
+    textDecoration: "none",
+    padding: "7px 11px",
+    fontSize: 12,
+    fontWeight: 900,
+  },
+  audio: {
+    width: "100%",
+    height: 36,
+  },
 };

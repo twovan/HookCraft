@@ -3,8 +3,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { CreditService } from '../../../../lib/credits/CreditService';
-import { supabaseAdmin } from '../../../../lib/supabase/server';
-import { getAuthUser } from '../../../../lib/supabase/auth-helpers';
+import { getServerSupabaseClient } from '../../../../lib/supabase/server';
+import { getAuthAccessToken, getAuthUser } from '../../../../lib/supabase/auth-helpers';
 
 export async function GET(req: NextRequest) {
   try {
@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ used: 0, total: 3, remaining: 3 });
     }
 
-    const creditService = new CreditService(supabaseAdmin);
+    const creditService = new CreditService(getServerSupabaseClient(await getAuthAccessToken()));
     const previewCount = await creditService.getPreviewCount(user.id);
 
     return NextResponse.json(previewCount);
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const creditService = new CreditService(supabaseAdmin);
+    const creditService = new CreditService(getServerSupabaseClient(await getAuthAccessToken()));
     const result = await creditService.consumePreview(user.id);
 
     if (!result.success) {

@@ -15,13 +15,6 @@ export interface TemplateSelectorProps {
   columns?: 2 | 3;
 }
 
-/**
- * 模板选择器组件
- * - 免费/付费 Tab 切换
- * - Mini 卡片（3 列，2:3 比例）
- * - Free 用户：仅显示 Free_Template，Paid_Template 显示锁定状态
- * - 点击模板选中
- */
 export default function TemplateSelector({
   templates,
   selectedTemplateId,
@@ -37,15 +30,11 @@ export default function TemplateSelector({
   const freeTemplates = templates.filter((t) => t.category === 'free_template');
   const paidTemplates = templates.filter((t) => t.category === 'paid_template');
 
-  // Fetch purchased templates when tab is active
   useEffect(() => {
     if (activeTab !== 'purchased') return;
     setPurchasedLoading(true);
     fetch('/api/templates/purchased')
-      .then((res) => {
-        if (res.ok) return res.json();
-        return { templates: [] };
-      })
+      .then((res) => (res.ok ? res.json() : { templates: [] }))
       .then((data) => {
         const mapped: Template[] = (data.templates || []).map((t: {
           id: string;
@@ -79,259 +68,108 @@ export default function TemplateSelector({
       ? paidTemplates
       : purchasedTemplates;
   const isLoading = loading || (purchasedLoading && activeTab === 'purchased');
-
   const isLocked = !isPaid && activeTab === 'paid_template';
   const isPurchasedTab = activeTab === 'purchased';
 
-  const tabs: { key: TemplateCategory | 'purchased'; label: string; icon?: string }[] = [
+  const tabs: { key: TemplateCategory | 'purchased'; label: string }[] = [
     { key: 'free_template', label: '免费' },
     { key: 'purchased', label: '已购' },
   ];
 
   return (
     <div>
-      {/* Tabs */}
-      <div
-        style={{
-          display: 'flex',
-          gap: '0',
-          marginBottom: '20px',
-          borderBottom: '1px solid #2a2a40',
-        }}
-      >
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            style={{
-              padding: '10px 20px',
-              border: 'none',
-              background: 'transparent',
-              fontSize: '14px',
-              fontWeight: activeTab === tab.key ? 600 : 400,
-              color: activeTab === tab.key ? '#7536d5' : '#9ca3af',
-              borderBottom: activeTab === tab.key ? '2px solid #7536d5' : '2px solid transparent',
-              cursor: 'pointer',
-              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-              transition: 'all 0.2s ease',
-            }}
-            aria-selected={activeTab === tab.key}
-            role="tab"
-          >
-            {tab.label}
-            {tab.icon && (
-              <span style={{ marginLeft: '4px', fontSize: '12px' }}>{tab.icon}</span>
-            )}
-          </button>
-        ))}
+      <div style={tabsStyle} role="tablist" aria-label="模板类型">
+        {tabs.map((tab) => {
+          const active = activeTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              style={{
+                ...tabStyle,
+                borderColor: active ? 'rgba(206,255,53,.42)' : 'transparent',
+                background: active ? 'rgba(206,255,53,.12)' : 'transparent',
+                color: active ? 'var(--hc-lime)' : 'var(--hc-muted)',
+              }}
+              aria-selected={active}
+              role="tab"
+            >
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Template Grid - 3 per row, 2:3 aspect ratio */}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: `repeat(${columns}, 1fr)`,
-          gap: '12px',
+          gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+          gap: 12,
         }}
         role="listbox"
         aria-label="模板列表"
       >
         {isLoading && Array.from({ length: 6 }).map((_, index) => (
-          <div
-            key={`template-skeleton-${index}`}
-            style={{
-              aspectRatio: '1 / 1.45',
-              borderRadius: '12px',
-              border: '1px solid #2a2a40',
-              background: 'linear-gradient(135deg, rgba(117, 54, 213, 0.12), rgba(18, 18, 30, 0.95))',
-              position: 'relative',
-              overflow: 'hidden',
-            }}
-          >
-            <div
-              style={{
-                position: 'absolute',
-                inset: 0,
-                background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent)',
-                animation: 'templateSkeleton 1.4s ease-in-out infinite',
-              }}
-            />
+          <div key={`template-skeleton-${index}`} style={skeletonStyle}>
+            <span style={skeletonShineStyle} />
           </div>
         ))}
 
         {!isLoading && displayTemplates.map((template) => {
           const isSelected = template.id === selectedTemplateId;
-
           return (
             <button
               key={template.id}
               onClick={() => {
-                if (!isLocked || isPurchasedTab) {
-                  onSelect(template);
-                }
+                if (!isLocked || isPurchasedTab) onSelect(template);
               }}
               disabled={isLocked && !isPurchasedTab}
               role="option"
               aria-selected={isSelected}
               aria-disabled={isLocked}
               style={{
-                position: 'relative',
-                aspectRatio: '1 / 1.45',
-                borderRadius: '12px',
-                border: isSelected
-                  ? '2px solid #7536d5'
-                  : '1px solid #2a2a40',
+                ...cardStyle,
+                borderColor: isSelected ? 'rgba(206,255,53,.66)' : 'var(--hc-line)',
                 background: template.coverUrl
                   ? `url(${template.coverUrl}) center/cover`
-                  : 'linear-gradient(135deg, rgba(117, 54, 213, 0.15) 0%, #0d0d14 100%)',
+                  : 'linear-gradient(135deg, rgba(206,255,53,.16), rgba(82,214,198,.08) 48%, rgba(255,90,61,.10))',
                 cursor: isLocked ? 'not-allowed' : 'pointer',
-                overflow: 'hidden',
-                padding: 0,
-                transition: 'all 0.2s ease',
-                opacity: isLocked ? 0.6 : 1,
-                boxShadow: isSelected
-                  ? '0 4px 12px rgba(117, 54, 213, 0.3)'
-                  : '0 2px 8px rgba(0, 0, 0, 0.04)',
+                opacity: isLocked ? 0.58 : 1,
+                boxShadow: isSelected ? '0 14px 34px rgba(206,255,53,.12)' : 'none',
               }}
             >
-              {/* Locked overlay */}
               {isLocked && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    background: 'rgba(255, 255, 255, 0.7)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexDirection: 'column',
-                    gap: '4px',
-                    backdropFilter: 'blur(2px)',
-                  }}
-                >
-                  <span style={{ fontSize: '24px' }}>🔒</span>
-                  <span
-                    style={{
-                      fontSize: '11px',
-                      color: '#9ca3af',
-                      fontWeight: 500,
-                    }}
-                  >
-                    升级解锁
-                  </span>
+                <div style={lockedOverlayStyle}>
+                  <span style={lockMarkStyle}>锁定</span>
+                  <span>升级解锁</span>
                 </div>
               )}
 
-              {/* Template info at bottom */}
-              <div
-                style={{
-                  position: 'absolute',
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  background: 'linear-gradient(transparent, rgba(0,0,0,0.82))',
-                  padding: '34px 10px 10px',
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    color: 'white',
-                    lineHeight: 1.3,
-                    textAlign: 'left',
-                  }}
-                >
-                  {template.name}
-                </div>
-                <div
-                  style={{
-                    fontSize: '10px',
-                    color: 'rgba(255,255,255,0.8)',
-                    textAlign: 'left',
-                    marginTop: '2px',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {template.genre}
-                </div>
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    marginTop: 8,
-                    minWidth: 0,
-                  }}
-                >
+              <div style={cardInfoStyle}>
+                <div style={templateNameStyle}>{template.name}</div>
+                <div style={templateGenreStyle}>{template.genre}</div>
+                <div style={producerStyle}>
                   <img
                     src={template.producerAvatarUrl || PUBLIC_PRODUCER_AVATAR}
                     alt=""
-                    style={{
-                      width: 20,
-                      height: 20,
-                      borderRadius: '50%',
-                      objectFit: 'cover',
-                      background: 'rgba(255,255,255,0.12)',
-                      flexShrink: 0,
-                    }}
+                    style={avatarStyle}
                   />
-                  <span
-                    style={{
-                      color: 'rgba(255,255,255,0.92)',
-                      fontSize: 10,
-                      fontWeight: 600,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {template.producerName || PUBLIC_PRODUCER_NAME}
-                  </span>
+                  <span>{template.producerName || PUBLIC_PRODUCER_NAME}</span>
                 </div>
               </div>
 
-              {/* Selected indicator */}
-              {isSelected && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '8px',
-                    right: '8px',
-                    width: '20px',
-                    height: '20px',
-                    borderRadius: '50%',
-                    background: '#7536d5',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '11px',
-                    color: 'white',
-                  }}
-                >
-                  ✓
-                </div>
-              )}
+              {isSelected && <div style={selectedMarkStyle}>已选</div>}
             </button>
           );
         })}
       </div>
 
-      {/* Empty state */}
       {displayTemplates.length === 0 && !isLoading && (
-        <div
-          style={{
-            textAlign: 'center',
-            padding: '32px 16px',
-            color: '#999',
-            fontSize: '13px',
-          }}
-        >
-          {activeTab === 'purchased' ? '暂无已购模板，去模板中心看看吧' : '暂无模板'}
+        <div style={emptyStyle}>
+          {activeTab === 'purchased' ? '暂无已购模板，去模板市场看看。' : '暂无模板'}
         </div>
       )}
+
       <style>{`
         @keyframes templateSkeleton {
           0% { transform: translateX(-100%); }
@@ -341,3 +179,140 @@ export default function TemplateSelector({
     </div>
   );
 }
+
+const tabsStyle: React.CSSProperties = {
+  display: 'inline-flex',
+  gap: 4,
+  marginBottom: 16,
+  padding: 4,
+  border: '1px solid var(--hc-line)',
+  borderRadius: 999,
+  background: 'rgba(255,255,255,.03)',
+};
+
+const tabStyle: React.CSSProperties = {
+  border: '1px solid transparent',
+  borderRadius: 999,
+  background: 'transparent',
+  padding: '8px 14px',
+  fontSize: 13,
+  fontWeight: 900,
+  cursor: 'pointer',
+};
+
+const skeletonStyle: React.CSSProperties = {
+  aspectRatio: '1 / 1.45',
+  borderRadius: 12,
+  border: '1px solid var(--hc-line)',
+  background: 'rgba(24,26,34,.86)',
+  position: 'relative',
+  overflow: 'hidden',
+};
+
+const skeletonShineStyle: React.CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  background: 'linear-gradient(90deg, transparent, rgba(255,255,255,.06), transparent)',
+  animation: 'templateSkeleton 1.4s ease-in-out infinite',
+};
+
+const cardStyle: React.CSSProperties = {
+  position: 'relative',
+  aspectRatio: '1 / 1.45',
+  borderRadius: 12,
+  border: '1px solid var(--hc-line)',
+  overflow: 'hidden',
+  padding: 0,
+  transition: 'border-color .2s ease, box-shadow .2s ease, opacity .2s ease',
+};
+
+const lockedOverlayStyle: React.CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  zIndex: 3,
+  display: 'grid',
+  placeItems: 'center',
+  gap: 5,
+  alignContent: 'center',
+  background: 'rgba(8,9,12,.72)',
+  backdropFilter: 'blur(2px)',
+  color: 'var(--hc-muted)',
+  fontSize: 12,
+  fontWeight: 900,
+};
+
+const lockMarkStyle: React.CSSProperties = {
+  color: 'var(--hc-lime)',
+  letterSpacing: '.1em',
+  fontSize: 10,
+};
+
+const cardInfoStyle: React.CSSProperties = {
+  position: 'absolute',
+  left: 0,
+  right: 0,
+  bottom: 0,
+  padding: '42px 10px 10px',
+  background: 'linear-gradient(transparent, rgba(0,0,0,.84))',
+  textAlign: 'left',
+};
+
+const templateNameStyle: React.CSSProperties = {
+  color: 'white',
+  fontSize: 12,
+  fontWeight: 900,
+  lineHeight: 1.35,
+};
+
+const templateGenreStyle: React.CSSProperties = {
+  marginTop: 3,
+  color: 'rgba(255,255,255,.78)',
+  fontSize: 10,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+};
+
+const producerStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 6,
+  minWidth: 0,
+  marginTop: 8,
+  color: 'rgba(255,255,255,.9)',
+  fontSize: 10,
+  fontWeight: 800,
+};
+
+const avatarStyle: React.CSSProperties = {
+  width: 20,
+  height: 20,
+  borderRadius: '50%',
+  objectFit: 'cover',
+  background: 'rgba(255,255,255,.12)',
+  flexShrink: 0,
+};
+
+const selectedMarkStyle: React.CSSProperties = {
+  position: 'absolute',
+  top: 8,
+  right: 8,
+  border: '1px solid rgba(206,255,53,.42)',
+  borderRadius: 999,
+  padding: '4px 7px',
+  background: 'rgba(8,9,12,.62)',
+  color: 'var(--hc-lime)',
+  fontSize: 10,
+  fontWeight: 950,
+};
+
+const emptyStyle: React.CSSProperties = {
+  marginTop: 12,
+  border: '1px solid var(--hc-line)',
+  borderRadius: 12,
+  padding: '28px 16px',
+  color: 'var(--hc-muted)',
+  background: 'rgba(255,255,255,.03)',
+  textAlign: 'center',
+  fontSize: 13,
+};

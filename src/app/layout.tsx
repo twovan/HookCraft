@@ -5,8 +5,11 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
 export const metadata: Metadata = {
-  title: "HookCraft AI Music Demo",
-  description: "AI 音乐生成 Demo - Powered by Google Lyria 3",
+  title: "HookCraft AI 音乐创作",
+  description: "面向华语创作者的 AI 音乐生成、模板与分轨工作台",
+  icons: {
+    icon: "/icon.svg",
+  },
 };
 
 export default function RootLayout({
@@ -22,7 +25,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body style={{ margin: 0, fontFamily: "'Inter', sans-serif" }}>
+      <body style={{ margin: 0, fontFamily: 'var(--hc-font)' }}>
         <AuthProvider>
           <Navbar />
           {children}

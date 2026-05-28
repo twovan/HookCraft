@@ -3,14 +3,33 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { CreditService } from '../../../../lib/credits/CreditService';
-import { supabaseAdmin } from '../../../../lib/supabase/server';
+import { isSupabaseAdminConfigured, supabaseAdmin } from '../../../../lib/supabase/server';
 import { getAuthUser } from '../../../../lib/supabase/auth-helpers';
+import { AdminConfigService } from '../../../../lib/admin/AdminConfigService';
+import {
+  calculateCreditsPackPrice,
+  findCreditsPack,
+  getPublicCreditsPacks,
+} from '../../../../config/creditsPack';
 
-const CREDITS_PACKS: Record<string, { credits: number; price: number; discountPrice: number; label: string }> = {
-  pack_50: { credits: 50, price: 9900, discountPrice: 7900, label: '50 Credits' },
-  pack_100: { credits: 100, price: 17900, discountPrice: 14300, label: '100 Credits' },
-  pack_200: { credits: 200, price: 32900, discountPrice: 26300, label: '200 Credits' },
-};
+async function loadCreditsPacksConfig() {
+  if (!isSupabaseAdminConfigured()) return [];
+
+  try {
+    const service = new AdminConfigService(supabaseAdmin);
+    const config = await service.getCurrentConfig();
+    return config.creditsPacks;
+  } catch {
+    return [];
+  }
+}
+
+export async function GET() {
+  const creditsPacks = await loadCreditsPacksConfig();
+  return NextResponse.json({
+    creditsPacks: getPublicCreditsPacks(creditsPacks),
+  });
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -21,12 +40,12 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const { packId } = body as { packId: string };
+    const configuredPacks = await loadCreditsPacksConfig();
+    const pack = packId ? findCreditsPack(configuredPacks, packId) : null;
 
-    if (!packId || !CREDITS_PACKS[packId]) {
+    if (!pack) {
       return NextResponse.json({ error: '无效的充值包' }, { status: 400 });
     }
-
-    const pack = CREDITS_PACKS[packId];
 
     // 使用 CreditService 将购买的 Credits 入账到 purchased_credits 表
     const creditService = new CreditService(supabaseAdmin);
@@ -43,14 +62,16 @@ export async function POST(req: NextRequest) {
       .select('tier')
       .eq('user_id', user.id)
       .single();
+    const tier = credits?.tier || 'free';
+    const amount = calculateCreditsPackPrice(pack, tier);
 
     await supabaseAdmin.from('payments').insert({
       id: orderId,
       user_id: user.id,
-      amount: pack.price,
+      amount,
       currency: 'CNY',
       provider: 'alipay',
-      tier: credits?.tier || 'free',
+      tier,
       billing_cycle: 'monthly',
       status: 'completed',
       completed_at: new Date().toISOString(),
@@ -63,7 +84,8 @@ export async function POST(req: NextRequest) {
       totalAvailable: result.totalAvailable,
       remaining: result.totalAvailable,
       order_id: orderId,
-      pack_label: pack.label,
+      pack_label: `${pack.credits} Credits`,
+      amount,
     });
   } catch (error: any) {
     console.error('Credits pack purchase error:', error);

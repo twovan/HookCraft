@@ -29,10 +29,28 @@ export default function UploadPage() {
     }
   }, [authLoading, user, router]);
 
+  const resetForm = () => {
+    setSuccess(false);
+    setName('');
+    setDescription('');
+    setGenre('');
+    setAudioFile(null);
+    setAudioPreview(null);
+    setCoverFile(null);
+    setCoverPreview(null);
+    setPrice(0);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) { setError('请输入模板名称'); return; }
-    if (!audioFile) { setError('请上传音频文件'); return; }
+    if (!name.trim()) {
+      setError('请输入模板名称');
+      return;
+    }
+    if (!audioFile) {
+      setError('请上传音频文件');
+      return;
+    }
 
     setUploading(true);
     setError(null);
@@ -67,79 +85,70 @@ export default function UploadPage() {
 
   if (authLoading || !user) {
     return (
-      <div style={{ minHeight: '100vh', background: '#0d0d14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ color: '#999', fontSize: 14 }}>加载中...</span>
-      </div>
+      <main className="upload-page centered">
+        <div className="state-card">
+          <span>上传</span>
+          <p>正在加载上传工作台...</p>
+        </div>
+        <UploadStyles />
+      </main>
     );
   }
 
   if (success) {
     return (
-      <div style={{ minHeight: '100vh', background: '#0d0d14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ textAlign: 'center', maxWidth: 480 }}>
-          <div style={{ fontSize: 64, marginBottom: 24 }}>🎉</div>
-          <h1 style={{ fontSize: 28, fontWeight: 700, color: '#e8e8f0', marginBottom: 12, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" }}>
-            模板提交成功
-          </h1>
-          <p style={{ color: '#9ca3af', fontSize: 15, marginBottom: 32, lineHeight: 1.6 }}>
-            你的模板已提交，管理员审核通过后将在平台上架。审核通常需要 1-3 个工作日。
-          </p>
-          <div style={{ display: 'flex', gap: 16, justifyContent: 'center' }}>
-            <button
-              onClick={() => { setSuccess(false); setName(''); setDescription(''); setGenre(''); setAudioFile(null); setAudioPreview(null); setCoverFile(null); setCoverPreview(null); setPrice(0); }}
-              style={primaryBtnStyle}
-            >
-              继续上传
-            </button>
-            <Link href="/templates" style={{ ...secondaryBtnStyle, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>
-              浏览模板
-            </Link>
+      <main className="upload-page centered">
+        <section className="success-card">
+          <span>已提交审核</span>
+          <h1>模板提交成功</h1>
+          <p>你的模板已提交，管理员审核通过后会在平台上架。审核通常需要 1-3 个工作日。</p>
+          <div className="action-row">
+            <button onClick={resetForm} className="hc-button hc-button-primary">继续上传</button>
+            <Link href="/templates" className="hc-button hc-button-ghost">浏览模板</Link>
           </div>
-        </div>
-      </div>
+        </section>
+        <UploadStyles />
+      </main>
     );
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0d0d14' }}>
-      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'radial-gradient(circle at 20% 50%, rgba(117, 54, 213,0.03) 0%, transparent 50%)', pointerEvents: 'none', zIndex: 0 }} />
+    <main className="upload-page">
+      <div className="upload-shell">
+        <header className="upload-header">
+          <span>制作人上传</span>
+          <h1>上传模板</h1>
+          <p>分享你的音乐作品，审核通过后将在平台展示并可被创作者购买或使用。</p>
+        </header>
 
-      <main style={{ maxWidth: 720, margin: '0 auto', padding: '48px 24px', position: 'relative', zIndex: 1 }}>
-        <h1 style={{ fontSize: 36, fontWeight: 700, color: '#e8e8f0', marginBottom: 8, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" }}>
-          上传模板
-        </h1>
-        <p style={{ color: '#9ca3af', fontSize: 15, marginBottom: 40 }}>
-          分享你的音乐作品，审核通过后将在平台展示
-        </p>
+        {error && <div className="error-box">{error}</div>}
 
-        {error && (
-          <div style={{ padding: '12px 16px', marginBottom: 20, borderRadius: 12, background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626', fontSize: 14 }}>
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit}>
-          {/* Audio Upload - Primary */}
-          <div style={cardStyle}>
-            <h3 style={sectionTitleStyle}>🎵 音频文件 *</h3>
+        <form onSubmit={handleSubmit} className="upload-form">
+          <section className="panel">
+            <h2>音频文件 *</h2>
             {audioFile ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'rgba(117, 54, 213, 0.15)', borderRadius: 12 }}>
-                  <span style={{ fontSize: 14, color: '#e8e8f0', fontWeight: 500 }}>🎵 {audioFile.name}</span>
-                  <button type="button" onClick={() => { setAudioFile(null); setAudioPreview(null); if (audioInputRef.current) audioInputRef.current.value = ''; }} style={{ background: 'none', border: 'none', color: '#999', cursor: 'pointer', fontSize: 16 }}>✕</button>
+              <div className="selected-audio">
+                <div>
+                  <strong>{audioFile.name}</strong>
+                  <span>{(audioFile.size / 1024 / 1024).toFixed(1)} MB</span>
                 </div>
-                {audioPreview && <audio controls src={audioPreview} style={{ width: '100%', height: 40 }} />}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAudioFile(null);
+                    setAudioPreview(null);
+                    if (audioInputRef.current) audioInputRef.current.value = '';
+                  }}
+                >
+                  移除
+                </button>
+                {audioPreview && <audio controls src={audioPreview} />}
               </div>
             ) : (
-              <div
-                onClick={() => audioInputRef.current?.click()}
-                style={{ border: '2px dashed #2a2a40', borderRadius: 16, padding: '40px 24px', textAlign: 'center', cursor: 'pointer', transition: 'border-color 0.2s' }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#7536d5'}
-                onMouseLeave={(e) => e.currentTarget.style.borderColor = '#2a2a40'}
-              >
-                <div style={{ fontSize: 40, marginBottom: 12 }}>🎶</div>
-                <div style={{ fontSize: 15, fontWeight: 600, color: '#e8e8f0', marginBottom: 4 }}>点击上传音频文件</div>
-                <div style={{ fontSize: 13, color: '#999' }}>支持 MP3、WAV、OGG、FLAC，最大 20MB</div>
+              <div className="drop-zone" onClick={() => audioInputRef.current?.click()}>
+                <span>音频</span>
+                <strong>点击上传音频文件</strong>
+                <p>支持 MP3、WAV、OGG、FLAC，最大 20MB。</p>
               </div>
             )}
             <input
@@ -148,57 +157,49 @@ export default function UploadPage() {
               accept="audio/mpeg,audio/wav,audio/ogg,audio/flac,.mp3,.wav,.ogg,.flac"
               onChange={(e) => {
                 const file = e.target.files?.[0];
-                if (file) { setAudioFile(file); setAudioPreview(URL.createObjectURL(file)); }
+                if (file) {
+                  setAudioFile(file);
+                  setAudioPreview(URL.createObjectURL(file));
+                }
               }}
               style={{ display: 'none' }}
             />
-          </div>
+          </section>
 
-          {/* Template Info */}
-          <div style={cardStyle}>
-            <h3 style={sectionTitleStyle}>📝 模板信息</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div>
-                <label style={labelStyle}>模板名称 *</label>
-                <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="给你的模板起个名字" style={inputStyle} required />
-              </div>
-              <div>
-                <label style={labelStyle}>描述</label>
-                <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="描述你的音乐风格、适用场景..." style={{ ...inputStyle, minHeight: 80, resize: 'vertical' }} />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div>
-                  <label style={labelStyle}>风格</label>
-                  <input type="text" value={genre} onChange={(e) => setGenre(e.target.value)} placeholder="如: Pop, Lo-Fi, EDM" style={inputStyle} />
-                </div>
-                <div>
-                  <label style={labelStyle}>分类</label>
-                  <select value={category} onChange={(e) => setCategory(e.target.value)} style={inputStyle}>
+          <section className="panel">
+            <h2>模板信息</h2>
+            <div className="field-stack">
+              <Field label="模板名称 *">
+                <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="给你的模板起个名字" required />
+              </Field>
+              <Field label="描述">
+                <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="描述音乐风格、适用场景和亮点..." />
+              </Field>
+              <div className="two-col">
+                <Field label="风格">
+                  <input type="text" value={genre} onChange={(e) => setGenre(e.target.value)} placeholder="如 Pop, Lo-Fi, EDM" />
+                </Field>
+                <Field label="分类">
+                  <select value={category} onChange={(e) => setCategory(e.target.value)}>
                     <option value="free_template">免费模板</option>
                     <option value="paid_template">付费模板</option>
                   </select>
-                </div>
+                </Field>
               </div>
               {category === 'paid_template' && (
-                <div>
-                  <label style={labelStyle}>价格（分）</label>
-                  <input type="number" value={price} onChange={(e) => setPrice(parseInt(e.target.value) || 0)} placeholder="如: 9900 = ¥99" style={inputStyle} />
-                  <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>以分为单位，9900 = ¥99</div>
-                </div>
+                <Field label="价格（分）">
+                  <input type="number" value={price} onChange={(e) => setPrice(parseInt(e.target.value) || 0)} placeholder="如 9900 = ¥99" />
+                  <small>以分为单位，9900 = ¥99。</small>
+                </Field>
               )}
             </div>
-          </div>
+          </section>
 
-          {/* Cover Image */}
-          <div style={cardStyle}>
-            <h3 style={sectionTitleStyle}>🖼️ 封面图片（可选）</h3>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-              <div style={{ width: 100, height: 100, borderRadius: 12, overflow: 'hidden', flexShrink: 0, border: '2px dashed #2a2a40', display: 'flex', alignItems: 'center', justifyContent: 'center', background: coverPreview ? undefined : '#1a1a2e' }}>
-                {coverPreview ? (
-                  <img src={coverPreview} alt="封面" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : (
-                  <span style={{ fontSize: 28, color: '#d1d5db' }}>🖼️</span>
-                )}
+          <section className="panel cover-panel">
+            <h2>封面图片（可选）</h2>
+            <div className="cover-row">
+              <div className="cover-preview">
+                {coverPreview ? <img src={coverPreview} alt="封面预览" /> : <span>封面</span>}
               </div>
               <div>
                 <input
@@ -206,31 +207,297 @@ export default function UploadPage() {
                   accept="image/jpeg,image/png,image/webp"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file) { setCoverFile(file); setCoverPreview(URL.createObjectURL(file)); }
+                    if (file) {
+                      setCoverFile(file);
+                      setCoverPreview(URL.createObjectURL(file));
+                    }
                   }}
-                  style={{ fontSize: 12 }}
                 />
-                <div style={{ fontSize: 11, color: '#999', marginTop: 4 }}>JPG、PNG、WebP，最大 5MB</div>
+                <p>JPG、PNG、WebP，最大 5MB。</p>
               </div>
             </div>
-          </div>
+          </section>
 
-          {/* Submit */}
-          <button type="submit" disabled={uploading || !name.trim() || !audioFile} style={{ ...primaryBtnStyle, width: '100%', padding: 16, fontSize: 16, opacity: uploading || !name.trim() || !audioFile ? 0.6 : 1, cursor: uploading || !name.trim() || !audioFile ? 'not-allowed' : 'pointer' }}>
+          <button type="submit" disabled={uploading || !name.trim() || !audioFile} className="submit-button">
             {uploading ? '上传中...' : '提交模板'}
           </button>
         </form>
-      </main>
-    </div>
+      </div>
+      <UploadStyles />
+    </main>
   );
 }
 
-const cardStyle: React.CSSProperties = {
-  background: '#1a1a2e', padding: 28, borderRadius: 20, marginBottom: 20,
-  boxShadow: '0 4px 20px rgba(0,0,0,0.04)', border: '1px solid rgba(117, 54, 213,0.1)',
-};
-const sectionTitleStyle: React.CSSProperties = { fontSize: 16, fontWeight: 600, color: '#e8e8f0', marginBottom: 16 };
-const labelStyle: React.CSSProperties = { display: 'block', fontSize: 13, fontWeight: 600, color: '#e8e8f0', marginBottom: 6 };
-const inputStyle: React.CSSProperties = { width: '100%', padding: '12px 14px', borderRadius: 12, border: '1px solid #2a2a40', fontSize: 14, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", outline: 'none', boxSizing: 'border-box' };
-const primaryBtnStyle: React.CSSProperties = { padding: '12px 28px', borderRadius: 24, border: 'none', background: 'linear-gradient(135deg, #7536d5, #5a2db8)', color: 'white', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", boxShadow: '0 6px 20px rgba(117, 54, 213,0.3)' };
-const secondaryBtnStyle: React.CSSProperties = { padding: '12px 28px', borderRadius: 24, border: '1px solid #2a2a40', background: 'transparent', color: '#9ca3af', fontSize: 14, fontWeight: 600, cursor: 'pointer' };
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="field">
+      <span>{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function UploadStyles() {
+  return (
+    <style>{`
+      .upload-page {
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at 10% 12%, rgba(206,255,53,.10), transparent 300px),
+          radial-gradient(circle at 88% 20%, rgba(82,214,198,.08), transparent 340px),
+          var(--hc-bg);
+        color: var(--hc-text);
+        padding: 42px 22px 72px;
+      }
+
+      .upload-page.centered {
+        display: grid;
+        place-items: center;
+      }
+
+      .upload-shell {
+        max-width: 820px;
+        margin: 0 auto;
+      }
+
+      .upload-header {
+        margin-bottom: 28px;
+      }
+
+      .upload-header span,
+      .success-card span,
+      .state-card span {
+        color: var(--hc-lime);
+        font-size: 12px;
+        font-weight: 950;
+        letter-spacing: .1em;
+        text-transform: uppercase;
+      }
+
+      .upload-header h1,
+      .success-card h1 {
+        margin: 8px 0;
+        font-size: clamp(40px, 6vw, 70px);
+        line-height: 1;
+      }
+
+      .upload-header p,
+      .success-card p,
+      .state-card p,
+      .drop-zone p,
+      .cover-row p {
+        color: var(--hc-muted);
+        line-height: 1.7;
+      }
+
+      .upload-form {
+        display: grid;
+        gap: 18px;
+      }
+
+      .panel,
+      .success-card,
+      .state-card {
+        border: 1px solid var(--hc-line);
+        border-radius: var(--hc-radius-lg);
+        background: rgba(24,26,34,.88);
+        box-shadow: var(--hc-shadow);
+      }
+
+      .panel {
+        padding: 24px;
+      }
+
+      .panel h2 {
+        margin: 0 0 16px;
+        font-size: 19px;
+      }
+
+      .drop-zone {
+        border: 1px dashed rgba(206,255,53,.34);
+        border-radius: var(--hc-radius);
+        background: rgba(206,255,53,.06);
+        padding: 38px 20px;
+        text-align: center;
+        cursor: pointer;
+      }
+
+        .drop-zone span,
+        .cover-preview span {
+          color: var(--hc-lime);
+          font-size: 11px;
+          font-weight: 950;
+        }
+
+      .drop-zone strong {
+        display: block;
+        margin: 8px 0 4px;
+        font-size: 17px;
+      }
+
+      .selected-audio {
+        display: grid;
+        gap: 12px;
+      }
+
+        .selected-audio div:first-child {
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+          flex-wrap: wrap;
+          border: 1px solid rgba(206,255,53,.28);
+        border-radius: 12px;
+        background: rgba(206,255,53,.08);
+        padding: 12px 14px;
+      }
+
+      .selected-audio span {
+        color: var(--hc-muted);
+      }
+
+      .selected-audio button {
+        width: fit-content;
+        border: 1px solid var(--hc-line);
+        border-radius: 999px;
+        background: transparent;
+        color: var(--hc-muted);
+        padding: 7px 12px;
+        cursor: pointer;
+      }
+
+      .field-stack {
+        display: grid;
+        gap: 16px;
+      }
+
+      .field {
+        display: grid;
+        gap: 7px;
+      }
+
+      .field span {
+        color: var(--hc-text);
+        font-size: 13px;
+        font-weight: 900;
+      }
+
+      .field input,
+      .field textarea,
+      .field select {
+        width: 100%;
+        border: 1px solid var(--hc-line);
+        border-radius: 12px;
+        background: #0d0f14;
+        color: var(--hc-text);
+        padding: 12px 14px;
+        font-size: 14px;
+        outline: none;
+        box-sizing: border-box;
+      }
+
+      .field textarea {
+        min-height: 92px;
+        resize: vertical;
+      }
+
+      .field small {
+        color: var(--hc-muted);
+        font-size: 11px;
+      }
+
+      .two-col {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+        .cover-row {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          min-width: 0;
+        }
+
+        .cover-preview {
+          width: 110px;
+          height: 110px;
+        flex: 0 0 auto;
+        display: grid;
+        place-items: center;
+        border: 1px dashed rgba(206,255,53,.34);
+        border-radius: 14px;
+        background: rgba(206,255,53,.06);
+        overflow: hidden;
+      }
+
+      .cover-preview img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .submit-button {
+        width: 100%;
+        border: none;
+        border-radius: 999px;
+        padding: 16px 20px;
+        background: linear-gradient(135deg, var(--hc-lime), var(--hc-cyan));
+        color: #08090c;
+        font-size: 16px;
+        font-weight: 950;
+        cursor: pointer;
+      }
+
+      .submit-button:disabled {
+        cursor: not-allowed;
+        opacity: .55;
+      }
+
+      .error-box {
+        border: 1px solid rgba(255,90,61,.34);
+        border-radius: 12px;
+        background: rgba(255,90,61,.1);
+        color: #ff8b76;
+        padding: 12px 14px;
+        font-size: 14px;
+        font-weight: 800;
+      }
+
+      .success-card,
+      .state-card {
+        width: min(560px, calc(100vw - 40px));
+        padding: 34px;
+        text-align: center;
+      }
+
+      .action-row {
+        display: flex;
+        justify-content: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-top: 24px;
+      }
+
+      @media (max-width: 640px) {
+        .upload-page {
+          padding: 28px 14px 56px;
+        }
+
+        .cover-row input {
+          max-width: 100%;
+          color: var(--hc-muted);
+        }
+
+        .two-col,
+        .cover-row {
+          grid-template-columns: 1fr;
+        }
+
+        .cover-row {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+      }
+    `}</style>
+  );
+}

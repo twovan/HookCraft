@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
@@ -29,6 +30,58 @@ interface StemEditorJob {
   editState?: StemEditState | null;
 }
 
+const TEXT = {
+  emptyResult: '\u5206\u8f68\u7ed3\u679c\u4e3a\u7a7a\uff0c\u8bf7\u91cd\u65b0\u8bf7\u6c42 API \u5206\u6790\u3002',
+  loadStemFailed: '\u52a0\u8f7d\u5206\u8f68\u5931\u8d25',
+  missingTaskId: '\u7f3a\u5c11\u6b4c\u66f2\u4efb\u52a1 ID\uff0c\u65e0\u6cd5\u52a0\u8f7d\u7f16\u8f91\u9879\u76ee\u3002',
+  createJobFailed: '\u521b\u5efa\u5206\u8f68\u4efb\u52a1\u5931\u8d25',
+  loadEditorFailed: '\u52a0\u8f7d\u7f16\u8f91\u9879\u76ee\u5931\u8d25',
+  refreshFailed: '\u5237\u65b0\u5206\u8f68\u5931\u8d25',
+  backToStudio: '\u8fd4\u56de\u521b\u4f5c\u4e2d\u5fc3',
+  songEditor: '\u6b4c\u66f2\u7f16\u8f91',
+  stemSaved: '\u5206\u8f68\u5df2\u4fdd\u5b58',
+  stemCached: '\u5206\u8f68\u5df2\u7f13\u5b58',
+  editSaved: '\u7f16\u8f91\u72b6\u6001\u5df2\u4fdd\u5b58',
+  loaded: '\u5df2\u52a0\u8f7d',
+  tracksFrom: '\u6761\u5206\u8f68\uff0c\u6765\u6e90\uff1a',
+  rereadCache: '\u91cd\u65b0\u8bfb\u53d6\u7f13\u5b58',
+  retryApi: '\u91cd\u65b0\u8bf7\u6c42 API \u5206\u6790',
+  editorProject: '\u7f16\u8f91\u9879\u76ee',
+  noCache: '\u6ca1\u6709\u53ef\u7528\u7684\u5206\u8f68\u7f13\u5b58\u3002\u786e\u8ba4 KIE \u4f59\u989d\u5145\u8db3\u540e\uff0c\u53ef\u4ee5\u624b\u52a8\u91cd\u65b0\u8bf7\u6c42 API \u5206\u6790\u3002',
+  checkingCache: '\u68c0\u67e5\u7f13\u5b58',
+  readingStemFiles: '\u8bfb\u53d6\u5206\u8f68\u6587\u4ef6',
+  startingApi: '\u542f\u52a8 API \u5206\u6790',
+  waitingApi: '\u7b49\u5f85 API \u8fd4\u56de',
+  writingCache: '\u5199\u5165\u7f13\u5b58',
+  stemLoaded: '\u5206\u8f68\u5df2\u52a0\u8f7d',
+  stemNotStarted: '\u5206\u8f68\u6ca1\u6709\u6210\u529f\u542f\u52a8',
+  checkingCacheNow: '\u6b63\u5728\u68c0\u67e5\u7f13\u5b58',
+  readingCacheNow: '\u6b63\u5728\u8bfb\u53d6\u7f13\u5b58',
+  startingApiNow: '\u6b63\u5728\u542f\u52a8 API \u5206\u6790',
+  apiAnalyzing: 'API \u5206\u6790\u4e2d',
+  writingCacheNow: '\u6b63\u5728\u5199\u5165\u7f13\u5b58',
+  preparingEditor: '\u51c6\u5907\u6b4c\u66f2\u7f16\u8f91',
+  findingSavedStems: '\u6b63\u5728\u67e5\u627e\u5df2\u4fdd\u5b58\u7684\u5206\u8f68',
+  readingCachedStems: '\u6b63\u5728\u8bfb\u53d6\u7f13\u5b58\u5206\u8f68',
+  submittingKie: '\u6b63\u5728\u63d0\u4ea4 KIE \u5206\u8f68\u8bf7\u6c42',
+  kieAnalyzing: 'KIE \u6b63\u5728\u5206\u6790\u97f3\u9891',
+  savingAnalysis: '\u6b63\u5728\u4fdd\u5b58\u5206\u6790\u7ed3\u679c',
+  cacheHit: '\u7f13\u5b58\u5df2\u547d\u4e2d',
+  loadFailed: '\u5206\u8f68\u52a0\u8f7d\u5931\u8d25',
+  checkingCacheDesc: '\u4f18\u5148\u8bfb\u53d6 Supabase \u4e2d\u5df2\u4fdd\u5b58\u7684\u5206\u8f68\u7ed3\u679c\uff0c\u4e0d\u4f1a\u5148\u6d88\u8017 API \u989d\u5ea6\u3002',
+  readingCacheDesc: '\u6b63\u5728\u4ece\u5df2\u4fdd\u5b58\u8bb0\u5f55\u8bfb\u53d6\u5206\u8f68\u6587\u4ef6\uff1b\u5982\u679c\u7f13\u5b58\u7f3a\u5931\uff0c\u4f1a\u5c1d\u8bd5\u7528 KIE \u4efb\u52a1\u53f7\u8865\u8bfb\u4e00\u6b21\u3002',
+  startingApiDesc: '\u6ca1\u6709\u53ef\u7528\u7f13\u5b58\u6216\u4f60\u624b\u52a8\u9009\u62e9\u91cd\u8bd5\uff0c\u6b63\u5728\u8bf7\u6c42 KIE \u91cd\u65b0\u5206\u6790\u3002',
+  apiProcessingDesc: 'API \u5df2\u63a5\u6536\u4efb\u52a1\uff0c\u6b63\u5728\u7b49\u5f85\u5206\u8f68\u5b8c\u6210\uff1b\u5b8c\u6210\u540e\u4f1a\u81ea\u52a8\u5199\u5165\u7f13\u5b58\u3002',
+  hydratingCacheDesc: '\u5df2\u62ff\u5230\u5206\u8f68\u7ed3\u679c\uff0c\u6b63\u5728\u6574\u7406\u5e76\u8fdb\u5165\u6ce2\u5f62\u7f16\u8f91\u5668\u3002',
+  cacheReadyDesc: '\u5df2\u4ece\u7f13\u5b58\u8bfb\u53d6\u5206\u8f68\uff0c\u4e0d\u4f1a\u4ea7\u751f\u65b0\u7684 KIE \u6d88\u8017\u3002',
+  failedDesc: '\u5206\u8f68\u6ca1\u6709\u6210\u529f\u542f\u52a8\uff0c\u8bf7\u67e5\u770b\u9519\u8bef\u63d0\u793a\u540e\u91cd\u8bd5\u3002',
+  cache: '\u7f13\u5b58',
+  apiHydratedCache: 'API \u8865\u8bfb\u540e\u7f13\u5b58',
+  apiRefilled: 'API \u56de\u586b',
+  apiStateless: 'API \u4e34\u65f6\u7ed3\u679c',
+  savedResult: '\u5df2\u4fdd\u5b58\u7ed3\u679c',
+};
+
 export default function StemEditorPageClient() {
   const searchParams = useSearchParams();
   const generationTaskId = searchParams.get('generationTaskId')?.trim() || '';
@@ -51,11 +104,19 @@ export default function StemEditorPageClient() {
     });
 
     if (data.status === 'completed' && stems.length > 0) {
+      setError(null);
       setPhase(data.analysisSource === 'cache' ? 'cache-ready' : 'hydrating-cache');
       return;
     }
 
+    if (data.status === 'completed' && stems.length === 0) {
+      setError(data.errorMessage || TEXT.emptyResult);
+      setPhase('failed');
+      return;
+    }
+
     if (data.status === 'queued' || data.status === 'processing') {
+      setError(null);
       setPhase(data.analysisSource === 'cache' || data.analysisSource === 'existing-job'
         ? 'reading-cache'
         : 'api-processing');
@@ -72,7 +133,7 @@ export default function StemEditorPageClient() {
     const res = await fetch(`/api/stems/${encodeURIComponent(jobId)}`, { cache: 'no-store' });
     const data = await res.json();
     if (!res.ok) {
-      throw new Error(data.error || '加载分轨失败');
+      throw new Error(data.error || TEXT.loadStemFailed);
     }
 
     applyJobData(data);
@@ -80,7 +141,7 @@ export default function StemEditorPageClient() {
 
   const createJob = useCallback(async (force = false) => {
     if (!generationTaskId) {
-      setError('缺少歌曲任务 ID，无法加载编辑项目。');
+      setError(TEXT.missingTaskId);
       setPhase('failed');
       return;
     }
@@ -107,10 +168,10 @@ export default function StemEditorPageClient() {
           stems: [],
           errorMessage: data.errorMessage || data.error || null,
         });
-        setError(data.error || data.errorMessage || '创建分轨任务失败');
+        setError(data.error || data.errorMessage || TEXT.createJobFailed);
         return;
       }
-      throw new Error(data.error || '创建分轨任务失败');
+      throw new Error(data.error || TEXT.createJobFailed);
     }
 
     applyJobData({
@@ -135,7 +196,7 @@ export default function StemEditorPageClient() {
         }
         await createJob();
       } catch (err) {
-        setError(err instanceof Error ? err.message : '加载编辑项目失败');
+        setError(err instanceof Error ? err.message : TEXT.loadEditorFailed);
         setPhase('failed');
       }
     })();
@@ -146,7 +207,7 @@ export default function StemEditorPageClient() {
 
     const timer = window.setInterval(() => {
       void refreshJob(job.jobId).catch((err) => {
-        setError(err instanceof Error ? err.message : '刷新分轨失败');
+        setError(err instanceof Error ? err.message : TEXT.refreshFailed);
         setPhase('failed');
       });
     }, 5000);
@@ -157,7 +218,7 @@ export default function StemEditorPageClient() {
   const hasLoadedStems = job?.status === 'completed' && job.stems.length > 0;
 
   return (
-    <main style={pageStyle}>
+    <main style={pageStyle(hasLoadedStems)}>
       <style>{`
         @keyframes stem-analyze-wave {
           0%, 100% { transform: scaleY(0.35); opacity: 0.45; }
@@ -168,64 +229,125 @@ export default function StemEditorPageClient() {
           100% { transform: translateX(220%); }
         }
       `}</style>
-      <header style={headerStyle}>
-        <Link href="/studio" style={backLinkStyle}>返回创作中心</Link>
-        <div>
-          <div style={eyebrowStyle}>HookCraft</div>
-          <h1 style={headingStyle}>歌曲编辑</h1>
-        </div>
-      </header>
+      {!hasLoadedStems && (
+        <header style={headerStyle}>
+          <div style={headerPrimaryStyle}>
+            <Link href="/" aria-label="返回 HookCraft 首页" style={brandStyle}>
+              <Image src="/logo-nav.svg" alt="HookCraft" width={140} height={36} priority />
+            </Link>
+            <div style={projectTitleStyle}>
+              <span style={headingStyle}>{TEXT.songEditor}</span>
+            </div>
+            <div style={headerFactsStyle}>
+              <span style={headerFactStyle('project')}>{TEXT.editorProject}</span>
+              <span style={headerFactStyle(phase === 'failed' ? 'danger' : 'loading')}>{formatEditorStatus(job?.status, phase)}</span>
+              {job?.jobId && <span style={headerFactStyle('neutral')}>任务 {job.jobId.slice(0, 8)}</span>}
+              <span style={headerFactStyle('neutral')}>{formatAnalysisSource(job?.analysisSource)}</span>
+            </div>
+          </div>
+          <div style={headerActionStyle}>
+            <span style={timeBadgeStyle}>{phase === 'failed' ? '需要处理' : '准备中'}</span>
+            <Link href="/studio" style={backLinkStyle}>{TEXT.backToStudio}</Link>
+          </div>
+        </header>
+      )}
+      {!hasLoadedStems && (
+        <aside style={sideRailStyle} aria-label="编辑器模块">
+          <span style={sideRailButtonStyle(true)}>轨道</span>
+          <span style={sideRailButtonStyle(false)}>混音</span>
+          <span style={sideRailButtonStyle(false)}>自动化</span>
+          <span style={sideRailButtonStyle(false)}>导出</span>
+        </aside>
+      )}
 
-      <section style={stageStyle}>
-        <div style={statusHeaderStyle}>
-          <div>
-            <div style={statusTitleRowStyle}>
-              <span style={statusTitleStyle}>{formatEditorStatus(job?.status, phase)}</span>
-              {hasLoadedStems && (
-                <span style={cacheBadgeStyle}>
-                  {job.analysisSource === 'cache' ? '分轨已保存' : '分轨已缓存'}
+      <section style={stageStyle(hasLoadedStems)}>
+        {!hasLoadedStems && (
+          <div style={fallbackWorkspaceStyle}>
+            <div style={fallbackTimelineColumnStyle}>
+              <div style={statusHeaderStyle}>
+                <div>
+                  <div style={statusTitleRowStyle}>
+                    <span style={statusTitleStyle}>{formatEditorStatus(job?.status, phase)}</span>
+                    {job?.editState && (
+                      <span style={editBadgeStyle}>{TEXT.editSaved}</span>
+                    )}
+                  </div>
+                  <div style={statusTextStyle}>{formatPhaseDescription(phase)}</div>
+                </div>
+                <div style={actionGroupStyle}>
+                  {job?.jobId && job.status === 'completed' && (
+                    <button type="button" onClick={() => void refreshJob(job.jobId)} style={refreshButtonStyle}>
+                      {TEXT.rereadCache}
+                    </button>
+                  )}
+                  {(job?.status === 'failed' || error) && generationTaskId && (
+                    <button type="button" onClick={() => void createJob(true)} style={refreshButtonStyle}>
+                      {TEXT.retryApi}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <AnalysisLoadingPanel phase={phase} />
+
+              {error && <div style={errorStyle}>{error}</div>}
+              {job?.errorMessage && <div style={errorStyle}>{job.errorMessage}</div>}
+
+              {(job?.status === 'failed' || error) && (
+                <div style={emptyStateStyle}>{TEXT.noCache}</div>
+              )}
+            </div>
+
+            <aside style={fallbackInspectorStyle} aria-label="分轨加载状态">
+              <div style={inspectorHeadingStyle}>
+                <div>
+                  <div style={inspectorEyebrowStyle}>Inspector</div>
+                  <div style={inspectorTitleStyle}>分轨准备</div>
+                </div>
+                <span style={headerFactStyle(phase === 'failed' ? 'danger' : 'loading')}>
+                  {phase === 'failed' ? '异常' : '处理中'}
                 </span>
-              )}
-              {job?.editState && (
-                <span style={editBadgeStyle}>编辑状态已保存</span>
-              )}
-            </div>
-            <div style={statusTextStyle}>
-              {hasLoadedStems
-                ? `已加载 ${job.stems.length} 条分轨，来源：${formatAnalysisSource(job.analysisSource)}`
-                : formatPhaseDescription(phase)}
-            </div>
+              </div>
+              <div style={inspectorSegmentStyle}>
+                <span style={inspectorSegmentActiveStyle}>轨道</span>
+                <span>混音</span>
+                <span>导出</span>
+              </div>
+              <div style={inspectorDetailGridStyle}>
+                <span>任务</span>
+                <strong>{job?.jobId ? job.jobId.slice(0, 8) : generationTaskId ? generationTaskId.slice(0, 8) : '待创建'}</strong>
+                <span>来源</span>
+                <strong>{formatAnalysisSource(job?.analysisSource)}</strong>
+                <span>状态</span>
+                <strong>{formatEditorStatus(job?.status, phase)}</strong>
+              </div>
+              <div style={inspectorActionGridStyle}>
+                <button type="button" style={refreshButtonStyle} onClick={() => generationTaskId && void createJob(false)}>
+                  启动分析
+                </button>
+                <button type="button" style={refreshButtonStyle} onClick={() => job?.jobId && void refreshJob(job.jobId)}>
+                  读取结果
+                </button>
+              </div>
+            </aside>
           </div>
-          <div style={actionGroupStyle}>
-            {job?.jobId && job.status === 'completed' && (
-              <button type="button" onClick={() => void refreshJob(job.jobId)} style={refreshButtonStyle}>
-                重新读取缓存
-              </button>
-            )}
-            {(job?.status === 'failed' || error) && generationTaskId && (
-              <button type="button" onClick={() => void createJob(true)} style={refreshButtonStyle}>
-                重新请求 API 分析
-              </button>
-            )}
-          </div>
-        </div>
+        )}
 
-        {!hasLoadedStems && <AnalysisLoadingPanel phase={phase} />}
-
-        {error && <div style={errorStyle}>{error}</div>}
-        {job?.errorMessage && <div style={errorStyle}>{job.errorMessage}</div>}
+        {!hasLoadedStems && <div style={fallbackTransportStyle} aria-hidden="true">
+          <div style={transportButtonGhostStyle} />
+          <div style={transportButtonGhostStyle} />
+          <div style={transportPlayGhostStyle} />
+          <div style={transportTimeGhostStyle}>0:00.00</div>
+          <div style={transportProgressGhostStyle}><span /></div>
+        </div>}
 
         {hasLoadedStems ? (
           <StemMixerEditor
             stems={job.stems}
-            versionLabel="编辑项目"
+            versionLabel={TEXT.editorProject}
             jobId={job.jobId}
             initialEditState={job.editState || null}
           />
-        ) : job?.status === 'failed' || error ? (
-          <div style={emptyStateStyle}>
-            没有可用的分轨缓存。确认 KIE 余额充足后，可以手动重新请求 API 分析。
-          </div>
         ) : null}
       </section>
     </main>
@@ -234,13 +356,13 @@ export default function StemEditorPageClient() {
 
 function AnalysisLoadingPanel({ phase }: { phase: LoadingPhase }) {
   const steps = [
-    { id: 'checking-cache', label: '检查缓存' },
-    { id: 'reading-cache', label: '读取分轨文件' },
-    { id: 'starting-api', label: '启动 API 分析' },
-    { id: 'api-processing', label: '等待 API 返回' },
-    { id: 'hydrating-cache', label: '写入缓存' },
+    { id: 'checking-cache', label: TEXT.checkingCache },
+    { id: 'reading-cache', label: TEXT.readingStemFiles },
+    { id: 'starting-api', label: TEXT.startingApi },
+    { id: 'api-processing', label: TEXT.waitingApi },
+    { id: 'hydrating-cache', label: TEXT.writingCache },
   ];
-  const activeIndex = Math.max(0, steps.findIndex((step) => step.id === phase));
+  const activeIndex = steps.findIndex((step) => step.id === phase);
 
   return (
     <div style={loadingPanelStyle}>
@@ -257,7 +379,7 @@ function AnalysisLoadingPanel({ phase }: { phase: LoadingPhase }) {
           {steps.map((step, index) => (
             <div
               key={step.id}
-              style={stepPillStyle(index < activeIndex, index === activeIndex)}
+              style={stepPillStyle(activeIndex > -1 && index < activeIndex, index === activeIndex)}
             >
               {step.label}
             </div>
@@ -269,90 +391,296 @@ function AnalysisLoadingPanel({ phase }: { phase: LoadingPhase }) {
 }
 
 function formatEditorStatus(status?: StemEditorStatus, phase?: LoadingPhase) {
-  if (status === 'completed') return '分轨已加载';
-  if (status === 'failed') return '分轨没有成功启动';
-  if (phase === 'checking-cache') return '正在检查缓存';
-  if (phase === 'reading-cache') return '正在读取缓存';
-  if (phase === 'starting-api') return '正在启动 API 分析';
-  if (phase === 'api-processing') return 'API 分析中';
-  if (phase === 'hydrating-cache') return '正在写入缓存';
-  return '准备歌曲编辑';
+  if (status === 'completed') return TEXT.stemLoaded;
+  if (status === 'failed') return TEXT.stemNotStarted;
+  if (phase === 'checking-cache') return TEXT.checkingCacheNow;
+  if (phase === 'reading-cache') return TEXT.readingCacheNow;
+  if (phase === 'starting-api') return TEXT.startingApiNow;
+  if (phase === 'api-processing') return TEXT.apiAnalyzing;
+  if (phase === 'hydrating-cache') return TEXT.writingCacheNow;
+  return TEXT.preparingEditor;
 }
 
 function formatPhaseTitle(phase: LoadingPhase) {
-  if (phase === 'checking-cache') return '正在查找已保存的分轨';
-  if (phase === 'reading-cache') return '正在读取缓存分轨';
-  if (phase === 'starting-api') return '正在提交 KIE 分轨请求';
-  if (phase === 'api-processing') return 'KIE 正在分析音频';
-  if (phase === 'hydrating-cache') return '正在保存分析结果';
-  if (phase === 'cache-ready') return '缓存已命中';
-  return '分轨加载失败';
+  if (phase === 'checking-cache') return TEXT.findingSavedStems;
+  if (phase === 'reading-cache') return TEXT.readingCachedStems;
+  if (phase === 'starting-api') return TEXT.submittingKie;
+  if (phase === 'api-processing') return TEXT.kieAnalyzing;
+  if (phase === 'hydrating-cache') return TEXT.savingAnalysis;
+  if (phase === 'cache-ready') return TEXT.cacheHit;
+  return TEXT.loadFailed;
 }
 
 function formatPhaseDescription(phase: LoadingPhase) {
-  if (phase === 'checking-cache') return '优先读取 Supabase 中已保存的分轨结果，不会先消耗 API 额度。';
-  if (phase === 'reading-cache') return '正在从已保存记录读取分轨文件；如果缓存缺失，会尝试用 KIE 任务号补读一次。';
-  if (phase === 'starting-api') return '没有可用缓存或你手动选择重试，正在请求 KIE 重新分析。';
-  if (phase === 'api-processing') return 'API 已接收任务，正在等待分轨完成；完成后会自动写入缓存。';
-  if (phase === 'hydrating-cache') return '已拿到分轨结果，正在整理并进入波形编辑器。';
-  if (phase === 'cache-ready') return '已从缓存读取分轨，不会产生新的 KIE 消耗。';
-  return '分轨没有成功启动，请查看错误提示后重试。';
+  if (phase === 'checking-cache') return TEXT.checkingCacheDesc;
+  if (phase === 'reading-cache') return TEXT.readingCacheDesc;
+  if (phase === 'starting-api') return TEXT.startingApiDesc;
+  if (phase === 'api-processing') return TEXT.apiProcessingDesc;
+  if (phase === 'hydrating-cache') return TEXT.hydratingCacheDesc;
+  if (phase === 'cache-ready') return TEXT.cacheReadyDesc;
+  return TEXT.failedDesc;
 }
 
 function formatAnalysisSource(source?: string | null) {
-  if (source === 'cache') return '缓存';
-  if (source === 'api-hydrated-cache') return 'API 补读后缓存';
-  if (source === 'api-refreshed') return 'API 回填';
-  if (source === 'api-stateless') return 'API 临时结果';
-  return '已保存结果';
+  if (source === 'cache') return TEXT.cache;
+  if (source === 'api-hydrated-cache') return TEXT.apiHydratedCache;
+  if (source === 'api-refreshed') return TEXT.apiRefilled;
+  if (source === 'api-stateless') return TEXT.apiStateless;
+  return TEXT.savedResult;
 }
 
-const pageStyle: CSSProperties = {
-  minHeight: '100vh',
-  background: '#090a14',
-  color: '#f4f4fb',
-  padding: '36px clamp(16px, 4vw, 56px)',
-};
+function pageStyle(loaded: boolean): CSSProperties {
+  return {
+    minHeight: '100vh',
+    background: loaded
+      ? '#070a11'
+      : 'linear-gradient(180deg, #050914 0%, #070b13 100%)',
+    color: '#f4f4fb',
+    padding: 0,
+    boxSizing: 'border-box',
+    overflowX: 'hidden',
+  };
+}
 
 const headerStyle: CSSProperties = {
-  maxWidth: 1240,
-  margin: '0 auto 24px',
+  position: 'fixed',
+  top: 0,
+  left: 0,
+  right: 0,
+  zIndex: 20,
+  minHeight: 72,
   display: 'flex',
-  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 16,
+  padding: '9px 18px 9px 22px',
+  borderBottom: '1px solid rgba(48, 52, 76, 0.72)',
+  background: 'linear-gradient(180deg, rgba(13, 19, 29, 0.98), rgba(7, 11, 19, 0.96))',
+  boxShadow: '0 10px 26px rgba(0, 0, 0, 0.26)',
+  boxSizing: 'border-box',
+};
+
+const headerPrimaryStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
   gap: 18,
+  minWidth: 0,
 };
 
-const backLinkStyle: CSSProperties = {
-  width: 'fit-content',
-  color: '#c0a7fc',
+const brandStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  minWidth: 172,
+  paddingRight: 20,
+  borderRight: '1px solid rgba(48, 52, 76, 0.72)',
   textDecoration: 'none',
-  border: '1px solid rgba(117, 54, 213, 0.32)',
-  borderRadius: 8,
-  background: 'rgba(117, 54, 213, 0.12)',
-  padding: '8px 12px',
-  fontSize: 13,
-  fontWeight: 700,
+  flex: '0 0 auto',
 };
 
-const eyebrowStyle: CSSProperties = {
-  color: '#8389a5',
+const projectTitleStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  minWidth: 0,
+  color: '#f4f4fb',
+  whiteSpace: 'nowrap',
+};
+
+const headerFactsStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 7,
+  minWidth: 0,
+  overflow: 'hidden',
+};
+
+function headerFactStyle(tone: 'project' | 'neutral' | 'loading' | 'danger'): CSSProperties {
+  const palette = {
+    project: { border: 'rgba(156, 108, 255, 0.34)', background: 'rgba(117, 54, 213, 0.12)', color: '#d8ccff' },
+    neutral: { border: 'rgba(48, 52, 76, 0.78)', background: 'rgba(15, 18, 32, 0.68)', color: '#aeb2c9' },
+    loading: { border: 'rgba(96, 165, 250, 0.38)', background: 'rgba(37, 99, 235, 0.12)', color: '#bfdbfe' },
+    danger: { border: 'rgba(248, 113, 113, 0.36)', background: 'rgba(239, 68, 68, 0.12)', color: '#fca5a5' },
+  }[tone];
+  return {
+    maxWidth: tone === 'project' ? 170 : 190,
+    border: `1px solid ${palette.border}`,
+    borderRadius: 999,
+    background: palette.background,
+    color: palette.color,
+    padding: '4px 9px',
+    fontSize: 11,
+    fontWeight: 900,
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  };
+}
+
+const headerActionStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 10,
+  flex: '0 0 auto',
+};
+
+const timeBadgeStyle: CSSProperties = {
+  color: '#aeb2c9',
   fontSize: 12,
   fontWeight: 800,
 };
 
-const headingStyle: CSSProperties = {
-  margin: '6px 0 0',
-  fontSize: 32,
+const backLinkStyle: CSSProperties = {
+  color: '#e8ddff',
+  textDecoration: 'none',
+  border: '1px solid rgba(139, 92, 246, 0.42)',
+  borderRadius: 10,
+  background: 'rgba(139, 92, 246, 0.14)',
+  padding: '9px 13px',
+  fontSize: 13,
   fontWeight: 900,
 };
 
-const stageStyle: CSSProperties = {
-  maxWidth: 1240,
-  margin: '0 auto',
-  borderRadius: 16,
-  border: '1px solid rgba(117, 54, 213, 0.24)',
-  background: 'linear-gradient(180deg, rgba(26, 28, 48, 0.98), rgba(15, 17, 31, 0.98))',
-  padding: 'clamp(16px, 2.4vw, 28px)',
+const headingStyle: CSSProperties = {
+  fontSize: 17,
+  fontWeight: 900,
+};
+
+const sideRailStyle: CSSProperties = {
+  position: 'fixed',
+  left: 0,
+  top: 72,
+  bottom: 0,
+  zIndex: 18,
+  width: 48,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'stretch',
+  gap: 8,
+  padding: '10px 6px',
+  boxSizing: 'border-box',
+  borderRight: '1px solid rgba(48, 52, 76, 0.64)',
+  background: 'linear-gradient(180deg, rgba(12, 17, 27, 0.98), rgba(5, 9, 15, 0.98))',
+};
+
+function sideRailButtonStyle(active: boolean): CSSProperties {
+  return {
+    minHeight: 54,
+    borderRadius: 8,
+    border: active ? '1px solid rgba(156, 108, 255, 0.72)' : '1px solid transparent',
+    background: active ? 'linear-gradient(180deg, rgba(117, 54, 213, 0.34), rgba(76, 29, 149, 0.22))' : 'transparent',
+    color: active ? '#f2ebff' : '#7e849b',
+    fontSize: 11,
+    fontWeight: 900,
+    writingMode: 'vertical-rl',
+    letterSpacing: 0,
+    display: 'grid',
+    placeItems: 'center',
+    boxShadow: active ? 'inset 2px 0 0 rgba(196, 181, 253, 0.9)' : 'none',
+  };
+}
+
+function stageStyle(loaded: boolean): CSSProperties {
+  return {
+    width: '100%',
+    maxWidth: 'none',
+    margin: 0,
+    minHeight: loaded ? '100vh' : 'calc(100vh - 72px)',
+    paddingTop: loaded ? 0 : 90,
+    paddingLeft: loaded ? 0 : 66,
+    paddingRight: loaded ? 0 : 18,
+    paddingBottom: loaded ? 0 : 84,
+    borderRadius: 0,
+    border: 'none',
+    background: loaded
+      ? '#050912'
+      : 'linear-gradient(180deg, rgba(10, 14, 28, 0.94), rgba(7, 10, 18, 0.98))',
+    boxSizing: 'border-box',
+    overflowX: 'hidden',
+  };
+}
+
+const fallbackWorkspaceStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr) 300px',
+  gap: 10,
+  alignItems: 'start',
+  width: '100%',
+  maxWidth: '100%',
+  minWidth: 0,
+};
+
+const fallbackTimelineColumnStyle: CSSProperties = {
+  minWidth: 0,
+};
+
+const fallbackInspectorStyle: CSSProperties = {
+  minHeight: 520,
+  borderRadius: 8,
+  border: '1px solid rgba(48, 52, 76, 0.74)',
+  background: 'linear-gradient(180deg, rgba(13, 18, 29, 0.94), rgba(7, 11, 20, 0.92))',
+  padding: 12,
+  boxSizing: 'border-box',
+  boxShadow: '0 16px 44px rgba(0, 0, 0, 0.18)',
+};
+
+const inspectorHeadingStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 10,
+};
+
+const inspectorEyebrowStyle: CSSProperties = {
+  color: '#737a93',
+  fontSize: 10,
+  fontWeight: 900,
+  textTransform: 'uppercase',
+};
+
+const inspectorTitleStyle: CSSProperties = {
+  marginTop: 3,
+  color: '#f4f4fb',
+  fontSize: 15,
+  fontWeight: 900,
+};
+
+const inspectorSegmentStyle: CSSProperties = {
+  marginTop: 12,
+  display: 'grid',
+  gridTemplateColumns: 'repeat(3, 1fr)',
+  gap: 4,
+  borderRadius: 8,
+  border: '1px solid rgba(48, 52, 76, 0.78)',
+  background: 'rgba(7, 9, 18, 0.72)',
+  padding: 4,
+  color: '#8f95aa',
+  fontSize: 12,
+  fontWeight: 850,
+  textAlign: 'center',
+};
+
+const inspectorSegmentActiveStyle: CSSProperties = {
+  borderRadius: 6,
+  border: '1px solid rgba(156, 108, 255, 0.58)',
+  background: 'rgba(117, 54, 213, 0.34)',
+  color: '#f2ebff',
+  padding: '7px 6px',
+};
+
+const inspectorDetailGridStyle: CSSProperties = {
+  marginTop: 14,
+  display: 'grid',
+  gridTemplateColumns: '70px minmax(0, 1fr)',
+  gap: '10px 12px',
+  color: '#81889d',
+  fontSize: 12,
+  lineHeight: 1.35,
+};
+
+const inspectorActionGridStyle: CSSProperties = {
+  marginTop: 16,
+  display: 'grid',
+  gridTemplateColumns: '1fr 1fr',
+  gap: 8,
 };
 
 const statusHeaderStyle: CSSProperties = {
@@ -360,6 +688,12 @@ const statusHeaderStyle: CSSProperties = {
   justifyContent: 'space-between',
   alignItems: 'center',
   gap: 16,
+  flexWrap: 'wrap',
+  minWidth: 0,
+  border: '1px solid rgba(48, 52, 76, 0.72)',
+  borderRadius: 8,
+  background: 'rgba(9, 13, 23, 0.82)',
+  padding: '12px 14px',
 };
 
 const statusTitleRowStyle: CSSProperties = {
@@ -406,42 +740,49 @@ const actionGroupStyle: CSSProperties = {
   alignItems: 'center',
   gap: 10,
   flexWrap: 'wrap',
+  minWidth: 0,
 };
 
 const refreshButtonStyle: CSSProperties = {
   minHeight: 36,
-  border: '1px solid rgba(117, 54, 213, 0.42)',
-  borderRadius: 8,
-  background: 'rgba(117, 54, 213, 0.16)',
+  border: '1px solid rgba(139, 92, 246, 0.48)',
+  borderRadius: 10,
+  background: 'rgba(139, 92, 246, 0.16)',
   color: '#e0d0ff',
-  padding: '8px 12px',
+  padding: '8px 13px',
   fontSize: 12,
-  fontWeight: 800,
+  fontWeight: 900,
   cursor: 'pointer',
 };
 
 const errorStyle: CSSProperties = {
-  marginTop: 14,
+  marginTop: 12,
   border: '1px solid rgba(248, 113, 113, 0.32)',
-  borderRadius: 10,
-  background: 'rgba(239, 68, 68, 0.1)',
+  borderRadius: 12,
+  background: 'rgba(127, 29, 29, 0.24)',
   color: '#fca5a5',
-  padding: '10px 12px',
+  padding: '11px 13px',
   fontSize: 13,
 };
 
 const loadingPanelStyle: CSSProperties = {
-  marginTop: 20,
-  minHeight: 230,
-  borderRadius: 14,
-  border: '1px solid rgba(48, 52, 76, 0.9)',
-  background: '#101321',
+  marginTop: 10,
+  minHeight: 248,
+  borderRadius: 8,
+  border: '1px solid rgba(48, 52, 76, 0.72)',
+  background: `
+    linear-gradient(90deg, rgba(32, 38, 55, 0.46) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(32, 38, 55, 0.28) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(10, 14, 24, 0.98), rgba(7, 10, 18, 0.98))
+  `,
+  backgroundSize: '74px 100%, 100% 52px, auto',
   display: 'grid',
   gridTemplateColumns: '96px minmax(0, 1fr)',
   alignItems: 'center',
   gap: 20,
   padding: 22,
   overflow: 'hidden',
+  boxShadow: '0 18px 48px rgba(0, 0, 0, 0.22)',
 };
 
 const waveLoaderStyle: CSSProperties = {
@@ -518,15 +859,66 @@ function stepPillStyle(done: boolean, active: boolean): CSSProperties {
 }
 
 const emptyStateStyle: CSSProperties = {
-  marginTop: 20,
-  minHeight: 180,
-  borderRadius: 12,
-  border: '1px dashed #30344c',
-  background: '#101321',
+  marginTop: 10,
+  minHeight: 116,
+  borderRadius: 8,
+  border: '1px dashed rgba(48, 52, 76, 0.9)',
+  background: 'rgba(10, 14, 28, 0.58)',
   color: '#aeb4c8',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
   padding: 20,
   textAlign: 'center',
+};
+
+const fallbackTransportStyle: CSSProperties = {
+  position: 'fixed',
+  left: 0,
+  right: 0,
+  bottom: 0,
+  zIndex: 19,
+  minHeight: 54,
+  display: 'grid',
+  gridTemplateColumns: '36px 36px 46px 104px minmax(0, 1fr)',
+  alignItems: 'center',
+  gap: 9,
+  padding: '8px 18px',
+  borderTop: '1px solid rgba(48, 52, 76, 0.72)',
+  background: 'rgba(7, 10, 18, 0.96)',
+  boxSizing: 'border-box',
+};
+
+const transportButtonGhostStyle: CSSProperties = {
+  width: 34,
+  height: 34,
+  borderRadius: 8,
+  border: '1px solid rgba(48, 52, 76, 0.9)',
+  background: '#111827',
+};
+
+const transportPlayGhostStyle: CSSProperties = {
+  width: 42,
+  height: 34,
+  borderRadius: 999,
+  background: '#f4f1ff',
+};
+
+const transportTimeGhostStyle: CSSProperties = {
+  height: 34,
+  borderRadius: 8,
+  border: '1px solid rgba(48, 52, 76, 0.9)',
+  background: '#111827',
+  color: '#f4f4fb',
+  display: 'grid',
+  placeItems: 'center',
+  fontSize: 12,
+  fontWeight: 900,
+};
+
+const transportProgressGhostStyle: CSSProperties = {
+  height: 8,
+  borderRadius: 999,
+  background: 'rgba(255, 255, 255, 0.82)',
+  overflow: 'hidden',
 };

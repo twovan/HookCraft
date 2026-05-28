@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 import HistoryList from '@/components/history/HistoryList';
 
 interface BatchSummary {
@@ -42,8 +43,20 @@ interface VersionDetail {
 type TimeRange = '7d' | '30d' | 'all';
 const PAGE_SIZE = 20;
 
+async function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit, timeout = 10000) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeout);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
 export default function CreationsPage() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
+  const [authTimedOut, setAuthTimedOut] = useState(false);
   const [expandParam] = useState(() => {
     if (typeof window !== 'undefined') {
       return new URLSearchParams(window.location.search).get('expand');
@@ -52,6 +65,7 @@ export default function CreationsPage() {
   });
   const [batches, setBatches] = useState<BatchSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [range, setRange] = useState<TimeRange>('30d');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -61,28 +75,49 @@ export default function CreationsPage() {
   const [expandedBatchDetail, setExpandedBatchDetail] = useState<{ templateName?: string; prompt?: string } | undefined>(undefined);
 
   useEffect(() => {
-    fetchBatches();
-  }, [range, page]);
+    if (!authLoading) {
+      setAuthTimedOut(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setAuthTimedOut(true), 1800);
+    return () => window.clearTimeout(timer);
+  }, [authLoading]);
 
-  // Auto-expand only when generation redirects back with an explicit batch id.
   useEffect(() => {
+    if (authLoading && !authTimedOut) return;
+    if (!user) {
+      router.replace('/login?redirectTo=/account/creations');
+      return;
+    }
+    fetchBatches();
+  }, [authLoading, authTimedOut, user, range, page, router]);
+
+  useEffect(() => {
+    if (!user) return;
     if (batches.length > 0 && expandParam && !expandedBatchId) {
       const matched = batches.find((batch) => batch.batchId === expandParam || batch.taskId === expandParam);
       handleExpand(matched?.taskId || expandParam, matched?.batchId || expandParam);
     }
-  }, [expandParam, batches, expandedBatchId]);
+  }, [expandParam, batches, expandedBatchId, user]);
 
   const fetchBatches = async () => {
     setLoading(true);
+    setFetchError(null);
     try {
-      const res = await fetch(`/api/batches?range=${range}&page=${page}&pageSize=${PAGE_SIZE}`);
+      const res = await fetchWithTimeout(`/api/batches?range=${range}&page=${page}&pageSize=${PAGE_SIZE}`);
       if (res.ok) {
         const data = await res.json();
         setBatches(data.batches || []);
         setTotal(data.total || 0);
+      } else {
+        setBatches([]);
+        setTotal(0);
+        setFetchError('创作记录暂时无法同步，请稍后重试。');
       }
     } catch {
-      // Handle error
+      setBatches([]);
+      setTotal(0);
+      setFetchError('网络连接不稳定，创作记录同步失败。');
     } finally {
       setLoading(false);
     }
@@ -112,17 +147,14 @@ export default function CreationsPage() {
   const handleExpand = async (taskId: string, batchId?: string) => {
     const targetBatchId = batchId || batches.find((b) => b.taskId === taskId)?.batchId || taskId;
     if (expandedTaskId === taskId) {
-      setExpandedBatchId(undefined);
-      setExpandedTaskId(undefined);
-      setExpandedVersions(undefined);
-      setExpandedBatchDetail(undefined);
+      closeExpandedDetail();
       return;
     }
 
     setExpandedBatchId(targetBatchId);
     setExpandedTaskId(taskId);
     try {
-      const res = await fetch(`/api/batches/${targetBatchId}`);
+      const res = await fetchWithTimeout(`/api/batches/${targetBatchId}`);
       if (res.ok) {
         const data = await res.json();
         const versions = data.versions || [];
@@ -159,69 +191,65 @@ export default function CreationsPage() {
   const pageStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const pageEnd = Math.min(page * PAGE_SIZE, total);
 
-  return (
-    <div style={{ minHeight: '100vh', background: '#0d0d14' }}>
-      {/* Background */}
-      <div style={{
-        position: 'fixed',
-        top: 0, left: 0, right: 0, bottom: 0,
-        background: 'radial-gradient(circle at 20% 50%, rgba(117, 54, 213,0.03) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(117, 54, 213,0.03) 0%, transparent 50%)',
-        pointerEvents: 'none',
-        zIndex: 0,
-      }} />
-
-      <div style={{ position: 'relative', zIndex: 1, maxWidth: 1420, margin: '0 auto', padding: '48px 32px' }}>
-        {/* Header */}
-        <div style={{ marginBottom: 32 }}>
-          <h1 style={{
-            fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-            fontSize: 32,
-            fontWeight: 700,
-            color: '#e8e8f0',
-            marginBottom: 8,
-          }}>
-            我的创作
-          </h1>
-          <p style={{ fontSize: 14, color: '#9ca3af', margin: 0 }}>
-            查看您的所有 AI 音乐创作记录
-          </p>
-        </div>
-
-        {/* Time range filter */}
-        <div style={{
-          display: 'flex',
-          gap: 8,
-          marginBottom: 24,
-        }}>
-          {rangeOptions.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => handleRangeChange(opt.value)}
-              style={{
-                padding: '8px 16px',
-                borderRadius: 20,
-                border: range === opt.value ? 'none' : '1px solid #2a2a40',
-                background: range === opt.value
-                  ? 'linear-gradient(135deg, #7536d5, #5a2db8)'
-                  : 'white',
-                color: range === opt.value ? 'white' : '#9ca3af',
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: 'pointer',
-                fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-                transition: 'all 0.2s',
-              }}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Content */}
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: '60px 0', color: '#999', fontSize: 14 }}>
-            加载中...
+  if ((authLoading && !authTimedOut) || !user) {
+    return (
+      <main className="creations-page">
+        <div className="creations-shell">
+          <div className="loading-panel">
+            <span>正在确认登录状态...</span>
+            <div />
           </div>
+        </div>
+        <CreationsStyles />
+      </main>
+    );
+  }
+
+  return (
+    <main className="creations-page">
+      <div className="creations-shell">
+        <header className="creations-header">
+          <div>
+            <span>创作档案</span>
+            <h1>我的创作</h1>
+            <p>查看、试听、重命名、下载或继续编辑你的 AI 音乐作品。</p>
+          </div>
+          <button type="button" className="hc-button hc-button-primary" onClick={() => router.push('/studio')}>
+            新建创作
+          </button>
+        </header>
+
+        <section className="creations-toolbar" aria-label="创作记录筛选">
+          <div className="range-tabs">
+            {rangeOptions.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => handleRangeChange(opt.value)}
+                className={range === opt.value ? 'active' : ''}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <div className="summary-pill">
+            {total > 0 ? `${pageStart}-${pageEnd} / ${total}` : '暂无记录'}
+          </div>
+        </section>
+
+        {loading ? (
+          <div className="loading-panel">
+            <span>正在同步创作记录...</span>
+            <div />
+          </div>
+        ) : fetchError ? (
+          <section className="error-panel" aria-live="polite">
+            <strong>同步失败</strong>
+            <p>{fetchError}</p>
+            <button type="button" className="hc-button hc-button-secondary" onClick={fetchBatches}>
+              重新同步
+            </button>
+          </section>
         ) : (
           <>
             <HistoryList
@@ -234,64 +262,225 @@ export default function CreationsPage() {
               expandedBatchDetail={expandedBatchDetail}
             />
             {total > PAGE_SIZE && (
-              <div style={{
-                marginTop: 18,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 12,
-                color: '#9ca3af',
-                fontSize: 13,
-              }}>
-                <span>{pageStart}-{pageEnd} / {total}</span>
-                <button
-                  type="button"
-                  onClick={() => handlePageChange(page - 1)}
-                  disabled={page <= 1}
-                  style={{
-                    ...paginationButtonStyle,
-                    opacity: page <= 1 ? 0.45 : 1,
-                    cursor: page <= 1 ? 'not-allowed' : 'pointer',
-                  }}
-                >
+              <nav className="pagination" aria-label="创作记录分页">
+                <button type="button" onClick={() => handlePageChange(page - 1)} disabled={page <= 1}>
                   上一页
                 </button>
-                <span style={{
-                  minWidth: 58,
-                  textAlign: 'center',
-                  color: '#e8e8f0',
-                  fontWeight: 600,
-                }}>
-                  {page} / {totalPages}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => handlePageChange(page + 1)}
-                  disabled={page >= totalPages}
-                  style={{
-                    ...paginationButtonStyle,
-                    opacity: page >= totalPages ? 0.45 : 1,
-                    cursor: page >= totalPages ? 'not-allowed' : 'pointer',
-                  }}
-                >
+                <span>{page} / {totalPages}</span>
+                <button type="button" onClick={() => handlePageChange(page + 1)} disabled={page >= totalPages}>
                   下一页
                 </button>
-              </div>
+              </nav>
             )}
           </>
         )}
       </div>
-    </div>
+
+      <CreationsStyles />
+    </main>
   );
 }
 
-const paginationButtonStyle: React.CSSProperties = {
-  border: '1px solid #2a2a40',
-  background: '#1b1f24',
-  color: '#e8e8f0',
-  borderRadius: 10,
-  padding: '8px 14px',
-  fontSize: 13,
-  fontWeight: 600,
-  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-};
+function CreationsStyles() {
+  return (
+    <style>{`
+        .creations-page {
+          min-height: 100vh;
+          background:
+            radial-gradient(circle at 12% 12%, rgba(206, 255, 53, 0.10), transparent 300px),
+            radial-gradient(circle at 88% 24%, rgba(82, 214, 198, 0.08), transparent 340px),
+            var(--hc-bg);
+          color: var(--hc-text);
+          padding: 42px 22px 72px;
+        }
+
+        .creations-shell {
+          max-width: 1420px;
+          margin: 0 auto;
+        }
+
+        .creations-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-end;
+          gap: 18px;
+          margin-bottom: 24px;
+        }
+
+        .creations-header span {
+          color: var(--hc-lime);
+          font-size: 12px;
+          font-weight: 900;
+          letter-spacing: .1em;
+          text-transform: uppercase;
+        }
+
+        .creations-header h1 {
+          margin: 8px 0 8px;
+          font-size: clamp(34px, 5vw, 58px);
+          line-height: 1;
+          letter-spacing: 0;
+        }
+
+        .creations-header p {
+          margin: 0;
+          color: var(--hc-muted);
+          font-size: 15px;
+          overflow-wrap: anywhere;
+        }
+
+        .creations-toolbar {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 14px;
+          margin-bottom: 18px;
+          border: 1px solid var(--hc-line);
+          background: rgba(24, 26, 34, 0.72);
+          border-radius: var(--hc-radius);
+          padding: 10px;
+        }
+
+        .range-tabs {
+          display: flex;
+          gap: 6px;
+          flex-wrap: wrap;
+        }
+
+        .range-tabs button,
+        .pagination button {
+          border: 1px solid transparent;
+          background: transparent;
+          color: var(--hc-muted);
+          border-radius: 999px;
+          padding: 9px 14px;
+          font-weight: 800;
+          cursor: pointer;
+          transition: background .2s ease, color .2s ease, border-color .2s ease;
+        }
+
+        .range-tabs button.active {
+          border-color: rgba(206, 255, 53, 0.36);
+          background: rgba(206, 255, 53, 0.12);
+          color: var(--hc-lime);
+        }
+
+        .summary-pill {
+          color: var(--hc-muted);
+          border: 1px solid var(--hc-line);
+          background: rgba(255,255,255,.03);
+          border-radius: 999px;
+          padding: 9px 12px;
+          font-size: 12px;
+          font-weight: 800;
+          white-space: nowrap;
+        }
+
+        .loading-panel {
+          border: 1px solid var(--hc-line);
+          background: rgba(24, 26, 34, 0.86);
+          border-radius: var(--hc-radius-lg);
+          padding: 46px 26px;
+          color: var(--hc-muted);
+          text-align: center;
+          box-shadow: var(--hc-shadow);
+        }
+
+        .loading-panel div {
+          width: min(360px, 100%);
+          height: 4px;
+          margin: 18px auto 0;
+          overflow: hidden;
+          border-radius: 999px;
+          background: linear-gradient(90deg, rgba(255,255,255,.08), var(--hc-lime), var(--hc-cyan), rgba(255,255,255,.08));
+          background-size: 240% 100%;
+          animation: creations-load 1.1s ease-in-out infinite alternate;
+        }
+
+        .error-panel {
+          border: 1px solid rgba(255, 90, 61, 0.34);
+          background: rgba(255, 90, 61, 0.08);
+          border-radius: var(--hc-radius-lg);
+          padding: 28px;
+          color: var(--hc-text);
+          box-shadow: var(--hc-shadow);
+        }
+
+        .error-panel strong {
+          display: block;
+          color: #ff9b87;
+          font-size: 18px;
+          margin-bottom: 8px;
+        }
+
+        .error-panel p {
+          margin: 0 0 18px;
+          color: var(--hc-muted);
+        }
+
+        .pagination {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          gap: 12px;
+          margin-top: 18px;
+          color: var(--hc-muted);
+          font-size: 13px;
+        }
+
+        .pagination span {
+          min-width: 58px;
+          text-align: center;
+          color: var(--hc-text);
+          font-weight: 900;
+        }
+
+        .pagination button {
+          border-color: var(--hc-line);
+          background: rgba(24, 26, 34, 0.86);
+          color: var(--hc-text);
+        }
+
+        .pagination button:disabled {
+          cursor: not-allowed;
+          opacity: .45;
+        }
+
+        @keyframes creations-load {
+          from { background-position: 0% 50%; }
+          to { background-position: 100% 50%; }
+        }
+
+        @media (max-width: 720px) {
+          .creations-page {
+            padding: 28px 14px 56px;
+          }
+
+          .creations-header,
+          .creations-toolbar {
+            align-items: stretch;
+            flex-direction: column;
+          }
+
+          .creations-header .hc-button,
+          .summary-pill {
+            width: 100%;
+          }
+
+          .range-tabs {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            width: 100%;
+          }
+
+          .range-tabs button {
+            padding-inline: 10px;
+          }
+
+          .summary-pill {
+            text-align: center;
+          }
+        }
+      `}</style>
+  );
+}

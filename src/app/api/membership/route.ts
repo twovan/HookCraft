@@ -2,8 +2,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { MembershipService } from '../../../lib/membership/MembershipService';
-import { supabaseAdmin } from '../../../lib/supabase/server';
-import { getAuthUser } from '../../../lib/supabase/auth-helpers';
+import { getServerSupabaseClient } from '../../../lib/supabase/server';
+import { getAuthAccessToken, getAuthUser } from '../../../lib/supabase/auth-helpers';
 
 export async function GET(req: NextRequest) {
   try {
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const membershipService = new MembershipService(supabaseAdmin);
+    const membershipService = new MembershipService(getServerSupabaseClient(await getAuthAccessToken()));
     const membership = await membershipService.getMembership(user.id);
 
     return NextResponse.json(membership);

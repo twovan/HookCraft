@@ -3,9 +3,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { TemplateService } from '../../../lib/template/TemplateService';
-import { supabaseAdmin } from '../../../lib/supabase/server';
+import { getServerSupabaseClient } from '../../../lib/supabase/server';
+import { getAuthAccessToken } from '../../../lib/supabase/auth-helpers';
 import type { MembershipTier } from '../../../types/membership';
 import { TIER_CONFIGS } from '../../../config/tierConfig';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
@@ -20,7 +23,8 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const templateService = new TemplateService(supabaseAdmin);
+    const supabase = getServerSupabaseClient(await getAuthAccessToken());
+    const templateService = new TemplateService(supabase);
     const allTemplates = await templateService.getTemplates();
 
     // 按用户等级过滤可访问的模板，且只显示已发布的
@@ -33,7 +37,7 @@ export async function GET(req: NextRequest) {
     let producerMap: Record<string, { name: string; avatarUrl?: string }> = {};
 
     if (producerIds.length > 0) {
-      const { data: producers } = await supabaseAdmin
+      const { data: producers } = await supabase
         .from('producers')
         .select('id, display_name, avatar_url')
         .in('id', producerIds);

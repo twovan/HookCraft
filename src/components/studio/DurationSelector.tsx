@@ -10,11 +10,6 @@ export interface DurationSelectorProps {
   disabled?: boolean;
 }
 
-/**
- * 时长选择器组件
- * - 两个按钮：30s 和 2min，显示 Credits 消耗
- * - Free 用户：仅 30s 可用，2min 显示升级提示
- */
 export default function DurationSelector({
   selected,
   onSelect,
@@ -26,18 +21,21 @@ export default function DurationSelector({
   const options: Array<{
     duration: 30 | 120;
     label: string;
+    detail: string;
     credits: number;
     locked: boolean;
   }> = [
     {
       duration: 30,
       label: '30 秒',
+      detail: isPaid ? '快速预览' : '消耗 1 次预览',
       credits: isPaid ? CREDITS_COST.preview : 0,
       locked: false,
     },
     {
       duration: 120,
       label: '2 分钟',
+      detail: '完整 Demo',
       credits: CREDITS_COST.full_demo_long,
       locked: !isPaid,
     },
@@ -45,26 +43,8 @@ export default function DurationSelector({
 
   return (
     <div>
-      <label
-        style={{
-          display: 'block',
-          fontSize: '14px',
-          fontWeight: 600,
-          color: '#e8e8f0',
-          marginBottom: '10px',
-          fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-        }}
-      >
-        生成时长
-      </label>
-      <div
-        style={{
-          display: 'flex',
-          gap: '12px',
-        }}
-        role="radiogroup"
-        aria-label="生成时长选择"
-      >
+      <label style={labelStyle}>生成时长</label>
+      <div style={groupStyle} role="radiogroup" aria-label="生成时长选择">
         {options.map((option) => {
           const isSelected = selected === option.duration;
           const isDisabled = disabled || option.locked;
@@ -84,90 +64,26 @@ export default function DurationSelector({
               aria-checked={isSelected}
               aria-disabled={isDisabled}
               style={{
-                flex: 1,
-                position: 'relative',
-                padding: '16px 12px',
-                borderRadius: '12px',
-                border: isSelected
-                  ? '2px solid #7536d5'
-                  : '1px solid #2a2a40',
+                ...optionStyle,
+                borderColor: isSelected ? 'rgba(206,255,53,.58)' : 'var(--hc-line)',
                 background: isSelected
-                  ? 'linear-gradient(135deg, rgba(117, 54, 213, 0.1) 0%, #0d0d14 100%)'
+                  ? 'linear-gradient(135deg, rgba(206,255,53,.12), rgba(82,214,198,.06))'
                   : option.locked
-                    ? '#12121e'
-                    : '#1a1a2e',
+                    ? 'rgba(255,255,255,.025)'
+                    : 'rgba(24,26,34,.86)',
                 cursor: isDisabled ? 'not-allowed' : 'pointer',
-                opacity: option.locked ? 0.7 : 1,
-                transition: 'all 0.2s ease',
-                fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-                textAlign: 'center',
+                opacity: option.locked ? 0.68 : 1,
               }}
             >
-              {/* Duration label */}
-              <div
-                style={{
-                  fontSize: '18px',
-                  fontWeight: 700,
-                  color: isSelected ? '#7536d5' : option.locked ? '#999' : '#e8e8f0',
-                  marginBottom: '4px',
-                  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-                }}
-              >
+              <span style={{ ...durationStyle, color: isSelected ? 'var(--hc-lime)' : 'var(--hc-text)' }}>
                 {option.label}
-              </div>
-
-              {/* Credits cost */}
-              <div
-                style={{
-                  fontSize: '12px',
-                  color: isSelected ? '#7536d5' : '#999',
-                  fontWeight: 500,
-                }}
-              >
-                {option.locked ? (
-                  <span style={{ color: '#7536d5' }}>需升级 Pro</span>
-                ) : isPaid ? (
-                  `${option.credits} Credit${option.credits > 1 ? 's' : ''}`
-                ) : (
-                  '消耗 1 次预览'
-                )}
-              </div>
-
-              {/* Lock icon for paid-only */}
-              {option.locked && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '8px',
-                    right: '8px',
-                    fontSize: '14px',
-                  }}
-                >
-                  🔒
-                </div>
-              )}
-
-              {/* Selected indicator */}
-              {isSelected && !option.locked && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '8px',
-                    right: '8px',
-                    width: '16px',
-                    height: '16px',
-                    borderRadius: '50%',
-                    background: '#7536d5',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '10px',
-                    color: 'white',
-                  }}
-                >
-                  ✓
-                </div>
-              )}
+              </span>
+              <span style={detailStyle}>
+                {option.locked ? '升级 Pro 解锁' : isPaid ? `${option.credits} 点额度` : option.detail}
+              </span>
+              <span style={{ ...statusStyle, color: isSelected ? 'var(--hc-lime)' : 'var(--hc-muted)' }}>
+                {option.locked ? '锁定' : isSelected ? '已选' : '可选'}
+              </span>
             </button>
           );
         })}
@@ -175,3 +91,51 @@ export default function DurationSelector({
     </div>
   );
 }
+
+const labelStyle: React.CSSProperties = {
+  display: 'block',
+  marginBottom: 10,
+  color: 'var(--hc-text)',
+  fontSize: 14,
+  fontWeight: 900,
+};
+
+const groupStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  gap: 10,
+};
+
+const optionStyle: React.CSSProperties = {
+  position: 'relative',
+  minHeight: 86,
+  border: '1px solid var(--hc-line)',
+  borderRadius: 12,
+  padding: '14px 13px',
+  textAlign: 'left',
+  transition: 'border-color .2s ease, background .2s ease, opacity .2s ease',
+};
+
+const durationStyle: React.CSSProperties = {
+  display: 'block',
+  fontSize: 20,
+  fontWeight: 950,
+  lineHeight: 1,
+};
+
+const detailStyle: React.CSSProperties = {
+  display: 'block',
+  marginTop: 8,
+  color: 'var(--hc-muted)',
+  fontSize: 12,
+  fontWeight: 800,
+};
+
+const statusStyle: React.CSSProperties = {
+  position: 'absolute',
+  top: 10,
+  right: 10,
+  fontSize: 10,
+  fontWeight: 950,
+  letterSpacing: '.08em',
+};

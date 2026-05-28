@@ -2,21 +2,64 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '../../../../lib/supabase/server';
 import { requireAdmin } from '../../../../lib/admin/auth';
 
+const ACTIVE_STATUSES = new Set(['pending', 'building_prompt', 'generating', 'post_processing']);
+const FINISHED_STATUSES = new Set(['completed', 'selected', 'archived']);
+
+function normalizeTaskStatus(task: any) {
+  if (task.error_code || task.error_message) return 'failed';
+  if (task.status === 'completed' && !task.audio_path && task.raw_audio_path) return 'generating';
+  return task.status || 'pending';
+}
+
+function getElapsedSeconds(task: any) {
+  if (!task.created_at) return 0;
+
+  const startedAt = new Date(task.created_at).getTime();
+  const endedAt = task.updated_at && !ACTIVE_STATUSES.has(normalizeTaskStatus(task))
+    ? new Date(task.updated_at).getTime()
+    : Date.now();
+  const seconds = Math.round((endedAt - startedAt) / 1000);
+
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : 0;
+}
+
+function getDurationSeconds(task: any) {
+  return typeof task.duration_seconds === 'number' && task.duration_seconds > 0
+    ? task.duration_seconds
+    : null;
+}
+
+function getStyleTag(task: any) {
+  const typeMap: Record<string, string> = {
+    preview: '预览',
+    full_demo: '完整',
+    upload_cover: '上传翻唱',
+    add_instrumental: '加伴奏',
+    style_dna: '风格 DNA',
+  };
+  const parts = [typeMap[task.generation_type] || task.generation_type || '未知类型'];
+
+  if (task.model_id) parts.push(task.model_id);
+  if (task.version_number) parts.push(`v${task.version_number}`);
+  if (task.raw_audio_path?.startsWith('kie:')) parts.push(task.raw_audio_path.slice(4));
+
+  return parts.join(' / ');
+}
+
 /**
  * GET /api/admin/ai-tasks
- * 获取 AI 生成任务列表和统计
+ * 获取 AI 生成任务列表和统计。
  */
 export async function GET(req: NextRequest) {
   try {
-    const { admin, response } = await requireAdmin(req);
+    const { response } = await requireAdmin(req);
     if (response) return response;
 
     const { searchParams } = new URL(req.url);
-    const page = parseInt(searchParams.get('page') || '1');
-    const pageSize = parseInt(searchParams.get('pageSize') || '10');
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const pageSize = parseInt(searchParams.get('pageSize') || '10', 10);
     const status = searchParams.get('status') || '';
 
-    // Build query
     let query = supabaseAdmin
       .from('generation_tasks')
       .select('*', { count: 'exact' });
@@ -34,40 +77,36 @@ export async function GET(req: NextRequest) {
 
     if (error) throw error;
 
-    // Stats - today's data
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayStr = today.toISOString();
 
     const { data: todayTasks } = await supabaseAdmin
       .from('generation_tasks')
-      .select('status, credits_consumed, created_at, updated_at')
+      .select('status, credits_consumed, created_at, updated_at, audio_path, raw_audio_path, error_code, error_message')
       .gte('created_at', todayStr);
 
-    const allToday = todayTasks || [];
-    const dailyCredits = allToday.reduce((sum: number, t: any) => sum + (t.credits_consumed || 1), 0);
-    const activeTasks = allToday.filter((t: any) => t.status === 'generating' || t.status === 'pending' || t.status === 'building_prompt').length;
-    const completedToday = allToday.filter((t: any) => t.status === 'completed').length;
-    const failedToday = allToday.filter((t: any) => t.status === 'failed').length;
+    const todayWithRealStatus = (todayTasks || []).map((t: any) => ({
+      ...t,
+      status: normalizeTaskStatus(t),
+    }));
+    const dailyCredits = todayWithRealStatus.reduce((sum: number, t: any) => sum + (t.credits_consumed || 0), 0);
+    const activeTasks = todayWithRealStatus.filter((t: any) => ACTIVE_STATUSES.has(t.status)).length;
+    const completedToday = todayWithRealStatus.filter((t: any) => FINISHED_STATUSES.has(t.status)).length;
+    const failedToday = todayWithRealStatus.filter((t: any) => t.status === 'failed' || t.status === 'safety_blocked').length;
     const successRate = (completedToday + failedToday) > 0
       ? Math.round((completedToday / (completedToday + failedToday)) * 100)
       : 100;
 
-    // Calculate average duration from created_at to updated_at for completed tasks
-    const completedTasks = allToday.filter((t: any) => t.status === 'completed' && t.updated_at);
-    const durations = completedTasks.map((t: any) => {
-      const start = new Date(t.created_at).getTime();
-      const end = new Date(t.updated_at).getTime();
-      return Math.round((end - start) / 1000);
-    }).filter((d: number) => d > 0 && d < 3600);
+    const completedTasks = todayWithRealStatus.filter((t: any) => FINISHED_STATUSES.has(t.status) && t.updated_at);
+    const durations = completedTasks.map(getElapsedSeconds).filter((d: number) => d > 0 && d < 3600);
     const avgDuration = durations.length > 0
       ? Math.round(durations.reduce((a: number, b: number) => a + b, 0) / durations.length)
       : 0;
 
-    // Popular styles (from generation_type)
     const { data: allTodayFull } = await supabaseAdmin
       .from('generation_tasks')
-      .select('generation_type, model_id')
+      .select('generation_type')
       .gte('created_at', todayStr);
 
     const styleCounts: Record<string, number> = {};
@@ -85,7 +124,6 @@ export async function GET(req: NextRequest) {
         percentage: totalStyleTasks > 0 ? Math.round((cnt / totalStyleTasks) * 100) : 0,
       }));
 
-    // Failure reasons
     const { data: failedTasksList } = await supabaseAdmin
       .from('generation_tasks')
       .select('error_message')
@@ -109,17 +147,21 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       data: (tasks || []).map((t: any) => {
-        const elapsed = t.updated_at && t.status === 'completed'
-          ? Math.round((new Date(t.updated_at).getTime() - new Date(t.created_at).getTime()) / 1000)
-          : 0;
+        const normalizedStatus = normalizeTaskStatus(t);
+
         return {
           id: t.id,
           userId: t.user_id,
-          userName: t.user_id?.slice(0, 8) || '用户',
-          styleTag: t.generation_type === 'preview' ? '预览' : '完整',
-          duration: t.credits_consumed || 0,
-          status: t.status,
-          elapsedTime: elapsed,
+          userName: t.user_id || '未知用户',
+          styleTag: getStyleTag(t),
+          duration: getDurationSeconds(t),
+          creditsConsumed: t.credits_consumed || 0,
+          status: normalizedStatus,
+          originalStatus: t.status,
+          elapsedTime: getElapsedSeconds(t),
+          modelId: t.model_id,
+          versionNumber: t.version_number,
+          errorMessage: t.error_message,
           createdAt: t.created_at,
         };
       }),
@@ -137,6 +179,6 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error('[Admin AI Tasks GET Error]', error);
-    return NextResponse.json({ error: '获取AI任务列表失败' }, { status: 500 });
+    return NextResponse.json({ error: '获取 AI 任务列表失败' }, { status: 500 });
   }
 }

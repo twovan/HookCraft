@@ -213,6 +213,27 @@ export default function StudioPageClient({
   const creditsExhaustedPaid = isPaid && isExhausted;
   const previewsExhaustedFree = !isPaid && previewCount !== null && previewCount.remaining < 1;
 
+  const tabButtonStyle = (tab: StudioTab): React.CSSProperties => {
+    const active = activeTab === tab;
+    return {
+      display: studioTabSettings.visibleTabs.includes(tab) ? 'block' : 'none',
+      flex: 1,
+      minWidth: 132,
+      padding: '12px 18px',
+      borderRadius: 8,
+      border: '1px solid transparent',
+      background: active ? 'rgba(206, 255, 53, 0.12)' : 'transparent',
+      color: active ? '#ceff35' : '#a8aaa3',
+      fontSize: 14,
+      fontWeight: 850,
+      cursor: 'pointer',
+      fontFamily: 'var(--hc-font)',
+      transition: 'all 0.15s ease',
+      boxShadow: active ? 'inset 0 0 0 1px rgba(206, 255, 53, 0.16)' : 'none',
+      whiteSpace: 'nowrap',
+    };
+  };
+
   const showUpgradePrompt = useCallback((feature: string) => {
     setUpgradeFeature(feature);
     setUpgradeModalOpen(true);
@@ -446,11 +467,13 @@ export default function StudioPageClient({
     <div
       style={{
         minHeight: '100vh',
-        background: '#0d0d14',
+        background: 'var(--hc-bg)',
         position: 'relative',
         paddingBottom: '80px',
       }}
+      className="studio-page"
     >
+      <style>{studioPageStyles}</style>
       {/* Background texture */}
       <div
         style={{
@@ -460,41 +483,44 @@ export default function StudioPageClient({
           right: 0,
           bottom: 0,
           background:
-            'radial-gradient(circle at 20% 50%, rgba(117, 54, 213, 0.03) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(117, 54, 213, 0.03) 0%, transparent 50%)',
+            'linear-gradient(180deg, rgba(82, 214, 198, 0.06), transparent 300px), radial-gradient(circle at 82% 12%, rgba(206, 255, 53, 0.12), transparent 300px)',
           pointerEvents: 'none',
           zIndex: 0,
         }}
       />
 
-      <div style={{ position: 'relative', zIndex: 1, maxWidth: 1400, margin: '0 auto', padding: '48px 48px' }}>
+      <div style={{ position: 'relative', zIndex: 1, maxWidth: 1400, margin: '0 auto', padding: '48px clamp(20px, 4vw, 48px)' }}>
         {/* Page Header */}
         <div style={{ marginBottom: '32px' }}>
           <h1
             style={{
               fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-              fontSize: '36px',
-              fontWeight: 700,
-              color: '#e8e8f0',
+              fontSize: '42px',
+              fontWeight: 900,
+              color: 'var(--hc-text)',
               marginBottom: '8px',
+              letterSpacing: 0,
             }}
           >
             AI 创作中心
           </h1>
-          <p style={{ fontSize: '15px', color: '#9ca3af', margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <p style={{ fontSize: '15px', color: 'var(--hc-text-muted)', margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
             <span>选择模板或输入提示词，AI 为您生成音乐作品</span>
-            <button
-              onClick={() => setCopyrightModalOpen(true)}
-              style={{
-                background: 'none', border: 'none', padding: 0,
-                color: '#9ca3af', fontSize: 12, cursor: 'pointer',
-                textDecoration: 'underline', fontFamily: "'Inter', sans-serif",
-                transition: 'color 0.2s',
-              }}
-              onMouseEnter={e => e.currentTarget.style.color = '#c0a7fc'}
-              onMouseLeave={e => e.currentTarget.style.color = '#9ca3af'}
-            >
-              © HookCraft 创作安全与版权说明
-            </button>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <button
+                onClick={() => setCopyrightModalOpen(true)}
+                style={{
+                  background: 'none', border: 'none', padding: 0,
+                  color: 'var(--hc-text-muted)', fontSize: 12, cursor: 'pointer',
+                  textDecoration: 'underline', fontFamily: "'Inter', sans-serif",
+                  transition: 'color 0.2s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.color = '#ceff35'}
+                onMouseLeave={e => e.currentTarget.style.color = 'var(--hc-text-muted)'}
+              >
+                © HookCraft 创作安全与版权说明
+              </button>
+            </span>
           </p>
         </div>
 
@@ -504,146 +530,42 @@ export default function StudioPageClient({
             display: showStudioTabs ? 'flex' : 'none',
             gap: '4px',
             marginBottom: '32px',
-            background: '#12121e',
-            borderRadius: '14px',
+            background: 'rgba(255,255,255,0.04)',
+            borderRadius: '12px',
             padding: '4px',
-            border: '1px solid #2a2a40',
+            border: '1px solid rgba(255,255,255,0.1)',
+            overflowX: 'auto',
           }}
         >
           <button
             onClick={() => setActiveTab('template')}
-            style={{
-              display: studioTabSettings.visibleTabs.includes('template') ? 'block' : 'none',
-              flex: 1,
-              padding: '12px 20px',
-              borderRadius: '10px',
-              border: 'none',
-              background: activeTab === 'template'
-                ? 'linear-gradient(135deg, rgba(117, 54, 213, 0.2), rgba(90, 45, 184, 0.2))'
-                : 'transparent',
-              color: activeTab === 'template' ? '#e8e8f0' : '#9ca3af',
-              fontSize: '14px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-              transition: 'all 0.15s ease',
-              boxShadow: activeTab === 'template'
-                ? '0 2px 8px rgba(117, 54, 213, 0.15)'
-                : 'none',
-              borderBottom: activeTab === 'template'
-                ? '2px solid #7536d5'
-                : '2px solid transparent',
-            }}
+            style={tabButtonStyle('template')}
           >
-            🎵 模板生成
+            模板生成
           </button>
           <button
             onClick={() => setActiveTab('upload')}
-            style={{
-              display: studioTabSettings.visibleTabs.includes('upload') ? 'block' : 'none',
-              flex: 1,
-              padding: '12px 20px',
-              borderRadius: '10px',
-              border: 'none',
-              background: activeTab === 'upload'
-                ? 'linear-gradient(135deg, rgba(117, 54, 213, 0.2), rgba(90, 45, 184, 0.2))'
-                : 'transparent',
-              color: activeTab === 'upload' ? '#e8e8f0' : '#9ca3af',
-              fontSize: '14px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-              transition: 'all 0.15s ease',
-              boxShadow: activeTab === 'upload'
-                ? '0 2px 8px rgba(117, 54, 213, 0.15)'
-                : 'none',
-              borderBottom: activeTab === 'upload'
-                ? '2px solid #7536d5'
-                : '2px solid transparent',
-            }}
+            style={tabButtonStyle('upload')}
           >
-            🎤 翻唱模式
+            翻唱模式
           </button>
           <button
             onClick={() => setActiveTab('advanced')}
-            style={{
-              display: studioTabSettings.visibleTabs.includes('advanced') ? 'block' : 'none',
-              flex: 1,
-              padding: '12px 20px',
-              borderRadius: '10px',
-              border: 'none',
-              background: activeTab === 'advanced'
-                ? 'linear-gradient(135deg, rgba(117, 54, 213, 0.2), rgba(90, 45, 184, 0.2))'
-                : 'transparent',
-              color: activeTab === 'advanced' ? '#e8e8f0' : '#9ca3af',
-              fontSize: '14px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-              transition: 'all 0.15s ease',
-              boxShadow: activeTab === 'advanced'
-                ? '0 2px 8px rgba(117, 54, 213, 0.15)'
-                : 'none',
-              borderBottom: activeTab === 'advanced'
-                ? '2px solid #7536d5'
-                : '2px solid transparent',
-            }}
+            style={tabButtonStyle('advanced')}
           >
-            🎚️ 参考编曲模式
+            参考编曲模式
           </button>
           <button
             onClick={() => setActiveTab('templateArrangement')}
-            style={{
-              display: studioTabSettings.visibleTabs.includes('templateArrangement') ? 'block' : 'none',
-              flex: 1,
-              padding: '12px 20px',
-              borderRadius: '10px',
-              border: 'none',
-              background: activeTab === 'templateArrangement'
-                ? 'linear-gradient(135deg, rgba(117, 54, 213, 0.2), rgba(90, 45, 184, 0.2))'
-                : 'transparent',
-              color: activeTab === 'templateArrangement' ? '#e8e8f0' : '#9ca3af',
-              fontSize: '14px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-              transition: 'all 0.15s ease',
-              boxShadow: activeTab === 'templateArrangement'
-                ? '0 2px 8px rgba(117, 54, 213, 0.15)'
-                : 'none',
-              borderBottom: activeTab === 'templateArrangement'
-                ? '2px solid #7536d5'
-                : '2px solid transparent',
-            }}
+            style={tabButtonStyle('templateArrangement')}
           >
-            🎛️ 模板编曲
+            模板编曲
           </button>
           <button
             onClick={() => setActiveTab('templateInstrumental')}
-            style={{
-              display: studioTabSettings.visibleTabs.includes('templateInstrumental') ? 'block' : 'none',
-              flex: 1,
-              padding: '12px 20px',
-              borderRadius: '10px',
-              border: 'none',
-              background: activeTab === 'templateInstrumental'
-                ? 'linear-gradient(135deg, rgba(117, 54, 213, 0.2), rgba(90, 45, 184, 0.2))'
-                : 'transparent',
-              color: activeTab === 'templateInstrumental' ? '#e8e8f0' : '#9ca3af',
-              fontSize: '14px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-              transition: 'all 0.15s ease',
-              boxShadow: activeTab === 'templateInstrumental'
-                ? '0 2px 8px rgba(117, 54, 213, 0.15)'
-                : 'none',
-              borderBottom: activeTab === 'templateInstrumental'
-                ? '2px solid #7536d5'
-                : '2px solid transparent',
-            }}
+            style={tabButtonStyle('templateInstrumental')}
           >
-            🎹 模板伴奏
+            模板伴奏
           </button>
         </div>
 
@@ -655,25 +577,25 @@ export default function StudioPageClient({
           <div style={{ marginBottom: '32px' }}>
             {isSensitivityLoading ? (
               <div style={{
-                background: '#1a1a2e',
-                borderRadius: 20,
+                background: 'var(--hc-panel)',
+                borderRadius: 14,
                 padding: '32px 24px',
-                border: '1px solid #2a2a40',
-                boxShadow: '0 4px 20px rgba(117, 54, 213, 0.06)',
+                border: '1px solid var(--hc-border)',
+                boxShadow: 'none',
                 textAlign: 'center',
               }}>
                 <div style={{
                   width: 40,
                   height: 40,
                   margin: '0 auto 16px',
-                  border: '3px solid #2a2a40',
-                  borderTopColor: '#7536d5',
+                  border: '3px solid rgba(255,255,255,0.12)',
+                  borderTopColor: '#ceff35',
                   borderRadius: '50%',
                   animation: 'spin 1s linear infinite',
                 }} />
                 <p style={{
                   fontSize: 14,
-                  color: '#e8e8f0',
+                  color: 'var(--hc-text)',
                   margin: 0,
                   fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
                 }}>
@@ -695,8 +617,8 @@ export default function StudioPageClient({
         {generationError && !isGenerating && !isSensitivityLoading && (
           <div style={{
             marginBottom: '32px',
-            background: '#1a1a2e',
-            borderRadius: 20,
+            background: 'var(--hc-panel)',
+            borderRadius: 14,
             padding: '32px 24px',
             border: '1px solid rgba(239, 68, 68, 0.3)',
             boxShadow: '0 4px 20px rgba(239, 68, 68, 0.06)',
@@ -711,14 +633,16 @@ export default function StudioPageClient({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: 28,
+              fontSize: 13,
+              fontWeight: 900,
+              color: '#ff5a5f',
             }}>
-              ❌
+              !
             </div>
             <h3 style={{
               fontSize: 18,
               fontWeight: 600,
-              color: '#e8e8f0',
+              color: 'var(--hc-text)',
               marginBottom: 12,
               fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
             }}>
@@ -726,7 +650,7 @@ export default function StudioPageClient({
             </h3>
             <p style={{
               fontSize: 14,
-              color: '#9ca3af',
+              color: 'var(--hc-text-muted)',
               lineHeight: 1.7,
               margin: '0 0 24px 0',
               fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
@@ -740,23 +664,23 @@ export default function StudioPageClient({
               onClick={() => setGenerationError(null)}
               style={{
                 padding: '12px 32px',
-                borderRadius: 24,
+                borderRadius: 999,
                 border: 'none',
-                background: 'linear-gradient(135deg, #7536d5, #5a2db8)',
-                color: 'white',
+                background: '#ceff35',
+                color: '#08090c',
                 fontSize: 15,
-                fontWeight: 600,
+                fontWeight: 900,
                 cursor: 'pointer',
                 fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-                boxShadow: '0 4px 16px rgba(117, 54, 213, 0.3)',
+                boxShadow: 'none',
                 transition: 'all 0.2s ease',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.boxShadow = '0 6px 20px rgba(117, 54, 213, 0.5)';
+                e.currentTarget.style.boxShadow = 'none';
                 e.currentTarget.style.transform = 'translateY(-1px)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = '0 4px 16px rgba(117, 54, 213, 0.3)';
+                e.currentTarget.style.boxShadow = 'none';
                 e.currentTarget.style.transform = 'translateY(0)';
               }}
             >
@@ -769,11 +693,11 @@ export default function StudioPageClient({
         {batchId && versions.length > 0 && !isGenerating && (
           <div style={{
             marginBottom: '32px',
-            background: '#1a1a2e',
-            borderRadius: 20,
+            background: 'var(--hc-panel)',
+            borderRadius: 14,
             padding: 24,
-            border: '1px solid #2a2a40',
-            boxShadow: '0 4px 20px rgba(117, 54, 213, 0.06)',
+            border: '1px solid var(--hc-border)',
+            boxShadow: 'none',
           }}>
             {versions.some(v => v.status === 'completed') ? (
               <div>
@@ -791,10 +715,10 @@ export default function StudioPageClient({
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 20 }}>
                   {versions.filter(v => v.status === 'completed').map((version, idx) => (
                     <div key={version.taskId} style={{
-                      padding: 16, background: '#12121e', borderRadius: 14,
-                      border: '1px solid #2a2a40',
+                      padding: 16, background: '#111217', borderRadius: 12,
+                      border: '1px solid var(--hc-border)',
                     }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#c0a7fc', marginBottom: 10 }}>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: '#ceff35', marginBottom: 10 }}>
                         版本 {idx + 1}
                       </div>
                       {version.audioUrl && (
@@ -823,7 +747,7 @@ export default function StudioPageClient({
                     onClick={() => { setBatchId(null); setVersions([]); setSelectedVersionId(undefined); }}
                     style={{
                       padding: '14px 32px', borderRadius: 24,
-                      border: '1px solid #7536d5', background: 'transparent', color: '#7536d5',
+                      border: '1px solid rgba(206, 255, 53, 0.34)', background: 'transparent', color: '#ceff35',
                       fontSize: 15, fontWeight: 600, cursor: 'pointer',
                       fontFamily: "'Inter', sans-serif",
                     }}
@@ -834,7 +758,7 @@ export default function StudioPageClient({
               </div>
             ) : (
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 48, marginBottom: 12 }}>❌</div>
+                <div style={{ fontSize: 13, fontWeight: 900, marginBottom: 12, color: '#ff5a5f' }}>生成失败</div>
                 <h3 style={{ fontSize: 18, fontWeight: 600, color: '#E53E3E', marginBottom: 8 }}>
                   生成失败
                 </h3>
@@ -845,7 +769,7 @@ export default function StudioPageClient({
                   onClick={() => { setBatchId(null); setVersions([]); }}
                   style={{
                     padding: '14px 32px', borderRadius: 24, border: 'none',
-                    background: 'linear-gradient(135deg, #7536d5, #5a2db8)', color: 'white',
+                    background: '#ceff35', color: '#08090c',
                     fontSize: 15, fontWeight: 700, cursor: 'pointer',
                     fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
                   }}
@@ -870,11 +794,11 @@ export default function StudioPageClient({
             {/* Left Column: Template Selection */}
             <div
               style={{
-                background: '#1a1a2e',
-                borderRadius: '20px',
+                background: 'var(--hc-panel)',
+                borderRadius: 14,
                 padding: '24px',
-                border: '1px solid #2a2a40',
-                boxShadow: '0 4px 20px rgba(117, 54, 213, 0.06)',
+                border: '1px solid var(--hc-border)',
+                boxShadow: 'none',
                 minWidth: 0,
                 overflow: 'hidden',
               }}
@@ -884,7 +808,7 @@ export default function StudioPageClient({
                   fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
                   fontSize: '18px',
                   fontWeight: 600,
-                  color: '#e8e8f0',
+                  color: 'var(--hc-text)',
                   margin: '0 0 20px 0',
                 }}
               >
@@ -903,11 +827,11 @@ export default function StudioPageClient({
               {/* Prompt Input */}
               <div
                 style={{
-                  background: '#1a1a2e',
-                  borderRadius: '20px',
+                  background: 'var(--hc-panel)',
+                  borderRadius: 14,
                   padding: '24px',
-                  border: '1px solid #2a2a40',
-                  boxShadow: '0 4px 20px rgba(117, 54, 213, 0.06)',
+                  border: '1px solid var(--hc-border)',
+                  boxShadow: 'none',
                 }}
               >
                 <PromptInput
@@ -920,11 +844,11 @@ export default function StudioPageClient({
               {/* Duration Selector */}
               <div
                 style={{
-                  background: '#1a1a2e',
-                  borderRadius: '20px',
+                  background: 'var(--hc-panel)',
+                  borderRadius: 14,
                   padding: '24px',
-                  border: '1px solid #2a2a40',
-                  boxShadow: '0 4px 20px rgba(117, 54, 213, 0.06)',
+                  border: '1px solid var(--hc-border)',
+                  boxShadow: 'none',
                 }}
               >
                 <DurationSelector
@@ -938,17 +862,17 @@ export default function StudioPageClient({
               {/* Vocal Mode Section */}
               <div
                 style={{
-                  background: '#1a1a2e',
-                  borderRadius: '20px',
+                  background: 'var(--hc-panel)',
+                  borderRadius: 14,
                   padding: '24px',
-                  border: '1px solid #2a2a40',
-                  boxShadow: '0 4px 20px rgba(117, 54, 213, 0.06)',
+                  border: '1px solid var(--hc-border)',
+                  boxShadow: 'none',
                 }}
               >
                 <h3 style={{
                   fontSize: 15,
                   fontWeight: 600,
-                  color: '#e8e8f0',
+                  color: 'var(--hc-text)',
                   marginBottom: 16,
                   fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
                 }}>
@@ -963,17 +887,17 @@ export default function StudioPageClient({
                       flex: 1,
                       padding: '10px 16px',
                       borderRadius: 12,
-                      border: !instrumentalOnly ? '2px solid #7536d5' : '1px solid #2a2a40',
-                      background: !instrumentalOnly ? 'rgba(117, 54, 213, 0.1)' : 'transparent',
-                      color: !instrumentalOnly ? '#7536d5' : '#9ca3af',
+                      border: !instrumentalOnly ? '1px solid rgba(206, 255, 53, 0.55)' : '1px solid var(--hc-border)',
+                      background: !instrumentalOnly ? 'rgba(206, 255, 53, 0.12)' : 'transparent',
+                      color: !instrumentalOnly ? '#ceff35' : 'var(--hc-text-muted)',
                       fontSize: 13,
-                      fontWeight: 600,
+                      fontWeight: 850,
                       cursor: 'pointer',
                       fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
                       transition: 'all 0.2s',
                     }}
                   >
-                    🎤 带歌词
+                    带歌词
                   </button>
                   <button
                     onClick={() => setInstrumentalOnly(true)}
@@ -981,17 +905,17 @@ export default function StudioPageClient({
                       flex: 1,
                       padding: '10px 16px',
                       borderRadius: 12,
-                      border: instrumentalOnly ? '2px solid #7536d5' : '1px solid #2a2a40',
-                      background: instrumentalOnly ? 'rgba(117, 54, 213, 0.1)' : 'transparent',
-                      color: instrumentalOnly ? '#7536d5' : '#9ca3af',
+                      border: instrumentalOnly ? '1px solid rgba(206, 255, 53, 0.55)' : '1px solid var(--hc-border)',
+                      background: instrumentalOnly ? 'rgba(206, 255, 53, 0.12)' : 'transparent',
+                      color: instrumentalOnly ? '#ceff35' : 'var(--hc-text-muted)',
                       fontSize: 13,
-                      fontWeight: 600,
+                      fontWeight: 850,
                       cursor: 'pointer',
                       fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
                       transition: 'all 0.2s',
                     }}
                   >
-                    🎹 纯器乐
+                    纯器乐
                   </button>
                 </div>
 
@@ -1005,17 +929,17 @@ export default function StudioPageClient({
                           flex: 1,
                           padding: '8px 12px',
                           borderRadius: 10,
-                          border: voiceGender === 'female' ? '2px solid #7536d5' : '1px solid #2a2a40',
-                          background: voiceGender === 'female' ? 'rgba(117, 54, 213, 0.08)' : 'transparent',
-                          color: voiceGender === 'female' ? '#e8e8f0' : '#9ca3af',
+                          border: voiceGender === 'female' ? '1px solid rgba(206, 255, 53, 0.55)' : '1px solid var(--hc-border)',
+                          background: voiceGender === 'female' ? 'rgba(206, 255, 53, 0.1)' : 'transparent',
+                          color: voiceGender === 'female' ? '#ceff35' : 'var(--hc-text-muted)',
                           fontSize: 12,
-                          fontWeight: 600,
+                          fontWeight: 850,
                           cursor: 'pointer',
                           fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
                           transition: 'all 0.2s',
                         }}
                       >
-                        👩 女声
+                        女声
                       </button>
                       <button
                         onClick={() => setVoiceGender('male')}
@@ -1023,17 +947,17 @@ export default function StudioPageClient({
                           flex: 1,
                           padding: '8px 12px',
                           borderRadius: 10,
-                          border: voiceGender === 'male' ? '2px solid #7536d5' : '1px solid #2a2a40',
-                          background: voiceGender === 'male' ? 'rgba(117, 54, 213, 0.08)' : 'transparent',
-                          color: voiceGender === 'male' ? '#e8e8f0' : '#9ca3af',
+                          border: voiceGender === 'male' ? '1px solid rgba(206, 255, 53, 0.55)' : '1px solid var(--hc-border)',
+                          background: voiceGender === 'male' ? 'rgba(206, 255, 53, 0.1)' : 'transparent',
+                          color: voiceGender === 'male' ? '#ceff35' : 'var(--hc-text-muted)',
                           fontSize: 12,
-                          fontWeight: 600,
+                          fontWeight: 850,
                           cursor: 'pointer',
                           fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
                           transition: 'all 0.2s',
                         }}
                       >
-                        👨 男声
+                        男声
                       </button>
                     </div>
 
@@ -1041,7 +965,7 @@ export default function StudioPageClient({
                     <div>
                       <label style={{
                         fontSize: 12,
-                        color: '#9ca3af',
+                        color: 'var(--hc-text-muted)',
                         marginBottom: 8,
                         display: 'block',
                         fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
@@ -1051,18 +975,18 @@ export default function StudioPageClient({
                           style={{
                             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                             width: 14, height: 14, borderRadius: '50%', marginLeft: 6,
-                            background: '#7536d5', color: 'white', fontSize: 9, fontWeight: 700,
+                            background: 'rgba(206, 255, 53, 0.14)', color: '#ceff35', fontSize: 9, fontWeight: 900,
                             cursor: 'help', transition: 'all 0.2s', position: 'relative',
                           }}
                           onMouseEnter={e => {
-                            e.currentTarget.style.background = '#2a2a40';
-                            e.currentTarget.style.color = '#9ca3af';
+                            e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
+                            e.currentTarget.style.color = 'var(--hc-text-muted)';
                             const tip = e.currentTarget.querySelector('[data-tip]') as HTMLElement;
                             if (tip) tip.style.display = 'block';
                           }}
                           onMouseLeave={e => {
-                            e.currentTarget.style.background = '#7536d5';
-                            e.currentTarget.style.color = 'white';
+                            e.currentTarget.style.background = 'rgba(206, 255, 53, 0.14)';
+                            e.currentTarget.style.color = '#ceff35';
                             const tip = e.currentTarget.querySelector('[data-tip]') as HTMLElement;
                             if (tip) tip.style.display = 'none';
                           }}
@@ -1071,9 +995,9 @@ export default function StudioPageClient({
                           <div data-tip style={{
                             display: 'none', position: 'absolute', top: '100%', left: '50%',
                             transform: 'translateX(-50%)', marginTop: 8,
-                            background: '#1a1a2e', border: '1px solid #2a2a40', borderRadius: 10,
+                            background: 'var(--hc-panel-raised)', border: '1px solid var(--hc-border)', borderRadius: 10,
                             padding: '10px 14px', width: 240, fontSize: 11, lineHeight: 1.6,
-                            color: '#e8e8f0', boxShadow: '0 8px 24px rgba(0,0,0,0.4)', zIndex: 100,
+                            color: 'var(--hc-text)', boxShadow: '0 8px 24px rgba(0,0,0,0.4)', zIndex: 100,
                             whiteSpace: 'normal', fontWeight: 400,
                           }}>
                             请勿输入以下违禁内容：<br/>
@@ -1093,9 +1017,9 @@ export default function StudioPageClient({
                           maxWidth: '100%',
                           padding: '12px 14px',
                           borderRadius: 12,
-                          border: '1px solid #2a2a40',
-                          background: '#0d0d14',
-                          color: '#e8e8f0',
+                          border: '1px solid var(--hc-border)',
+                          background: '#0b0c10',
+                          color: 'var(--hc-text)',
                           fontSize: 13,
                           lineHeight: 1.6,
                           resize: 'vertical',
@@ -1103,8 +1027,8 @@ export default function StudioPageClient({
                           fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
                           transition: 'border-color 0.2s',
                         }}
-                        onFocus={(e) => e.currentTarget.style.borderColor = '#7536d5'}
-                        onBlur={(e) => e.currentTarget.style.borderColor = '#2a2a40'}
+                        onFocus={(e) => e.currentTarget.style.borderColor = '#ceff35'}
+                        onBlur={(e) => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'}
                       />
                     </div>
                   </>
@@ -1126,22 +1050,22 @@ export default function StudioPageClient({
               style={{
                 width: '100%',
                 padding: '14px 24px',
-                borderRadius: '24px',
+                borderRadius: 999,
                 border: 'none',
                 background: !templateStudioLoading && canGenerate && !isGenerating && !isSensitivityLoading && (selectedTemplate || prompt.trim())
-                  ? 'linear-gradient(135deg, #7536d5 0%, #5a2db8 100%)'
-                  : '#2a2a40',
+                  ? '#ceff35'
+                  : '#20222b',
                 color: !templateStudioLoading && canGenerate && !isGenerating && !isSensitivityLoading && (selectedTemplate || prompt.trim())
-                  ? 'white'
-                  : '#6b7280',
+                  ? '#08090c'
+                  : 'var(--hc-text-weak)',
                 fontSize: '15px',
-                fontWeight: 700,
+                fontWeight: 900,
                 cursor: !templateStudioLoading && canGenerate && !isGenerating && !isSensitivityLoading && (selectedTemplate || prompt.trim())
                   ? 'pointer'
                   : 'not-allowed',
-                fontFamily: "'Inter', sans-serif",
+                fontFamily: 'var(--hc-font)',
                 boxShadow: !templateStudioLoading && canGenerate && !isGenerating && !isSensitivityLoading && (selectedTemplate || prompt.trim())
-                  ? '0 4px 20px rgba(117, 54, 213, 0.4)'
+                  ? '0 10px 26px rgba(206, 255, 53, 0.12)'
                   : 'none',
                 transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                 display: 'flex',
@@ -1155,7 +1079,7 @@ export default function StudioPageClient({
                 {templateStudioLoading
                   ? '正在同步模板与额度'
                   : isPaid
-                  ? `消耗 ${totalCost} Credits（2版本）· 剩余 ${credits?.totalAvailable ?? 0}`
+                  ? `消耗 ${totalCost} 点额度（2版本）· 剩余 ${credits?.totalAvailable ?? 0}`
                   : `消耗 1 次预览（2版本）· 剩余 ${previewCount?.remaining ?? 0} 次`
                 }
               </span>
@@ -1165,8 +1089,8 @@ export default function StudioPageClient({
           {/* Credits exhausted messages */}
           {creditsExhaustedPaid && (
             <div style={{ background: 'rgba(229, 57, 53, 0.1)', borderRadius: '12px', padding: '16px 20px', border: '1px solid rgba(229, 57, 53, 0.3)', fontSize: '13px', color: '#C53030', lineHeight: 1.6, marginTop: 16 }} role="alert">
-              <strong>Credits 已用尽</strong>
-              <p style={{ margin: '8px 0 0 0' }}>购买 Credits 充值包或等待下月刷新。</p>
+              <strong>额度已用尽</strong>
+              <p style={{ margin: '8px 0 0 0' }}>购买额度充值包或等待下月刷新。</p>
             </div>
           )}
           {previewsExhaustedFree && (
@@ -1201,11 +1125,11 @@ export default function StudioPageClient({
           >
             <section
               style={{
-                background: '#1a1a2e',
-                borderRadius: 20,
+                background: 'var(--hc-panel)',
+                borderRadius: 14,
                 padding: 24,
-                border: '1px solid #2a2a40',
-                boxShadow: '0 4px 20px rgba(117, 54, 213, 0.06)',
+                border: '1px solid var(--hc-border)',
+                boxShadow: 'none',
                 position: 'sticky',
                 top: 24,
               }}
@@ -1214,7 +1138,7 @@ export default function StudioPageClient({
                 <h2
                   style={{
                     margin: 0,
-                    color: '#e8e8f0',
+                    color: 'var(--hc-text)',
                     fontSize: 18,
                     fontWeight: 700,
                     fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
@@ -1222,7 +1146,7 @@ export default function StudioPageClient({
                 >
                   选择模板
                 </h2>
-                <p style={{ margin: '8px 0 0', color: '#9ca3af', fontSize: 12, lineHeight: 1.6 }}>
+                <p style={{ margin: '8px 0 0', color: 'var(--hc-text-muted)', fontSize: 12, lineHeight: 1.6 }}>
                   模板会自动填充并锁定右侧风格，生成接口沿用高级编曲。
                 </p>
               </div>
@@ -1254,11 +1178,11 @@ export default function StudioPageClient({
           >
             <section
               style={{
-                background: '#1a1a2e',
-                borderRadius: 20,
+                background: 'var(--hc-panel)',
+                borderRadius: 14,
                 padding: 24,
-                border: '1px solid #2a2a40',
-                boxShadow: '0 4px 20px rgba(117, 54, 213, 0.06)',
+                border: '1px solid var(--hc-border)',
+                boxShadow: 'none',
                 position: 'sticky',
                 top: 24,
               }}
@@ -1267,7 +1191,7 @@ export default function StudioPageClient({
                 <h2
                   style={{
                     margin: 0,
-                    color: '#e8e8f0',
+                    color: 'var(--hc-text)',
                     fontSize: 18,
                     fontWeight: 700,
                     fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
@@ -1275,8 +1199,8 @@ export default function StudioPageClient({
                 >
                   选择模板
                 </h2>
-                <p style={{ margin: '8px 0 0', color: '#9ca3af', fontSize: 12, lineHeight: 1.6 }}>
-                  模板的 SUNO 解析会作为 tags 传给 add-instrumental，默认使用 V5.5。
+                <p style={{ margin: '8px 0 0', color: 'var(--hc-text-muted)', fontSize: 12, lineHeight: 1.6 }}>
+                  模板解析会自动生成风格标签，默认使用 V5.5 伴奏模型。
                 </p>
               </div>
               <TemplateSelector
@@ -1304,45 +1228,45 @@ export default function StudioPageClient({
           zIndex: 9999, padding: 24,
         }} onClick={() => setCopyrightModalOpen(false)}>
           <div style={{
-            background: '#1a1a2e', borderRadius: 20, maxWidth: 480, width: '100%',
-            padding: 32, border: '1px solid #2a2a40', position: 'relative',
+            background: 'var(--hc-panel)', borderRadius: 14, maxWidth: 480, width: '100%',
+            padding: 32, border: '1px solid var(--hc-border)', position: 'relative',
             boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
           }} onClick={e => e.stopPropagation()}>
             <button onClick={() => setCopyrightModalOpen(false)} style={{
               position: 'absolute', top: 16, right: 16, border: 'none',
-              background: '#2a2a40', borderRadius: 8, width: 28, height: 28,
-              color: '#9ca3af', fontSize: 14, cursor: 'pointer',
+              background: '#20222b', borderRadius: 8, width: 28, height: 28,
+              color: 'var(--hc-text-muted)', fontSize: 14, cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>✕</button>
 
-            <h2 style={{ fontSize: 20, fontWeight: 700, color: '#e8e8f0', marginBottom: 8, fontFamily: "'Inter', sans-serif" }}>
+            <h2 style={{ fontSize: 20, fontWeight: 900, color: 'var(--hc-text)', marginBottom: 8, fontFamily: 'var(--hc-font)' }}>
               HookCraft
             </h2>
-            <h3 style={{ fontSize: 16, fontWeight: 600, color: '#c0a7fc', marginBottom: 20 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 800, color: '#ceff35', marginBottom: 20 }}>
               创作安全与版权说明
             </h3>
 
-            <p style={{ fontSize: 14, color: '#9ca3af', lineHeight: 1.8, marginBottom: 16 }}>
+            <p style={{ fontSize: 14, color: 'var(--hc-text-muted)', lineHeight: 1.8, marginBottom: 16 }}>
               欢迎使用 HookCraft AI 创作工具
             </p>
-            <p style={{ fontSize: 14, color: '#e8e8f0', lineHeight: 1.8, marginBottom: 20 }}>
+            <p style={{ fontSize: 14, color: 'var(--hc-text)', lineHeight: 1.8, marginBottom: 20 }}>
               为了保护音乐创作者的合法权益并遵守平台安全规范，AI 创作中心无法处理包含以下意图的提示词：
             </p>
 
             <div style={{ marginBottom: 20 }}>
-              <p style={{ fontSize: 14, color: '#e8e8f0', fontWeight: 600, marginBottom: 8 }}>
+              <p style={{ fontSize: 14, color: 'var(--hc-text)', fontWeight: 800, marginBottom: 8 }}>
                 1. 未与本平台签约的现实公众人物与版权导向：
               </p>
-              <p style={{ fontSize: 13, color: '#9ca3af', lineHeight: 1.8, paddingLeft: 16 }}>
+              <p style={{ fontSize: 13, color: 'var(--hc-text-muted)', lineHeight: 1.8, paddingLeft: 16 }}>
                 包含具体歌手、知名乐队名称，或明确要求模仿特定受版权保护的曲目。
               </p>
             </div>
 
             <div style={{ marginBottom: 24 }}>
-              <p style={{ fontSize: 14, color: '#e8e8f0', fontWeight: 600, marginBottom: 8 }}>
+              <p style={{ fontSize: 14, color: 'var(--hc-text)', fontWeight: 800, marginBottom: 8 }}>
                 2. 不当内容：
               </p>
-              <p style={{ fontSize: 13, color: '#9ca3af', lineHeight: 1.8, paddingLeft: 16 }}>
+              <p style={{ fontSize: 13, color: 'var(--hc-text-muted)', lineHeight: 1.8, paddingLeft: 16 }}>
                 包含暴力、仇恨言论、歧视、色情及其他违反社区准则的词汇。
               </p>
             </div>
@@ -1351,11 +1275,11 @@ export default function StudioPageClient({
               <button
                 onClick={() => setCopyrightModalOpen(false)}
                 style={{
-                  padding: '12px 32px', borderRadius: 24, border: 'none',
-                  background: 'linear-gradient(135deg, #7536d5, #5a2db8)',
-                  color: 'white', fontSize: 14, fontWeight: 600, cursor: 'pointer',
-                  fontFamily: "'Inter', sans-serif",
-                  boxShadow: '0 4px 16px rgba(117, 54, 213, 0.3)',
+                  padding: '12px 32px', borderRadius: 999, border: 'none',
+                  background: '#ceff35',
+                  color: '#08090c', fontSize: 14, fontWeight: 900, cursor: 'pointer',
+                  fontFamily: 'var(--hc-font)',
+                  boxShadow: 'none',
                 }}
               >
                 我知道了
@@ -1402,3 +1326,73 @@ export default function StudioPageClient({
     </div>
   );
 }
+
+const studioPageStyles = `
+  .studio-page section,
+  .studio-page textarea,
+  .studio-page input,
+  .studio-page button {
+    letter-spacing: 0;
+  }
+
+  .studio-page textarea,
+  .studio-page input {
+    border-color: rgba(255,255,255,0.12) !important;
+    background: #0b0c10 !important;
+  }
+
+  .studio-page button {
+    border-radius: 8px;
+  }
+
+  .studio-page [style*="#1a1a2e"],
+  .studio-page [style*="rgba(13, 17, 23"] {
+    background: var(--hc-panel) !important;
+  }
+
+  .studio-page [style*="#2a2a40"],
+  .studio-page [style*="rgba(148, 163, 184"] {
+    border-color: rgba(255,255,255,0.1) !important;
+  }
+
+  .studio-page [style*="#7536d5"],
+  .studio-page [style*="#B7FF4A"] {
+    border-color: rgba(206,255,53,0.36) !important;
+    color: var(--hc-lime) !important;
+  }
+
+  .studio-page [style*="background: #7536d5"],
+  .studio-page [style*="background: #B7FF4A"],
+  .studio-page [style*="linear-gradient(135deg, #7536d5"],
+  .studio-page [style*="linear-gradient(135deg, #B7FF4A"] {
+    background: var(--hc-lime) !important;
+    color: #08090c !important;
+  }
+
+  .studio-page [style*="borderRadius: 20"],
+  .studio-page [style*="border-radius: 20"] {
+    border-radius: 14px !important;
+  }
+
+  .studio-page audio {
+    accent-color: var(--hc-lime);
+  }
+
+  .studio-page select,
+  .studio-page input[type="number"] {
+    border-color: rgba(255,255,255,0.12) !important;
+    background: #0b0c10 !important;
+    color: var(--hc-text) !important;
+  }
+
+  @media (max-width: 980px) {
+    .studio-page [style*="grid-template-columns: 1fr 1fr"],
+    .studio-page [style*="grid-template-columns: minmax(260px, 320px) minmax(0, 1fr)"] {
+      grid-template-columns: 1fr !important;
+    }
+
+    .studio-page [style*="position: sticky"] {
+      position: static !important;
+    }
+  }
+`;

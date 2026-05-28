@@ -15,7 +15,20 @@ export interface SubscriptionPanelProps {
   onBuyCredits?: () => void;
 }
 
-/** Feature display names */
+const TIER_LABELS: Record<MembershipTier, string> = {
+  free: '免费版',
+  pro: '专业版',
+  business: '商业版',
+};
+
+const STATUS_LABELS: Record<MembershipInfo['status'], string> = {
+  active: '活跃',
+  cancelled: '已取消',
+  expiring: '即将到期',
+  expired: '已过期',
+  grace_period: '宽限期',
+};
+
 const FEATURE_LABELS: Partial<Record<FeatureKey, string>> = {
   full_demo: '完整 Demo 生成',
   premium_singer: '高级歌手声模',
@@ -28,18 +41,10 @@ const FEATURE_LABELS: Partial<Record<FeatureKey, string>> = {
   export_stems: '分轨导出',
   commercial_use: '个人商用授权',
   full_commercial_use: '完整商用授权',
-  credits_pack_discount: 'Credits 充值折扣',
+  credits_pack_discount: '额度充值包折扣',
   image_input: '图片灵感输入',
 };
 
-/**
- * 订阅管理面板
- * - 显示当前等级、到期日期、自动续费状态
- * - 升级/降级/取消按钮
- * - 降级显示失去功能警告
- * - 升级显示按比例差价
- * - Credits Pack 购买历史
- */
 export default function SubscriptionPanel({
   membership,
   creditsPurchaseHistory,
@@ -48,22 +53,16 @@ export default function SubscriptionPanel({
   onCancel,
   onBuyCredits,
 }: SubscriptionPanelProps) {
-  const [showDowngradeWarning, setShowDowngradeWarning] = useState(false);
   const [downgradeTarget, setDowngradeTarget] = useState<MembershipTier | null>(null);
-  const [showUpgradeInfo, setShowUpgradeInfo] = useState(false);
   const [upgradeTarget, setUpgradeTarget] = useState<MembershipTier | null>(null);
 
   const currentConfig = TIER_CONFIGS[membership.tier];
-  const tierOrder: Record<MembershipTier, number> = { free: 0, pro: 1, business: 2 };
 
-  // Calculate lost features for downgrade
   const getLostFeatures = (targetTier: MembershipTier): FeatureKey[] => {
-    const currentFeatures = TIER_CONFIGS[membership.tier].features;
     const targetFeatures = new Set(TIER_CONFIGS[targetTier].features);
-    return currentFeatures.filter((f) => !targetFeatures.has(f));
+    return currentConfig.features.filter((feature) => !targetFeatures.has(feature));
   };
 
-  // Calculate prorated price for upgrade
   const calculateProratedPrice = (targetTier: MembershipTier): number => {
     if (!membership.expiresAt) return TIER_CONFIGS[targetTier].monthlyPrice;
     const now = new Date();
@@ -74,429 +73,347 @@ export default function SubscriptionPanel({
     return Math.max(0, Math.round((targetDailyRate - currentDailyRate) * remainingDays));
   };
 
-  const handleDowngradeClick = (target: MembershipTier) => {
-    setDowngradeTarget(target);
-    setShowDowngradeWarning(true);
-    setShowUpgradeInfo(false);
-  };
-
-  const handleUpgradeClick = (target: MembershipTier) => {
-    setUpgradeTarget(target);
-    setShowUpgradeInfo(true);
-    setShowDowngradeWarning(false);
-  };
-
-  const confirmDowngrade = () => {
-    if (downgradeTarget && onDowngrade) {
-      onDowngrade(downgradeTarget);
-    }
-    setShowDowngradeWarning(false);
-    setDowngradeTarget(null);
-  };
-
-  const confirmUpgrade = () => {
-    if (upgradeTarget && onUpgrade) {
-      onUpgrade(upgradeTarget);
-    }
-    setShowUpgradeInfo(false);
-    setUpgradeTarget(null);
-  };
-
   const formatDate = (date: Date | string | null): string => {
-    if (!date) return '—';
+    if (!date) return '-';
     const d = date instanceof Date ? date : new Date(date);
     return d.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
   };
 
-  const formatAmount = (amount: number): string => {
-    return `¥${(amount / 100).toFixed(2)}`;
-  };
+  const formatAmount = (amount: number): string => `¥${(amount / 100).toFixed(2)}`;
+
+  const nextUpgradeTier: MembershipTier | null = membership.tier === 'free' ? 'pro' : membership.tier === 'pro' ? 'business' : null;
+  const nextDowngradeTier: MembershipTier | null = membership.tier === 'business' ? 'pro' : membership.tier === 'pro' ? 'free' : null;
 
   return (
-    <div
-      style={{
-        background: '#1a1a2e',
-        borderRadius: '20px',
-        padding: '32px',
-        border: '1px solid #2a2a40',
-        boxShadow: '0 4px 20px rgba(117, 54, 213, 0.06)',
-      }}
-    >
-      {/* Header */}
-      <h2
-        style={{
-          fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-          fontSize: '22px',
-          fontWeight: 700,
-          color: '#e8e8f0',
-          margin: '0 0 24px 0',
-        }}
-      >
-        订阅管理
-      </h2>
-
-      {/* Current Plan Info */}
-      <div
-        style={{
-          background: '#0d0d14',
-          borderRadius: '16px',
-          padding: '20px 24px',
-          border: '1px solid #2a2a40',
-          marginBottom: '24px',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span
-              style={{
-                fontSize: '20px',
-                fontWeight: 700,
-                color: '#7536d5',
-                fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-              }}
-            >
-              {currentConfig.name}
-            </span>
-            <span
-              style={{
-                padding: '4px 10px',
-                borderRadius: '12px',
-                fontSize: '11px',
-                fontWeight: 600,
-                background: membership.status === 'active'
-                  ? 'rgba(72, 187, 120, 0.1)'
-                  : membership.status === 'cancelled'
-                    ? 'rgba(237, 137, 54, 0.1)'
-                    : membership.status === 'expiring'
-                      ? 'rgba(237, 137, 54, 0.1)'
-                      : 'rgba(229, 62, 62, 0.1)',
-                color: membership.status === 'active'
-                  ? '#38A169'
-                  : membership.status === 'cancelled'
-                    ? '#DD6B20'
-                    : membership.status === 'expiring'
-                      ? '#DD6B20'
-                      : '#E53E3E',
-              }}
-            >
-              {membership.status === 'active' && '活跃'}
-              {membership.status === 'cancelled' && '已取消'}
-              {membership.status === 'expiring' && '即将到期'}
-              {membership.status === 'expired' && '已过期'}
-              {membership.status === 'grace_period' && '宽限期'}
-            </span>
-          </div>
-          {membership.tier !== 'free' && (
-            <span style={{ fontSize: '18px', fontWeight: 700, color: '#e8e8f0', fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" }}>
-              {formatAmount(currentConfig.monthlyPrice)}/月
-            </span>
-          )}
+    <section className="subscription-panel">
+      <header className="panel-head">
+        <div>
+          <span>订阅</span>
+          <h2>订阅管理</h2>
         </div>
+        <b>{STATUS_LABELS[membership.status]}</b>
+      </header>
 
-        {/* Details grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-          <div>
-            <div style={{ fontSize: '12px', color: '#999', marginBottom: '4px' }}>到期日期</div>
-            <div style={{ fontSize: '14px', color: '#e8e8f0', fontWeight: 500 }}>
-              {membership.tier === 'free' ? '永久免费' : formatDate(membership.expiresAt)}
-            </div>
-          </div>
-          <div>
-            <div style={{ fontSize: '12px', color: '#999', marginBottom: '4px' }}>自动续费</div>
-            <div style={{ fontSize: '14px', color: '#e8e8f0', fontWeight: 500 }}>
-              {membership.tier === 'free' ? '—' : membership.autoRenew ? '已开启' : '已关闭'}
-            </div>
-          </div>
-          <div>
-            <div style={{ fontSize: '12px', color: '#999', marginBottom: '4px' }}>月度 Credits</div>
-            <div style={{ fontSize: '14px', color: '#e8e8f0', fontWeight: 500 }}>
-              {currentConfig.monthlyCredits > 0 ? `${currentConfig.monthlyCredits} Credits` : `${currentConfig.monthlyPreviews} 次预览`}
-            </div>
-          </div>
-          <div>
-            <div style={{ fontSize: '12px', color: '#999', marginBottom: '4px' }}>计费周期</div>
-            <div style={{ fontSize: '14px', color: '#e8e8f0', fontWeight: 500 }}>
-              {membership.billingCycle === 'monthly' ? '月付' : membership.billingCycle === 'yearly' ? '年付' : '—'}
-            </div>
-          </div>
+      <div className="current-plan">
+        <div className="plan-title">
+          <strong>{TIER_LABELS[membership.tier]}</strong>
+          {membership.tier !== 'free' && <span>{formatAmount(currentConfig.monthlyPrice)}/月</span>}
+        </div>
+        <div className="plan-grid">
+          <InfoCell label="到期日期" value={membership.tier === 'free' ? '永久免费' : formatDate(membership.expiresAt)} />
+          <InfoCell label="自动续费" value={membership.tier === 'free' ? '-' : membership.autoRenew ? '已开启' : '已关闭'} />
+          <InfoCell label="月度额度" value={currentConfig.monthlyCredits > 0 ? `${currentConfig.monthlyCredits} 点额度` : `${currentConfig.monthlyPreviews} 次预览`} />
+          <InfoCell label="计费周期" value={membership.billingCycle === 'monthly' ? '月付' : membership.billingCycle === 'yearly' ? '年付' : '-'} />
         </div>
       </div>
 
-      {/* Action Buttons */}
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
-        {/* Upgrade buttons */}
-        {membership.tier !== 'business' && (
-          <button
-            onClick={() => handleUpgradeClick(membership.tier === 'free' ? 'pro' : 'business')}
-            style={{
-              padding: '10px 20px',
-              borderRadius: '20px',
-              border: 'none',
-              background: 'linear-gradient(135deg, #7536d5 0%, #5a2db8 100%)',
-              color: 'white',
-              fontSize: '13px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-              boxShadow: '0 2px 8px rgba(117, 54, 213, 0.3)',
-            }}
-          >
-            升级到{TIER_CONFIGS[membership.tier === 'free' ? 'pro' : 'business'].name}
+      <div className="action-row">
+        {nextUpgradeTier && onUpgrade && (
+          <button className="primary" onClick={() => { setUpgradeTarget(nextUpgradeTier); setDowngradeTarget(null); }}>
+            升级到 {TIER_LABELS[nextUpgradeTier]}
           </button>
         )}
-
-        {/* Downgrade button */}
-        {membership.tier !== 'free' && (
-          <button
-            onClick={() => handleDowngradeClick(membership.tier === 'business' ? 'pro' : 'free')}
-            style={{
-              padding: '10px 20px',
-              borderRadius: '20px',
-              border: '1px solid #2a2a40',
-              background: 'transparent',
-              color: '#9ca3af',
-              fontSize: '13px',
-              fontWeight: 500,
-              cursor: 'pointer',
-              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-            }}
-          >
-            降级
-          </button>
+        {nextDowngradeTier && onDowngrade && (
+          <button onClick={() => { setDowngradeTarget(nextDowngradeTier); setUpgradeTarget(null); }}>降级</button>
         )}
-
-        {/* Cancel button */}
         {membership.tier !== 'free' && membership.status !== 'cancelled' && onCancel && (
-          <button
-            onClick={onCancel}
-            style={{
-              padding: '10px 20px',
-              borderRadius: '20px',
-              border: '1px solid rgba(229, 57, 53, 0.3)',
-              background: 'transparent',
-              color: '#E53E3E',
-              fontSize: '13px',
-              fontWeight: 500,
-              cursor: 'pointer',
-              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-            }}
-          >
-            取消订阅
-          </button>
+          <button className="danger" onClick={onCancel}>取消订阅</button>
         )}
-
-        {/* Buy Credits */}
         {membership.tier !== 'free' && onBuyCredits && (
-          <button
-            onClick={onBuyCredits}
-            style={{
-              padding: '10px 20px',
-              borderRadius: '20px',
-              border: '1px solid #2a2a40',
-              background: '#0d0d14',
-              color: '#7536d5',
-              fontSize: '13px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-            }}
-          >
-            购买 Credits 充值包
-          </button>
+          <button onClick={onBuyCredits}>购买额度充值包</button>
         )}
       </div>
 
-      {/* Downgrade Warning */}
-      {showDowngradeWarning && downgradeTarget && (
-        <div
-          style={{
-            background: 'rgba(229, 57, 53, 0.1)',
-            borderRadius: '12px',
-            padding: '20px',
-            border: '1px solid rgba(229, 57, 53, 0.3)',
-            marginBottom: '24px',
-          }}
-          role="alert"
-        >
-          <h4
-            style={{
-              fontSize: '15px',
-              fontWeight: 600,
-              color: '#C53030',
-              margin: '0 0 12px 0',
-              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-            }}
-          >
-            ⚠️ 降级后将失去以下功能
-          </h4>
-          <ul style={{ margin: '0 0 16px 0', padding: '0 0 0 20px', listStyle: 'disc' }}>
-            {getLostFeatures(downgradeTarget).map((feature) => (
-              <li
-                key={feature}
-                style={{ fontSize: '13px', color: '#742A2A', marginBottom: '6px', lineHeight: 1.5 }}
-              >
-                {FEATURE_LABELS[feature] || feature}
-              </li>
-            ))}
+      {downgradeTarget && (
+        <div className="notice danger" role="alert">
+          <h3>降级后将失去以下功能</h3>
+          <ul>
+            {getLostFeatures(downgradeTarget).map((feature) => <li key={feature}>{FEATURE_LABELS[feature] || feature}</li>)}
           </ul>
-          <p style={{ fontSize: '13px', color: '#742A2A', margin: '0 0 16px 0' }}>
-            降级将在当前计费周期结束后生效，届时您的等级将变为{TIER_CONFIGS[downgradeTarget].name}。
-          </p>
-          <div style={{ display: 'flex', gap: '12px' }}>
-            <button
-              onClick={confirmDowngrade}
-              style={{
-                padding: '8px 16px',
-                borderRadius: '16px',
-                border: 'none',
-                background: '#E53E3E',
-                color: 'white',
-                fontSize: '13px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-              }}
-            >
-              确认降级
-            </button>
-            <button
-              onClick={() => { setShowDowngradeWarning(false); setDowngradeTarget(null); }}
-              style={{
-                padding: '8px 16px',
-                borderRadius: '16px',
-                border: '1px solid #2a2a40',
-                background: '#1a1a2e',
-                color: '#9ca3af',
-                fontSize: '13px',
-                fontWeight: 500,
-                cursor: 'pointer',
-                fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-              }}
-            >
-              取消
-            </button>
+          <p>降级将在当前计费周期结束后生效，届时等级将变为 {TIER_LABELS[downgradeTarget]}。</p>
+          <div className="notice-actions">
+            <button className="danger-fill" onClick={() => { onDowngrade?.(downgradeTarget); setDowngradeTarget(null); }}>确认降级</button>
+            <button onClick={() => setDowngradeTarget(null)}>取消</button>
           </div>
         </div>
       )}
 
-      {/* Upgrade Info */}
-      {showUpgradeInfo && upgradeTarget && (
-        <div
-          style={{
-            background: '#F0FFF4',
-            borderRadius: '12px',
-            padding: '20px',
-            border: '1px solid #C6F6D5',
-            marginBottom: '24px',
-          }}
-        >
-          <h4
-            style={{
-              fontSize: '15px',
-              fontWeight: 600,
-              color: '#276749',
-              margin: '0 0 12px 0',
-              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-            }}
-          >
-            ✨ 升级到{TIER_CONFIGS[upgradeTarget].name}
-          </h4>
-          <p style={{ fontSize: '13px', color: '#2F855A', margin: '0 0 8px 0' }}>
-            按剩余天数比例计算差价，仅需补缴：
-          </p>
-          <div
-            style={{
-              fontSize: '24px',
-              fontWeight: 700,
-              color: '#276749',
-              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-              marginBottom: '16px',
-            }}
-          >
-            {formatAmount(calculateProratedPrice(upgradeTarget))}
-          </div>
-          <div style={{ display: 'flex', gap: '12px' }}>
-            <button
-              onClick={confirmUpgrade}
-              style={{
-                padding: '8px 16px',
-                borderRadius: '16px',
-                border: 'none',
-                background: 'linear-gradient(135deg, #7536d5 0%, #5a2db8 100%)',
-                color: 'white',
-                fontSize: '13px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-              }}
-            >
-              确认升级
-            </button>
-            <button
-              onClick={() => { setShowUpgradeInfo(false); setUpgradeTarget(null); }}
-              style={{
-                padding: '8px 16px',
-                borderRadius: '16px',
-                border: '1px solid #2a2a40',
-                background: '#1a1a2e',
-                color: '#9ca3af',
-                fontSize: '13px',
-                fontWeight: 500,
-                cursor: 'pointer',
-                fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-              }}
-            >
-              取消
-            </button>
+      {upgradeTarget && (
+        <div className="notice success">
+          <h3>升级到 {TIER_LABELS[upgradeTarget]}</h3>
+          <p>按剩余天数比例计算差价，预计补缴：</p>
+          <strong>{formatAmount(calculateProratedPrice(upgradeTarget))}</strong>
+          <div className="notice-actions">
+            <button className="primary" onClick={() => { onUpgrade?.(upgradeTarget); setUpgradeTarget(null); }}>确认升级</button>
+            <button onClick={() => setUpgradeTarget(null)}>取消</button>
           </div>
         </div>
       )}
 
-      {/* Credits Pack Purchase History */}
-      <div>
-        <h3
-          style={{
-            fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-            fontSize: '16px',
-            fontWeight: 600,
-            color: '#e8e8f0',
-            margin: '0 0 16px 0',
-          }}
-        >
-          Credits 充值记录
-        </h3>
+      <section className="purchase-history">
+        <h3>额度充值记录</h3>
         {creditsPurchaseHistory.length === 0 ? (
-          <div
-            style={{
-              textAlign: 'center',
-              padding: '24px',
-              color: '#999',
-              fontSize: '13px',
-              background: '#0d0d14',
-              borderRadius: '12px',
-              border: '1px solid #2a2a40',
-            }}
-          >
-            暂无充值记录
-          </div>
+          <div className="empty-history">暂无充值记录</div>
         ) : (
           <CreditsPurchaseList records={creditsPurchaseHistory} />
         )}
-      </div>
-    </div>
+      </section>
+
+      <style>{`
+        .subscription-panel {
+          border: 1px solid var(--hc-line);
+          border-radius: var(--hc-radius-lg);
+          background: rgba(24,26,34,.88);
+          box-shadow: var(--hc-shadow);
+          padding: 24px;
+        }
+
+        .panel-head {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 16px;
+          margin-bottom: 18px;
+        }
+
+        .panel-head span {
+          color: var(--hc-lime);
+          font-size: 12px;
+          font-weight: 950;
+          letter-spacing: .1em;
+          text-transform: uppercase;
+        }
+
+        .panel-head h2 {
+          margin: 6px 0 0;
+          color: var(--hc-text);
+          font-size: 22px;
+        }
+
+        .panel-head b,
+        .plan-title span {
+          border: 1px solid rgba(206,255,53,.32);
+          border-radius: 999px;
+          background: rgba(206,255,53,.1);
+          color: var(--hc-lime);
+          padding: 6px 10px;
+          font-size: 12px;
+          white-space: nowrap;
+        }
+
+        .current-plan {
+          border: 1px solid var(--hc-line);
+          border-radius: var(--hc-radius);
+          background: rgba(8,9,12,.34);
+          padding: 18px;
+          margin-bottom: 18px;
+        }
+
+        .plan-title {
+          display: flex;
+          justify-content: space-between;
+          gap: 14px;
+          align-items: center;
+          margin-bottom: 16px;
+        }
+
+        .plan-title strong {
+          color: var(--hc-lime);
+          font-size: 22px;
+        }
+
+        .plan-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 12px;
+        }
+
+        .info-cell span {
+          display: block;
+          color: var(--hc-muted);
+          font-size: 12px;
+          margin-bottom: 4px;
+        }
+
+        .info-cell strong {
+          color: var(--hc-text);
+          font-size: 14px;
+        }
+
+        .action-row,
+        .notice-actions {
+          display: flex;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+
+        .action-row {
+          margin-bottom: 18px;
+        }
+
+        .action-row button,
+        .notice-actions button {
+          border: 1px solid var(--hc-line);
+          border-radius: 999px;
+          background: rgba(255,255,255,.04);
+          color: var(--hc-text);
+          padding: 10px 14px;
+          font-size: 13px;
+          font-weight: 900;
+          cursor: pointer;
+        }
+
+        button.primary,
+        .notice-actions button.primary {
+          border-color: transparent;
+          background: linear-gradient(135deg, var(--hc-lime), var(--hc-cyan));
+          color: #08090c;
+        }
+
+        button.danger {
+          border-color: rgba(255,90,61,.34);
+          color: #ff8b76;
+        }
+
+        .danger-fill {
+          border-color: transparent !important;
+          background: #ff5a3d !important;
+          color: #08090c !important;
+        }
+
+        .notice {
+          border-radius: var(--hc-radius);
+          padding: 16px;
+          margin-bottom: 18px;
+        }
+
+        .notice h3 {
+          margin: 0 0 10px;
+          font-size: 15px;
+        }
+
+        .notice p {
+          color: var(--hc-muted);
+          margin: 0 0 12px;
+          line-height: 1.6;
+        }
+
+        .notice strong {
+          display: block;
+          color: var(--hc-lime);
+          font-size: 24px;
+          margin-bottom: 12px;
+        }
+
+        .notice ul {
+          margin: 0 0 12px;
+          padding-left: 20px;
+          color: var(--hc-muted);
+        }
+
+        .notice.danger {
+          border: 1px solid rgba(255,90,61,.34);
+          background: rgba(255,90,61,.1);
+        }
+
+        .notice.success {
+          border: 1px solid rgba(206,255,53,.3);
+          background: rgba(206,255,53,.08);
+        }
+
+        .purchase-history h3 {
+          margin: 0 0 14px;
+          color: var(--hc-text);
+          font-size: 16px;
+        }
+
+        .empty-history {
+          border: 1px solid var(--hc-line);
+          border-radius: 12px;
+          background: rgba(8,9,12,.34);
+          color: var(--hc-muted);
+          padding: 22px;
+          text-align: center;
+          font-size: 13px;
+        }
+
+        .history-list {
+          display: grid;
+          gap: 8px;
+        }
+
+        .history-item {
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+          border: 1px solid var(--hc-line);
+          border-radius: 12px;
+          background: rgba(8,9,12,.34);
+          padding: 12px 14px;
+        }
+
+        .history-item span {
+          color: var(--hc-muted);
+          font-size: 12px;
+        }
+
+        .history-item strong {
+          color: var(--hc-text);
+          font-size: 13px;
+        }
+
+        .history-item b {
+          color: var(--hc-lime);
+        }
+
+        .pagination {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          gap: 12px;
+          margin-top: 14px;
+        }
+
+        .pagination button {
+          border: 1px solid var(--hc-line);
+          border-radius: 999px;
+          background: rgba(255,255,255,.04);
+          color: var(--hc-text);
+          padding: 8px 12px;
+          cursor: pointer;
+        }
+
+        .pagination button:disabled {
+          opacity: .45;
+          cursor: not-allowed;
+        }
+
+        @media (max-width: 640px) {
+          .plan-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+      `}</style>
+    </section>
   );
 }
 
-
-// ─── Credits 充值记录子组件（含分页和 Credits 数量显示） ───
+function InfoCell({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="info-cell">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
 
 const CREDITS_PACKS_MAP: Record<number, number> = {
   9900: 50,
   17900: 100,
   32900: 200,
-  7900: 50,   // 商业版折扣价
-  14300: 100, // 商业版折扣价
-  26300: 200, // 商业版折扣价
+  7900: 50,
+  14300: 100,
+  26300: 200,
 };
 
 function getCreditsFromAmount(amount: number): number | null {
@@ -506,114 +423,48 @@ function getCreditsFromAmount(amount: number): number | null {
 function CreditsPurchaseList({ records }: { records: PaymentRecord[] }) {
   const [page, setPage] = useState(1);
   const pageSize = 5;
-
-  // 按时间倒序排列
   const sortedRecords = [...records].sort((a, b) => {
     const dateA = new Date((a as any).created_at || a.createdAt || 0).getTime();
     const dateB = new Date((b as any).created_at || b.createdAt || 0).getTime();
     return dateB - dateA;
   });
 
-  const totalPages = Math.ceil(sortedRecords.length / pageSize);
+  const totalPages = Math.max(1, Math.ceil(sortedRecords.length / pageSize));
   const paginatedRecords = sortedRecords.slice((page - 1) * pageSize, page * pageSize);
 
   const fmtDate = (date: Date | string | null): string => {
-    if (!date) return '—';
+    if (!date) return '-';
     const d = date instanceof Date ? date : new Date(date);
     return d.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
   };
 
-  const fmtAmount = (amount: number): string => {
-    return `¥${(amount / 100).toFixed(2)}`;
-  };
+  const fmtAmount = (amount: number): string => `¥${(amount / 100).toFixed(2)}`;
 
   return (
     <div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <div className="history-list">
         {paginatedRecords.map((record) => {
           const creditsAmount = getCreditsFromAmount(record.amount);
           return (
-            <div
-              key={record.id}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '12px 16px',
-                borderRadius: '10px',
-                background: '#0d0d14',
-                border: '1px solid #2a2a40',
-              }}
-            >
+            <div key={record.id} className="history-item">
               <div>
-                <div style={{ fontSize: '13px', fontWeight: 500, color: '#e8e8f0' }}>
-                  Credits 充值包
-                  {creditsAmount && (
-                    <span style={{ marginLeft: 8, fontSize: 12, color: '#7536d5', fontWeight: 600 }}>
-                      +{creditsAmount} Credits
-                    </span>
-                  )}
-                </div>
-                <div style={{ fontSize: '11px', color: '#999', marginTop: '2px' }}>
-                  {fmtDate(record.createdAt || (record as any).created_at || (record as any).completed_at)}
-                </div>
+                <strong>额度充值包 {creditsAmount ? `+${creditsAmount} 点额度` : ''}</strong>
+                <span>{fmtDate(record.createdAt || (record as any).created_at || (record as any).completed_at)}</span>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '14px', fontWeight: 600, color: '#7536d5' }}>
-                  {fmtAmount(record.amount)}
-                </div>
-                <div
-                  style={{
-                    fontSize: '11px',
-                    color: record.status === 'completed' ? '#38A169' : record.status === 'failed' ? '#E53E3E' : '#DD6B20',
-                    marginTop: '2px',
-                  }}
-                >
-                  {record.status === 'completed' && '已完成'}
-                  {record.status === 'pending' && '处理中'}
-                  {record.status === 'failed' && '失败'}
-                  {record.status === 'refunded' && '已退款'}
-                </div>
+                <b>{fmtAmount(record.amount)}</b>
+                <span>{record.status === 'completed' ? '已完成' : record.status === 'pending' ? '处理中' : record.status === 'failed' ? '失败' : '已退款'}</span>
               </div>
             </div>
           );
         })}
       </div>
 
-      {/* Pagination */}
       {totalPages > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, marginTop: 16 }}>
-          <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page <= 1}
-            style={{
-              padding: '8px 16px', borderRadius: 10, border: '1px solid #2a2a40',
-              background: page <= 1 ? '#12121e' : '#1a1a2e', fontSize: 12,
-              color: page <= 1 ? '#4a4a5a' : '#c0a7fc', fontWeight: 500,
-              cursor: page <= 1 ? 'not-allowed' : 'pointer',
-              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-              transition: 'all 0.2s',
-            }}
-          >
-            上一页
-          </button>
-          <span style={{ fontSize: 13, color: '#e8e8f0', fontWeight: 600 }}>
-            {page} / {totalPages}
-          </span>
-          <button
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page >= totalPages}
-            style={{
-              padding: '8px 16px', borderRadius: 10, border: '1px solid #2a2a40',
-              background: page >= totalPages ? '#12121e' : '#1a1a2e', fontSize: 12,
-              color: page >= totalPages ? '#4a4a5a' : '#c0a7fc', fontWeight: 500,
-              cursor: page >= totalPages ? 'not-allowed' : 'pointer',
-              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-              transition: 'all 0.2s',
-            }}
-          >
-            下一页
-          </button>
+        <div className="pagination">
+          <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>上一页</button>
+          <span>{page} / {totalPages}</span>
+          <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>下一页</button>
         </div>
       )}
     </div>

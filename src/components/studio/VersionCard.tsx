@@ -26,155 +26,50 @@ export default function VersionCard({
   const hasAudio = !!version.audioUrl;
   const [audioCurrentTime, setAudioCurrentTime] = useState(0);
 
-  const cardStyle: React.CSSProperties = {
-    position: 'relative',
-    background: '#1a1a2e',
-    borderRadius: 16,
-    padding: 20,
-    border: isSelected
-      ? '2px solid #7536d5'
-      : '1px solid #2a2a40',
-    boxShadow: isSelected
-      ? '0 4px 20px rgba(117, 54, 213, 0.2)'
-      : '0 2px 12px rgba(0, 0, 0, 0.04)',
-    transition: 'all 0.2s ease',
-    opacity: isFailed ? 0.6 : 1,
-  };
-
-  const overlayStyle: React.CSSProperties = {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 16,
-    background: 'rgba(200, 200, 200, 0.3)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 2,
-  };
-
-  const headerStyle: React.CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  };
-
-  const versionLabelStyle: React.CSSProperties = {
-    fontSize: 14,
-    fontWeight: 700,
-    color: '#e8e8f0',
-    fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-  };
-
-  const durationStyle: React.CSSProperties = {
-    fontSize: 12,
-    color: '#999',
-    fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-  };
-
-  const wavePreviewStyle: React.CSSProperties = {
-    height: 40,
-    background: 'rgba(117, 54, 213, 0.15)',
-    borderRadius: 8,
-    marginBottom: 12,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 2,
-    padding: '0 12px',
-    overflow: 'hidden',
-  };
-
-  const selectButtonStyle: React.CSSProperties = {
-    width: '100%',
-    padding: '10px 16px',
-    borderRadius: 20,
-    border: isSelected ? 'none' : '1px solid #7536d5',
-    background: isSelected
-      ? 'linear-gradient(135deg, #7536d5, #5a2db8)'
-      : 'transparent',
-    color: isSelected ? 'white' : '#7536d5',
-    fontSize: 13,
-    fontWeight: 600,
-    cursor: isFailed ? 'not-allowed' : 'pointer',
-    fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-    transition: 'all 0.2s ease',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  };
-
   const formatDuration = (seconds?: number) => {
     if (!seconds) return '--:--';
     const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
+    const s = Math.floor(seconds % 60);
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
   return (
-    <div style={cardStyle}>
+    <article
+      style={{
+        ...cardStyle,
+        borderColor: isSelected ? 'rgba(206,255,53,.58)' : 'var(--hc-line)',
+        boxShadow: isSelected ? '0 16px 38px rgba(206,255,53,.12)' : 'var(--hc-shadow)',
+        opacity: isFailed ? 0.66 : 1,
+      }}
+    >
       {isFailed && (
         <div style={overlayStyle}>
-          <span style={{
-            background: 'rgba(255, 255, 255, 0.95)',
-            padding: '8px 16px',
-            borderRadius: 8,
-            fontSize: 12,
-            color: '#C53030',
-            fontWeight: 600,
-          }}>
-            {version.error?.message || '生成失败'}
-          </span>
+          <span>{version.error?.message || '生成失败'}</span>
         </div>
       )}
 
       <div style={headerStyle}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={versionLabelStyle}>版本 {version.versionNumber}</span>
-          {isSelected && (
-            <span style={{
-              width: 18,
-              height: 18,
-              borderRadius: '50%',
-              background: '#7536d5',
-              color: 'white',
-              fontSize: 10,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-              ✓
-            </span>
-          )}
+        <div style={{ minWidth: 0 }}>
+          <span style={eyebrowStyle}>Version {version.versionNumber}</span>
+          <strong style={versionLabelStyle}>版本 {version.versionNumber}</strong>
         </div>
         <span style={durationStyle}>{formatDuration(version.durationSeconds)}</span>
       </div>
 
-      {/* Wave preview placeholder */}
-      <div style={wavePreviewStyle}>
+      <div style={wavePreviewStyle} aria-hidden="true">
         {Array.from({ length: 24 }).map((_, i) => (
-          <div
+          <span
             key={i}
             style={{
-              width: 3,
-              height: 30,
-              borderRadius: 2,
+              height: `${24 + ((i * 23) % 68)}%`,
               background: isPlaying
-                ? 'linear-gradient(180deg, #7536d5 0%, #5a2db8 100%)'
-                : 'rgba(117, 54, 213, 0.4)',
-              transform: `scaleY(${0.3 + Math.random() * 0.7})`,
-              transformOrigin: 'bottom center',
-              transition: 'transform 0.3s ease',
+                ? 'linear-gradient(180deg, var(--hc-lime), var(--hc-cyan))'
+                : 'rgba(206,255,53,.34)',
             }}
           />
         ))}
       </div>
 
-      {/* Player */}
       {hasAudio && !isFailed && (
         <div style={{ marginBottom: 12 }}>
           <AudioPlayerInline
@@ -187,7 +82,6 @@ export default function VersionCard({
         </div>
       )}
 
-      {/* Synced Lyrics */}
       {hasAudio && !isFailed && version.lyrics && (
         <div style={{ marginBottom: 12 }}>
           <SyncedLyrics
@@ -198,14 +92,89 @@ export default function VersionCard({
         </div>
       )}
 
-      {/* Select button */}
-      <button
-        onClick={onSelect}
-        disabled={isFailed}
-        style={selectButtonStyle}
-      >
-        {isSelected ? '✓ 已选择' : '选择此版本'}
+      <button onClick={onSelect} disabled={isFailed} style={selectButtonStyle(isSelected, isFailed)}>
+        {isSelected ? '已选择' : '选择此版本'}
       </button>
-    </div>
+    </article>
   );
 }
+
+const cardStyle: React.CSSProperties = {
+  position: 'relative',
+  borderRadius: 16,
+  padding: 18,
+  border: '1px solid var(--hc-line)',
+  background: 'rgba(24,26,34,.88)',
+  transition: 'border-color .2s ease, box-shadow .2s ease, opacity .2s ease',
+  overflow: 'hidden',
+};
+
+const overlayStyle: React.CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  zIndex: 2,
+  display: 'grid',
+  placeItems: 'center',
+  borderRadius: 16,
+  background: 'rgba(8,9,12,.72)',
+  backdropFilter: 'blur(2px)',
+};
+
+const headerStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'flex-start',
+  justifyContent: 'space-between',
+  gap: 10,
+  marginBottom: 12,
+};
+
+const eyebrowStyle: React.CSSProperties = {
+  display: 'block',
+  color: 'var(--hc-lime)',
+  fontSize: 10,
+  fontWeight: 950,
+  letterSpacing: '.08em',
+  textTransform: 'uppercase',
+  marginBottom: 4,
+};
+
+const versionLabelStyle: React.CSSProperties = {
+  color: 'var(--hc-text)',
+  fontSize: 15,
+  fontWeight: 950,
+};
+
+const durationStyle: React.CSSProperties = {
+  color: 'var(--hc-muted)',
+  fontSize: 12,
+  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+};
+
+const wavePreviewStyle: React.CSSProperties = {
+  height: 44,
+  borderRadius: 10,
+  marginBottom: 12,
+  display: 'grid',
+  gridTemplateColumns: 'repeat(24, 1fr)',
+  alignItems: 'center',
+  gap: 2,
+  padding: '0 12px',
+  overflow: 'hidden',
+  border: '1px solid var(--hc-line)',
+  background: 'rgba(8,9,12,.36)',
+};
+
+const selectButtonStyle = (isSelected: boolean, isFailed: boolean): React.CSSProperties => ({
+  width: '100%',
+  padding: '11px 16px',
+  borderRadius: 999,
+  border: isSelected ? '1px solid transparent' : '1px solid rgba(206,255,53,.34)',
+  background: isSelected
+    ? 'linear-gradient(135deg, var(--hc-lime), var(--hc-cyan))'
+    : 'rgba(206,255,53,.08)',
+  color: isSelected ? '#08090c' : 'var(--hc-lime)',
+  fontSize: 13,
+  fontWeight: 950,
+  cursor: isFailed ? 'not-allowed' : 'pointer',
+  transition: 'all .2s ease',
+});

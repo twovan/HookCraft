@@ -344,7 +344,7 @@ export default function AudioUploadTab() {
         const errorMessage = data.error || '生成失败，请重试';
 
         if (errorCode === 'INSUFFICIENT_CREDITS') {
-          setGenerationError('Credits 余额不足');
+          setGenerationError('额度余额不足');
           setGenerationStatus('error');
           return;
         }
@@ -484,6 +484,7 @@ export default function AudioUploadTab() {
   const paramsDisabled = coverMode === 'one-step'
     ? (uploadStatus !== 'ready') || isGenerating
     : (!isPreprocessed) || isGenerating;
+  const isCreditError = generationError?.includes('额度余额不足') ?? false;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -510,7 +511,7 @@ export default function AudioUploadTab() {
       )}
 
       {/* Main two-column layout (Requirement 9.3) */}
-      <div style={{
+      <div className="audio-upload-grid" style={{
         display: 'grid',
         gridTemplateColumns: '1fr 1fr',
         gap: 32,
@@ -518,11 +519,11 @@ export default function AudioUploadTab() {
       }}>
         {/* Left Column: Audio Upload + Waveform + Analyze Button */}
         <div style={{
-          background: '#1a1a2e',
+          background: 'rgba(13, 17, 23, 0.94)',
           borderRadius: 20,
           padding: 24,
-          border: '1px solid #2a2a40',
-          boxShadow: '0 4px 20px rgba(117, 54, 213, 0.06)',
+          border: '1px solid rgba(148, 163, 184, 0.18)',
+          boxShadow: '0 4px 20px rgba(36, 230, 200, 0.08)',
           display: 'flex',
           flexDirection: 'column',
           gap: 16,
@@ -532,7 +533,7 @@ export default function AudioUploadTab() {
             fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
             fontSize: 18,
             fontWeight: 600,
-            color: '#e8e8f0',
+            color: '#F7FAF2',
             margin: 0,
           }}>
             上传参考音频
@@ -588,14 +589,14 @@ export default function AudioUploadTab() {
                     borderRadius: 12,
                     border: 'none',
                     background: isPreprocessing
-                      ? '#2a2a40'
-                      : 'linear-gradient(135deg, #7536d5 0%, #9b59b6 100%)',
-                    color: isPreprocessing ? '#666' : '#fff',
+                      ? 'rgba(148, 163, 184, 0.18)'
+                      : 'linear-gradient(135deg, #B7FF4A 0%, #24E6C8 100%)',
+                    color: isPreprocessing ? '#666' : '#08100e',
                     fontSize: 15,
                     fontWeight: 600,
                     cursor: isPreprocessing ? 'not-allowed' : 'pointer',
                     fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-                    boxShadow: isPreprocessing ? 'none' : '0 4px 16px rgba(117, 54, 213, 0.3)',
+                    boxShadow: isPreprocessing ? 'none' : '0 4px 16px rgba(36, 230, 200, 0.28)',
                     transition: 'all 0.3s ease',
                   }}
                 >
@@ -632,7 +633,7 @@ export default function AudioUploadTab() {
                   <div style={{
                     width: 16,
                     height: 16,
-                    border: '2px solid #7536d5',
+                    border: '2px solid #B7FF4A',
                     borderTopColor: 'transparent',
                     borderRadius: '50%',
                     animation: 'audioTabSpin 0.8s linear infinite',
@@ -673,12 +674,12 @@ export default function AudioUploadTab() {
 
           {/* 歌词结构标签 - 左侧面板内 */}
           <div style={{
-            background: '#12121e',
+            background: 'rgba(8, 11, 16, 0.82)',
             borderRadius: 12,
             padding: 16,
-            border: '1px solid #2a2a40',
+            border: '1px solid rgba(148, 163, 184, 0.18)',
           }}>
-            <h3 style={{ fontSize: 14, fontWeight: 600, color: '#e8e8f0', margin: '0 0 10px 0', fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" }}>
+            <h3 style={{ fontSize: 14, fontWeight: 600, color: '#F7FAF2', margin: '0 0 10px 0', fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" }}>
               歌词结构标签
             </h3>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -686,7 +687,7 @@ export default function AudioUploadTab() {
                 <button
                   key={tag}
                   onClick={() => setParams(prev => ({ ...prev, lyrics: prev.lyrics + (prev.lyrics.endsWith('\n') || prev.lyrics === '' ? '' : '\n') + tag + '\n' }))}
-                  style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #2a2a40', background: '#1a1a2e', color: '#e8e8f0', fontSize: 12, fontFamily: 'monospace', cursor: 'pointer', transition: 'all 0.15s ease' }}
+                  style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(148, 163, 184, 0.18)', background: 'rgba(13, 17, 23, 0.94)', color: '#F7FAF2', fontSize: 12, fontFamily: 'monospace', cursor: 'pointer', transition: 'all 0.15s ease' }}
                 >
                   {tag}
                 </button>
@@ -699,10 +700,10 @@ export default function AudioUploadTab() {
 
           {/* 使用提示 - 左侧面板内 */}
           <div style={{
-            background: '#12121e',
+            background: 'rgba(8, 11, 16, 0.82)',
             borderRadius: 12,
             padding: 16,
-            border: '1px solid #2a2a40',
+            border: '1px solid rgba(148, 163, 184, 0.18)',
           }}>
             <p style={{ fontSize: 12, fontWeight: 600, color: '#f59e0b', margin: '0 0 8px 0', fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" }}>
               💡 使用提示
@@ -718,18 +719,18 @@ export default function AudioUploadTab() {
 
         {/* Right Column: Params Editor */}
         <div style={{
-          background: '#1a1a2e',
+          background: 'rgba(13, 17, 23, 0.94)',
           borderRadius: 20,
           padding: 24,
-          border: '1px solid #2a2a40',
-          boxShadow: '0 4px 20px rgba(117, 54, 213, 0.06)',
+          border: '1px solid rgba(148, 163, 184, 0.18)',
+          boxShadow: '0 4px 20px rgba(36, 230, 200, 0.08)',
           minWidth: 0,
         }}>
           <h2 style={{
             fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
             fontSize: 18,
             fontWeight: 600,
-            color: '#e8e8f0',
+            color: '#F7FAF2',
             margin: '0 0 20px 0',
           }}>
             编曲参数
@@ -751,8 +752,8 @@ export default function AudioUploadTab() {
             <div style={{
               marginTop: 16,
               padding: '14px 16px',
-              background: 'rgba(239, 68, 68, 0.1)',
-              border: '1px solid rgba(239, 68, 68, 0.2)',
+              background: isCreditError ? 'rgba(206,255,53,.08)' : 'rgba(239, 68, 68, 0.1)',
+              border: isCreditError ? '1px solid rgba(206,255,53,.26)' : '1px solid rgba(239, 68, 68, 0.2)',
               borderRadius: 10,
               display: 'flex',
               flexDirection: 'column',
@@ -760,24 +761,33 @@ export default function AudioUploadTab() {
             }}>
               <span style={{
                 fontSize: 13,
-                color: '#ef4444',
+                color: isCreditError ? '#B7FF4A' : '#ef4444',
                 fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
                 lineHeight: 1.5,
               }}>
                 {generationError}
               </span>
               {/* Credits insufficient - show recharge link */}
-              {generationError.includes('Credits 余额不足') && (
+              {isCreditError && (
                 <a
-                  href="/account"
+                  href="/pricing#credits-pack"
                   style={{
+                    width: 'fit-content',
+                    minHeight: 34,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    border: '1px solid rgba(206,255,53,.28)',
+                    borderRadius: 999,
+                    background: 'rgba(206,255,53,.1)',
+                    padding: '0 13px',
                     fontSize: 13,
-                    color: '#7536d5',
-                    textDecoration: 'underline',
+                    color: '#B7FF4A',
+                    textDecoration: 'none',
+                    fontWeight: 800,
                     fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
                   }}
                 >
-                  前往充值 &rarr;
+                  前往购买额度
                 </a>
               )}
             </div>
@@ -805,10 +815,10 @@ export default function AudioUploadTab() {
               </p>
               <p style={{
                 fontSize: 13,
-                color: '#e8e8f0',
+                color: '#F7FAF2',
                 margin: 0,
                 padding: '8px 12px',
-                background: '#12121e',
+                background: 'rgba(8, 11, 16, 0.82)',
                 borderRadius: 6,
                 fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
                 lineHeight: 1.5,
@@ -823,8 +833,8 @@ export default function AudioUploadTab() {
                     padding: '8px 16px',
                     borderRadius: 8,
                     border: 'none',
-                    background: '#7536d5',
-                    color: '#fff',
+                    background: '#B7FF4A',
+                    color: '#08100e',
                     fontSize: 13,
                     fontWeight: 600,
                     cursor: 'pointer',
@@ -839,7 +849,7 @@ export default function AudioUploadTab() {
                     flex: 1,
                     padding: '8px 16px',
                     borderRadius: 8,
-                    border: '1px solid #2a2a40',
+                    border: '1px solid rgba(148, 163, 184, 0.18)',
                     background: 'transparent',
                     color: '#9ca3af',
                     fontSize: 13,
@@ -859,25 +869,25 @@ export default function AudioUploadTab() {
       {/* Generation Progress (Task 8.1) */}
       {isGenerating && (
         <div style={{
-          background: '#1a1a2e',
+          background: 'rgba(13, 17, 23, 0.94)',
           borderRadius: 20,
           padding: '32px 24px',
-          border: '1px solid #2a2a40',
-          boxShadow: '0 4px 20px rgba(117, 54, 213, 0.06)',
+          border: '1px solid rgba(148, 163, 184, 0.18)',
+          boxShadow: '0 4px 20px rgba(36, 230, 200, 0.08)',
           textAlign: 'center',
         }}>
           <div style={{
             width: 40,
             height: 40,
             margin: '0 auto 16px',
-            border: '3px solid #2a2a40',
-            borderTopColor: '#7536d5',
+            border: '3px solid rgba(148, 163, 184, 0.18)',
+            borderTopColor: '#B7FF4A',
             borderRadius: '50%',
             animation: 'audioTabSpin 1s linear infinite',
           }} />
           <p style={{
             fontSize: 14,
-            color: '#e8e8f0',
+            color: '#F7FAF2',
             margin: 0,
             fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
           }}>
@@ -897,16 +907,16 @@ export default function AudioUploadTab() {
       {/* Generation Result (Task 8.2: Requirements 11.1-11.4) */}
       {isCompleted && generationResult?.audioUrl && (
         <div style={{
-          background: '#1a1a2e',
+          background: 'rgba(13, 17, 23, 0.94)',
           borderRadius: 20,
           padding: 24,
-          border: '1px solid #2a2a40',
-          boxShadow: '0 4px 20px rgba(117, 54, 213, 0.06)',
+          border: '1px solid rgba(148, 163, 184, 0.18)',
+          boxShadow: '0 4px 20px rgba(36, 230, 200, 0.08)',
         }}>
           <h3 style={{
             fontSize: 18,
             fontWeight: 600,
-            color: '#e8e8f0',
+            color: '#F7FAF2',
             marginBottom: 20,
             fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
             textAlign: 'center',
@@ -917,9 +927,9 @@ export default function AudioUploadTab() {
           {/* Audio Player (Requirement 11.1) */}
           <div style={{
             padding: 16,
-            background: '#12121e',
+            background: 'rgba(8, 11, 16, 0.82)',
             borderRadius: 14,
-            border: '1px solid #2a2a40',
+            border: '1px solid rgba(148, 163, 184, 0.18)',
             marginBottom: 16,
           }}>
             <audio
@@ -934,9 +944,9 @@ export default function AudioUploadTab() {
           {!params.isInstrumental && params.lyrics && (
             <div style={{
               padding: 16,
-              background: '#12121e',
+              background: 'rgba(8, 11, 16, 0.82)',
               borderRadius: 14,
-              border: '1px solid #2a2a40',
+              border: '1px solid rgba(148, 163, 184, 0.18)',
               marginBottom: 16,
               maxHeight: 200,
               overflowY: 'auto',
@@ -944,7 +954,7 @@ export default function AudioUploadTab() {
               <h4 style={{
                 fontSize: 14,
                 fontWeight: 600,
-                color: '#c0a7fc',
+                color: '#B7FF4A',
                 marginBottom: 8,
                 fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
               }}>
@@ -952,7 +962,7 @@ export default function AudioUploadTab() {
               </h4>
               <pre style={{
                 fontSize: 13,
-                color: '#e8e8f0',
+                color: '#F7FAF2',
                 whiteSpace: 'pre-wrap',
                 wordBreak: 'break-word',
                 margin: 0,
@@ -971,9 +981,9 @@ export default function AudioUploadTab() {
               style={{
                 padding: '12px 32px',
                 borderRadius: 24,
-                border: '1px solid #7536d5',
+                border: '1px solid #B7FF4A',
                 background: 'transparent',
-                color: '#7536d5',
+                color: '#B7FF4A',
                 fontSize: 15,
                 fontWeight: 600,
                 cursor: 'pointer',
@@ -992,6 +1002,13 @@ export default function AudioUploadTab() {
         @keyframes audioTabSpin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 980px) {
+          .audio-upload-grid {
+            grid-template-columns: 1fr !important;
+            gap: 18px !important;
+          }
         }
       `}</style>
     </div>

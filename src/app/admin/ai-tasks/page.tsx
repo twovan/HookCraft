@@ -11,9 +11,14 @@ interface TaskItem {
   userId: string;
   userName: string;
   styleTag: string;
-  duration: number;
+  duration: number | null;
+  creditsConsumed: number;
   status: string;
+  originalStatus?: string;
   elapsedTime: number;
+  modelId?: string;
+  versionNumber?: number;
+  errorMessage?: string | null;
   createdAt: string;
 }
 
@@ -36,6 +41,31 @@ interface FailureItem {
   percentage: number;
 }
 
+type TagColor = 'green' | 'orange' | 'red' | 'blue' | 'gray' | 'purple';
+
+const statusMap: Record<string, { label: string; color: TagColor }> = {
+  pending: { label: '等待中', color: 'orange' },
+  building_prompt: { label: '构建 Prompt', color: 'blue' },
+  generating: { label: '生成中', color: 'blue' },
+  post_processing: { label: '后处理中', color: 'purple' },
+  completed: { label: '已完成', color: 'green' },
+  selected: { label: '已选中', color: 'green' },
+  archived: { label: '已归档', color: 'gray' },
+  failed: { label: '失败', color: 'red' },
+  safety_blocked: { label: '安全拦截', color: 'red' },
+};
+
+const activeStatuses = new Set(['pending', 'building_prompt', 'generating', 'post_processing']);
+
+function formatSeconds(seconds: number | null | undefined) {
+  if (!seconds || seconds <= 0) return '-';
+  if (seconds < 60) return `${seconds}s`;
+
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+  return rest > 0 ? `${minutes}m ${rest}s` : `${minutes}m`;
+}
+
 export default function AdminAITasksPage() {
   const [data, setData] = useState<TaskItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -53,7 +83,9 @@ export default function AdminAITasksPage() {
       const params = new URLSearchParams();
       params.set('page', String(page));
       params.set('pageSize', String(pageSize));
-      Object.entries(filters).forEach(([k, v]) => { if (v) params.set(k, v); });
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value) params.set(key, value);
+      });
 
       const res = await fetch(`/api/admin/ai-tasks?${params.toString()}`);
       if (!res.ok) throw new Error('请求失败');
@@ -80,12 +112,19 @@ export default function AdminAITasksPage() {
 
   const filterConfigs: FilterConfig[] = [
     {
-      key: 'status', type: 'select', placeholder: '任务状态',
+      key: 'status',
+      type: 'select',
+      placeholder: '任务状态',
       options: [
-        { label: '生成中', value: 'generating' },
-        { label: '已完成', value: 'completed' },
-        { label: '失败', value: 'failed' },
         { label: '等待中', value: 'pending' },
+        { label: '构建 Prompt', value: 'building_prompt' },
+        { label: '生成中', value: 'generating' },
+        { label: '后处理中', value: 'post_processing' },
+        { label: '已完成', value: 'completed' },
+        { label: '已选中', value: 'selected' },
+        { label: '已归档', value: 'archived' },
+        { label: '失败', value: 'failed' },
+        { label: '安全拦截', value: 'safety_blocked' },
       ],
     },
   ];
@@ -94,29 +133,32 @@ export default function AdminAITasksPage() {
     {
       key: 'id',
       title: '任务ID',
-      render: (row) => <span style={{ fontSize: 11, fontFamily: 'monospace' }}>{row.id.slice(0, 8)}...</span>,
+      render: (row) => <span style={monoCellStyle} title={row.id}>{row.id}</span>,
     },
-    { key: 'userName', title: '用户' },
-    { key: 'styleTag', title: '风格/种子' },
+    {
+      key: 'userName',
+      title: '用户ID',
+      render: (row) => <span style={monoCellStyle} title={row.userId}>{row.userName}</span>,
+    },
+    { key: 'styleTag', title: '风格/模型/种子' },
     {
       key: 'duration',
-      title: '时长',
-      render: (row) => <span>{row.duration}s</span>,
+      title: '音频时长',
+      render: (row) => <span>{formatSeconds(row.duration)}</span>,
     },
     {
       key: 'status',
       title: '状态',
       render: (row) => {
-        const statusMap: Record<string, { label: string; color: 'green' | 'orange' | 'red' | 'blue' | 'gray' }> = {
-          completed: { label: '已完成', color: 'green' },
-          generating: { label: '生成中', color: 'blue' },
-          failed: { label: '失败', color: 'red' },
-          pending: { label: '等待中', color: 'orange' },
-        };
-        const s = statusMap[row.status] || { label: row.status, color: 'gray' as const };
+        const meta = statusMap[row.status] || { label: row.status, color: 'gray' as const };
+        const tag = <Tag label={meta.label} color={meta.color} />;
+
         return (
-          <span style={row.status === 'generating' ? pulsingStyle : undefined}>
-            <Tag label={s.label} color={s.color} />
+          <span
+            style={activeStatuses.has(row.status) ? pulsingStyle : undefined}
+            title={row.errorMessage || (row.originalStatus && row.originalStatus !== row.status ? `原始状态: ${row.originalStatus}` : undefined)}
+          >
+            {tag}
           </span>
         );
       },
@@ -124,7 +166,12 @@ export default function AdminAITasksPage() {
     {
       key: 'elapsedTime',
       title: '耗时',
-      render: (row) => <span>{row.elapsedTime > 0 ? `${row.elapsedTime}s` : '-'}</span>,
+      render: (row) => <span>{formatSeconds(row.elapsedTime)}</span>,
+    },
+    {
+      key: 'creditsConsumed',
+      title: '消耗',
+      render: (row) => <span>{row.creditsConsumed}</span>,
     },
     {
       key: 'createdAt',
@@ -139,20 +186,16 @@ export default function AdminAITasksPage() {
 
   return (
     <div style={{ display: 'flex', gap: 24 }}>
-      {/* Main content */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        {/* Stats */}
         <div style={statsGridStyle}>
           <StatCard label="今日消耗积分" value={stats.dailyCredits} icon="🔥" iconColor="orange" />
           <StatCard label="正在生成" value={stats.activeTasks} icon="⚡" iconColor="blue" />
           <StatCard label="成功率" value={`${stats.successRate}%`} icon="✅" iconColor="green" />
-          <StatCard label="平均耗时" value={`${stats.avgDuration}s`} icon="⏱️" iconColor="purple" />
+          <StatCard label="平均耗时" value={formatSeconds(stats.avgDuration)} icon="⏱️" iconColor="purple" />
         </div>
 
-        {/* Filters */}
         <FilterBar filters={filterConfigs} values={filters} onChange={handleFilterChange} />
 
-        {/* Table */}
         <DataTable
           columns={columns}
           data={data}
@@ -164,38 +207,35 @@ export default function AdminAITasksPage() {
         />
       </div>
 
-      {/* Right sidebar */}
       <div style={{ width: 280, flexShrink: 0 }}>
-        {/* Popular Styles */}
         <div style={sidebarCardStyle}>
           <h4 style={sidebarTitleStyle}>🎵 热门风格</h4>
           {popularStyles.length === 0 ? (
             <div style={{ fontSize: 12, color: '#9ca3af' }}>暂无数据</div>
           ) : (
-            popularStyles.map((s, i) => (
-              <div key={i} style={sidebarItemStyle}>
-                <span style={{ fontSize: 13, color: '#374151' }}>{s.style}</span>
+            popularStyles.map((style) => (
+              <div key={style.style} style={sidebarItemStyle}>
+                <span style={{ fontSize: 13, color: '#374151' }}>{style.style}</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 12, color: '#6b7280' }}>{s.count}次</span>
-                  <span style={{ fontSize: 11, color: '#D4A574', fontWeight: 600 }}>{s.percentage}%</span>
+                  <span style={{ fontSize: 12, color: '#6b7280' }}>{style.count}次</span>
+                  <span style={{ fontSize: 11, color: '#D4A574', fontWeight: 600 }}>{style.percentage}%</span>
                 </div>
               </div>
             ))
           )}
         </div>
 
-        {/* Failure Reasons */}
         <div style={{ ...sidebarCardStyle, marginTop: 16 }}>
           <h4 style={sidebarTitleStyle}>⚠️ 失败原因统计</h4>
           {failureReasons.length === 0 ? (
             <div style={{ fontSize: 12, color: '#9ca3af' }}>暂无失败记录</div>
           ) : (
-            failureReasons.map((f, i) => (
-              <div key={i} style={sidebarItemStyle}>
-                <span style={{ fontSize: 12, color: '#374151', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.reason}</span>
+            failureReasons.map((failure) => (
+              <div key={failure.reason} style={sidebarItemStyle}>
+                <span style={failureReasonStyle} title={failure.reason}>{failure.reason}</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 12, color: '#6b7280' }}>{f.count}</span>
-                  <span style={{ fontSize: 11, color: '#ef4444', fontWeight: 600 }}>{f.percentage}%</span>
+                  <span style={{ fontSize: 12, color: '#6b7280' }}>{failure.count}</span>
+                  <span style={{ fontSize: 11, color: '#ef4444', fontWeight: 600 }}>{failure.percentage}%</span>
                 </div>
               </div>
             ))
@@ -211,6 +251,16 @@ const statsGridStyle: React.CSSProperties = {
   gridTemplateColumns: 'repeat(4, 1fr)',
   gap: 16,
   marginBottom: 16,
+};
+
+const monoCellStyle: React.CSSProperties = {
+  display: 'inline-block',
+  maxWidth: 260,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  verticalAlign: 'middle',
+  fontSize: 11,
+  fontFamily: 'monospace',
 };
 
 const sidebarCardStyle: React.CSSProperties = {
@@ -234,6 +284,15 @@ const sidebarItemStyle: React.CSSProperties = {
   justifyContent: 'space-between',
   padding: '8px 0',
   borderBottom: '1px solid #f3f4f6',
+};
+
+const failureReasonStyle: React.CSSProperties = {
+  fontSize: 12,
+  color: '#374151',
+  maxWidth: 160,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
 };
 
 const pulsingStyle: React.CSSProperties = {

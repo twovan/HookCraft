@@ -15,6 +15,10 @@ function createMockSupabase() {
   const mockSelect = vi.fn();
   const mockUpdate = vi.fn();
   const mockUpdateEq = vi.fn();
+  const mockAdminConfigSelect = vi.fn().mockResolvedValue({ data: [], error: null });
+  const mockInsertSingle = vi.fn();
+  const mockInsertSelect = vi.fn();
+  const mockInsert = vi.fn();
 
   // select chain: from('memberships').select('*').eq('user_id', x).single()
   mockSingle.mockResolvedValue({ data: null, error: null });
@@ -24,10 +28,21 @@ function createMockSupabase() {
   // update chain: from('memberships').update({}).eq('user_id', x)
   mockUpdateEq.mockResolvedValue({ data: null, error: null });
   mockUpdate.mockReturnValue({ eq: mockUpdateEq });
+  mockInsertSingle.mockResolvedValue({ data: createMembershipRow(), error: null });
+  mockInsertSelect.mockReturnValue({ single: mockInsertSingle });
+  mockInsert.mockReturnValue({ select: mockInsertSelect });
 
-  const mockFrom = vi.fn().mockReturnValue({
-    select: mockSelect,
-    update: mockUpdate,
+  const mockFrom = vi.fn().mockImplementation((table: string) => {
+    if (table === 'admin_config') {
+      return {
+        select: mockAdminConfigSelect,
+      };
+    }
+    return {
+      select: mockSelect,
+      insert: mockInsert,
+      update: mockUpdate,
+    };
   });
 
   const supabase = {
@@ -44,6 +59,10 @@ function createMockSupabase() {
     mockUpdate,
     mockUpdateEq,
     mockRpc,
+    mockAdminConfigSelect,
+    mockInsert,
+    mockInsertSelect,
+    mockInsertSingle,
   };
 }
 
@@ -112,17 +131,22 @@ describe('MembershipService', () => {
       expect(info.autoRenew).toBe(true);
     });
 
-    it('数据库错误时抛出 AppError', async () => {
+    it('会员记录不存在时自动创建 free 会员', async () => {
       mocks.mockSingle.mockResolvedValue({
         data: null,
         error: { code: 'PGRST116', message: 'Row not found' },
       });
+      const freeRow = createMembershipRow({ tier: 'free' });
+      mocks.mockInsertSingle.mockResolvedValue({ data: freeRow, error: null });
 
-      await expect(service.getMembership('user-1')).rejects.toMatchObject({
-        code: 'PGRST116',
-        table: 'memberships',
-        operation: 'select',
-      });
+      const info = await service.getMembership('user-1');
+
+      expect(info.tier).toBe('free');
+      expect(mocks.mockInsert).toHaveBeenCalledWith(expect.objectContaining({
+        user_id: 'user-1',
+        tier: 'free',
+        status: 'active',
+      }));
     });
   });
 
@@ -232,6 +256,49 @@ describe('MembershipService', () => {
       const result = await service.upgradeTier('user-1', 'business');
       expect(result.success).toBe(true);
       expect(result.proratedAmount).toBeGreaterThan(0);
+    });
+
+    it('升级时使用后台配置的价格和 monthly credits', async () => {
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30);
+      const row = createMembershipRow({
+        tier: 'pro',
+        billing_cycle: 'monthly',
+        expires_at: expiresAt.toISOString(),
+        status: 'active',
+      });
+      mocks.mockSingle.mockResolvedValue({ data: row, error: null });
+      mocks.mockRpc.mockResolvedValue({ data: null, error: null });
+      mocks.mockAdminConfigSelect.mockResolvedValue({
+        data: [
+          {
+            config_type: 'pricing',
+            config_data: [
+              { tier: 'pro', monthlyPrice: 10000, yearlyPrice: 96000 },
+              { tier: 'business', monthlyPrice: 40000, yearlyPrice: 384000 },
+            ],
+          },
+          {
+            config_type: 'credit_quota',
+            config_data: [
+              { tier: 'pro', monthlyCredits: 111 },
+              { tier: 'business', monthlyCredits: 777 },
+            ],
+          },
+        ],
+        error: null,
+      });
+
+      const result = await service.upgradeTier('user-1', 'business');
+
+      expect(result.success).toBe(true);
+      expect(result.proratedAmount).toBe(30000);
+      expect(mocks.mockRpc).toHaveBeenCalledWith('upgrade_membership', {
+        p_user_id: 'user-1',
+        p_target_tier: 'business',
+        p_billing_cycle: 'monthly',
+        p_monthly_credits: 777,
+      });
     });
   });
 

@@ -17,5 +17,11 @@ const nextConfig = {
       bodySizeLimit: '20mb',
     },
   },
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.optimization.splitChunks = false;
+    }
+    return config;
+  },
 }
 module.exports = nextConfig

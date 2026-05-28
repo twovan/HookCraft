@@ -17,6 +17,29 @@ interface TemplateItem {
   salesCount?: number;
 }
 
+const gradients = [
+  'linear-gradient(135deg, #ceff35 0%, #52d6c6 48%, #15181f 100%)',
+  'linear-gradient(135deg, #ff5a3d 0%, #f5c542 44%, #15181f 100%)',
+  'linear-gradient(135deg, #52d6c6 0%, #8b5cf6 48%, #15181f 100%)',
+  'linear-gradient(135deg, #f5c542 0%, #ceff35 42%, #15181f 100%)',
+];
+
+function getGradient(name: string) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return gradients[Math.abs(hash) % gradients.length];
+}
+
+async function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit, timeout = 10000) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeout);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
 export default function ProducerProfilePage() {
   const params = useParams();
   const id = params.id as string;
@@ -27,7 +50,6 @@ export default function ProducerProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'templates' | 'other'>('templates');
-  const [hoveredCard, setHoveredCard] = useState<string | null>(null);
 
   useEffect(() => {
     fetchProducer();
@@ -39,8 +61,9 @@ export default function ProducerProfilePage() {
   }, [selectedGenre]);
 
   const fetchProducer = async () => {
+    setLoading(true);
     try {
-      const res = await fetch(`/api/producers/${id}`);
+      const res = await fetchWithTimeout(`/api/producers/${id}`);
       if (res.ok) {
         const data = await res.json();
         setProducer(data.producer);
@@ -48,7 +71,7 @@ export default function ProducerProfilePage() {
         setError('制作人不存在');
       }
     } catch {
-      setError('加载失败');
+      setError('加载失败，请重试');
     } finally {
       setLoading(false);
     }
@@ -56,15 +79,15 @@ export default function ProducerProfilePage() {
 
   const fetchTemplates = async () => {
     try {
-      const params = new URLSearchParams();
-      if (selectedGenre) params.set('genre', selectedGenre);
-      const res = await fetch(`/api/producers/${id}/templates?${params.toString()}`);
+      const query = new URLSearchParams();
+      if (selectedGenre) query.set('genre', selectedGenre);
+      const res = await fetchWithTimeout(`/api/producers/${id}/templates?${query.toString()}`);
       if (res.ok) {
         const data = await res.json();
         setTemplates(data.templates || []);
       }
     } catch {
-      // Silently fail
+      setTemplates([]);
     }
   };
 
@@ -75,299 +98,382 @@ export default function ProducerProfilePage() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', background: '#0d0d14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ color: '#999', fontSize: 14 }}>加载中...</span>
-      </div>
+      <main className="producer-page centered">
+        <StateCard title="正在加载制作人..." />
+        <ProducerStyles />
+      </main>
     );
   }
 
   if (error || !producer) {
     return (
-      <div style={{ minHeight: '100vh', background: '#0d0d14', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
-        <span style={{ fontSize: 48 }}>🎵</span>
-        <span style={{ color: '#999', fontSize: 16 }}>{error || '制作人不存在'}</span>
-        <Link href="/" style={{ color: '#7536d5', textDecoration: 'none', fontWeight: 600 }}>← 返回首页</Link>
-      </div>
+      <main className="producer-page centered">
+        <section className="state-card">
+          <span>制作人暂不可用</span>
+          <h1>{error || '制作人不存在'}</h1>
+          <Link href="/" className="hc-button hc-button-primary">返回首页</Link>
+        </section>
+        <ProducerStyles />
+      </main>
     );
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0d0d14' }}>
-      {/* Background */}
-      <div style={{
-        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-        background: 'radial-gradient(circle at 20% 50%, rgba(117, 54, 213,0.03) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(117, 54, 213,0.03) 0%, transparent 50%)',
-        pointerEvents: 'none', zIndex: 0,
-      }} />
-
-      <div style={{ position: 'relative', zIndex: 1, maxWidth: 1200, margin: '0 auto', padding: '48px 24px' }}>
-        {/* Producer Header */}
-        <div style={{
-          background: '#1a1a2e',
-          borderRadius: 24,
-          padding: 32,
-          border: '1px solid #2a2a40',
-          boxShadow: '0 4px 20px rgba(117, 54, 213, 0.06)',
-          marginBottom: 32,
-          display: 'flex',
-          gap: 24,
-          alignItems: 'flex-start',
-        }}>
-          {/* Avatar */}
-          <div style={{
-            width: 80,
-            height: 80,
-            borderRadius: '50%',
-            background: producer.avatarUrl
-              ? `url(${producer.avatarUrl}) center/cover`
-              : 'linear-gradient(135deg, #7536d5, #5a2db8)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 32,
-            color: 'white',
-            flexShrink: 0,
-          }}>
+    <main className="producer-page">
+      <div className="producer-shell">
+        <section className="producer-hero">
+          <div
+            className="producer-avatar"
+            style={producer.avatarUrl ? { backgroundImage: `url(${producer.avatarUrl})` } : undefined}
+          >
             {!producer.avatarUrl && producer.displayName.charAt(0)}
           </div>
 
-          {/* Info */}
-          <div style={{ flex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-              <h1 style={{
-                fontSize: 28,
-                fontWeight: 700,
-                color: '#e8e8f0',
-                margin: 0,
-                fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-              }}>
-                {producer.displayName}
-              </h1>
-              {/* 认证制作人 badge */}
-              <span style={{
-                padding: '4px 12px',
-                background: 'rgba(117, 54, 213, 0.15)',
-                color: '#7536d5',
-                fontSize: 11,
-                fontWeight: 700,
-                borderRadius: 12,
-                border: '1px solid rgba(117, 54, 213, 0.3)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-              }}>
-                ✓ 认证制作人
-              </span>
+          <div className="producer-info">
+            <div className="title-row">
+              <div>
+                <span>认证制作人</span>
+                <h1>{producer.displayName}</h1>
+              </div>
+              <b>已认证</b>
             </div>
 
-            {producer.bio && (
-              <p style={{ fontSize: 14, color: '#9ca3af', lineHeight: 1.6, marginBottom: 12 }}>
-                {producer.bio}
-              </p>
-            )}
+            {producer.bio && <p>{producer.bio}</p>}
 
-            {/* Style tags */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
-              {producer.styleTags.map((tag) => (
-                <span key={tag} style={{
-                  padding: '5px 14px',
-                  background: 'rgba(117, 54, 213, 0.15)',
-                  color: '#7536d5',
-                  fontSize: 12,
-                  fontWeight: 600,
-                  borderRadius: 12,
-                }}>
-                  {tag}
-                </span>
-              ))}
+            <div className="tag-row">
+              {producer.styleTags.map((tag) => <span key={tag}>{tag}</span>)}
             </div>
 
-            {/* Stats row */}
-            <div style={{ display: 'flex', gap: 32 }}>
-              <div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: '#7536d5' }}>{producer.templateCount}</div>
-                <div style={{ fontSize: 12, color: '#999' }}>模板</div>
-              </div>
-              <div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: '#7536d5' }}>{producer.totalSales || 0}</div>
-                <div style={{ fontSize: 12, color: '#999' }}>销量</div>
-              </div>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: '#e8e8f0' }}>{formatDate(producer.joinedAt)}</div>
-                <div style={{ fontSize: 12, color: '#999' }}>入驻时间</div>
-              </div>
+            <div className="stat-row">
+              <Stat value={producer.templateCount} label="模板" />
+              <Stat value={producer.totalSales || 0} label="销量" />
+              <Stat value={formatDate(producer.joinedAt)} label="入驻时间" />
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* Tabs */}
-        <div style={{ display: 'flex', gap: 4, marginBottom: 24 }}>
-          <button
-            onClick={() => setActiveTab('templates')}
-            style={{
-              padding: '10px 20px',
-              borderRadius: 20,
-              border: 'none',
-              background: activeTab === 'templates'
-                ? 'linear-gradient(135deg, #7536d5, #5a2db8)'
-                : 'white',
-              color: activeTab === 'templates' ? 'white' : '#9ca3af',
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: 'pointer',
-              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-            }}
-          >
-            模板作品
-          </button>
-          <button
-            onClick={() => setActiveTab('other')}
-            style={{
-              padding: '10px 20px',
-              borderRadius: 20,
-              border: 'none',
-              background: activeTab === 'other'
-                ? 'linear-gradient(135deg, #7536d5, #5a2db8)'
-                : 'white',
-              color: activeTab === 'other' ? 'white' : '#9ca3af',
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: 'pointer',
-              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-            }}
-          >
-            其他内容
-          </button>
+        <div className="tabs">
+          <button className={activeTab === 'templates' ? 'active' : ''} onClick={() => setActiveTab('templates')}>模板作品</button>
+          <button className={activeTab === 'other' ? 'active' : ''} onClick={() => setActiveTab('other')}>其他内容</button>
         </div>
 
         {activeTab === 'templates' && (
           <>
-            {/* Genre filter */}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
-              <button
-                onClick={() => setSelectedGenre(null)}
-                style={{
-                  padding: '6px 14px',
-                  borderRadius: 16,
-                  border: !selectedGenre ? 'none' : '1px solid #2a2a40',
-                  background: !selectedGenre ? 'rgba(117, 54, 213, 0.15)' : '#1a1a2e',
-                  color: !selectedGenre ? '#7536d5' : '#9ca3af',
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                全部
-              </button>
+            <div className="filter-row">
+              <button className={!selectedGenre ? 'active' : ''} onClick={() => setSelectedGenre(null)}>全部</button>
               {producer.styleTags.map((tag) => (
-                <button
-                  key={tag}
-                  onClick={() => setSelectedGenre(tag)}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: 16,
-                    border: selectedGenre === tag ? 'none' : '1px solid #2a2a40',
-                    background: selectedGenre === tag ? 'rgba(117, 54, 213, 0.15)' : '#1a1a2e',
-                    color: selectedGenre === tag ? '#7536d5' : '#9ca3af',
-                    fontSize: 12,
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                  }}
-                >
+                <button key={tag} className={selectedGenre === tag ? 'active' : ''} onClick={() => setSelectedGenre(tag)}>
                   {tag}
                 </button>
               ))}
             </div>
 
-            {/* Templates grid */}
             {templates.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '60px 0', color: '#999' }}>
-                <div style={{ fontSize: 48, marginBottom: 12, opacity: 0.5 }}>🎵</div>
-                <p style={{ fontSize: 14 }}>暂无模板</p>
-              </div>
+              <section className="empty-card">
+                <span>暂无模板</span>
+                <p>暂无模板</p>
+              </section>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 20 }}>
-                {templates.map((t) => (
-                  <Link
-                    key={t.id}
-                    href={`/templates/${t.id}`}
-                    style={{
-                      background: '#1a1a2e',
-                      borderRadius: 16,
-                      overflow: 'hidden',
-                      boxShadow: hoveredCard === t.id
-                        ? '0 8px 30px rgba(117, 54, 213,0.2)'
-                        : '0 2px 12px rgba(0,0,0,0.04)',
-                      transition: 'all 0.3s ease',
-                      transform: hoveredCard === t.id ? 'translateY(-4px)' : 'none',
-                      textDecoration: 'none',
-                      color: 'inherit',
-                      display: 'block',
-                    }}
-                    onMouseEnter={() => setHoveredCard(t.id)}
-                    onMouseLeave={() => setHoveredCard(null)}
-                  >
-                    <div style={{
-                      height: 120,
-                      background: t.coverUrl
-                        ? `url(${t.coverUrl}) center/cover`
-                        : 'linear-gradient(135deg, rgba(117, 54, 213, 0.15), #0d0d14)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 32,
-                    }}>
-                      {!t.coverUrl && '🎵'}
-                    </div>
-                    <div style={{ padding: 16 }}>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: '#e8e8f0', marginBottom: 6 }}>
-                        {t.name}
+              <section className="template-grid">
+                {templates.map((template) => (
+                  <Link key={template.id} href={`/templates/${template.id}`} className="template-card">
+                    <div
+                      className="template-cover"
+                      style={template.coverUrl ? { backgroundImage: `url(${template.coverUrl})` } : { background: getGradient(template.name) }}
+                    />
+                    <div className="template-body">
+                      <h3>{template.name}</h3>
+                      <div className="tag-row small">
+                        {(template.genreTags || [template.genre]).filter(Boolean).slice(0, 2).map((tag) => <span key={tag}>{tag}</span>)}
                       </div>
-                      <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                        {(t.genreTags || [t.genre]).filter(Boolean).slice(0, 2).map((tag) => (
-                          <span key={tag} style={{
-                            padding: '3px 8px',
-                            background: 'rgba(117, 54, 213, 0.15)',
-                            color: '#7536d5',
-                            fontSize: 10,
-                            fontWeight: 600,
-                            borderRadius: 8,
-                          }}>
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div style={{ fontSize: 18, fontWeight: 700, color: '#7536d5' }}>
-                          {t.price && t.price > 0 ? `￥${Math.round(t.price / 100)}` : '免费'}
-                        </div>
-                        {(t.salesCount || 0) > 0 && (
-                          <div style={{ fontSize: 11, color: '#9ca3af' }}>
-                            销量 {t.salesCount}
-                          </div>
-                        )}
+                      <div className="template-meta">
+                        <strong>{template.price && template.price > 0 ? `¥${Math.round(template.price / 100)}` : '免费'}</strong>
+                        {(template.salesCount || 0) > 0 && <span>销量 {template.salesCount}</span>}
                       </div>
                     </div>
                   </Link>
                 ))}
-              </div>
+              </section>
             )}
           </>
         )}
 
         {activeTab === 'other' && (
-          <div style={{
-            textAlign: 'center',
-            padding: '80px 20px',
-            background: '#1a1a2e',
-            borderRadius: 20,
-            border: '1px solid #2a2a40',
-          }}>
-            <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.4 }}>📝</div>
-            <p style={{ fontSize: 15, color: '#999' }}>暂无其他内容</p>
-          </div>
+          <section className="empty-card">
+            <span>即将上线</span>
+            <p>暂无其他内容</p>
+          </section>
         )}
       </div>
+      <ProducerStyles />
+    </main>
+  );
+}
+
+function Stat({ value, label }: { value: string | number; label: string }) {
+  return (
+    <div>
+      <strong>{value}</strong>
+      <span>{label}</span>
     </div>
+  );
+}
+
+function StateCard({ title }: { title: string }) {
+  return (
+    <section className="state-card">
+      <span>制作人</span>
+      <h1>{title}</h1>
+    </section>
+  );
+}
+
+function ProducerStyles() {
+  return (
+    <style>{`
+      .producer-page {
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at 10% 12%, rgba(206,255,53,.10), transparent 320px),
+          radial-gradient(circle at 88% 20%, rgba(82,214,198,.08), transparent 340px),
+          var(--hc-bg);
+        color: var(--hc-text);
+        padding: 42px 22px 72px;
+      }
+
+      .producer-page.centered {
+        display: grid;
+        place-items: center;
+      }
+
+      .producer-shell {
+        max-width: 1180px;
+        margin: 0 auto;
+      }
+
+      .producer-hero,
+      .template-card,
+      .empty-card,
+      .state-card {
+        border: 1px solid var(--hc-line);
+        border-radius: var(--hc-radius-lg);
+        background: rgba(24,26,34,.88);
+        box-shadow: var(--hc-shadow);
+      }
+
+      .producer-hero {
+        display: flex;
+        gap: 24px;
+        align-items: flex-start;
+        padding: 28px;
+        margin-bottom: 24px;
+      }
+
+      .producer-avatar {
+        width: 92px;
+        height: 92px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        flex: 0 0 auto;
+        background: linear-gradient(135deg, var(--hc-lime), var(--hc-cyan));
+        background-size: cover;
+        background-position: center;
+        color: #08090c;
+        font-size: 34px;
+        font-weight: 950;
+      }
+
+      .producer-info {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .title-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 14px;
+      }
+
+      .title-row span,
+      .state-card span,
+      .empty-card span {
+        color: var(--hc-lime);
+        font-size: 12px;
+        font-weight: 950;
+        letter-spacing: .1em;
+        text-transform: uppercase;
+      }
+
+      .title-row h1 {
+        margin: 8px 0 0;
+        font-size: clamp(34px, 5vw, 58px);
+        line-height: 1;
+      }
+
+      .title-row b {
+        border: 1px solid rgba(206,255,53,.34);
+        border-radius: 999px;
+        background: rgba(206,255,53,.1);
+        color: var(--hc-lime);
+        padding: 7px 11px;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+
+      .producer-info p {
+        margin: 16px 0;
+        color: var(--hc-muted);
+        line-height: 1.75;
+      }
+
+      .tag-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .tag-row span {
+        border: 1px solid rgba(206,255,53,.28);
+        border-radius: 999px;
+        background: rgba(206,255,53,.1);
+        color: var(--hc-lime);
+        padding: 6px 10px;
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .tag-row.small span {
+        padding: 4px 8px;
+        font-size: 10px;
+      }
+
+      .stat-row {
+        display: flex;
+        gap: 30px;
+        margin-top: 20px;
+        flex-wrap: wrap;
+      }
+
+      .stat-row strong {
+        display: block;
+        color: var(--hc-lime);
+        font-size: 22px;
+      }
+
+      .stat-row span {
+        color: var(--hc-muted);
+        font-size: 12px;
+      }
+
+      .tabs,
+      .filter-row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+      }
+
+      .tabs button,
+      .filter-row button {
+        border: 1px solid var(--hc-line);
+        border-radius: 999px;
+        background: rgba(24,26,34,.72);
+        color: var(--hc-muted);
+        padding: 9px 14px;
+        font-weight: 900;
+        cursor: pointer;
+      }
+
+      .tabs button.active,
+      .filter-row button.active {
+        border-color: rgba(206,255,53,.36);
+        background: rgba(206,255,53,.12);
+        color: var(--hc-lime);
+      }
+
+      .template-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .template-card {
+        overflow: hidden;
+        color: inherit;
+        text-decoration: none;
+        transition: transform .22s ease, border-color .22s ease;
+      }
+
+      .template-card:hover {
+        transform: translateY(-4px);
+        border-color: rgba(206,255,53,.36);
+      }
+
+      .template-cover {
+        height: 132px;
+        background-size: cover;
+        background-position: center;
+      }
+
+      .template-body {
+        padding: 14px;
+      }
+
+      .template-body h3 {
+        margin: 0 0 10px;
+        color: var(--hc-text);
+        font-size: 15px;
+      }
+
+      .template-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        margin-top: 12px;
+      }
+
+      .template-meta strong {
+        color: var(--hc-lime);
+        font-size: 18px;
+      }
+
+      .template-meta span {
+        color: var(--hc-muted);
+        font-size: 11px;
+      }
+
+      .empty-card,
+      .state-card {
+        padding: 34px;
+        text-align: center;
+      }
+
+      .state-card {
+        width: min(520px, calc(100vw - 40px));
+      }
+
+      @media (max-width: 920px) {
+        .producer-hero {
+          flex-direction: column;
+        }
+
+        .template-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 560px) {
+        .producer-page {
+          padding: 28px 14px 56px;
+        }
+
+        .template-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    `}</style>
   );
 }

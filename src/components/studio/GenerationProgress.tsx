@@ -9,10 +9,10 @@ interface GenerationProgressProps {
 }
 
 const STEPS = [
-  { label: '准备生成', icon: '🎯' },
-  { label: '构建 Prompt', icon: '📝' },
-  { label: 'AI 创作中', icon: '🎵' },
-  { label: '后处理', icon: '✨' },
+  { label: '准备生成', code: '01' },
+          { label: '构建提示词', code: '02' },
+  { label: 'AI 创作中', code: '03' },
+  { label: '后处理', code: '04' },
 ];
 
 export default function GenerationProgress({
@@ -23,7 +23,6 @@ export default function GenerationProgress({
   const [currentStep, setCurrentStep] = useState(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
-  // Simulate step progression
   useEffect(() => {
     if (!isGenerating) {
       setCurrentStep(0);
@@ -34,24 +33,20 @@ export default function GenerationProgress({
     setCurrentStep(0);
     setElapsedSeconds(0);
 
-    const stepTimer = setInterval(() => {
-      setCurrentStep((prev) => {
-        if (prev < STEPS.length - 1) return prev + 1;
-        return prev;
-      });
+    const stepTimer = window.setInterval(() => {
+      setCurrentStep((prev) => (prev < STEPS.length - 1 ? prev + 1 : prev));
     }, 4000);
 
-    const secondTimer = setInterval(() => {
+    const secondTimer = window.setInterval(() => {
       setElapsedSeconds((prev) => prev + 1);
     }, 1000);
 
     return () => {
-      clearInterval(stepTimer);
-      clearInterval(secondTimer);
+      window.clearInterval(stepTimer);
+      window.clearInterval(secondTimer);
     };
   }, [isGenerating]);
 
-  // When completed, jump to last step
   useEffect(() => {
     if (completedCount > 0 && completedCount >= totalCount) {
       setCurrentStep(STEPS.length - 1);
@@ -65,83 +60,43 @@ export default function GenerationProgress({
   };
 
   return (
-    <div style={{
-      background: '#1a1a2e',
-      borderRadius: 20,
-      padding: 32,
-      border: '1px solid #2a2a40',
-      boxShadow: '0 4px 20px rgba(117, 54, 213, 0.06)',
-    }}>
-      {/* Header */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 24,
-      }}>
-        <span style={{
-          fontSize: 18,
-          fontWeight: 600,
-          color: '#e8e8f0',
-          fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-        }}>
-          {isGenerating ? '正在生成中...' : '生成完成'}
-        </span>
-        {isGenerating && (
-          <span style={{
-            fontSize: 14,
-            color: '#7536d5',
-            fontWeight: 600,
-            fontFamily: "monospace",
-          }}>
-            {formatTime(elapsedSeconds)}
-          </span>
-        )}
+    <div style={panelStyle}>
+      <div style={headerStyle}>
+        <div>
+          <span style={eyebrowStyle}>生成队列</span>
+          <strong style={titleStyle}>{isGenerating ? '正在生成中...' : '生成完成'}</strong>
+        </div>
+        {isGenerating && <span style={timerStyle}>{formatTime(elapsedSeconds)}</span>}
       </div>
 
-      {/* Steps */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+      <div style={stepsStyle}>
         {STEPS.map((step, idx) => {
           const isActive = idx === currentStep && isGenerating;
           const isDone = idx < currentStep || !isGenerating;
 
           return (
-            <div
-              key={idx}
-              style={{
-                flex: 1,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: 8,
-              }}
-            >
-              <div style={{
-                width: 36,
-                height: 36,
-                borderRadius: '50%',
-                background: isDone
-                  ? 'linear-gradient(135deg, #7536d5, #5a2db8)'
-                  : isActive
-                    ? 'rgba(117, 54, 213, 0.3)'
-                    : '#2a2a40',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 16,
-                transition: 'all 0.3s ease',
-                boxShadow: isActive ? '0 0 12px rgba(117, 54, 213, 0.5)' : 'none',
-                animation: isActive ? 'pulse 1.5s infinite' : 'none',
-              }}>
-                {isDone ? '✓' : step.icon}
+            <div key={step.code} style={stepStyle}>
+              <div
+                style={{
+                  ...stepDotStyle,
+                  background: isDone
+                    ? 'linear-gradient(135deg, var(--hc-lime), var(--hc-cyan))'
+                    : isActive
+                      ? 'rgba(206,255,53,.16)'
+                      : 'rgba(255,255,255,.05)',
+                  borderColor: isActive || isDone ? 'rgba(206,255,53,.42)' : 'var(--hc-line)',
+                  color: isDone ? '#08090c' : isActive ? 'var(--hc-lime)' : 'var(--hc-muted)',
+                  animation: isActive ? 'progressPulse 1.5s infinite' : 'none',
+                }}
+              >
+                {isDone ? '好' : step.code}
               </div>
-              <span style={{
-                fontSize: 11,
-                color: isActive ? '#7536d5' : isDone ? '#e8e8f0' : '#666',
-                fontWeight: isActive ? 600 : 400,
-                fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-                textAlign: 'center',
-              }}>
+              <span
+                style={{
+                  ...stepLabelStyle,
+                  color: isActive ? 'var(--hc-lime)' : isDone ? 'var(--hc-text)' : 'var(--hc-muted)',
+                }}
+              >
                 {step.label}
               </span>
             </div>
@@ -149,89 +104,165 @@ export default function GenerationProgress({
         })}
       </div>
 
-      {/* Waveform animation */}
       {isGenerating && (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 3,
-          height: 40,
-          marginBottom: 16,
-        }}>
+        <div style={waveStyle} aria-hidden="true">
           {Array.from({ length: 32 }).map((_, i) => (
-            <div
+            <span
               key={i}
               style={{
-                width: 3,
-                borderRadius: 2,
-                background: 'linear-gradient(180deg, #7536d5, #5a2db8)',
-                animation: `waveBar 1.2s ease-in-out ${i * 0.05}s infinite alternate`,
-                height: '100%',
-                transform: `scaleY(${0.2 + Math.random() * 0.3})`,
+                display: 'block',
+                width: '100%',
+                borderRadius: 999,
+                background: 'linear-gradient(180deg, var(--hc-lime), rgba(82,214,198,.48))',
+                height: `${22 + ((i * 19) % 66)}%`,
+                animation: 'waveBar 1.1s ease-in-out infinite alternate',
+                animationDelay: `${i * 0.045}s`,
               }}
             />
           ))}
         </div>
       )}
 
-      {/* Progress bar */}
-      <div style={{
-        width: '100%',
-        height: 6,
-        background: 'rgba(117, 54, 213, 0.15)',
-        borderRadius: 3,
-        overflow: 'hidden',
-        position: 'relative',
-      }}>
-        <div style={{
-          height: '100%',
-          background: 'linear-gradient(90deg, #7536d5, #5a2db8)',
-          borderRadius: 3,
-          width: isGenerating
-            ? `${Math.min(((currentStep + 1) / STEPS.length) * 90, 90)}%`
-            : '100%',
-          transition: 'width 1s ease',
-        }} />
-        {isGenerating && (
-          <div style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)',
-            animation: 'shimmer 2s infinite',
-          }} />
-        )}
+      <div style={trackStyle}>
+        <div
+          style={{
+            ...barStyle,
+            width: isGenerating
+              ? `${Math.min(((currentStep + 1) / STEPS.length) * 90, 90)}%`
+              : '100%',
+          }}
+        />
+        {isGenerating && <span style={shimmerStyle} />}
       </div>
 
       {isGenerating && (
-        <p style={{
-          fontSize: 12,
-          color: '#9ca3af',
-          marginTop: 16,
-          textAlign: 'center',
-          fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-        }}>
-          AI 正在为您创作音乐，通常需要 15-60 秒...
-        </p>
+        <p style={hintStyle}>AI 正在为你创作音乐，通常需要 15-60 秒。</p>
       )}
 
       <style>{`
-        @keyframes shimmer {
+        @keyframes progressShimmer {
           0% { transform: translateX(-100%); }
           100% { transform: translateX(100%); }
         }
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.6; }
+        @keyframes progressPulse {
+          0%, 100% { box-shadow: 0 0 0 rgba(206,255,53,0); }
+          50% { box-shadow: 0 0 24px rgba(206,255,53,.16); }
         }
         @keyframes waveBar {
-          0% { transform: scaleY(0.2); }
-          100% { transform: scaleY(1); }
+          0% { transform: scaleY(.35); opacity: .55; }
+          100% { transform: scaleY(1); opacity: 1; }
         }
       `}</style>
     </div>
   );
 }
+
+const panelStyle: React.CSSProperties = {
+  border: '1px solid var(--hc-line)',
+  borderRadius: 'var(--hc-radius-lg)',
+  padding: 26,
+  background: 'rgba(24,26,34,.88)',
+  boxShadow: 'var(--hc-shadow)',
+};
+
+const headerStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'flex-start',
+  justifyContent: 'space-between',
+  gap: 16,
+  marginBottom: 22,
+};
+
+const eyebrowStyle: React.CSSProperties = {
+  display: 'block',
+  color: 'var(--hc-lime)',
+  fontSize: 11,
+  fontWeight: 950,
+  letterSpacing: '.1em',
+  textTransform: 'uppercase',
+  marginBottom: 6,
+};
+
+const titleStyle: React.CSSProperties = {
+  color: 'var(--hc-text)',
+  fontSize: 18,
+  fontWeight: 950,
+};
+
+const timerStyle: React.CSSProperties = {
+  color: 'var(--hc-lime)',
+  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+  fontSize: 14,
+  fontWeight: 900,
+};
+
+const stepsStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+  gap: 8,
+  marginBottom: 22,
+};
+
+const stepStyle: React.CSSProperties = {
+  display: 'grid',
+  justifyItems: 'center',
+  gap: 8,
+  minWidth: 0,
+};
+
+const stepDotStyle: React.CSSProperties = {
+  width: 38,
+  height: 38,
+  borderRadius: 999,
+  border: '1px solid var(--hc-line)',
+  display: 'grid',
+  placeItems: 'center',
+  fontSize: 10,
+  fontWeight: 950,
+  transition: 'all .25s ease',
+};
+
+const stepLabelStyle: React.CSSProperties = {
+  fontSize: 11,
+  fontWeight: 800,
+  textAlign: 'center',
+};
+
+const waveStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(32, 1fr)',
+  alignItems: 'center',
+  gap: 3,
+  height: 42,
+  marginBottom: 16,
+};
+
+const trackStyle: React.CSSProperties = {
+  width: '100%',
+  height: 6,
+  background: 'rgba(255,255,255,.08)',
+  borderRadius: 999,
+  overflow: 'hidden',
+  position: 'relative',
+};
+
+const barStyle: React.CSSProperties = {
+  height: '100%',
+  background: 'linear-gradient(90deg, var(--hc-lime), var(--hc-cyan))',
+  borderRadius: 999,
+  transition: 'width 1s ease',
+};
+
+const shimmerStyle: React.CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  background: 'linear-gradient(90deg, transparent, rgba(255,255,255,.28), transparent)',
+  animation: 'progressShimmer 2s infinite',
+};
+
+const hintStyle: React.CSSProperties = {
+  margin: '14px 0 0',
+  color: 'var(--hc-muted)',
+  fontSize: 12,
+  textAlign: 'center',
+};

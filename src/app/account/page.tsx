@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMembershipStore } from '@/store/membershipStore';
@@ -12,27 +12,30 @@ import type { PaymentRecord } from '@/types/payment';
 import type { CreditHistory } from '@/types/credits';
 import type { MembershipTier } from '@/types/membership';
 
-/**
- * 账户管理页面
- * - 月度 Credits 使用统计（付费：consumed/total，Free：used/3 previews）
- * - 历史使用趋势（简单柱状图占位）
- * - 支付失败错误显示与重试
- * - 订阅管理面板
- * - 使用 Supabase Auth 获取当前用户信息，未登录时重定向到登录页
- */
 export default function AccountPage() {
   const { user, loading: authLoading, signOut } = useAuth();
   const router = useRouter();
+  const [authTimedOut, setAuthTimedOut] = useState(false);
 
-  // 未登录时重定向到登录页（客户端安全网，中间件已处理）
   useEffect(() => {
-    if (!authLoading && !user) {
+    if (!authLoading) {
+      setAuthTimedOut(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setAuthTimedOut(true), 1800);
+    return () => window.clearTimeout(timer);
+  }, [authLoading]);
+
+  useEffect(() => {
+    if ((authLoading && !authTimedOut) || user) return;
+    if (!user) {
       router.replace('/login?redirectTo=/account');
     }
-  }, [authLoading, user, router]);
+  }, [authLoading, authTimedOut, user, router]);
 
   const membership = useMembershipStore((s) => s.membership);
   const fetchMembership = useMembershipStore((s) => s.fetchMembership);
+  const membershipError = useMembershipStore((s) => s.error);
   const credits = useCreditStore((s) => s.credits);
   const previewCount = useCreditStore((s) => s.previewCount);
   const fetchCredits = useCreditStore((s) => s.fetchCredits);
@@ -47,25 +50,22 @@ export default function AccountPage() {
   const [dailyData, setDailyData] = useState<Array<{ date: string; count: number }>>([]);
 
   useEffect(() => {
+    if ((authLoading && !authTimedOut) || !user) return;
     fetchMembership();
-    // Fetch credit history
     fetchCreditHistory();
-    // Fetch purchase history
     fetchPurchaseHistory();
-    // Fetch daily data
     fetchDailyData();
-  }, []);
+  }, [authLoading, authTimedOut, user]);
 
-  // 在 membership 加载完成后，根据等级加载对应的 credits 数据
   useEffect(() => {
-    if (membership) {
-      if (isPaid) {
-        fetchCredits();
-      } else {
-        fetchPreviewCount();
-      }
+    if ((authLoading && !authTimedOut) || !user) return;
+    if (!membership) return;
+    if (isPaid) {
+      fetchCredits();
+    } else {
+      fetchPreviewCount();
     }
-  }, [membership]);
+  }, [authLoading, authTimedOut, user, membership, isPaid, fetchCredits, fetchPreviewCount]);
 
   const fetchCreditHistory = async () => {
     try {
@@ -75,7 +75,7 @@ export default function AccountPage() {
         setCreditHistory(data);
       }
     } catch {
-      // Silently fail - history is non-critical
+      // History is non-critical for account management.
     }
   };
 
@@ -87,7 +87,7 @@ export default function AccountPage() {
         setPurchaseHistory(data.filter((r: PaymentRecord) => r.status !== 'pending'));
       }
     } catch {
-      // Silently fail
+      // Payment history panel can render empty if this request fails.
     }
   };
 
@@ -97,13 +97,11 @@ export default function AccountPage() {
       if (res.ok) {
         const data = await res.json();
         const batches = data.batches || [];
-        // Group by date
         const dateMap: Record<string, number> = {};
         for (const batch of batches) {
           const date = new Date(batch.createdAt).toISOString().slice(0, 10);
           dateMap[date] = (dateMap[date] || 0) + 1;
         }
-        // Fill last 14 days
         const days: Array<{ date: string; count: number }> = [];
         for (let i = 13; i >= 0; i--) {
           const d = new Date();
@@ -114,7 +112,7 @@ export default function AccountPage() {
         setDailyData(days);
       }
     } catch {
-      // Silently fail
+      // Daily trend is optional.
     }
   };
 
@@ -186,112 +184,85 @@ export default function AccountPage() {
     }
   };
 
-  // Find max value for bar chart scaling
-  const maxUsage = creditHistory.length > 0
-    ? Math.max(...creditHistory.map((h) => h.total), 1)
-    : 1;
+  const maxUsage = useMemo(
+    () => (creditHistory.length > 0 ? Math.max(...creditHistory.map((h) => h.total), 1) : 1),
+    [creditHistory]
+  );
 
-  if (authLoading || !user) {
+  const handleRetryAccountData = () => {
+    if (!user) return;
+    fetchMembership({ force: true });
+    fetchCreditHistory();
+    fetchPurchaseHistory();
+    fetchDailyData();
+  };
+
+  const accountSyncMessage = membershipError?.includes('Internal Server Error')
+    ? '会员与额度服务暂时不可用，请检查服务配置后重试。'
+    : membershipError || '会员与额度服务暂时不可用，请稍后重试。';
+
+  if ((authLoading && !authTimedOut) || !user) {
     return (
-      <div style={{ minHeight: '100vh', background: '#0d0d14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ fontSize: '14px', color: '#999' }}>加载中...</div>
-      </div>
+      <main className="account-page account-centered">
+        <div className="account-state">
+          <span>账户</span>
+          <p>正在确认账户状态...</p>
+          <div className="account-state-loader" />
+        </div>
+        <AccountStyles />
+      </main>
     );
   }
 
   if (!membership) {
     return (
-      <div style={{ minHeight: '100vh', background: '#0d0d14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ fontSize: '14px', color: '#999' }}>加载中...</div>
-      </div>
+      <main className="account-page account-centered">
+        <div className="account-state account-state-error" role="alert">
+          <span>账户同步</span>
+          <strong>账户数据暂时无法加载</strong>
+          <p>{accountSyncMessage}</p>
+          <div className="account-state-actions">
+            <button className="hc-button" onClick={handleRetryAccountData}>
+              重新同步
+            </button>
+            <button className="hc-button hc-button-ghost" onClick={() => router.push('/studio')}>
+              返回工作台
+            </button>
+          </div>
+        </div>
+        <AccountStyles />
+      </main>
     );
   }
 
+  const monthlyPercent = isPaid && credits?.monthlyTotal
+    ? Math.min(100, (credits.monthlyUsed / credits.monthlyTotal) * 100)
+    : 0;
+  const previewPercent = !isPaid && previewCount?.total
+    ? Math.min(100, (previewCount.used / previewCount.total) * 100)
+    : 0;
+
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        background: '#0d0d14',
-        padding: '48px 24px',
-      }}
-    >
-      <div style={{ maxWidth: '900px', margin: '0 auto' }}>
-        {/* Page Header */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '40px' }}>
+    <main className="account-page">
+      <div className="account-shell">
+        <header className="account-header">
           <div>
-            <h1
-              style={{
-                fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-                fontSize: '36px',
-                fontWeight: 700,
-                color: '#e8e8f0',
-                marginBottom: '8px',
-              }}
-            >
-              账户管理
-            </h1>
-            <p style={{ fontSize: '15px', color: '#9ca3af', margin: 0 }}>
-              {user.email} · 管理你的会员订阅和创作额度
-            </p>
+            <span>账户中心</span>
+            <h1>账户管理</h1>
+            <p>{user.email} · 管理你的会员订阅、额度余额和创作记录。</p>
           </div>
-          <button
-            onClick={signOut}
-            style={{
-              padding: '8px 16px',
-              borderRadius: '16px',
-              border: '1px solid #E2E8F0',
-              background: '#1a1a2e',
-              color: '#9ca3af',
-              fontSize: '13px',
-              fontWeight: 500,
-              cursor: 'pointer',
-              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-              transition: 'all 0.2s',
-            }}
-          >
+          <button onClick={signOut} className="hc-button hc-button-ghost">
             退出登录
           </button>
-        </div>
+        </header>
 
-        {/* Payment Error Alert */}
         {paymentError && (
-          <div
-            style={{
-              background: 'rgba(229, 57, 53, 0.1)',
-              borderRadius: '12px',
-              padding: '16px 20px',
-              border: '1px solid rgba(229, 57, 53, 0.3)',
-              marginBottom: '24px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '16px',
-            }}
-            role="alert"
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ fontSize: '16px' }}>⚠️</span>
-              <span style={{ fontSize: '14px', color: '#C53030', fontWeight: 500 }}>
-                {paymentError}
-              </span>
+          <div className="payment-alert" role="alert">
+            <div>
+              <strong>支付状态需要确认</strong>
+              <span>{paymentError}</span>
             </div>
-            <button
-              onClick={handleRetryPayment}
-              disabled={isRetrying}
-              style={{
-                padding: '8px 16px',
-                borderRadius: '16px',
-                border: 'none',
-                background: '#E53E3E',
-                color: 'white',
-                fontSize: '12px',
-                fontWeight: 600,
-                cursor: isRetrying ? 'not-allowed' : 'pointer',
-                opacity: isRetrying ? 0.6 : 1,
-                fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-                whiteSpace: 'nowrap',
-              }}
-            >
+            <button onClick={handleRetryPayment} disabled={isRetrying}>
               {isRetrying ? '重试中...' : '重试支付'}
             </button>
           </div>
@@ -299,351 +270,107 @@ export default function AccountPage() {
 
         <ProfileSettings />
 
-        {/* Usage Stats Section */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '24px',
-            marginBottom: '32px',
-          }}
-        >
-          {/* Monthly Credits Usage */}
-          <div
-            style={{
-              background: '#1a1a2e',
-              borderRadius: '20px',
-              padding: '24px',
-              border: '1px solid #2a2a40',
-              boxShadow: '0 4px 20px rgba(117, 54, 213, 0.06)',
-            }}
-          >
-            <h3
-              style={{
-                fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-                fontSize: '16px',
-                fontWeight: 600,
-                color: '#e8e8f0',
-                margin: '0 0 16px 0',
-              }}
-            >
-              本月用量
-            </h3>
+        <section className="account-grid">
+          <article className="account-card usage-card">
+            <div className="card-heading">
+              <span>额度</span>
+              <h2>本月用量</h2>
+            </div>
 
             {isPaid && credits ? (
               <>
-                {/* Paid user: Credits usage */}
-                <div style={{ marginBottom: '16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '8px' }}>
-                    <span
-                      style={{
-                        fontSize: '32px',
-                        fontWeight: 700,
-                        color: '#7536d5',
-                        fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-                      }}
-                    >
-                      {credits.monthlyUsed}
-                    </span>
-                    <span style={{ fontSize: '14px', color: '#9ca3af' }}>
-                      / {credits.monthlyTotal} Credits 已消耗
-                    </span>
-                  </div>
-                  {/* Progress bar */}
-                  <div
-                    style={{
-                      background: '#2a2a40',
-                      borderRadius: '6px',
-                      height: '8px',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    <div
-                      style={{
-                        height: '100%',
-                        borderRadius: '6px',
-                        width: `${credits.monthlyTotal > 0 ? (credits.monthlyUsed / credits.monthlyTotal) * 100 : 0}%`,
-                        background: 'linear-gradient(90deg, #7536d5, #5a2db8)',
-                        transition: 'width 0.3s ease',
-                      }}
-                    />
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
-                    <span style={{ fontSize: '12px', color: '#999' }}>
-                      月度剩余 {credits.monthlyRemaining} Credits
-                    </span>
-                    {credits.purchasedBalance > 0 && (
-                      <span style={{ fontSize: '12px', color: '#6B46C1', fontWeight: 500 }}>
-                        购买余额 {credits.purchasedBalance}
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '4px' }}>
-                    总可用 {credits.totalAvailable} Credits
-                  </div>
+                <div className="metric-line">
+                  <strong>{credits.monthlyUsed}</strong>
+                  <span>/ {credits.monthlyTotal} 点额度已消耗</span>
                 </div>
+                <div className="progress-track" aria-label="本月额度使用进度">
+                  <div style={{ width: `${monthlyPercent}%` }} />
+                </div>
+                <div className="usage-meta">
+                  <span>月度剩余 {credits.monthlyRemaining} 点额度</span>
+                  {credits.purchasedBalance > 0 && <span>购买余额 {credits.purchasedBalance}</span>}
+                </div>
+                <p>总可用 {credits.totalAvailable} 点额度</p>
               </>
             ) : !isPaid && previewCount ? (
               <>
-                {/* Free user: Preview count */}
-                <div style={{ marginBottom: '16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '8px' }}>
-                    <span
-                      style={{
-                        fontSize: '32px',
-                        fontWeight: 700,
-                        color: '#7536d5',
-                        fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-                      }}
-                    >
-                      {previewCount.used}
-                    </span>
-                    <span style={{ fontSize: '14px', color: '#9ca3af' }}>
-                      / {previewCount.total} 次预览已使用
-                    </span>
-                  </div>
-                  {/* Dot indicators */}
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    {Array.from({ length: previewCount.total }).map((_, i) => (
-                      <div
-                        key={i}
-                        style={{
-                          width: '28px',
-                          height: '28px',
-                          borderRadius: '50%',
-                          background: i < previewCount.used
-                            ? '#E2E8F0'
-                            : 'linear-gradient(135deg, #7536d5 0%, #5a2db8 100%)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '12px',
-                          color: i < previewCount.used ? '#A0AEC0' : 'white',
-                          fontWeight: 600,
-                        }}
-                      >
-                        {i < previewCount.used ? '✓' : '♪'}
-                      </div>
-                    ))}
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#999', marginTop: '8px' }}>
-                    剩余 {previewCount.remaining} 次预览
-                  </div>
+                <div className="metric-line">
+                  <strong>{previewCount.used}</strong>
+                  <span>/ {previewCount.total} 次预览已使用</span>
                 </div>
+                <div className="progress-track" aria-label="免费预览使用进度">
+                  <div style={{ width: `${previewPercent}%` }} />
+                </div>
+                <div className="preview-dots">
+                  {Array.from({ length: previewCount.total }).map((_, i) => (
+                    <span key={i} className={i < previewCount.used ? 'used' : ''}>
+                      {i + 1}
+                    </span>
+                  ))}
+                </div>
+                <p>剩余 {previewCount.remaining} 次预览</p>
               </>
             ) : (
-              <div style={{ fontSize: '13px', color: '#999' }}>加载中...</div>
+              <p>正在加载额度...</p>
             )}
-          </div>
+          </article>
 
-          {/* Historical Usage Trend (Bar Chart Placeholder) */}
-          <div
-            style={{
-              background: '#1a1a2e',
-              borderRadius: '20px',
-              padding: '24px',
-              border: '1px solid #2a2a40',
-              boxShadow: '0 4px 20px rgba(117, 54, 213, 0.06)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-              <h3
-                style={{
-                  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-                  fontSize: '16px',
-                  fontWeight: 600,
-                  color: '#e8e8f0',
-                  margin: 0,
-                }}
-              >
-                使用趋势
-              </h3>
-              <div style={{ display: 'flex', gap: 4 }}>
-                <button
-                  onClick={() => setTrendView('day')}
-                  style={{
-                    padding: '4px 12px',
-                    borderRadius: 12,
-                    border: 'none',
-                    background: trendView === 'day' ? 'rgba(117, 54, 213, 0.2)' : 'transparent',
-                    color: trendView === 'day' ? '#7536d5' : '#9ca3af',
-                    fontSize: 11,
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-                  }}
-                >
+          <article className="account-card trend-card">
+            <div className="card-heading row">
+              <div>
+                <span>趋势</span>
+                <h2>使用趋势</h2>
+              </div>
+              <div className="segmented">
+                <button className={trendView === 'day' ? 'active' : ''} onClick={() => setTrendView('day')}>
                   日
                 </button>
-                <button
-                  onClick={() => setTrendView('month')}
-                  style={{
-                    padding: '4px 12px',
-                    borderRadius: 12,
-                    border: 'none',
-                    background: trendView === 'month' ? 'rgba(117, 54, 213, 0.2)' : 'transparent',
-                    color: trendView === 'month' ? '#7536d5' : '#9ca3af',
-                    fontSize: 11,
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-                  }}
-                >
+                <button className={trendView === 'month' ? 'active' : ''} onClick={() => setTrendView('month')}>
                   月
                 </button>
               </div>
             </div>
 
             {trendView === 'month' && creditHistory.length > 0 ? (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-end',
-                  gap: '8px',
-                  height: '120px',
-                  padding: '0 4px',
-                }}
-                role="img"
-                aria-label="月度使用趋势柱状图"
-              >
+              <div className="bar-chart" role="img" aria-label="月度额度使用趋势柱状图">
                 {creditHistory.slice(-6).map((month) => {
                   const monthlyHeight = maxUsage > 0 ? ((month.monthlyUsed ?? 0) / maxUsage) * 100 : 0;
                   const purchasedHeight = maxUsage > 0 ? ((month.purchasedUsed ?? 0) / maxUsage) * 100 : 0;
                   const totalHeight = monthlyHeight + purchasedHeight;
                   return (
-                    <div
-                      key={month.month}
-                      style={{
-                        flex: 1,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: '4px',
-                        height: '100%',
-                        justifyContent: 'flex-end',
-                      }}
-                    >
+                    <div key={month.month} className="bar-column">
                       <div
-                        style={{
-                          width: '100%',
-                          maxWidth: '32px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          height: `${Math.max(totalHeight, 4)}%`,
-                          minHeight: '4px',
-                        }}
+                        className="stacked-bar"
+                        style={{ height: `${Math.max(totalHeight, month.used > 0 ? 6 : 4)}%` }}
                         title={`${month.month}: 月度 ${month.monthlyUsed ?? 0} + 购买 ${month.purchasedUsed ?? 0} / ${month.total}`}
                       >
-                        {/* 购买 Credits 部分（紫色，上方） */}
-                        {(month.purchasedUsed ?? 0) > 0 && (
-                          <div
-                            style={{
-                              width: '100%',
-                              flex: purchasedHeight,
-                              background: 'linear-gradient(180deg, #9F7AEA 0%, #B794F4 100%)',
-                              borderRadius: monthlyHeight > 0 ? '4px 4px 0 0' : '4px',
-                              transition: 'flex 0.3s ease',
-                            }}
-                          />
-                        )}
-                        {/* 月度 Credits 部分（金色，下方） */}
-                        {(month.monthlyUsed ?? 0) > 0 && (
-                          <div
-                            style={{
-                              width: '100%',
-                              flex: monthlyHeight,
-                              background: 'linear-gradient(180deg, #7536d5 0%, #E8C9A8 100%)',
-                              borderRadius: purchasedHeight > 0 ? '0 0 0 0' : '4px 4px 0 0',
-                              transition: 'flex 0.3s ease',
-                            }}
-                          />
-                        )}
-                        {/* Fallback if both are 0 but used > 0 (legacy data) */}
-                        {(month.monthlyUsed ?? 0) === 0 && (month.purchasedUsed ?? 0) === 0 && month.used > 0 && (
-                          <div
-                            style={{
-                              width: '100%',
-                              flex: 1,
-                              background: 'linear-gradient(180deg, #7536d5 0%, #E8C9A8 100%)',
-                              borderRadius: '4px 4px 0 0',
-                            }}
-                          />
-                        )}
+                        {(month.purchasedUsed ?? 0) > 0 && <i style={{ flex: purchasedHeight }} />}
+                        {((month.monthlyUsed ?? 0) > 0 || month.used > 0) && <b style={{ flex: monthlyHeight || 1 }} />}
                       </div>
-                      <span style={{ fontSize: '10px', color: '#999', whiteSpace: 'nowrap' }}>
-                        {month.month.slice(5)}月
-                      </span>
+                      <span>{month.month.slice(5)}月</span>
                     </div>
                   );
                 })}
               </div>
             ) : trendView === 'day' && dailyData.length > 0 ? (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-end',
-                  gap: '4px',
-                  height: '120px',
-                  padding: '0 4px',
-                }}
-                role="img"
-                aria-label="每日创作趋势柱状图"
-              >
+              <div className="bar-chart daily" role="img" aria-label="每日创作趋势柱状图">
                 {dailyData.map((day) => {
-                  const maxDaily = Math.max(...dailyData.map(d => d.count), 1);
+                  const maxDaily = Math.max(...dailyData.map((d) => d.count), 1);
                   const height = (day.count / maxDaily) * 100;
                   return (
-                    <div
-                      key={day.date}
-                      style={{
-                        flex: 1,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: '4px',
-                        height: '100%',
-                        justifyContent: 'flex-end',
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: '100%',
-                          maxWidth: '20px',
-                          height: `${Math.max(height, 4)}%`,
-                          minHeight: '4px',
-                          background: day.count > 0
-                            ? 'linear-gradient(180deg, #7536d5 0%, #5a2db8 100%)'
-                            : '#2a2a40',
-                          borderRadius: '3px 3px 0 0',
-                          transition: 'height 0.3s ease',
-                        }}
-                        title={`${day.date}: ${day.count} 次创作`}
-                      />
-                      <span style={{ fontSize: '9px', color: '#999', whiteSpace: 'nowrap' }}>
-                        {day.date.slice(8)}
-                      </span>
+                    <div key={day.date} className="bar-column">
+                      <div className={day.count > 0 ? 'single-bar active' : 'single-bar'} style={{ height: `${Math.max(height, 4)}%` }} title={`${day.date}: ${day.count} 次创作`} />
+                      <span>{day.date.slice(8)}</span>
                     </div>
                   );
                 })}
               </div>
             ) : (
-              <div
-                style={{
-                  height: '120px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#999',
-                  fontSize: '13px',
-                }}
-              >
-                暂无历史数据
-              </div>
+              <div className="empty-chart">暂无历史数据</div>
             )}
-          </div>
-        </div>
+          </article>
+        </section>
 
-        {/* Subscription Panel */}
         <SubscriptionPanel
           membership={membership}
           creditsPurchaseHistory={purchaseHistory}
@@ -653,6 +380,371 @@ export default function AccountPage() {
           onBuyCredits={() => window.open('/pricing#credits-pack', '_blank')}
         />
       </div>
-    </div>
+      <AccountStyles />
+    </main>
+  );
+}
+
+function AccountStyles() {
+  return (
+    <style>{`
+      .account-page {
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at 12% 12%, rgba(206, 255, 53, 0.10), transparent 300px),
+          radial-gradient(circle at 88% 20%, rgba(82, 214, 198, 0.08), transparent 340px),
+          var(--hc-bg);
+        color: var(--hc-text);
+        padding: 42px 22px 72px;
+      }
+
+      .account-centered {
+        display: grid;
+        place-items: center;
+      }
+
+      .account-shell {
+        max-width: 1040px;
+        margin: 0 auto;
+      }
+
+      .account-header {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 18px;
+        margin-bottom: 26px;
+      }
+
+      .account-header span,
+      .card-heading span,
+      .account-state span {
+        color: var(--hc-lime);
+        font-size: 12px;
+        font-weight: 900;
+        letter-spacing: .1em;
+        text-transform: uppercase;
+      }
+
+      .account-header h1 {
+        margin: 8px 0 8px;
+        font-size: clamp(34px, 5vw, 58px);
+        line-height: 1;
+        letter-spacing: 0;
+      }
+
+      .account-header p,
+      .usage-card p {
+        margin: 0;
+        color: var(--hc-muted);
+        font-size: 14px;
+        overflow-wrap: anywhere;
+      }
+
+      .payment-alert,
+      .account-card,
+      .account-state {
+        border: 1px solid var(--hc-line);
+        background: rgba(24, 26, 34, 0.88);
+        border-radius: var(--hc-radius-lg);
+        box-shadow: var(--hc-shadow);
+      }
+
+      .payment-alert {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        margin-bottom: 20px;
+        padding: 16px;
+        border-color: rgba(255, 90, 61, 0.34);
+        background: rgba(255, 90, 61, 0.1);
+      }
+
+      .payment-alert strong,
+      .payment-alert span {
+        display: block;
+      }
+
+      .payment-alert strong {
+        color: #ffb5a7;
+        margin-bottom: 4px;
+      }
+
+      .payment-alert span {
+        color: var(--hc-muted);
+        font-size: 13px;
+      }
+
+      .payment-alert button {
+        border: 1px solid rgba(255, 90, 61, 0.4);
+        background: rgba(255, 90, 61, 0.18);
+        color: #ffb5a7;
+        border-radius: 999px;
+        padding: 9px 12px;
+        font-weight: 900;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+
+      .account-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+        margin: 22px 0;
+      }
+
+      .account-card {
+        padding: 22px;
+        min-width: 0;
+      }
+
+      .card-heading {
+        margin-bottom: 18px;
+      }
+
+      .card-heading.row {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .card-heading h2 {
+        margin: 6px 0 0;
+        color: var(--hc-text);
+        font-size: 18px;
+      }
+
+      .metric-line {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        margin-bottom: 12px;
+        flex-wrap: wrap;
+      }
+
+      .metric-line strong {
+        color: var(--hc-lime);
+        font-size: 42px;
+        line-height: 1;
+      }
+
+      .metric-line span,
+      .usage-meta {
+        color: var(--hc-muted);
+        font-size: 13px;
+      }
+
+      .progress-track {
+        height: 9px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(255,255,255,.08);
+      }
+
+      .progress-track div {
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, var(--hc-lime), var(--hc-cyan));
+        transition: width .25s ease;
+      }
+
+      .usage-meta {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        margin: 10px 0 8px;
+        flex-wrap: wrap;
+      }
+
+      .preview-dots {
+        display: flex;
+        gap: 8px;
+        margin: 12px 0 10px;
+        flex-wrap: wrap;
+      }
+
+      .preview-dots span {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        border: 1px solid rgba(206, 255, 53, 0.32);
+        color: var(--hc-lime);
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .preview-dots span.used {
+        border-color: var(--hc-line);
+        color: var(--hc-muted);
+        background: rgba(255,255,255,.05);
+      }
+
+      .segmented {
+        display: flex;
+        padding: 3px;
+        gap: 3px;
+        border: 1px solid var(--hc-line);
+        border-radius: 999px;
+        background: rgba(255,255,255,.03);
+      }
+
+      .segmented button {
+        border: 0;
+        border-radius: 999px;
+        background: transparent;
+        color: var(--hc-muted);
+        padding: 6px 11px;
+        font-size: 12px;
+        font-weight: 900;
+        cursor: pointer;
+      }
+
+      .segmented button.active {
+        background: rgba(206, 255, 53, 0.13);
+        color: var(--hc-lime);
+      }
+
+      .bar-chart {
+        height: 142px;
+        display: flex;
+        align-items: flex-end;
+        gap: 10px;
+      }
+
+      .bar-chart.daily {
+        gap: 5px;
+      }
+
+      .bar-column {
+        flex: 1;
+        min-width: 0;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .stacked-bar,
+      .single-bar {
+        width: min(100%, 32px);
+        min-height: 4px;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        overflow: hidden;
+        border-radius: 6px 6px 0 0;
+        background: rgba(255,255,255,.06);
+      }
+
+      .single-bar {
+        width: min(100%, 20px);
+      }
+
+      .single-bar.active,
+      .stacked-bar b {
+        background: linear-gradient(180deg, var(--hc-lime), rgba(82,214,198,.7));
+      }
+
+      .stacked-bar i {
+        background: linear-gradient(180deg, #f5c542, var(--hc-coral));
+      }
+
+      .bar-column span {
+        color: var(--hc-muted);
+        font-size: 10px;
+        white-space: nowrap;
+      }
+
+      .empty-chart {
+        height: 142px;
+        display: grid;
+        place-items: center;
+        color: var(--hc-muted);
+        font-size: 13px;
+      }
+
+      .account-state {
+        width: min(520px, calc(100vw - 40px));
+        padding: 30px;
+        text-align: center;
+      }
+
+      .account-state p {
+        margin: 10px 0 18px;
+        color: var(--hc-muted);
+      }
+
+      .account-state strong {
+        display: block;
+        margin-top: 10px;
+        color: var(--hc-text);
+        font-size: 22px;
+      }
+
+      .account-state .account-state-loader {
+        height: 4px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: linear-gradient(90deg, rgba(255,255,255,.08), var(--hc-lime), var(--hc-cyan), rgba(255,255,255,.08));
+        background-size: 240% 100%;
+        animation: account-load 1.1s ease-in-out infinite alternate;
+      }
+
+      .account-state-actions {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      @keyframes account-load {
+        from { background-position: 0% 50%; }
+        to { background-position: 100% 50%; }
+      }
+
+      @media (max-width: 760px) {
+        .account-page {
+          padding: 28px 14px 56px;
+        }
+
+        .account-header,
+        .payment-alert {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .account-header .hc-button,
+        .payment-alert button {
+          width: 100%;
+        }
+
+        .card-heading.row {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .account-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .bar-chart {
+          gap: 7px;
+        }
+
+        .segmented {
+          width: 100%;
+        }
+
+        .segmented button {
+          flex: 1;
+        }
+      }
+    `}</style>
   );
 }

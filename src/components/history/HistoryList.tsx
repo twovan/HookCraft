@@ -97,7 +97,7 @@ export default function HistoryList({
         body: JSON.stringify({ title: trimmed }),
       });
     } catch {
-      // Keep the optimistic title; rename is non-critical for playback.
+      // Keep the optimistic title; rename failures do not block playback.
     }
   };
 
@@ -148,36 +148,43 @@ export default function HistoryList({
     return batchNames[songId] || batch.title || batch.templateName || '未命名歌曲';
   };
 
+  const getBatchSummary = (batch: BatchSummary) => {
+    if (batch.templateName) return batch.templateName;
+    return batch.promptSummary || '未填写描述';
+  };
+
   if (batches.length === 0) {
     return (
       <div style={emptyStyle}>
-        <div style={{ fontSize: 38, marginBottom: 12, opacity: 0.55 }}>♪</div>
+        <div style={emptyMarkStyle}>作品库为空</div>
         <p style={{ fontSize: 15, margin: 0 }}>暂无创作记录</p>
+        <span style={{ display: 'block', marginTop: 8, color: 'var(--hc-muted)', fontSize: 13 }}>
+          生成完成后的作品会出现在这里。
+        </span>
+        <Link href="/studio" style={emptyActionStyle}>
+          去工作台创作
+        </Link>
       </div>
     );
   }
 
   return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: showDetail ? 'minmax(0, 1fr) minmax(360px, 420px)' : 'minmax(0, 1fr)',
-        gap: 18,
-        alignItems: 'start',
-      }}
-    >
+    <div className="history-list-grid" style={gridStyle(showDetail)}>
       <section style={listPanelStyle}>
-        <div style={listHeaderStyle}>
-          <div style={{ color: '#d7d7df', fontSize: 16, fontWeight: 600 }}>
-            我的创作({batches.length})
+        <div className="history-list-header" style={listHeaderStyle}>
+          <div>
+            <div style={{ color: 'var(--hc-text)', fontSize: 16, fontWeight: 900 }}>
+              创作记录({batches.length})
+            </div>
+            <div style={{ color: 'var(--hc-muted)', fontSize: 12, marginTop: 3 }}>按生成时间排序</div>
           </div>
-          <div style={{ display: 'flex', gap: 18, color: '#a1a1aa', fontSize: 13 }}>
-            <span>状态 <strong style={{ color: '#e8e8f0' }}>全部</strong></span>
-            <span>模型 <strong style={{ color: '#e8e8f0' }}>全部</strong></span>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            <span style={miniBadgeStyle}>最近记录</span>
+            <span style={miniBadgeStyle}>点击查看详情</span>
           </div>
         </div>
 
-        <div style={{ maxHeight: showDetail ? '76vh' : 'none', overflowY: showDetail ? 'auto' : 'visible' }}>
+        <div className="history-list-scroll" style={{ maxHeight: showDetail ? '76vh' : 'none', overflowY: showDetail ? 'auto' : 'visible' }}>
           {batches.map((batch) => {
             const songId = batch.taskId || batch.batchId;
             const isActive = expandedTaskId === songId;
@@ -185,18 +192,20 @@ export default function HistoryList({
             const title = getBatchTitle(batch);
 
             return (
-              <div
+              <article
                 key={songId}
                 onClick={() => !isFailed && onExpand(songId, batch.batchId)}
+                className="history-row"
                 style={{
                   ...rowStyle,
-                  background: isActive ? 'rgba(212, 165, 116, 0.11)' : 'transparent',
+                  background: isActive ? 'rgba(206, 255, 53, 0.08)' : 'transparent',
+                  borderColor: isActive ? 'rgba(206, 255, 53, 0.26)' : 'transparent',
                   cursor: isFailed ? 'default' : 'pointer',
                   opacity: isFailed ? 0.82 : 1,
                 }}
               >
-                <div style={{ ...coverStyle, borderColor: isFailed ? '#ff163b' : 'rgba(255,255,255,0.08)' }}>
-                  <span style={{ fontSize: 22 }}>{isFailed ? '×' : '♪'}</span>
+                <div style={{ ...coverStyle, borderColor: isFailed ? 'rgba(255, 90, 61, 0.5)' : 'rgba(206, 255, 53, 0.24)' }}>
+                  <span>{isFailed ? '异常' : '作品'}</span>
                 </div>
 
                 <div style={{ minWidth: 0, flex: 1 }}>
@@ -214,11 +223,11 @@ export default function HistoryList({
                       style={editInputStyle}
                     />
                   ) : (
-                    <div style={titleRowStyle}>
+                    <div className="history-title-row" style={titleRowStyle}>
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {title}
                       </span>
-                      {isFailed && <span style={failedBadgeStyle}>生成异常，积分已退回</span>}
+                      {isFailed && <span style={failedBadgeStyle}>生成异常，额度已退回</span>}
                       {!isFailed && (
                         <button
                           type="button"
@@ -230,16 +239,14 @@ export default function HistoryList({
                           style={iconButtonStyle}
                           title="重命名"
                         >
-                          ✎
+                          重命名
                         </button>
                       )}
                     </div>
                   )}
 
                   <div style={metaStyle}>{formatDate(batch.createdAt)}</div>
-                  <div style={summaryStyle}>
-                    {batch.promptSummary || batch.templateName || '未填写描述'}
-                  </div>
+                  <div style={summaryStyle}>{getBatchSummary(batch)}</div>
                   {isFailed && (
                     <div style={failedMessageStyle}>
                       {batch.errorMessage || '生成过程中出现错误，请调整内容后重试。'}
@@ -247,10 +254,8 @@ export default function HistoryList({
                   )}
                 </div>
 
-                <div style={rowActionsStyle} onClick={(e) => e.stopPropagation()}>
-                  {!isFailed && (
-                    <span style={durationPillStyle}>{formatDuration(batch.durationSeconds || undefined)}</span>
-                  )}
+                <div className="history-row-actions" style={rowActionsStyle} onClick={(e) => e.stopPropagation()}>
+                  {!isFailed && <span style={durationPillStyle}>{formatDuration(batch.durationSeconds || undefined)}</span>}
                   {!isFailed && (
                     <button type="button" onClick={() => onReCreate(songId)} style={smallActionStyle}>
                       重新创作
@@ -259,10 +264,7 @@ export default function HistoryList({
                   {batch.canEditSong && batch.taskId && (
                     <>
                       {batch.hasStemCache && <span style={stemCacheBadgeStyle}>分轨已缓存</span>}
-                      <Link
-                        href={buildStemEditorHref(batch.taskId, batch.stemJobId)}
-                        style={editSongLinkStyle}
-                      >
+                      <Link href={buildStemEditorHref(batch.taskId, batch.stemJobId)} style={editSongLinkStyle}>
                         编辑歌曲
                       </Link>
                     </>
@@ -275,26 +277,26 @@ export default function HistoryList({
                           onDelete(batch.batchId);
                         }
                       }}
-                      style={{ ...smallActionStyle, color: '#ef4444' }}
+                      style={{ ...smallActionStyle, color: '#ff8b76' }}
                     >
                       删除
                     </button>
                   )}
                 </div>
-              </div>
+              </article>
             );
           })}
         </div>
       </section>
 
       {showDetail && expandedBatch && (
-        <aside style={detailPanelStyle}>
+        <aside className="history-detail-panel" style={detailPanelStyle}>
           <div style={detailHeaderStyle}>
             <div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: '#e8e8f0' }}>
+              <div style={{ fontSize: 16, fontWeight: 900, color: 'var(--hc-text)' }}>
                 {getBatchTitle(expandedBatch)}
               </div>
-              <div style={{ fontSize: 12, color: '#8f96a3', marginTop: 4 }}>
+              <div style={{ fontSize: 12, color: 'var(--hc-muted)', marginTop: 4 }}>
                 {formatDate(expandedBatch.createdAt)}
               </div>
             </div>
@@ -302,12 +304,13 @@ export default function HistoryList({
               type="button"
               onClick={() => onExpand(expandedBatch.taskId || expandedBatch.batchId, expandedBatch.batchId)}
               style={closeButtonStyle}
+              title="关闭详情"
             >
               ×
             </button>
           </div>
 
-          {expandedBatchDetail?.prompt && (
+          {expandedBatchDetail?.prompt && !expandedBatchDetail.templateName && (
             <div style={promptBoxStyle}>{expandedBatchDetail.prompt}</div>
           )}
 
@@ -319,15 +322,15 @@ export default function HistoryList({
                   key={version.taskId}
                   style={{
                     ...versionCardStyle,
-                    borderColor: isSelected ? '#D4A574' : '#2f3540',
+                    borderColor: isSelected ? 'rgba(206, 255, 53, 0.42)' : 'var(--hc-line)',
                   }}
                 >
                   <div style={versionHeaderStyle}>
                     <div>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: '#f4f4f5' }}>
+                      <div style={{ fontSize: 14, fontWeight: 900, color: 'var(--hc-text)' }}>
                         {version.title || `版本 ${version.versionNumber}`}
                       </div>
-                      <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                         <span style={durationPillStyle}>{formatDuration(version.durationSeconds)}</span>
                         {isSelected && <span style={selectedBadgeStyle}>已选</span>}
                         {(version.styleTags || []).slice(0, 3).map((tag) => (
@@ -350,7 +353,9 @@ export default function HistoryList({
 
                   {version.audioUrl ? (
                     <audio
-                      ref={(el) => { if (el) audioRefs.current[version.taskId] = el; }}
+                      ref={(el) => {
+                        if (el) audioRefs.current[version.taskId] = el;
+                      }}
                       controls
                       src={version.audioUrl}
                       onTimeUpdate={(e) =>
@@ -366,7 +371,7 @@ export default function HistoryList({
                       style={{ width: '100%', height: 36, marginTop: 12 }}
                     />
                   ) : (
-                    <div style={{ marginTop: 12, color: '#8f96a3', fontSize: 13 }}>音频加载中...</div>
+                    <div style={{ marginTop: 12, color: 'var(--hc-muted)', fontSize: 13 }}>音频加载中...</div>
                   )}
 
                   {version.lyrics ? (
@@ -386,6 +391,7 @@ export default function HistoryList({
           </div>
         </aside>
       )}
+      <HistoryListStyles />
     </div>
   );
 }
@@ -396,75 +402,122 @@ function buildStemEditorHref(taskId: string, stemJobId?: string | null) {
   return `/studio/stem-editor?${params.toString()}`;
 }
 
+const gridStyle = (showDetail: boolean): CSSProperties => ({
+  display: 'grid',
+  gridTemplateColumns: showDetail ? 'minmax(0, 1fr) minmax(360px, 420px)' : 'minmax(0, 1fr)',
+  gap: 18,
+  alignItems: 'start',
+});
+
 const emptyStyle: CSSProperties = {
   textAlign: 'center',
   padding: '80px 20px',
-  color: '#6b7280',
-  background: '#1b1f24',
-  border: '1px solid #2f3540',
-  borderRadius: 16,
+  color: 'var(--hc-muted)',
+  background: 'rgba(24, 26, 34, 0.86)',
+  border: '1px solid var(--hc-line)',
+  borderRadius: 'var(--hc-radius-lg)',
+  boxShadow: 'var(--hc-shadow)',
+};
+
+const emptyMarkStyle: CSSProperties = {
+  display: 'inline-flex',
+  marginBottom: 12,
+  border: '1px solid rgba(206, 255, 53, 0.28)',
+  borderRadius: 999,
+  padding: '6px 10px',
+  color: 'var(--hc-lime)',
+  fontSize: 11,
+  fontWeight: 950,
+  letterSpacing: '.08em',
+};
+
+const emptyActionStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginTop: 18,
+  minHeight: 38,
+  borderRadius: 999,
+  padding: '0 16px',
+  background: 'linear-gradient(135deg, var(--hc-lime), var(--hc-cyan))',
+  color: '#08090c',
+  textDecoration: 'none',
+  fontSize: 13,
+  fontWeight: 900,
 };
 
 const listPanelStyle: CSSProperties = {
-  background: '#1b1f24',
-  border: '1px solid #2f3540',
-  borderRadius: 16,
+  background: 'rgba(24, 26, 34, 0.88)',
+  border: '1px solid var(--hc-line)',
+  borderRadius: 'var(--hc-radius-lg)',
   overflow: 'hidden',
-  boxShadow: '0 18px 50px rgba(0,0,0,0.24)',
+  boxShadow: 'var(--hc-shadow)',
 };
 
 const listHeaderStyle: CSSProperties = {
-  height: 58,
-  padding: '0 18px',
-  borderBottom: '1px solid #2f3540',
+  minHeight: 64,
+  padding: '14px 18px',
+  borderBottom: '1px solid var(--hc-line)',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
+  gap: 14,
+};
+
+const miniBadgeStyle: CSSProperties = {
+  border: '1px solid var(--hc-line)',
+  background: 'rgba(255,255,255,.03)',
+  color: 'var(--hc-muted)',
+  borderRadius: 999,
+  padding: '6px 9px',
+  fontSize: 11,
+  fontWeight: 800,
+  whiteSpace: 'nowrap',
 };
 
 const rowStyle: CSSProperties = {
-  minHeight: 82,
-  padding: '13px 18px',
-  borderBottom: '1px solid #2a3038',
+  minHeight: 86,
+  padding: '14px 18px',
+  borderBottom: '1px solid rgba(255,255,255,.06)',
+  borderLeft: '1px solid transparent',
   display: 'flex',
   alignItems: 'center',
   gap: 14,
-  transition: 'background 0.18s ease',
+  transition: 'background 0.18s ease, border-color 0.18s ease',
 };
 
 const coverStyle: CSSProperties = {
-  width: 52,
-  height: 52,
-  borderRadius: 10,
+  width: 54,
+  height: 54,
+  borderRadius: 12,
   flexShrink: 0,
-  background: 'linear-gradient(135deg, #2a2042, #1d2735)',
-  border: '1px solid rgba(255,255,255,0.08)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  color: '#D4A574',
+  background: 'linear-gradient(135deg, rgba(206,255,53,.18), rgba(82,214,198,.10) 46%, rgba(255,90,61,.12))',
+  border: '1px solid rgba(206,255,53,.24)',
+  display: 'grid',
+  placeItems: 'center',
+  color: 'var(--hc-lime)',
 };
 
 const titleRowStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: 8,
-  color: '#f4f4f5',
+  color: 'var(--hc-text)',
   fontSize: 14,
-  fontWeight: 700,
+  fontWeight: 900,
   minWidth: 0,
 };
 
 const metaStyle: CSSProperties = {
-  color: '#8f96a3',
+  color: 'var(--hc-muted)',
   fontSize: 12,
-  marginTop: 3,
+  marginTop: 4,
 };
 
 const summaryStyle: CSSProperties = {
-  color: '#8f96a3',
+  color: 'var(--hc-muted)',
   fontSize: 12,
-  marginTop: 3,
+  marginTop: 4,
   overflow: 'hidden',
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
@@ -475,12 +528,15 @@ const rowActionsStyle: CSSProperties = {
   alignItems: 'center',
   gap: 10,
   flexShrink: 0,
+  flexWrap: 'wrap',
+  justifyContent: 'flex-end',
 };
 
 const durationPillStyle: CSSProperties = {
   borderRadius: 999,
-  background: '#252a31',
-  color: '#c2c8d0',
+  background: 'rgba(255,255,255,.06)',
+  border: '1px solid var(--hc-line)',
+  color: 'var(--hc-text)',
   padding: '4px 9px',
   fontSize: 12,
   lineHeight: 1,
@@ -489,67 +545,69 @@ const durationPillStyle: CSSProperties = {
 const smallActionStyle: CSSProperties = {
   border: 'none',
   background: 'transparent',
-  color: '#d8dce3',
+  color: 'var(--hc-text)',
   fontSize: 12,
+  fontWeight: 800,
   cursor: 'pointer',
   padding: '4px 2px',
 };
 
 const editSongLinkStyle: CSSProperties = {
-  border: '1px solid rgba(117, 54, 213, 0.42)',
-  background: 'rgba(117, 54, 213, 0.16)',
-  color: '#dccdff',
-  borderRadius: 8,
+  border: '1px solid rgba(206, 255, 53, 0.34)',
+  background: 'rgba(206, 255, 53, 0.1)',
+  color: 'var(--hc-lime)',
+  borderRadius: 999,
   padding: '6px 10px',
   fontSize: 12,
-  fontWeight: 700,
+  fontWeight: 900,
   textDecoration: 'none',
   whiteSpace: 'nowrap',
 };
 
 const stemCacheBadgeStyle: CSSProperties = {
-  border: '1px solid rgba(34, 197, 94, 0.34)',
-  background: 'rgba(34, 197, 94, 0.12)',
-  color: '#86efac',
+  border: '1px solid rgba(82, 214, 198, 0.34)',
+  background: 'rgba(82, 214, 198, 0.10)',
+  color: 'var(--hc-cyan)',
   borderRadius: 999,
   padding: '4px 8px',
   fontSize: 11,
-  fontWeight: 800,
+  fontWeight: 900,
   whiteSpace: 'nowrap',
 };
 
 const iconButtonStyle: CSSProperties = {
-  border: 'none',
+  border: '1px solid transparent',
   background: 'transparent',
-  color: '#7d8490',
+  color: 'var(--hc-muted)',
   cursor: 'pointer',
-  fontSize: 12,
-  padding: 0,
+  fontSize: 11,
+  fontWeight: 800,
+  padding: '3px 5px',
 };
 
 const editInputStyle: CSSProperties = {
   fontSize: 14,
-  fontWeight: 600,
-  color: '#e8e8f0',
-  background: '#11151a',
-  border: '1px solid #D4A574',
-  borderRadius: 6,
-  padding: '4px 8px',
+  fontWeight: 800,
+  color: 'var(--hc-text)',
+  background: '#0d0f14',
+  border: '1px solid var(--hc-lime)',
+  borderRadius: 8,
+  padding: '6px 9px',
   outline: 'none',
   width: '100%',
   maxWidth: 360,
 };
 
 const detailPanelStyle: CSSProperties = {
-  background: '#1b1f24',
-  border: '1px solid #2f3540',
-  borderRadius: 16,
+  background: 'rgba(24, 26, 34, 0.9)',
+  border: '1px solid var(--hc-line)',
+  borderRadius: 'var(--hc-radius-lg)',
   padding: 18,
   position: 'sticky',
   top: 24,
   maxHeight: '82vh',
   overflowY: 'auto',
-  boxShadow: '0 18px 50px rgba(0,0,0,0.28)',
+  boxShadow: 'var(--hc-shadow)',
 };
 
 const detailHeaderStyle: CSSProperties = {
@@ -558,24 +616,27 @@ const detailHeaderStyle: CSSProperties = {
   alignItems: 'flex-start',
   gap: 12,
   paddingBottom: 14,
-  borderBottom: '1px solid #2f3540',
+  borderBottom: '1px solid var(--hc-line)',
   marginBottom: 14,
 };
 
 const closeButtonStyle: CSSProperties = {
-  border: 'none',
-  background: 'transparent',
-  color: '#8f96a3',
-  fontSize: 26,
+  width: 34,
+  height: 34,
+  border: '1px solid var(--hc-line)',
+  borderRadius: 999,
+  background: 'rgba(255,255,255,.04)',
+  color: 'var(--hc-muted)',
+  fontSize: 22,
   lineHeight: 1,
   cursor: 'pointer',
 };
 
 const promptBoxStyle: CSSProperties = {
-  borderRadius: 10,
-  background: '#14181d',
-  border: '1px solid #2f3540',
-  color: '#aeb6c2',
+  borderRadius: 12,
+  background: 'rgba(8, 9, 12, 0.54)',
+  border: '1px solid var(--hc-line)',
+  color: 'var(--hc-muted)',
   fontSize: 12,
   lineHeight: 1.7,
   padding: 12,
@@ -583,10 +644,10 @@ const promptBoxStyle: CSSProperties = {
 };
 
 const versionCardStyle: CSSProperties = {
-  border: '1px solid #2f3540',
+  border: '1px solid var(--hc-line)',
   borderRadius: 14,
   padding: 14,
-  background: '#161a20',
+  background: 'rgba(8, 9, 12, 0.44)',
 };
 
 const versionHeaderStyle: CSSProperties = {
@@ -597,28 +658,31 @@ const versionHeaderStyle: CSSProperties = {
 };
 
 const downloadButtonStyle: CSSProperties = {
-  border: '1px solid #3a414c',
-  background: '#20252d',
-  color: '#d8dce3',
-  borderRadius: 8,
-  padding: '6px 10px',
+  border: '1px solid var(--hc-line)',
+  background: 'rgba(255,255,255,.05)',
+  color: 'var(--hc-text)',
+  borderRadius: 999,
+  padding: '7px 11px',
   fontSize: 12,
+  fontWeight: 900,
   cursor: 'pointer',
 };
 
 const selectedBadgeStyle: CSSProperties = {
   borderRadius: 999,
-  background: 'rgba(212, 165, 116, 0.16)',
-  color: '#D4A574',
+  background: 'rgba(206, 255, 53, 0.12)',
+  border: '1px solid rgba(206, 255, 53, 0.3)',
+  color: 'var(--hc-lime)',
   padding: '3px 8px',
   fontSize: 11,
-  fontWeight: 700,
+  fontWeight: 900,
 };
 
 const tagStyle: CSSProperties = {
   borderRadius: 999,
-  background: '#252a31',
-  color: '#D4A574',
+  background: 'rgba(255,255,255,.05)',
+  border: '1px solid var(--hc-line)',
+  color: 'var(--hc-muted)',
   padding: '3px 8px',
   fontSize: 11,
 };
@@ -626,7 +690,7 @@ const tagStyle: CSSProperties = {
 const noLyricsStyle: CSSProperties = {
   marginTop: 12,
   padding: '12px 0 0',
-  color: '#737b86',
+  color: 'var(--hc-muted)',
   fontSize: 12,
 };
 
@@ -635,17 +699,75 @@ const failedBadgeStyle: CSSProperties = {
   alignItems: 'center',
   borderRadius: 999,
   padding: '2px 8px',
-  background: 'rgba(239, 68, 68, 0.14)',
-  border: '1px solid rgba(239, 68, 68, 0.32)',
-  color: '#fca5a5',
+  background: 'rgba(255, 90, 61, 0.12)',
+  border: '1px solid rgba(255, 90, 61, 0.34)',
+  color: '#ff8b76',
   fontSize: 11,
-  fontWeight: 700,
+  fontWeight: 900,
   whiteSpace: 'nowrap',
 };
 
 const failedMessageStyle: CSSProperties = {
   marginTop: 6,
-  color: '#fca5a5',
+  color: '#ff8b76',
   fontSize: 12,
   lineHeight: 1.5,
 };
+
+function HistoryListStyles() {
+  return (
+    <style>{`
+      @media (max-width: 920px) {
+        .history-list-grid {
+          grid-template-columns: minmax(0, 1fr) !important;
+        }
+
+        .history-list-scroll {
+          max-height: none !important;
+          overflow: visible !important;
+        }
+
+        .history-detail-panel {
+          position: static !important;
+          max-height: none !important;
+        }
+      }
+
+      @media (max-width: 720px) {
+        .history-list-header {
+          align-items: stretch !important;
+          flex-direction: column !important;
+        }
+
+        .history-list-header > div:last-child {
+          justify-content: flex-start !important;
+        }
+
+        .history-row {
+          align-items: stretch !important;
+          flex-direction: column !important;
+          gap: 12px !important;
+        }
+
+        .history-row > div:nth-child(2) {
+          width: 100% !important;
+        }
+
+        .history-title-row {
+          align-items: flex-start !important;
+          flex-wrap: wrap !important;
+        }
+
+        .history-title-row > span:first-child {
+          white-space: normal !important;
+          overflow-wrap: anywhere !important;
+        }
+
+        .history-row-actions {
+          justify-content: flex-start !important;
+          width: 100% !important;
+        }
+      }
+    `}</style>
+  );
+}

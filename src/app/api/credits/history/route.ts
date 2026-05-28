@@ -2,8 +2,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { CreditService } from '../../../../lib/credits/CreditService';
-import { supabaseAdmin } from '../../../../lib/supabase/server';
-import { getAuthUser } from '../../../../lib/supabase/auth-helpers';
+import { getServerSupabaseClient } from '../../../../lib/supabase/server';
+import { getAuthAccessToken, getAuthUser } from '../../../../lib/supabase/auth-helpers';
 
 export async function GET(req: NextRequest) {
   try {
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const creditService = new CreditService(supabaseAdmin);
+    const creditService = new CreditService(getServerSupabaseClient(await getAuthAccessToken()));
     const history = await creditService.getCreditHistory(user.id, months);
 
     return NextResponse.json({ history });

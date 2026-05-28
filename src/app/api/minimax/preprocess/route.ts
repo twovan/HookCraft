@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser } from '../../../../lib/supabase/auth-helpers';
 import { MiniMaxProvider } from '../../../../lib/generation/MiniMaxProvider';
 import { CreditService } from '../../../../lib/credits/CreditService';
+import { getConsumeCreditsErrorMessage } from '../../../../lib/credits/consumeError';
 import { supabaseAdmin } from '../../../../lib/supabase/server';
 
 export const maxDuration = 60;
@@ -156,7 +157,14 @@ export async function POST(req: NextRequest) {
       const result = await provider.preprocess({ audioBase64: '', audioUrl });
       const consumeResult = await creditService.consumeCredits(user.id, ['ai_preprocess']);
       if (!consumeResult.success) {
-        return NextResponse.json({ error: 'Credits 扣减失败，请重试' }, { status: 402 });
+        const errorMessage = getConsumeCreditsErrorMessage(consumeResult.error);
+        console.error('[minimax/preprocess] Credits consume failed:', {
+          userId: user.id,
+          operations: ['ai_preprocess'],
+          error: consumeResult.error,
+          remaining: consumeResult.remaining,
+        });
+        return NextResponse.json({ error: errorMessage, code: consumeResult.error }, { status: 402 });
       }
 
       return NextResponse.json({
@@ -194,7 +202,14 @@ export async function POST(req: NextRequest) {
     const result = await provider.preprocess({ audioBase64: audioBase64! });
     const consumeResult = await creditService.consumeCredits(user.id, ['ai_preprocess']);
     if (!consumeResult.success) {
-      return NextResponse.json({ error: 'Credits 扣减失败，请重试' }, { status: 402 });
+      const errorMessage = getConsumeCreditsErrorMessage(consumeResult.error);
+      console.error('[minimax/preprocess] Credits consume failed:', {
+        userId: user.id,
+        operations: ['ai_preprocess'],
+        error: consumeResult.error,
+        remaining: consumeResult.remaining,
+      });
+      return NextResponse.json({ error: errorMessage, code: consumeResult.error }, { status: 402 });
     }
 
     // Step 8: 返回预处理结果

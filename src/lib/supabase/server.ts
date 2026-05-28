@@ -9,6 +9,10 @@ import type { Database } from './types';
  */
 let _supabaseAdmin: SupabaseClient<Database> | null = null;
 
+export function isSupabaseAdminConfigured() {
+  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+}
+
 function getSupabaseAdmin(): SupabaseClient<Database> {
   if (_supabaseAdmin) return _supabaseAdmin;
 
@@ -43,3 +47,33 @@ export const supabaseAdmin = new Proxy({} as SupabaseClient<Database>, {
     return value;
   },
 });
+
+export function createSupabaseRlsClient(accessToken?: string | null): SupabaseClient<Database> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl) {
+    throw new Error('缺少环境变量: NEXT_PUBLIC_SUPABASE_URL');
+  }
+  if (!anonKey) {
+    throw new Error('缺少环境变量: NEXT_PUBLIC_SUPABASE_ANON_KEY');
+  }
+
+  return createClient<Database>(supabaseUrl, anonKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+    global: accessToken
+      ? {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      : undefined,
+  });
+}
+
+export function getServerSupabaseClient(accessToken?: string | null) {
+  return isSupabaseAdminConfigured() ? supabaseAdmin : createSupabaseRlsClient(accessToken);
+}

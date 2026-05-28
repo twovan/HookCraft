@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "typecheck": "tsc --noEmit --incremental false",
+    "test": "vitest run --dir src",
     "build": "next build",
     "start": "next start"
   },

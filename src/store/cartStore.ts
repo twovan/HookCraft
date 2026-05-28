@@ -44,17 +44,11 @@ export const useCartStore = create<CartStore>()(
         set({ items: [] });
       },
 
-      getTotal: () => {
-        return get().items.reduce((sum, item) => sum + item.price, 0);
-      },
+      getTotal: () => get().items.reduce((sum, item) => sum + item.price, 0),
 
-      getCount: () => {
-        return get().items.length;
-      },
+      getCount: () => get().items.length,
 
-      hasItem: (templateId: string) => {
-        return get().items.some((i) => i.template_id === templateId);
-      },
+      hasItem: (templateId: string) => get().items.some((i) => i.template_id === templateId),
     }),
     {
       name: 'hookcraft-cart',

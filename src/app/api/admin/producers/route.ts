@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
     // Calculate average revenue share
     const allProfiles = producerProfiles || [];
     const avgShare = allProfiles.length > 0
-      ? allProfiles.reduce((sum: number) => sum + 0.7, 0) / allProfiles.length
+      ? allProfiles.reduce((sum: number, p: any) => sum + (Number(p.revenue_share) || 0.7), 0) / allProfiles.length
       : 0.7;
 
     // Calculate template count per producer
@@ -77,8 +77,9 @@ export async function GET(req: NextRequest) {
         name: p.display_name,
         email: '',
         avatarUrl: p.avatar_url,
+        bio: p.bio || '',
         expertiseTags: p.style_tags || [],
-        revenueShare: 0.7,
+        revenueShare: Number(p.revenue_share) || 0.7,
         status: 'active',
         templateCount: templateStats[p.id] || 0,
         totalSales: 0,

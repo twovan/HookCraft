@@ -13,6 +13,18 @@ import { cookies, headers } from 'next/headers';
 import type { User } from '@supabase/supabase-js';
 import { createClient } from '@supabase/supabase-js';
 
+export async function getAuthAccessToken(): Promise<string | null> {
+  const headerStore = await headers();
+  const authHeader = headerStore.get('authorization');
+
+  if (authHeader?.startsWith('Bearer ')) {
+    return authHeader.slice(7);
+  }
+
+  const cookieStore = await cookies();
+  return cookieStore.get('sb-access-token')?.value ?? null;
+}
+
 /**
  * 从请求中提取认证用户
  * 

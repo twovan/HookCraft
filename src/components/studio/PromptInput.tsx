@@ -7,11 +7,6 @@ export interface PromptInputProps {
   maxLength?: number;
 }
 
-/**
- * Prompt 输入组件
- * - Textarea 用于输入提示词
- * - Placeholder 引导用户
- */
 export default function PromptInput({
   value,
   onChange,
@@ -20,104 +15,127 @@ export default function PromptInput({
 }: PromptInputProps) {
   return (
     <div>
-      <label
-        htmlFor="prompt-input"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          fontSize: '14px',
-          fontWeight: 600,
-          color: '#e8e8f0',
-          marginBottom: '8px',
-          fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-        }}
-      >
-        创作提示词
-        <span
-          style={{
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            width: 16, height: 16, borderRadius: '50%', marginLeft: 6,
-            background: '#7536d5', color: 'white', fontSize: 10, fontWeight: 700,
-            cursor: 'help', transition: 'all 0.2s', position: 'relative',
+      <div style={headerStyle}>
+        <label htmlFor="prompt-input" style={labelStyle}>
+          创作提示词
+        </label>
+        <div
+          style={helpWrapStyle}
+          onMouseEnter={(e) => {
+            const tip = e.currentTarget.querySelector('[data-tip]') as HTMLElement | null;
+            if (tip) tip.style.opacity = '1';
           }}
-          onMouseEnter={e => {
-            e.currentTarget.style.background = '#2a2a40';
-            e.currentTarget.style.color = '#9ca3af';
-            const tip = e.currentTarget.querySelector('[data-tip]') as HTMLElement;
-            if (tip) tip.style.display = 'block';
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.background = '#7536d5';
-            e.currentTarget.style.color = 'white';
-            const tip = e.currentTarget.querySelector('[data-tip]') as HTMLElement;
-            if (tip) tip.style.display = 'none';
+          onMouseLeave={(e) => {
+            const tip = e.currentTarget.querySelector('[data-tip]') as HTMLElement | null;
+            if (tip) tip.style.opacity = '0';
           }}
         >
-          !
-          <div data-tip style={{
-            display: 'none', position: 'absolute', top: '100%', left: '50%',
-            transform: 'translateX(-50%)', marginTop: 8,
-            background: '#1a1a2e', border: '1px solid #2a2a40', borderRadius: 10,
-            padding: '10px 14px', width: 260, fontSize: 11, lineHeight: 1.6,
-            color: '#e8e8f0', boxShadow: '0 8px 24px rgba(0,0,0,0.4)', zIndex: 100,
-            whiteSpace: 'normal', fontWeight: 400,
-          }}>
-            请勿输入以下违禁内容：<br/>
-            1. 未与本平台签约的现实公众人物与版权导向：包含具体歌手、知名乐队名称，或明确要求模仿特定受版权保护的曲目。<br/>
-            2. 不当内容：包含暴力、仇恨言论、歧视、色情或其他违反社区准则的词汇
+          <span style={helpDotStyle}>i</span>
+          <div style={tipStyle}>
+            请避免输入未经授权的公众人物、歌手、乐队、受版权保护曲目名称，以及暴力、仇恨、色情等违规内容。
           </div>
-        </span>
-      </label>
+        </div>
+      </div>
       <textarea
         id="prompt-input"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
         maxLength={maxLength}
-        placeholder="描述你想要的音乐风格，例如：一首轻快的流行歌曲，带有吉他和钢琴伴奏，适合夏天听的感觉..."
+        placeholder="描述你想要的音乐风格，例如：一首轻快的华语流行歌，带吉他和钢琴伴奏，适合夏天傍晚听。"
         style={{
-          width: '100%',
-          minHeight: '100px',
-          padding: '14px 16px',
-          borderRadius: '12px',
-          border: '1px solid #2a2a40',
-          background: disabled ? '#F7F7F7' : '#0d0d14',
-          fontSize: '14px',
-          fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-          color: '#e8e8f0',
-          lineHeight: 1.6,
-          resize: 'vertical',
-          outline: 'none',
-          boxSizing: 'border-box',
-          transition: 'border-color 0.2s ease',
+          ...textareaStyle,
+          background: disabled ? 'rgba(255,255,255,.04)' : '#0d0f14',
           opacity: disabled ? 0.6 : 1,
           cursor: disabled ? 'not-allowed' : 'text',
         }}
         onFocus={(e) => {
-          if (!disabled) {
-            e.currentTarget.style.borderColor = '#7536d5';
-          }
+          if (!disabled) e.currentTarget.style.borderColor = 'var(--hc-lime)';
         }}
         onBlur={(e) => {
-          e.currentTarget.style.borderColor = '#2a2a40';
+          e.currentTarget.style.borderColor = 'var(--hc-line)';
         }}
         aria-label="创作提示词输入"
       />
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          marginTop: '6px',
-          fontSize: '12px',
-          color: '#999',
-        }}
-      >
-        <span>可选：输入提示词或选择模板，也可以两者结合</span>
-        <span>
-          {value.length}/{maxLength}
-        </span>
+      <div style={metaStyle}>
+        <span>可选：输入提示词或选择模板，也可以两者结合。</span>
+        <span>{value.length}/{maxLength}</span>
       </div>
     </div>
   );
 }
+
+const headerStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  marginBottom: 9,
+};
+
+const labelStyle: React.CSSProperties = {
+  color: 'var(--hc-text)',
+  fontSize: 14,
+  fontWeight: 900,
+};
+
+const helpWrapStyle: React.CSSProperties = {
+  position: 'relative',
+  display: 'inline-flex',
+};
+
+const helpDotStyle: React.CSSProperties = {
+  width: 18,
+  height: 18,
+  borderRadius: 999,
+  display: 'grid',
+  placeItems: 'center',
+  border: '1px solid rgba(206,255,53,.36)',
+  background: 'rgba(206,255,53,.12)',
+  color: 'var(--hc-lime)',
+  fontSize: 11,
+  fontWeight: 900,
+  cursor: 'help',
+};
+
+const tipStyle: React.CSSProperties = {
+  position: 'absolute',
+  left: '50%',
+  top: 'calc(100% + 8px)',
+  transform: 'translateX(-50%)',
+  width: 280,
+  padding: '11px 13px',
+  borderRadius: 12,
+  border: '1px solid var(--hc-line)',
+  background: '#15181f',
+  color: 'var(--hc-muted)',
+  boxShadow: 'var(--hc-shadow)',
+  fontSize: 12,
+  lineHeight: 1.6,
+  zIndex: 20,
+  opacity: 0,
+  pointerEvents: 'none',
+};
+
+const textareaStyle: React.CSSProperties = {
+  width: '100%',
+  minHeight: 110,
+  padding: '14px 16px',
+  borderRadius: 12,
+  border: '1px solid var(--hc-line)',
+  color: 'var(--hc-text)',
+  fontSize: 14,
+  lineHeight: 1.6,
+  resize: 'vertical',
+  outline: 'none',
+  boxSizing: 'border-box',
+  transition: 'border-color .2s ease, background .2s ease',
+};
+
+const metaStyle: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  gap: 12,
+  marginTop: 7,
+  color: 'var(--hc-muted)',
+  fontSize: 12,
+};

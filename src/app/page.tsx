@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import ProducerCard from '@/components/producer/ProducerCard';
 import type { ProducerSummary } from '@/types/producer';
 
@@ -20,275 +20,317 @@ interface TemplateItem {
   producerName?: string;
 }
 
-const GRADIENTS = [
-  'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-  'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-  'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-  'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
-  'linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)',
-  'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
-  'linear-gradient(135deg, #0f0c29 0%, #302b63 100%)',
-  'linear-gradient(135deg, #2d1b69 0%, #11998e 100%)',
+const COVER_GRADIENTS = [
+  'linear-gradient(135deg, #ceff35 0%, #52d6c6 48%, #15181f 100%)',
+  'linear-gradient(135deg, #ff5a3d 0%, #f5c542 42%, #15181f 100%)',
+  'linear-gradient(135deg, #52d6c6 0%, #8b5cf6 50%, #15181f 100%)',
+  'linear-gradient(135deg, #f5c542 0%, #ceff35 38%, #15181f 100%)',
+  'linear-gradient(135deg, #ff5a3d 0%, #8b5cf6 52%, #15181f 100%)',
 ];
+
+const GENRE_CHANNELS = ['Chinese Pop', 'EDM', 'Hip-Hop', 'Lo-Fi', 'Rock', 'Jazz'];
 
 function getGradient(name: string): string {
   let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  return GRADIENTS[Math.abs(hash) % GRADIENTS.length];
+  for (let i = 0; i < name.length; i += 1) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return COVER_GRADIENTS[Math.abs(hash) % COVER_GRADIENTS.length];
+}
+
+async function fetchWithTimeout(url: string, timeoutMs = 8000) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { signal: controller.signal });
+  } finally {
+    window.clearTimeout(timer);
+  }
 }
 
 export default function HomePage() {
-  const [hoveredCard, setHoveredCard] = useState<string | null>(null);
   const [templates, setTemplates] = useState<TemplateItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [featuredProducers, setFeaturedProducers] = useState<ProducerSummary[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchTemplates() {
       try {
-        const res = await fetch('/api/templates');
+        const res = await fetchWithTimeout('/api/templates');
         if (res.ok) {
           const data = await res.json();
           setTemplates(Array.isArray(data) ? data : data.templates ?? []);
         }
       } catch {
-        // Silently fail
+        // Keep the homepage usable when templates are temporarily unavailable.
       } finally {
         setLoading(false);
       }
     }
-    fetchTemplates();
+
+    void fetchTemplates();
   }, []);
 
   useEffect(() => {
     async function fetchProducers() {
       try {
-        const res = await fetch('/api/producers/featured');
+        const res = await fetchWithTimeout('/api/producers/featured', 5000);
         if (res.ok) {
           const data = await res.json();
           setFeaturedProducers(data.producers || []);
         }
       } catch {
-        // Silently fail
+        // Producer recommendations are optional on the landing surface.
       }
     }
-    fetchProducers();
+
+    void fetchProducers();
   }, []);
 
-  // Split templates: first half = hot, second half = new
-  const half = Math.ceil(templates.length / 2);
-  const hotTemplates = templates.slice(0, half);
-  const newTemplates = templates.slice(half);
+  const featuredTemplates = useMemo(() => templates.slice(0, 8), [templates]);
+  const newTemplates = useMemo(() => templates.slice(8, 12), [templates]);
+  const heroTemplate = featuredTemplates[0];
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0d0d14' }}>
-      <div style={{
-        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-        background: 'radial-gradient(circle at 20% 50%, rgba(117, 54, 213, 0.05) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(117, 54, 213, 0.05) 0%, transparent 50%)',
-        pointerEvents: 'none', zIndex: 0,
-      }} />
+    <main className="hc-shell home-page">
+      <style>{homeStyles}</style>
 
-      <div style={{ position: 'relative', zIndex: 1 }}>
-        {/* Hero Banner */}
-        <section style={{
-          textAlign: 'center', padding: '80px 24px 90px',
-          position: 'relative', overflow: 'hidden',
-          backgroundImage: 'url(/banner_bg.png)',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-        }}>
-          {/* Dark overlay for text readability */}
-          <div style={{
-            position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(0, 0, 0, 0.3)',
-          }} />
-          <div style={{ position: 'relative', zIndex: 1 }}>
-            {/* Logo icon */}
-            <div style={{ marginBottom: 20 }}>
-              <img src="/logo.svg" alt="" style={{ height: 48, opacity: 0.9 }} />
-            </div>
-            <h1 style={{
-              fontSize: 48, fontWeight: 700, color: '#ffffff', marginBottom: 12,
-              fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif", letterSpacing: 1, lineHeight: 1.2,
-            }}>
-              华语流行音乐的
-              <br />
-              AI Demo 创作与发布平台
-            </h1>
-            <p style={{
-              fontSize: 16, color: 'rgba(255,255,255,0.7)', marginBottom: 36,
-              maxWidth: 500, margin: '0 auto 36px',
-            }}>
-              AI 驱动创作灵感 · 释放无限音乐可能
+      <section className="home-hero">
+        <div className="hc-container home-hero-grid">
+          <div className="home-hero-copy">
+            <h1>从一个 Hook 开始，做出能发布的中文 Demo</h1>
+            <p>
+              浏览签约制作人的模板，输入创作方向，让 HookCraft 帮你生成双版本 Demo，
+              再进入分轨工作台完成试听、剪辑和导出。
             </p>
-            <Link href="/studio" style={{
-              padding: '14px 36px', borderRadius: 24, border: 'none',
-              background: 'rgba(117, 54, 213, 0.85)', color: 'white',
-              fontSize: 16, fontWeight: 600, textDecoration: 'none',
-              boxShadow: '0 6px 24px rgba(117, 54, 213, 0.4)',
-              backdropFilter: 'blur(8px)',
-            }}>
-              ✦ 开始创作
-            </Link>
+            <div className="home-hero-actions">
+              <Link href="/studio" className="hc-button">进入工作台</Link>
+              <Link href="/templates" className="hc-button hc-button-secondary">探索模板</Link>
+            </div>
+          </div>
+
+          <div className="home-console" aria-label="HookCraft product preview">
+            <div className="home-console-top">
+              <div>
+                <span className="home-console-label">正在生成</span>
+                <strong>{heroTemplate?.name || 'City Pop 旋律 Hook'}</strong>
+              </div>
+              <span className="home-live-dot">就绪</span>
+            </div>
+            <div className="home-album-row">
+              <TemplateCover template={heroTemplate} size="large" />
+              <div className="home-track-stack">
+                {['人声', '鼓组', '贝斯', '键盘'].map((track, index) => (
+                  <div className="home-track" key={track}>
+                    <span>{track}</span>
+                    <div>
+                      {Array.from({ length: 20 }).map((_, bar) => (
+                        <i key={bar} style={{ height: `${20 + ((bar + index * 3) % 7) * 7}%` }} />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="home-console-footer">
+              <span>2 个版本</span>
+              <span>版权安全检查</span>
+              <span>分轨编辑</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="hc-container home-section home-discovery">
+        <div className="home-section-head">
+          <div>
+            <h2 className="hc-section-title">精选模板</h2>
+            <p className="hc-section-kicker">从可试听的风格模板开始，比空白提示词更快接近成品。</p>
+          </div>
+          <Link href="/templates" className="home-text-link">查看全部</Link>
+        </div>
+
+        {loading ? (
+          <div className="home-empty">正在同步模板...</div>
+        ) : featuredTemplates.length === 0 ? (
+          <div className="home-empty">暂无模板，稍后再来看看。</div>
+        ) : (
+          <div className="home-template-grid">
+            {featuredTemplates.map((template) => (
+              <TemplateCard key={template.id} template={template} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="hc-container home-section">
+        <div className="home-channel-band">
+          <div>
+            <h2 className="hc-section-title">按风格找灵感</h2>
+            <p className="hc-section-kicker">面向华语商业 Demo 的模板频道，适合副歌、广告歌、短视频和提案小样。</p>
+          </div>
+          <div className="home-channel-list">
+            {GENRE_CHANNELS.map((genre) => (
+              <Link key={genre} href={`/templates?genre=${encodeURIComponent(genre)}`}>
+                {genre}
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {newTemplates.length > 0 && (
+        <section className="hc-container home-section">
+          <div className="home-section-head">
+            <div>
+              <h2 className="hc-section-title">新品上架</h2>
+              <p className="hc-section-kicker">新模板会保留原有购买、使用和创作入口。</p>
+            </div>
+          </div>
+          <div className="home-template-grid compact">
+            {newTemplates.map((template) => (
+              <TemplateCard key={template.id} template={template} />
+            ))}
           </div>
         </section>
+      )}
 
-        {/* 热门模板 */}
-        <section style={{ maxWidth: 1400, margin: '0 auto', padding: '80px 48px 0' }}>
-          <h2 style={{
-            fontSize: 36, fontWeight: 700, marginBottom: 48, color: '#e8e8f0',
-            fontFamily: "'Playfair Display', serif", letterSpacing: -0.5,
-            position: 'relative', display: 'inline-block',
-          }}>
-            热门模板
-            <span style={{
-              position: 'absolute', bottom: -12, left: 0, width: 60, height: 3,
-              background: 'linear-gradient(90deg, #7536d5, transparent)', borderRadius: 2,
-            }} />
-          </h2>
-          {loading ? (
-            <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>加载中...</div>
-          ) : hotTemplates.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>暂无模板</div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 24, marginBottom: 48 }}>
-              {hotTemplates.map((t) => (
-                <TemplateCard key={t.id} template={t} hovered={hoveredCard === t.id} onHover={setHoveredCard} />
-              ))}
+      {featuredProducers.length > 0 && (
+        <section className="hc-container home-section">
+          <div className="home-section-head">
+            <div>
+              <h2 className="hc-section-title">推荐创作者</h2>
+              <p className="hc-section-kicker">从制作人出发发现模板，沿用现有制作人详情与模板交易功能。</p>
             </div>
-          )}
+          </div>
+          <div className="home-producer-grid">
+            {featuredProducers.slice(0, 4).map((producer) => (
+              <ProducerCard key={producer.id} producer={producer} />
+            ))}
+          </div>
         </section>
+      )}
 
-        {/* 新品上架 */}
-        {newTemplates.length > 0 && (
-          <section style={{ maxWidth: 1400, margin: '0 auto', padding: '48px 48px 80px' }}>
-            <h2 style={{
-              fontSize: 36, fontWeight: 700, marginBottom: 48, color: '#e8e8f0',
-              fontFamily: "'Playfair Display', serif", letterSpacing: -0.5,
-              position: 'relative', display: 'inline-block',
-            }}>
-              新品上架
-              <span style={{
-                position: 'absolute', bottom: -12, left: 0, width: 60, height: 3,
-                background: 'linear-gradient(90deg, #7536d5, transparent)', borderRadius: 2,
-              }} />
-            </h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 24 }}>
-              {newTemplates.map((t) => (
-                <TemplateCard key={t.id} template={t} hovered={hoveredCard === t.id} onHover={setHoveredCard} />
-              ))}
-            </div>
-          </section>
-        )}
+      <section className="hc-container home-section home-safe-band">
+        <div>
+          <h2 className="hc-section-title">商业创作需要可控流程</h2>
+          <p className="hc-section-kicker">
+            HookCraft 会在生成前处理版权安全检查，生成后保留版本、下载和分轨编辑路径，
+            让 Demo 从灵感进入可管理的作品库。
+          </p>
+        </div>
+        <Link href="/pricing" className="hc-button">查看会员与额度</Link>
+      </section>
+    </main>
+  );
+}
 
-        {/* 推荐创作者 */}
-        {featuredProducers.length > 0 && (
-          <section style={{ maxWidth: 1400, margin: '0 auto', padding: '0 48px 80px' }}>
-            <h2 style={{
-              fontSize: 36, fontWeight: 700, marginBottom: 48, color: '#e8e8f0',
-              fontFamily: "'Playfair Display', serif", letterSpacing: -0.5,
-              position: 'relative', display: 'inline-block',
-            }}>
-              推荐创作者
-              <span style={{
-                position: 'absolute', bottom: -12, left: 0, width: 60, height: 3,
-                background: 'linear-gradient(90deg, #7536d5, transparent)', borderRadius: 2,
-              }} />
-            </h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 24 }}>
-              {featuredProducers.map((producer) => (
-                <ProducerCard key={producer.id} producer={producer} />
-              ))}
-            </div>
-          </section>
-        )}
-      </div>
+function TemplateCover({ template, size = 'normal' }: { template?: TemplateItem; size?: 'normal' | 'large' }) {
+  const label = template?.genre || 'Hook';
+  return (
+    <div className={`template-cover ${size}`} style={{ background: getGradient(template?.name || label) }}>
+      {template?.coverUrl ? (
+        <Image src={template.coverUrl} alt={template.name} fill style={{ objectFit: 'cover' }} sizes={size === 'large' ? '320px' : '25vw'} />
+      ) : (
+        <>
+          <span>{label}</span>
+          <div className="cover-bars">
+            {Array.from({ length: 14 }).map((_, index) => <i key={index} />)}
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
-function TemplateCard({ template, hovered, onHover }: {
-  template: TemplateItem;
-  hovered: boolean;
-  onHover: (id: string | null) => void;
-}) {
-  const gradient = getGradient(template.name);
-  const tags = [
-    template.category === 'free_template' ? '免费' : '付费',
-    template.genre,
-  ].filter(Boolean);
+function TemplateCard({ template }: { template: TemplateItem }) {
+  const tags = [template.genre, template.category === 'free_template' ? '免费' : '付费'].filter(Boolean);
   const price = template.price ? Math.round(template.price / 100) : 0;
 
   return (
-    <Link
-      href={`/templates/${template.id}`}
-      style={{
-        background: '#1a1a2e', borderRadius: 20, overflow: 'hidden',
-        boxShadow: hovered ? '0 12px 40px rgba(117, 54, 213,0.25)' : '0 4px 20px rgba(117, 54, 213, 0.1)',
-        transition: 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
-        cursor: 'pointer', textDecoration: 'none', color: 'inherit',
-        transform: hovered ? 'translateY(-8px) scale(1.02)' : 'none',
-        display: 'block',
-      }}
-      onMouseEnter={() => onHover(template.id)}
-      onMouseLeave={() => onHover(null)}
-    >
-      <div style={{ position: 'relative', width: '100%', paddingTop: '56.25%', overflow: 'hidden' }}>
-        {template.coverUrl ? (
-          <Image src={template.coverUrl} alt={template.name} fill style={{ objectFit: 'cover' }} sizes="(max-width: 768px) 100vw, 25vw" />
-        ) : (
-          <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: gradient }} />
-        )}
-        <div style={{
-          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.4)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          opacity: hovered ? 1 : 0, transition: 'opacity 0.3s',
-        }}>
-          <div style={{
-            width: 60, height: 60, borderRadius: '50%', background: 'white',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 24, boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
-          }}>▶</div>
-        </div>
-      </div>
-      <div style={{ padding: 20 }}>
-        <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 10, color: '#e8e8f0', lineHeight: 1.3 }}>
-          {template.name}
-        </div>
-        {template.producerName && (
-          <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 8 }}>
-            by{' '}
-            <Link
-              href={`/producers/${template.producerId}`}
-              onClick={(e) => e.stopPropagation()}
-              style={{ color: '#7536d5', textDecoration: 'none', fontWeight: 500 }}
-            >
-              {template.producerName}
-            </Link>
-          </div>
-        )}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-          {tags.map((tag) => (
-            <span key={tag} style={{
-              padding: '5px 14px', background: 'rgba(117, 54, 213, 0.15)', color: '#7536d5',
-              fontSize: 11, fontWeight: 600, borderRadius: 12,
-            }}>{tag}</span>
-          ))}
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontSize: 26, fontWeight: 700, color: '#7536d5' }}>
-            {price > 0 ? `￥${price}` : '免费'}
-          </div>
-          <Link href={`/studio?templateId=${template.id}`} onClick={(e) => e.stopPropagation()} style={{
-            padding: '8px 16px', borderRadius: 24,
-            background: 'linear-gradient(135deg, #7536d5, #5a2db8)', color: 'white',
-            fontSize: 12, fontWeight: 600, textDecoration: 'none',
-          }}>
-            使用模板
+    <article className="template-card">
+      <Link href={`/templates/${template.id}`} className="template-card-cover" aria-label={`查看模板 ${template.name}`}>
+        <TemplateCover template={template} />
+        <span className="template-play">试听</span>
+      </Link>
+      <div className="template-card-body">
+        <Link href={`/templates/${template.id}`} className="template-title">{template.name}</Link>
+        {template.producerName && template.producerId && (
+          <Link href={`/producers/${template.producerId}`} className="template-producer">
+            by {template.producerName}
           </Link>
+        )}
+        <div className="template-tags">
+          {tags.map((tag) => <span key={tag}>{tag}</span>)}
+        </div>
+        <div className="template-card-bottom">
+          <strong>{price > 0 ? `￥${price}` : '已包含'}</strong>
+          <Link href={`/studio?templateId=${template.id}`}>使用模板</Link>
         </div>
       </div>
-    </Link>
+    </article>
   );
 }
+
+const homeStyles = `
+  .home-page { padding-bottom: 88px; overflow: hidden; }
+  .home-hero { min-height: calc(100vh - 70px); display: flex; align-items: center; padding: 58px 0 46px; }
+  .home-hero-grid { display: grid; grid-template-columns: minmax(0, 0.92fr) minmax(460px, 1fr); gap: 56px; align-items: center; }
+  .home-hero-copy h1 { margin: 0; max-width: 760px; font-size: 64px; line-height: 1.02; font-weight: 900; letter-spacing: 0; color: var(--hc-text); }
+  .home-hero-copy p { max-width: 610px; margin: 24px 0 0; color: var(--hc-text-muted); font-size: 17px; line-height: 1.8; }
+  .home-hero-actions { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 32px; }
+  .home-console { border: 1px solid var(--hc-border); border-radius: 18px; background: linear-gradient(180deg, rgba(24, 26, 34, 0.96), rgba(12, 14, 18, 0.96)); box-shadow: var(--hc-shadow); padding: 18px; }
+  .home-console-top, .home-console-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .home-console-label { display: block; color: var(--hc-text-weak); font-size: 12px; font-weight: 700; margin-bottom: 6px; }
+  .home-console-top strong { color: var(--hc-text); font-size: 18px; }
+  .home-live-dot { border: 1px solid rgba(206,255,53,.38); border-radius: 999px; color: var(--hc-lime); padding: 6px 10px; font-size: 12px; font-weight: 800; }
+  .home-album-row { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 18px; margin-top: 18px; }
+  .template-cover { position: relative; aspect-ratio: 1; overflow: hidden; border-radius: var(--hc-radius); border: 1px solid rgba(255,255,255,.12); display: flex; flex-direction: column; justify-content: space-between; padding: 14px; color: #08090c; }
+  .template-cover.large { width: 220px; }
+  .template-cover span { position: relative; z-index: 1; width: fit-content; border-radius: 999px; background: rgba(8,9,12,.74); color: var(--hc-text); padding: 6px 10px; font-size: 12px; font-weight: 800; }
+  .cover-bars { position: relative; z-index: 1; display: flex; align-items: end; gap: 4px; height: 48px; }
+  .cover-bars i { flex: 1; border-radius: 999px; background: rgba(8,9,12,.72); }
+  .cover-bars i:nth-child(3n+1) { height: 44%; } .cover-bars i:nth-child(3n+2) { height: 76%; } .cover-bars i:nth-child(3n) { height: 58%; }
+  .home-track-stack { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+  .home-track { border: 1px solid rgba(255,255,255,.1); border-radius: 10px; background: #111217; padding: 10px; }
+  .home-track span { display: block; color: var(--hc-text-muted); font-size: 12px; font-weight: 800; margin-bottom: 8px; }
+  .home-track div { height: 34px; display: flex; align-items: center; gap: 3px; }
+  .home-track i { flex: 1; border-radius: 999px; background: var(--hc-cyan); opacity: .82; }
+  .home-track:nth-child(2) i { background: var(--hc-coral); } .home-track:nth-child(3) i { background: var(--hc-lime); } .home-track:nth-child(4) i { background: var(--hc-violet); }
+  .home-console-footer { margin-top: 16px; color: var(--hc-text-muted); font-size: 12px; font-weight: 700; }
+  .home-section { padding-top: 82px; }
+  .home-section-head { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
+  .home-text-link { color: var(--hc-lime); text-decoration: none; font-size: 14px; font-weight: 800; white-space: nowrap; }
+  .home-empty { border: 1px dashed var(--hc-border); border-radius: var(--hc-radius-lg); background: rgba(255,255,255,.03); color: var(--hc-text-muted); padding: 28px; text-align: center; }
+  .home-template-grid, .home-producer-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
+  .template-card { min-width: 0; border: 1px solid var(--hc-border); border-radius: var(--hc-radius-lg); background: var(--hc-panel); overflow: hidden; transition: transform 160ms ease, border-color 160ms ease; }
+  .template-card:hover { transform: translateY(-3px); border-color: var(--hc-border-strong); }
+  .template-card-cover { position: relative; display: block; color: inherit; text-decoration: none; }
+  .template-play { position: absolute; right: 12px; bottom: 12px; min-height: 32px; display: inline-flex; align-items: center; border-radius: 999px; background: var(--hc-lime); color: #08090c; padding: 0 12px; font-size: 12px; font-weight: 900; opacity: 0; transform: translateY(4px); transition: opacity 160ms ease, transform 160ms ease; }
+  .template-card:hover .template-play { opacity: 1; transform: translateY(0); }
+  .template-card-body { padding: 14px; }
+  .template-title { display: block; color: var(--hc-text); text-decoration: none; font-size: 16px; line-height: 1.35; font-weight: 800; }
+  .template-producer { display: inline-block; margin-top: 7px; color: var(--hc-text-muted); text-decoration: none; font-size: 12px; font-weight: 700; }
+  .template-tags { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+  .template-tags span { border-radius: 999px; background: rgba(255,255,255,.06); color: var(--hc-text-muted); padding: 5px 9px; font-size: 11px; font-weight: 800; }
+  .template-card-bottom { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; }
+  .template-card-bottom strong { color: var(--hc-lime); font-size: 18px; }
+  .template-card-bottom a { min-height: 34px; display: inline-flex; align-items: center; border-radius: 999px; background: rgba(206,255,53,.1); border: 1px solid rgba(206,255,53,.24); color: var(--hc-lime); text-decoration: none; padding: 0 12px; font-size: 12px; font-weight: 900; white-space: nowrap; }
+  .home-channel-band, .home-safe-band { border: 1px solid var(--hc-border); border-radius: 18px; background: linear-gradient(135deg, rgba(206,255,53,.1), rgba(82,214,198,.05) 46%, rgba(255,90,61,.08)); padding: 28px; display: grid; grid-template-columns: minmax(0, .9fr) minmax(340px, 1fr); gap: 28px; align-items: center; }
+  .home-channel-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .home-channel-list a { min-height: 54px; display: flex; align-items: center; justify-content: center; border-radius: var(--hc-radius); border: 1px solid var(--hc-border); background: rgba(8,9,12,.48); color: var(--hc-text); text-decoration: none; font-size: 14px; font-weight: 850; }
+  .home-safe-band { grid-template-columns: minmax(0, 1fr) auto; }
+  @media (max-width: 1100px) {
+    .home-hero-grid, .home-channel-band, .home-safe-band { grid-template-columns: 1fr; }
+    .home-hero-copy h1 { font-size: 48px; }
+    .home-template-grid, .home-producer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 720px) {
+    .home-hero { min-height: auto; padding: 44px 0 30px; }
+    .home-hero-copy h1 { font-size: 38px; }
+    .home-hero-copy p { font-size: 15px; }
+    .home-album-row { grid-template-columns: 1fr; }
+    .template-cover.large { width: 100%; }
+    .home-template-grid, .home-producer-grid, .home-channel-list { grid-template-columns: 1fr; }
+    .home-section-head { align-items: start; flex-direction: column; }
+    .home-safe-band .hc-button { width: 100%; }
+  }
+`;

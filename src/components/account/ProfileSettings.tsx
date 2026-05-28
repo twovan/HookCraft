@@ -12,39 +12,6 @@ type ProfileData = {
   avatarUrl: string | null;
 };
 
-const cardStyle: React.CSSProperties = {
-  background: '#1a1a2e',
-  borderRadius: 20,
-  padding: 24,
-  border: '1px solid #2a2a40',
-  boxShadow: '0 4px 20px rgba(117, 54, 213, 0.06)',
-};
-
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '12px 14px',
-  borderRadius: 12,
-  border: '1px solid #2a2a40',
-  background: '#11111d',
-  color: '#e8e8f0',
-  fontSize: 14,
-  outline: 'none',
-  boxSizing: 'border-box',
-  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-};
-
-const buttonStyle: React.CSSProperties = {
-  padding: '10px 18px',
-  borderRadius: 18,
-  border: 'none',
-  background: 'linear-gradient(135deg, #7536d5, #5a2db8)',
-  color: 'white',
-  fontSize: 13,
-  fontWeight: 600,
-  cursor: 'pointer',
-  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-};
-
 export default function ProfileSettings() {
   const { user, refreshUser } = useAuth();
   const [profile, setProfile] = useState<ProfileData | null>(null);
@@ -181,143 +148,209 @@ export default function ProfileSettings() {
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 24, marginBottom: 32 }}>
-      <form onSubmit={handleProfileSubmit} style={cardStyle}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 18, marginBottom: 22 }}>
-          <label style={{ position: 'relative', width: 72, height: 72, flex: '0 0 auto', cursor: uploadingAvatar ? 'not-allowed' : 'pointer' }}>
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              onChange={handleAvatarChange}
-              disabled={uploadingAvatar}
-              style={{ display: 'none' }}
-            />
-            <div
-              style={{
-                width: 72,
-                height: 72,
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #7536d5, #5a2db8)',
-                border: '2px solid rgba(117, 54, 213, 0.45)',
-                color: 'white',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 28,
-                fontWeight: 800,
-                overflow: 'hidden',
-              }}
-            >
-              {profile?.avatarUrl ? (
-                <img src={profile.avatarUrl} alt="头像" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              ) : (
-                initial
-              )}
+    <div className="profile-settings">
+      <form onSubmit={handleProfileSubmit} className="profile-card">
+        <div className="profile-head">
+          <label className="avatar-picker">
+            <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleAvatarChange} disabled={uploadingAvatar} />
+            <div className="avatar">
+              {profile?.avatarUrl ? <img src={profile.avatarUrl} alt="头像" /> : initial}
             </div>
-            <span
-              style={{
-                position: 'absolute',
-                right: -2,
-                bottom: -2,
-                width: 24,
-                height: 24,
-                borderRadius: '50%',
-                background: '#11111d',
-                border: '1px solid #2a2a40',
-                color: '#e8e8f0',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 13,
-                fontWeight: 700,
-              }}
-            >
-              {uploadingAvatar ? '...' : '+'}
-            </span>
+            <span>{uploadingAvatar ? '...' : '+'}</span>
           </label>
-          <div style={{ minWidth: 0 }}>
-            <h2 style={{ margin: '0 0 6px', color: '#e8e8f0', fontSize: 20 }}>
-              {profile?.username || username || '用户'}
-            </h2>
-            <p style={{ margin: 0, color: '#9ca3af', fontSize: 13, overflowWrap: 'anywhere' }}>
-              {profile?.email || user?.email}
-            </p>
-            <p style={{ margin: '6px 0 0', color: '#7c8296', fontSize: 12 }}>
-              点击头像可上传 JPG、PNG 或 WebP
-            </p>
+          <div>
+            <h2>{profile?.username || username || '用户'}</h2>
+            <p>{profile?.email || user?.email}</p>
+            <small>点击头像可上传 JPG、PNG 或 WebP。</small>
           </div>
         </div>
 
-        <label style={{ display: 'block', color: '#e8e8f0', fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
-          用户名
+        <label className="field">
+          <span>用户名</span>
+          <input value={username} onChange={(e) => setUsername(e.target.value)} maxLength={20} />
         </label>
-        <input
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          maxLength={20}
-          style={inputStyle}
-        />
 
         {(profileError || profileMessage) && (
-          <div style={{ marginTop: 12, color: profileError ? '#f87171' : '#34d399', fontSize: 13 }}>
-            {profileError || profileMessage}
-          </div>
+          <div className={profileError ? 'message error' : 'message success'}>{profileError || profileMessage}</div>
         )}
 
-        <button
-          type="submit"
-          disabled={savingProfile}
-          style={{ ...buttonStyle, marginTop: 18, opacity: savingProfile ? 0.6 : 1, cursor: savingProfile ? 'not-allowed' : 'pointer' }}
-        >
+        <button type="submit" disabled={savingProfile} className="profile-button">
           {savingProfile ? '保存中...' : '保存资料'}
         </button>
       </form>
 
-      <form onSubmit={handlePasswordSubmit} style={cardStyle}>
-        <h2 style={{ margin: '0 0 18px', color: '#e8e8f0', fontSize: 20 }}>修改密码</h2>
-        <div style={{ display: 'grid', gap: 14 }}>
-          <div>
-            <label style={{ display: 'block', color: '#e8e8f0', fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
-              新密码
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              minLength={8}
-              autoComplete="new-password"
-              style={inputStyle}
-            />
-          </div>
-          <div>
-            <label style={{ display: 'block', color: '#e8e8f0', fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
-              确认新密码
-            </label>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              minLength={8}
-              autoComplete="new-password"
-              style={inputStyle}
-            />
-          </div>
+      <form onSubmit={handlePasswordSubmit} className="profile-card">
+        <h2>修改密码</h2>
+        <div className="field-stack">
+          <label className="field">
+            <span>新密码</span>
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} autoComplete="new-password" />
+          </label>
+          <label className="field">
+            <span>确认新密码</span>
+            <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} minLength={8} autoComplete="new-password" />
+          </label>
         </div>
 
         {(passwordError || passwordMessage) && (
-          <div style={{ marginTop: 12, color: passwordError ? '#f87171' : '#34d399', fontSize: 13 }}>
-            {passwordError || passwordMessage}
-          </div>
+          <div className={passwordError ? 'message error' : 'message success'}>{passwordError || passwordMessage}</div>
         )}
 
-        <button
-          type="submit"
-          disabled={savingPassword}
-          style={{ ...buttonStyle, marginTop: 18, opacity: savingPassword ? 0.6 : 1, cursor: savingPassword ? 'not-allowed' : 'pointer' }}
-        >
+        <button type="submit" disabled={savingPassword} className="profile-button">
           {savingPassword ? '更新中...' : '更新密码'}
         </button>
       </form>
+
+      <style>{`
+        .profile-settings {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+          gap: 18px;
+          margin-bottom: 24px;
+        }
+
+        .profile-card {
+          border: 1px solid var(--hc-line);
+          border-radius: var(--hc-radius-lg);
+          background: rgba(24, 26, 34, .88);
+          box-shadow: var(--hc-shadow);
+          padding: 22px;
+        }
+
+        .profile-card h2 {
+          margin: 0 0 18px;
+          color: var(--hc-text);
+          font-size: 20px;
+        }
+
+        .profile-head {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          margin-bottom: 20px;
+        }
+
+        .avatar-picker {
+          position: relative;
+          width: 72px;
+          height: 72px;
+          flex: 0 0 auto;
+          cursor: pointer;
+        }
+
+        .avatar-picker input {
+          display: none;
+        }
+
+        .avatar {
+          width: 72px;
+          height: 72px;
+          display: grid;
+          place-items: center;
+          overflow: hidden;
+          border-radius: 50%;
+          border: 1px solid rgba(206,255,53,.34);
+          background: linear-gradient(135deg, var(--hc-lime), var(--hc-cyan));
+          color: #08090c;
+          font-size: 28px;
+          font-weight: 950;
+        }
+
+        .avatar img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+
+        .avatar-picker span {
+          position: absolute;
+          right: -2px;
+          bottom: -2px;
+          width: 24px;
+          height: 24px;
+          display: grid;
+          place-items: center;
+          border: 1px solid var(--hc-line);
+          border-radius: 50%;
+          background: #11151a;
+          color: var(--hc-lime);
+          font-weight: 950;
+        }
+
+        .profile-head h2 {
+          margin: 0 0 6px;
+        }
+
+        .profile-head p {
+          margin: 0;
+          color: var(--hc-muted);
+          font-size: 13px;
+          overflow-wrap: anywhere;
+        }
+
+        .profile-head small {
+          display: block;
+          margin-top: 6px;
+          color: var(--hc-muted);
+          font-size: 12px;
+        }
+
+        .field-stack {
+          display: grid;
+          gap: 14px;
+        }
+
+        .field {
+          display: grid;
+          gap: 8px;
+          color: var(--hc-text);
+          font-size: 13px;
+          font-weight: 900;
+        }
+
+        .field input {
+          width: 100%;
+          box-sizing: border-box;
+          border: 1px solid var(--hc-line);
+          border-radius: 12px;
+          background: #0d0f14;
+          color: var(--hc-text);
+          padding: 12px 14px;
+          font-size: 14px;
+          outline: none;
+        }
+
+        .profile-button {
+          margin-top: 18px;
+          border: none;
+          border-radius: 999px;
+          background: linear-gradient(135deg, var(--hc-lime), var(--hc-cyan));
+          color: #08090c;
+          padding: 11px 18px;
+          font-size: 13px;
+          font-weight: 950;
+          cursor: pointer;
+        }
+
+        .profile-button:disabled {
+          cursor: not-allowed;
+          opacity: .58;
+        }
+
+        .message {
+          margin-top: 12px;
+          font-size: 13px;
+          font-weight: 800;
+        }
+
+        .message.success {
+          color: var(--hc-lime);
+        }
+
+        .message.error {
+          color: #ff8b76;
+        }
+      `}</style>
     </div>
   );
 }
