@@ -449,14 +449,18 @@ function formatExportTimestamp(date: Date) {
   ].join('');
 }
 
-function downloadBlob(blob: Blob, fileName: string, revokeDelayMs = 1000) {
-  const url = URL.createObjectURL(blob);
+function triggerDownloadUrl(url: string, fileName: string) {
   const link = document.createElement('a');
   link.href = url;
   link.download = fileName;
   document.body.appendChild(link);
   link.click();
   link.remove();
+}
+
+function downloadBlob(blob: Blob, fileName: string, revokeDelayMs = 1000) {
+  const url = URL.createObjectURL(blob);
+  triggerDownloadUrl(url, fileName);
   window.setTimeout(() => URL.revokeObjectURL(url), revokeDelayMs);
 }
 
@@ -880,6 +884,11 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
   const [isExporting, setIsExporting] = useState(false);
   const [exportingStemType, setExportingStemType] = useState<string | null>(null);
   const [exportStatusInput, setExportStatusInput] = useState<StemExportStatusInput>({ phase: 'idle' });
+  const [latestExportDownload, setLatestExportDownload] = useState<{
+    url: string;
+    fileName: string;
+    label: string;
+  } | null>(null);
   const [exportRecords, setExportRecords] = useState<StemExportRecord[]>([]);
   const [exportHistoryLoadedKey, setExportHistoryLoadedKey] = useState<string | null>(null);
   const [isAudioRetrying, setIsAudioRetrying] = useState(false);
@@ -938,6 +947,12 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     () => exportRecords.map((record) => ({ ...record, view: formatStemExportRecord(record) })),
     [exportRecords],
   );
+
+  useEffect(() => () => {
+    if (latestExportDownload?.url) {
+      URL.revokeObjectURL(latestExportDownload.url);
+    }
+  }, [latestExportDownload?.url]);
   const timelineLaneWidth = useMemo(
     () => Math.round(resolveTimelineBaseLaneWidth(showAdvancedControls, timelineViewportWidth) * timelineZoom),
     [showAdvancedControls, timelineViewportWidth, timelineZoom],
@@ -2167,12 +2182,6 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     });
   }, [duration, selectedTrackTrimControls]);
 
-  const seekFromTimelineRulerPointer = useCallback((event: PointerEvent<HTMLDivElement>) => {
-    if (duration <= 0) return;
-    const guide = resolveTimelineRulerPointer(event);
-    handleSeek(guide.time);
-  }, [duration, handleSeek, resolveTimelineRulerPointer]);
-
   const handleTimelineRulerPointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
     event.preventDefault();
     const trimIntent = resolveTimelineRulerTrimIntent(event);
@@ -2192,10 +2201,9 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     }
 
     timelineRulerTrimDragRef.current = null;
-    updateTimelineRulerGuide(event, true);
-    seekFromTimelineRulerPointer(event);
+    updateTimelineRulerGuide(event, false);
     event.currentTarget.setPointerCapture(event.pointerId);
-  }, [resolveTimelineRulerTrimIntent, seekFromTimelineRulerPointer, selectedTrack, selectedTrackTrimControls, updateTimelineRulerGuide]);
+  }, [resolveTimelineRulerTrimIntent, selectedTrack, selectedTrackTrimControls, updateTimelineRulerGuide]);
 
   const handleTimelineRulerPointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
     const trimDrag = timelineRulerTrimDragRef.current;
@@ -2213,9 +2221,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     }
 
     updateTimelineRulerGuide(event, event.buttons === 1);
-    if (event.buttons !== 1) return;
-    seekFromTimelineRulerPointer(event);
-  }, [resolveTimelineRulerPointer, seekFromTimelineRulerPointer, selectedTrack, setTrackTrim, setTrackTrimRange, updateTimelineRulerGuide]);
+  }, [resolveTimelineRulerPointer, selectedTrack, setTrackTrim, setTrackTrimRange, updateTimelineRulerGuide]);
 
   const handleTimelineRulerPointerUp = useCallback((event: PointerEvent<HTMLDivElement>) => {
     const trimDrag = timelineRulerTrimDragRef.current;
@@ -2654,6 +2660,18 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     await persistEditState('manual');
   }, [persistEditState]);
 
+  const returnToStudioAfterSave = useCallback(async () => {
+    setPlaybackError(null);
+    setSaveStatus('正在自动保存当前项目，保存完成后返回创作中心...');
+    const saved = await persistEditState('manual');
+    if (!saved) return;
+
+    setSaveStatus('当前项目已自动保存，正在返回创作中心。');
+    window.setTimeout(() => {
+      window.location.assign('/studio');
+    }, 180);
+  }, [persistEditState]);
+
   const savePendingEditsBeforeExport = useCallback(async () => {
     const intent = resolveStemExportSaveIntent({
       hasPendingChanges: hasPendingEditChanges,
@@ -2984,6 +3002,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     setIsExporting(true);
     setPlaybackError(null);
     setSaveStatus(null);
+    setLatestExportDownload(null);
     setExportStatusInput({
       phase: 'preparing',
       message: `正在准备“${exportModeLabel(exportMode)}”导出。`,
@@ -3080,9 +3099,17 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
       const rendered = await offlineContext.startRendering();
       setExportStatusInput({ phase: 'encoding', fileType: 'WAV' });
       const blob = encodeWav(rendered);
+      const fileName = `hookcraft-${exportModeFileLabel(exportMode)}-${formatExportTimestamp(new Date())}.wav`;
+      const url = URL.createObjectURL(blob);
       setExportStatusInput({ phase: 'downloading', fileType: 'WAV' });
-      downloadBlob(blob, `hookcraft-${exportModeFileLabel(exportMode)}-${formatExportTimestamp(new Date())}.wav`);
-      setExportStatusInput({ phase: 'done', fileType: 'WAV', exportedCount: exportableStems.length });
+      setLatestExportDownload({ url, fileName, label: `${exportModeLabel(exportMode)} WAV` });
+      triggerDownloadUrl(url, fileName);
+      setExportStatusInput({
+        phase: 'done',
+        fileType: 'WAV',
+        exportedCount: exportableStems.length,
+        message: 'WAV 已生成。如果浏览器没有自动下载，请点击下方下载链接。',
+      });
       setExportRecords((records) => appendStemExportRecord(records, createStemExportRecord({
         scope: 'mix',
         label: exportModeLabel(exportMode),
@@ -3106,6 +3133,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     setExportingStemType(stem.type);
     setPlaybackError(null);
     setSaveStatus(null);
+    setLatestExportDownload(null);
     setExportStatusInput({
       phase: 'preparing',
       message: `正在准备导出“${getStemDisplayName(stem).zh}”单轨。`,
@@ -3168,9 +3196,17 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
       const rendered = await offlineContext.startRendering();
       setExportStatusInput({ phase: 'encoding', fileType: 'WAV' });
       const blob = encodeWav(rendered);
+      const fileName = `hookcraft-${normalizeStemType(stem.type)}-${formatExportTimestamp(new Date())}.wav`;
+      const url = URL.createObjectURL(blob);
       setExportStatusInput({ phase: 'downloading', fileType: 'WAV' });
-      downloadBlob(blob, `hookcraft-${normalizeStemType(stem.type)}-${formatExportTimestamp(new Date())}.wav`);
-      setExportStatusInput({ phase: 'done', fileType: 'WAV', exportedCount: 1 });
+      setLatestExportDownload({ url, fileName, label: `${getStemDisplayName(stem).zh} 单轨 WAV` });
+      triggerDownloadUrl(url, fileName);
+      setExportStatusInput({
+        phase: 'done',
+        fileType: 'WAV',
+        exportedCount: 1,
+        message: '单轨 WAV 已生成。如果浏览器没有自动下载，请点击下方下载链接。',
+      });
       setExportRecords((records) => appendStemExportRecord(records, createStemExportRecord({
         scope: 'stem',
         label: getStemDisplayName(stem).zh,
@@ -3195,6 +3231,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     setExportingStemType(null);
     setPlaybackError(null);
     setSaveStatus(null);
+    setLatestExportDownload(null);
     setExportStatusInput({
       phase: 'preparing',
       message: '正在准备批量导出所有已缓存分轨。',
@@ -3411,33 +3448,21 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
           <div style={editorProjectTitleStyle}>
             <span style={editorTitleStyle}>歌曲编辑</span>
           </div>
-          <div style={editorHeaderFactsStyle} aria-label="编辑器状态">
-            <span style={editorHeaderFactStyle('project')} title={versionLabel}>项目 {versionLabel}</span>
-            <span style={editorHeaderFactStyle('neutral')}>分轨 {stems.length}</span>
-            <span style={editorHeaderFactStyle(loadingCount > 0 ? 'loading' : 'ready')}>
-              缓存 {readyStemCount}/{loadableStemCount}
-            </span>
-            <span style={editorHeaderFactStyle('neutral')}>时长 {formatStemTimecode(duration)}</span>
-            <span style={editorHeaderFactStyle(snapToGrid ? 'snap' : 'neutral')}>
-              {snapToGrid ? `吸附 ${snapStepSeconds}s` : '自由定位'}
-            </span>
-          </div>
           <div style={editorStatusClusterStyle}>
             <span style={saveBadgeStyle(saveBadge.tone)}>{saveBadge.label}</span>
             <span>{formatStemTimecode(currentTime)}</span>
           </div>
         </div>
-        <div style={editorHeaderSecondaryStyle}>
-          <div style={editorProjectMetaStyle}>
-            <span style={editorModeBadgeStyle}>编辑项目</span>
-            <span>{versionLabel}</span>
-            <span>{stems.length} 条分轨</span>
-            <span>已缓存 {readyStemCount}/{loadableStemCount}</span>
-            <span>{formatStemTimecode(duration)}</span>
-            <span>{trackDensity === 'compact' ? '紧凑轨道' : '舒展轨道'}</span>
-          </div>
-        </div>
         <div style={editorActionStyle}>
+          <button
+            type="button"
+            onClick={() => void returnToStudioAfterSave()}
+            disabled={isSaving}
+            title="自动保存当前项目后返回创作中心"
+            style={ghostButtonStyle}
+          >
+            返回创作中心
+          </button>
           <button type="button" onClick={undoTrackChange} disabled={!canUndo} style={historyButtonStyle(canUndo)}>
             撤销
           </button>
@@ -4197,6 +4222,15 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
               </div>
               <div style={exportStatusDetailStyle}>{exportStatus.detail}</div>
             </div>
+            {latestExportDownload && (
+              <a
+                href={latestExportDownload.url}
+                download={latestExportDownload.fileName}
+                style={exportDownloadLinkStyle}
+              >
+                下载 {latestExportDownload.label}
+              </a>
+            )}
             {recentExportRecords.length > 0 && (
               <div style={exportHistoryStyle}>
                 <div style={exportHistoryHeaderStyle}>
@@ -4613,6 +4647,11 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
               style={stemTrackStyle(isAudible, state.solo, showAdvancedControls, isSelectedTrack, timelineGridColumns, timelineMinWidth, trackDensity)}
             >
               <div style={stemNameStyle} data-timeline-pan-zone="true">
+                <span
+                  aria-hidden="true"
+                  title={stemAudioStatusLabel(audioStatus)}
+                  style={stemAudioCornerBadgeStyle(audioStatus)}
+                />
                 <span style={stemIndexStyle(isSelectedTrack)}>{String(index + 1).padStart(2, '0')}</span>
                 <span style={stemColorStyle(stem.type)} />
                 <div style={stemIdentityStyle}>
@@ -4622,7 +4661,6 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
                   <div style={stemStatusRowStyle}>
                     <span style={stemTypeStyle}>{displayName.en}</span>
                     {isSelectedTrack && <span style={selectedTrackBadgeStyle}>已选</span>}
-                    <span style={stemAudioStatusBadgeStyle(audioStatus)}>{stemAudioStatusLabel(audioStatus)}</span>
                     {state.solo && <span style={stemStateBadgeStyle('solo')}>独奏</span>}
                     {state.muted && <span style={stemStateBadgeStyle('muted')}>静音</span>}
                     {state.mutedRanges.length > 0 && <span style={stemStateBadgeStyle('range')}>{state.mutedRanges.length} 段</span>}
@@ -4868,6 +4906,104 @@ function editorStyle(metrics: DawEditorLayoutMetrics): CSSProperties {
   };
 }
 
+type EditorButtonTone = 'neutral' | 'primary' | 'info' | 'success' | 'warning' | 'danger' | 'purple';
+
+function editorButtonChromeStyle({
+  tone = 'neutral',
+  active = false,
+  disabled = false,
+  compact = false,
+  round = false,
+}: {
+  tone?: EditorButtonTone;
+  active?: boolean;
+  disabled?: boolean;
+  compact?: boolean;
+  round?: boolean;
+} = {}): CSSProperties {
+  const palette: Record<EditorButtonTone, {
+    border: string;
+    background: string;
+    activeBackground: string;
+    color: string;
+    activeColor: string;
+    glow: string;
+  }> = {
+    neutral: {
+      border: 'rgba(70, 76, 106, 0.86)',
+      background: 'linear-gradient(180deg, #20253a 0%, #141827 54%, #0d111d 100%)',
+      activeBackground: 'linear-gradient(180deg, #313650 0%, #222842 54%, #151a2c 100%)',
+      color: '#d9dced',
+      activeColor: '#ffffff',
+      glow: 'rgba(148, 163, 184, 0.16)',
+    },
+    primary: {
+      border: 'rgba(190, 167, 255, 0.78)',
+      background: 'linear-gradient(180deg, #9b5cff 0%, #7536d5 55%, #4c1d95 100%)',
+      activeBackground: 'linear-gradient(180deg, #b27aff 0%, #8547e8 55%, #5b21b6 100%)',
+      color: '#ffffff',
+      activeColor: '#ffffff',
+      glow: 'rgba(156, 108, 255, 0.38)',
+    },
+    purple: {
+      border: 'rgba(170, 142, 255, 0.58)',
+      background: 'linear-gradient(180deg, rgba(94, 54, 174, 0.92), rgba(47, 28, 95, 0.92))',
+      activeBackground: 'linear-gradient(180deg, rgba(126, 84, 220, 0.95), rgba(72, 42, 139, 0.95))',
+      color: '#e9ddff',
+      activeColor: '#ffffff',
+      glow: 'rgba(156, 108, 255, 0.3)',
+    },
+    info: {
+      border: 'rgba(96, 165, 250, 0.58)',
+      background: 'linear-gradient(180deg, rgba(37, 99, 235, 0.34), rgba(17, 42, 91, 0.82))',
+      activeBackground: 'linear-gradient(180deg, rgba(59, 130, 246, 0.52), rgba(29, 78, 216, 0.82))',
+      color: '#dbeafe',
+      activeColor: '#f8fbff',
+      glow: 'rgba(96, 165, 250, 0.28)',
+    },
+    success: {
+      border: 'rgba(52, 211, 153, 0.56)',
+      background: 'linear-gradient(180deg, rgba(16, 185, 129, 0.3), rgba(6, 78, 59, 0.78))',
+      activeBackground: 'linear-gradient(180deg, rgba(52, 211, 153, 0.5), rgba(5, 150, 105, 0.76))',
+      color: '#bbf7d0',
+      activeColor: '#ecfdf5',
+      glow: 'rgba(52, 211, 153, 0.25)',
+    },
+    warning: {
+      border: 'rgba(251, 191, 36, 0.58)',
+      background: 'linear-gradient(180deg, rgba(251, 191, 36, 0.27), rgba(120, 53, 15, 0.8))',
+      activeBackground: 'linear-gradient(180deg, rgba(251, 191, 36, 0.48), rgba(180, 83, 9, 0.75))',
+      color: '#fde68a',
+      activeColor: '#fff7d6',
+      glow: 'rgba(251, 191, 36, 0.24)',
+    },
+    danger: {
+      border: 'rgba(248, 113, 113, 0.58)',
+      background: 'linear-gradient(180deg, rgba(239, 68, 68, 0.3), rgba(127, 29, 29, 0.78))',
+      activeBackground: 'linear-gradient(180deg, rgba(248, 113, 113, 0.5), rgba(185, 28, 28, 0.76))',
+      color: '#fecaca',
+      activeColor: '#fff1f2',
+      glow: 'rgba(248, 113, 113, 0.24)',
+    },
+  };
+  const colors = palette[tone];
+
+  return {
+    minHeight: compact ? 24 : 32,
+    borderRadius: round ? 999 : 8,
+    border: `1px solid ${disabled ? 'rgba(48, 52, 76, 0.72)' : colors.border}`,
+    background: disabled ? 'linear-gradient(180deg, rgba(30, 34, 49, 0.62), rgba(13, 17, 29, 0.72))' : active ? colors.activeBackground : colors.background,
+    color: disabled ? '#62687c' : active ? colors.activeColor : colors.color,
+    boxShadow: disabled
+      ? 'inset 0 1px 0 rgba(255,255,255,0.03)'
+      : `inset 0 1px 0 rgba(255,255,255,0.16), inset 0 -2px 0 rgba(0,0,0,0.34), 0 1px 0 rgba(255,255,255,0.04), 0 0 16px ${active ? colors.glow : 'rgba(0,0,0,0)'}`,
+    textShadow: disabled ? 'none' : '0 1px 0 rgba(0,0,0,0.32)',
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    transition: 'border-color 140ms ease, background 140ms ease, box-shadow 140ms ease, color 140ms ease, transform 140ms ease',
+    whiteSpace: 'nowrap',
+  };
+}
+
 const editorHeaderStyle: CSSProperties = {
   gridColumn: '1 / -1',
   position: 'fixed',
@@ -4908,25 +5044,19 @@ const editorSideRailStyle: CSSProperties = {
 
 function sideRailButtonStyle(active: boolean, armed = false): CSSProperties {
   return {
+    ...editorButtonChromeStyle({ tone: active ? 'purple' : armed ? 'info' : 'neutral', active, disabled: false }),
     minHeight: 54,
-    borderRadius: 8,
-    border: active
-      ? '1px solid rgba(156, 108, 255, 0.72)'
-      : armed
-        ? '1px solid rgba(59, 130, 246, 0.38)'
-        : '1px solid transparent',
-    background: active
-      ? 'linear-gradient(180deg, rgba(117, 54, 213, 0.34), rgba(76, 29, 149, 0.22))'
-      : armed
-        ? 'rgba(59, 130, 246, 0.12)'
-        : 'transparent',
+    borderRadius: 9,
     color: active ? '#f2ebff' : armed ? '#bfdbfe' : '#7e849b',
-    cursor: 'pointer',
     fontSize: 11,
     fontWeight: 900,
     writingMode: 'vertical-rl',
     letterSpacing: 0,
-    boxShadow: active ? 'inset 2px 0 0 rgba(196, 181, 253, 0.9)' : 'none',
+    boxShadow: active
+      ? 'inset 2px 0 0 rgba(196, 181, 253, 0.9), inset 0 1px 0 rgba(255,255,255,0.16), inset 0 -2px 0 rgba(0,0,0,0.34)'
+      : armed
+        ? 'inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -2px 0 rgba(0,0,0,0.3)'
+        : 'inset 0 1px 0 rgba(255,255,255,0.06), inset 0 -2px 0 rgba(0,0,0,0.24)',
     transition: 'background 0.16s ease, border-color 0.16s ease, color 0.16s ease',
   };
 }
@@ -5040,15 +5170,11 @@ const editorActionStyle: CSSProperties = {
 };
 
 const primarySmallButtonStyle: CSSProperties = {
+  ...editorButtonChromeStyle({ tone: 'primary' }),
   minHeight: 32,
-  borderRadius: 8,
-  border: '1px solid rgba(156, 108, 255, 0.6)',
-  background: '#7536d5',
-  color: '#fff',
   padding: '6px 11px',
-  cursor: 'pointer',
   fontSize: 12,
-  fontWeight: 800,
+  fontWeight: 900,
 };
 
 const editorEyebrowRowStyle: CSSProperties = {
@@ -5137,15 +5263,11 @@ const editorProjectMetaStyle: CSSProperties = {
 };
 
 const ghostButtonStyle: CSSProperties = {
+  ...editorButtonChromeStyle({ tone: 'neutral' }),
   minHeight: 32,
-  borderRadius: 8,
-  border: '1px solid #30344c',
-  background: '#141727',
-  color: '#d8d9e6',
   padding: '6px 11px',
-  cursor: 'pointer',
   fontSize: 12,
-  fontWeight: 700,
+  fontWeight: 850,
 };
 
 function historyButtonStyle(enabled: boolean): CSSProperties {
@@ -5203,26 +5325,23 @@ const transportButtonGroupStyle: CSSProperties = {
 };
 
 const playButtonStyle: CSSProperties = {
+  ...editorButtonChromeStyle({ tone: 'primary', round: true, active: true }),
   minHeight: 42,
   minWidth: 58,
-  border: 'none',
-  borderRadius: 999,
-  background: '#f4f1ff',
-  color: '#111827',
+  border: '1px solid rgba(243, 232, 255, 0.92)',
+  background: 'linear-gradient(180deg, #ffffff 0%, #e7ddff 42%, #a78bfa 100%)',
+  color: '#14111f',
   fontSize: 13,
   fontWeight: 900,
-  cursor: 'pointer',
+  boxShadow: 'inset 0 2px 0 rgba(255,255,255,0.9), inset 0 -3px 0 rgba(91, 33, 182, 0.34), 0 0 22px rgba(167, 139, 250, 0.32)',
+  textShadow: '0 1px 0 rgba(255,255,255,0.44)',
 };
 
 function transportIconButtonStyle(disabled: boolean): CSSProperties {
   return {
+    ...editorButtonChromeStyle({ tone: 'neutral', compact: false, disabled }),
     minWidth: 42,
     minHeight: 34,
-    borderRadius: 8,
-    border: '1px solid rgba(48, 52, 76, 0.72)',
-    background: disabled ? 'rgba(20, 23, 39, 0.46)' : 'rgba(16, 21, 33, 0.86)',
-    color: disabled ? '#5f6478' : '#cfd3e6',
-    cursor: disabled ? 'not-allowed' : 'pointer',
     padding: '0 8px',
     fontSize: 11,
     fontWeight: 900,
@@ -5253,25 +5372,21 @@ const transportEditLabelStyle: CSSProperties = {
 
 function transportEditButtonStyle(disabled: boolean): CSSProperties {
   return {
+    ...editorButtonChromeStyle({ tone: 'purple', compact: true, round: true, disabled }),
     minHeight: 24,
-    borderRadius: 999,
-    border: disabled ? '1px solid rgba(48, 52, 76, 0.72)' : '1px solid rgba(156, 108, 255, 0.38)',
-    background: disabled ? 'rgba(20, 23, 39, 0.5)' : 'rgba(117, 54, 213, 0.14)',
-    color: disabled ? '#60657a' : '#dfd7ff',
     padding: '0 9px',
-    cursor: disabled ? 'not-allowed' : 'pointer',
     fontSize: 11,
     fontWeight: 900,
-    whiteSpace: 'nowrap',
   };
 }
 
 function transportLoopButtonStyle(active: boolean): CSSProperties {
   return {
-    ...transportEditButtonStyle(false),
-    border: active ? '1px solid rgba(52, 211, 153, 0.48)' : '1px solid rgba(156, 108, 255, 0.38)',
-    background: active ? 'rgba(16, 185, 129, 0.16)' : 'rgba(117, 54, 213, 0.14)',
-    color: active ? '#a7f3d0' : '#dfd7ff',
+    ...editorButtonChromeStyle({ tone: active ? 'success' : 'purple', compact: true, round: true, active }),
+    minHeight: 24,
+    padding: '0 9px',
+    fontSize: 11,
+    fontWeight: 900,
   };
 }
 
@@ -5285,24 +5400,11 @@ const transportOptionBarStyle: CSSProperties = {
 
 function transportOptionButtonStyle(active: boolean, disabled: boolean): CSSProperties {
   return {
+    ...editorButtonChromeStyle({ tone: active ? 'success' : 'info', compact: true, round: true, active, disabled }),
     minHeight: 24,
-    borderRadius: 999,
-    border: disabled
-      ? '1px solid rgba(48, 52, 76, 0.62)'
-      : active
-        ? '1px solid rgba(52, 211, 153, 0.42)'
-        : '1px solid rgba(96, 165, 250, 0.3)',
-    background: disabled
-      ? 'rgba(15, 18, 32, 0.46)'
-      : active
-        ? 'rgba(16, 185, 129, 0.13)'
-        : 'rgba(37, 99, 235, 0.1)',
-    color: disabled ? '#60657a' : active ? '#a7f3d0' : '#bfdbfe',
     padding: '0 9px',
-    cursor: disabled ? 'not-allowed' : 'pointer',
     fontSize: 11,
     fontWeight: 900,
-    whiteSpace: 'nowrap',
   };
 }
 
@@ -5487,29 +5589,26 @@ const inspectorTabsStyle: CSSProperties = {
 
 function inspectorTabButtonStyle(active: boolean): CSSProperties {
   return {
+    ...editorButtonChromeStyle({ tone: 'purple', compact: true, active }),
     minHeight: 30,
     borderRadius: 7,
-    border: active ? '1px solid rgba(156, 108, 255, 0.72)' : '1px solid transparent',
-    background: active ? 'rgba(117, 54, 213, 0.34)' : 'transparent',
     color: active ? '#f2ebff' : '#9ca3af',
-    cursor: 'pointer',
     fontSize: 12,
     fontWeight: 900,
+    boxShadow: active
+      ? 'inset 0 1px 0 rgba(255,255,255,0.14), inset 0 -2px 0 rgba(0,0,0,0.34), 0 0 14px rgba(156, 108, 255, 0.22)'
+      : 'inset 0 1px 0 rgba(255,255,255,0.04), inset 0 -2px 0 rgba(0,0,0,0.2)',
   };
 }
 
 function inspectorCollapseButtonStyle(collapsed: boolean): CSSProperties {
   return {
-    border: '1px solid rgba(156, 108, 255, 0.4)',
+    ...editorButtonChromeStyle({ tone: 'purple', compact: true, round: collapsed, active: collapsed }),
     borderRadius: collapsed ? 999 : 7,
-    background: collapsed ? 'rgba(117, 54, 213, 0.28)' : 'rgba(117, 54, 213, 0.12)',
-    color: collapsed ? '#f1edff' : '#d8d0ff',
     minHeight: collapsed ? 28 : 26,
     padding: collapsed ? '0 8px' : '0 9px',
-    cursor: 'pointer',
     fontSize: 11,
     fontWeight: 900,
-    whiteSpace: 'nowrap',
   };
 }
 
@@ -5588,15 +5687,12 @@ const mutedRangeTimeStyle: CSSProperties = {
 };
 
 const mutedRangeRestoreButtonStyle: CSSProperties = {
+  ...editorButtonChromeStyle({ tone: 'danger', compact: true }),
   minHeight: 22,
   borderRadius: 7,
-  border: '1px solid rgba(248, 113, 113, 0.5)',
-  background: 'rgba(127, 29, 29, 0.3)',
   padding: '3px 8px',
-  cursor: 'pointer',
-  color: '#fee2e2',
   fontSize: 11,
-  fontWeight: 800,
+  fontWeight: 900,
 };
 
 const selectedTrackStatsStyle: CSSProperties = {
@@ -5708,24 +5804,24 @@ const panelHeadingMetaStyle: CSSProperties = {
 };
 
 const presetButtonStyle: CSSProperties = {
+  ...editorButtonChromeStyle({ tone: 'purple', compact: true }),
   minHeight: 30,
   borderRadius: 7,
-  border: '1px solid rgba(156, 108, 255, 0.42)',
-  background: 'rgba(117, 54, 213, 0.16)',
-  color: '#dfd7ff',
   padding: '5px 10px',
-  cursor: 'pointer',
   fontSize: 12,
-  fontWeight: 800,
+  fontWeight: 900,
   minWidth: 0,
 };
 
 function viewModeButtonStyle(active: boolean): CSSProperties {
   return {
-    ...presetButtonStyle,
-    border: active ? '1px solid rgba(156, 108, 255, 0.82)' : presetButtonStyle.border,
-    background: active ? 'rgba(117, 54, 213, 0.34)' : presetButtonStyle.background,
-    color: active ? '#f2ebff' : presetButtonStyle.color,
+    ...editorButtonChromeStyle({ tone: 'purple', compact: true, active }),
+    minHeight: 30,
+    borderRadius: 7,
+    padding: '5px 10px',
+    fontSize: 12,
+    fontWeight: 900,
+    minWidth: 0,
   };
 }
 
@@ -5771,30 +5867,22 @@ const exportActionGridStyle: CSSProperties = {
 
 function exportPrimaryActionStyle(disabled: boolean): CSSProperties {
   return {
+    ...editorButtonChromeStyle({ tone: 'primary', disabled }),
     minHeight: 34,
-    borderRadius: 8,
-    border: disabled ? '1px solid rgba(48, 52, 76, 0.72)' : '1px solid rgba(156, 108, 255, 0.72)',
-    background: disabled ? 'rgba(20, 23, 39, 0.62)' : 'linear-gradient(135deg, #7536d5, #2563eb)',
-    color: disabled ? '#656b82' : '#fff',
     padding: '6px 10px',
-    cursor: disabled ? 'not-allowed' : 'pointer',
     fontSize: 12,
     fontWeight: 900,
-    whiteSpace: 'nowrap',
   };
 }
 
 function exportModeButtonStyle(active: boolean): CSSProperties {
   return {
+    ...editorButtonChromeStyle({ tone: 'purple', active }),
     minHeight: 32,
     borderRadius: 8,
-    border: active ? '1px solid rgba(156, 108, 255, 0.86)' : '1px solid rgba(48, 52, 76, 0.9)',
-    background: active ? 'rgba(117, 54, 213, 0.34)' : '#141727',
-    color: active ? '#f2ebff' : '#c9ccdc',
     padding: '6px 8px',
-    cursor: 'pointer',
     fontSize: 12,
-    fontWeight: 800,
+    fontWeight: 900,
   };
 }
 
@@ -5905,6 +5993,21 @@ const exportStatusDetailStyle: CSSProperties = {
   lineHeight: 1.45,
 };
 
+const exportDownloadLinkStyle: CSSProperties = {
+  ...editorButtonChromeStyle({ tone: 'info', compact: true, active: true }),
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginTop: 8,
+  minHeight: 30,
+  padding: '0 12px',
+  borderRadius: 7,
+  color: '#cffafe',
+  fontSize: 12,
+  fontWeight: 900,
+  textDecoration: 'none',
+};
+
 const exportHistoryStyle: CSSProperties = {
   marginTop: 10,
   padding: '8px 10px',
@@ -5932,15 +6035,12 @@ const exportHistoryHeaderActionsStyle: CSSProperties = {
 };
 
 const exportHistoryClearButtonStyle: CSSProperties = {
+  ...editorButtonChromeStyle({ tone: 'neutral', compact: true }),
   minHeight: 24,
   borderRadius: 7,
-  border: '1px solid rgba(48, 52, 76, 0.9)',
-  background: '#141727',
-  color: '#cfd3e6',
   padding: '3px 7px',
-  cursor: 'pointer',
   fontSize: 11,
-  fontWeight: 800,
+  fontWeight: 900,
 };
 
 const exportHistoryListStyle: CSSProperties = {
@@ -5989,16 +6089,13 @@ const playbackErrorStyle: CSSProperties = {
 };
 
 const inlineRetryButtonStyle: CSSProperties = {
+  ...editorButtonChromeStyle({ tone: 'danger', compact: true }),
   marginLeft: 10,
   minHeight: 26,
   borderRadius: 7,
-  border: '1px solid rgba(248, 113, 113, 0.42)',
-  background: 'rgba(239, 68, 68, 0.14)',
-  color: '#fecaca',
   padding: '4px 9px',
-  cursor: 'pointer',
   fontSize: 12,
-  fontWeight: 800,
+  fontWeight: 900,
 };
 
 const loadingNoticeStyle: CSSProperties = {
@@ -6171,13 +6268,10 @@ const timelineZoomControlsStyle: CSSProperties = {
 
 function timelineZoomButtonStyle(disabled: boolean): CSSProperties {
   return {
+    ...editorButtonChromeStyle({ tone: 'purple', compact: true, disabled }),
     width: 24,
     height: 22,
-    border: disabled ? '1px solid rgba(48, 52, 76, 0.7)' : '1px solid rgba(156, 108, 255, 0.36)',
     borderRadius: 5,
-    background: disabled ? 'rgba(20, 23, 39, 0.74)' : 'rgba(117, 54, 213, 0.15)',
-    color: disabled ? '#60657a' : '#dfd7ff',
-    cursor: disabled ? 'not-allowed' : 'pointer',
     fontSize: 13,
     fontWeight: 900,
     lineHeight: 1,
@@ -6194,12 +6288,9 @@ const timelineZoomValueStyle: CSSProperties = {
 };
 
 const timelineZoomFitButtonStyle: CSSProperties = {
+  ...editorButtonChromeStyle({ tone: 'neutral', compact: true }),
   minHeight: 22,
-  border: '1px solid rgba(48, 52, 76, 0.9)',
   borderRadius: 5,
-  background: '#141727',
-  color: '#aeb2c9',
-  cursor: 'pointer',
   padding: '0 7px',
   fontSize: 10,
   fontWeight: 900,
@@ -6230,76 +6321,51 @@ const timelineSelectionActionsStyle: CSSProperties = {
 
 function timelineSelectionActionButtonStyle(disabled: boolean): CSSProperties {
   return {
+    ...editorButtonChromeStyle({ tone: 'info', compact: true, round: true, disabled }),
     minHeight: 20,
-    borderRadius: 999,
-    border: '1px solid rgba(48, 52, 76, 0.82)',
-    background: disabled ? 'rgba(15, 18, 32, 0.46)' : 'rgba(31, 35, 55, 0.92)',
-    color: disabled ? '#5f6478' : '#dbeafe',
     padding: '0 7px',
-    cursor: disabled ? 'not-allowed' : 'pointer',
     fontSize: 10,
     fontWeight: 900,
-    whiteSpace: 'nowrap',
   };
 }
 
 function timelineSelectionLoopButtonStyle(active: boolean): CSSProperties {
   return {
+    ...editorButtonChromeStyle({ tone: active ? 'success' : 'info', compact: true, round: true, active }),
     minHeight: 20,
-    borderRadius: 999,
-    border: active ? '1px solid rgba(52, 211, 153, 0.48)' : '1px solid rgba(48, 52, 76, 0.82)',
-    background: active ? 'rgba(16, 185, 129, 0.14)' : 'rgba(31, 35, 55, 0.92)',
-    color: active ? '#a7f3d0' : '#dbeafe',
     padding: '0 7px',
-    cursor: 'pointer',
     fontSize: 10,
     fontWeight: 900,
-    whiteSpace: 'nowrap',
   };
 }
 
 function timelineFollowButtonStyle(active: boolean): CSSProperties {
   return {
+    ...editorButtonChromeStyle({ tone: 'success', compact: true, round: true, active }),
     minHeight: 24,
-    borderRadius: 999,
-    border: active ? '1px solid rgba(52, 211, 153, 0.44)' : '1px solid rgba(48, 52, 76, 0.86)',
-    background: active ? 'rgba(16, 185, 129, 0.13)' : 'rgba(10, 13, 24, 0.78)',
-    color: active ? '#a7f3d0' : '#9ca3af',
     padding: '0 9px',
-    cursor: 'pointer',
     fontSize: 11,
     fontWeight: 900,
-    whiteSpace: 'nowrap',
   };
 }
 
 function timelineSnapButtonStyle(active: boolean): CSSProperties {
   return {
+    ...editorButtonChromeStyle({ tone: 'warning', compact: true, round: true, active }),
     minHeight: 24,
-    borderRadius: 999,
-    border: active ? '1px solid rgba(251, 191, 36, 0.48)' : '1px solid rgba(48, 52, 76, 0.86)',
-    background: active ? 'rgba(251, 191, 36, 0.14)' : 'rgba(10, 13, 24, 0.78)',
-    color: active ? '#fde68a' : '#9ca3af',
     padding: '0 9px',
-    cursor: 'pointer',
     fontSize: 11,
     fontWeight: 900,
-    whiteSpace: 'nowrap',
   };
 }
 
 function timelineSnapStepButtonStyle(disabled: boolean): CSSProperties {
   return {
+    ...editorButtonChromeStyle({ tone: 'warning', compact: true, round: true, disabled }),
     minHeight: 24,
-    borderRadius: 999,
-    border: disabled ? '1px solid rgba(48, 52, 76, 0.72)' : '1px solid rgba(251, 191, 36, 0.32)',
-    background: disabled ? 'rgba(10, 13, 24, 0.58)' : 'rgba(251, 191, 36, 0.08)',
-    color: disabled ? '#60657a' : '#facc15',
     padding: '0 9px',
-    cursor: disabled ? 'not-allowed' : 'pointer',
     fontSize: 11,
     fontWeight: 900,
-    whiteSpace: 'nowrap',
   };
 }
 
@@ -6321,31 +6387,21 @@ function timelinePrecisionHintStyle(active: boolean): CSSProperties {
 
 function timelineDensityButtonStyle(active: boolean): CSSProperties {
   return {
+    ...editorButtonChromeStyle({ tone: 'success', compact: true, round: true, active }),
     minHeight: 24,
-    borderRadius: 999,
-    border: active ? '1px solid rgba(52, 211, 153, 0.44)' : '1px solid rgba(48, 52, 76, 0.86)',
-    background: active ? 'rgba(16, 185, 129, 0.13)' : 'rgba(10, 13, 24, 0.78)',
-    color: active ? '#a7f3d0' : '#cfd3e6',
     padding: '0 9px',
-    cursor: 'pointer',
     fontSize: 11,
     fontWeight: 900,
-    whiteSpace: 'nowrap',
   };
 }
 
 function timelineHelpButtonStyle(active: boolean): CSSProperties {
   return {
+    ...editorButtonChromeStyle({ tone: 'purple', compact: true, round: true, active }),
     minHeight: 24,
-    borderRadius: 999,
-    border: active ? '1px solid rgba(216, 201, 255, 0.62)' : '1px solid rgba(48, 52, 76, 0.86)',
-    background: active ? 'rgba(117, 54, 213, 0.3)' : 'rgba(10, 13, 24, 0.78)',
-    color: active ? '#f2ebff' : '#cfd3e6',
     padding: '0 9px',
-    cursor: 'pointer',
     fontSize: 11,
     fontWeight: 900,
-    whiteSpace: 'nowrap',
   };
 }
 
@@ -6371,16 +6427,11 @@ function timelineShortcutHelpStyle(minWidth: number): CSSProperties {
 }
 
 const timelineLocateButtonStyle: CSSProperties = {
+  ...editorButtonChromeStyle({ tone: 'info', compact: true, round: true }),
   minHeight: 24,
-  borderRadius: 999,
-  border: '1px solid rgba(96, 165, 250, 0.38)',
-  background: 'rgba(37, 99, 235, 0.13)',
-  color: '#bfdbfe',
   padding: '0 9px',
-  cursor: 'pointer',
   fontSize: 11,
   fontWeight: 900,
-  whiteSpace: 'nowrap',
 };
 
 function timelineScrollProgressStyle(minWidth: number, shortcutHelpOpen: boolean): CSSProperties {
@@ -6757,6 +6808,28 @@ function stemAudioStatusLabel(status: StemTrackAudioStatus) {
   return '待加载';
 }
 
+function stemAudioCornerBadgeStyle(status: StemTrackAudioStatus): CSSProperties {
+  const palette: Record<StemTrackAudioStatus, string> = {
+    ready: '#34d399',
+    loading: '#60a5fa',
+    failed: '#f87171',
+    skipped: '#94a3b8',
+    pending: '#fbbf24',
+  };
+
+  return {
+    position: 'absolute',
+    top: 5,
+    left: 5,
+    width: 7,
+    height: 7,
+    borderRadius: 999,
+    background: palette[status],
+    boxShadow: `0 0 0 2px rgba(8, 12, 21, 0.96), 0 0 10px ${palette[status]}66`,
+    pointerEvents: 'none',
+  };
+}
+
 function stemAudioStatusBadgeStyle(status: StemTrackAudioStatus): CSSProperties {
   const palette: Record<StemTrackAudioStatus, { border: string; background: string; color: string }> = {
     ready: {
@@ -6854,47 +6927,19 @@ const stemButtonsStyle: CSSProperties = {
 };
 
 function trackToggleStyle(active: boolean, tone: 'mute' | 'solo' | 'export' | 'retry' = 'export'): CSSProperties {
-  const palette: Record<typeof tone, { border: string; background: string; color: string; activeBackground: string; activeColor: string }> = {
-    mute: {
-      border: '1px solid rgba(248, 113, 113, 0.42)',
-      background: '#171a2c',
-      color: '#aeb2c9',
-      activeBackground: 'rgba(248, 113, 113, 0.22)',
-      activeColor: '#fecaca',
-    },
-    solo: {
-      border: '1px solid rgba(251, 191, 36, 0.42)',
-      background: '#171a2c',
-      color: '#aeb2c9',
-      activeBackground: 'rgba(251, 191, 36, 0.24)',
-      activeColor: '#fde68a',
-    },
-    export: {
-      border: '1px solid rgba(156, 108, 255, 0.42)',
-      background: '#171a2c',
-      color: '#aeb2c9',
-      activeBackground: 'rgba(117, 54, 213, 0.28)',
-      activeColor: '#eadcff',
-    },
-    retry: {
-      border: '1px solid rgba(96, 165, 250, 0.42)',
-      background: '#171a2c',
-      color: '#bfdbfe',
-      activeBackground: 'rgba(37, 99, 235, 0.24)',
-      activeColor: '#dbeafe',
-    },
+  const palette: Record<typeof tone, EditorButtonTone> = {
+    mute: 'danger',
+    solo: 'warning',
+    export: 'purple',
+    retry: 'info',
   };
-  const colors = palette[tone];
 
   return {
+    ...editorButtonChromeStyle({ tone: palette[tone], compact: true, active }),
     minWidth: tone === 'export' ? 44 : 28,
     minHeight: 26,
     padding: tone === 'export' ? '0 7px' : '0 4px',
     borderRadius: 6,
-    border: active ? colors.border : '1px solid #30344c',
-    background: active ? colors.activeBackground : colors.background,
-    color: active ? colors.activeColor : colors.color,
-    cursor: 'pointer',
     fontSize: 10,
     fontWeight: 900,
     fontVariantNumeric: 'tabular-nums',
@@ -6947,15 +6992,12 @@ const trimHeaderActionsStyle: CSSProperties = {
 };
 
 const trimResetButtonStyle: CSSProperties = {
+  ...editorButtonChromeStyle({ tone: 'neutral', compact: true }),
   minHeight: 22,
   borderRadius: 6,
-  border: '1px solid #30344c',
-  background: '#171a2c',
-  color: '#aeb2c9',
   padding: '2px 7px',
-  cursor: 'pointer',
   fontSize: 10,
-  fontWeight: 800,
+  fontWeight: 900,
 };
 
 const trimControlStyle: CSSProperties = {
@@ -7355,16 +7397,21 @@ function WaveformTrackCanvas({
         pendingSeekRef.current = null;
         updatePointerGuide(event, '移动选区', true);
       } else {
-        pendingSeekRef.current = {
-          x: event.clientX,
-          time,
-          moved: false,
-          mode: intent.kind === 'playhead' ? 'playhead' : 'click',
-        };
         trimDragRef.current = null;
         trimRangeDragRef.current = null;
         clipDragRef.current = null;
-        updatePointerGuide(event, intent.kind === 'playhead' ? '播放头' : '定位', intent.kind === 'playhead');
+        if (intent.kind === 'playhead') {
+          pendingSeekRef.current = {
+            x: event.clientX,
+            time,
+            moved: false,
+            mode: 'playhead',
+          };
+          updatePointerGuide(event, '播放头', true);
+        } else {
+          pendingSeekRef.current = null;
+          updatePointerGuide(event, '选择', false);
+        }
       }
     }
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -7466,18 +7513,15 @@ function WaveformTrackCanvas({
       updatePointerGuide(event, '播放头', false);
       return;
     }
-    if (pendingSeek && !pendingSeek.moved) {
-      onSeek(pendingSeek.time, snapEnabled && !event.altKey);
-    }
-    updatePointerGuide(event, '定位', false);
-  }, [cancelScheduledSeekChange, cancelScheduledTrimChange, interactionTimeFromPointer, onClipMove, onSeek, onTrimChange, onTrimRangeMove, snapEnabled, updatePointerGuide]);
+    updatePointerGuide(event, '选择', false);
+  }, [cancelScheduledSeekChange, cancelScheduledTrimChange, interactionTimeFromPointer, onClipMove, onSeek, onTrimChange, onTrimRangeMove, updatePointerGuide]);
 
   return (
     <div style={waveformCanvasWrapStyle}>
       <canvas
         ref={canvasRef}
         draggable={false}
-        aria-label="Stem waveform. Click to seek, drag the playhead, or drag trim handles to edit this track."
+        aria-label="Stem waveform. Select the track, drag the playhead, or drag trim handles to edit this track."
         onContextMenu={(event) => event.preventDefault()}
         onDragStart={(event) => event.preventDefault()}
         onPointerDown={handlePointerDown}

@@ -19,6 +19,18 @@ describe('public pricing config', () => {
     expect(pro?.monthlyCredits).toBe(88);
   });
 
+  it('applies admin tier names to public tier cards', () => {
+    const tiers = mergeTierConfigsWithAdminConfig(Object.values(TIER_CONFIGS), {
+      pricing: [
+        { tier: 'pro', name: 'Creator Plus', monthlyPrice: 8800, yearlyPrice: 80000 },
+      ],
+      creditQuotas: [],
+    });
+
+    const pro = tiers.find((tier) => tier.tier === 'pro');
+    expect(pro?.name).toBe('Creator Plus');
+  });
+
   it('keeps defaults when admin config omits a tier', () => {
     const tiers = mergeTierConfigsWithAdminConfig(Object.values(TIER_CONFIGS), {
       pricing: [

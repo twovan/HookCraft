@@ -19,7 +19,8 @@ async function loadCreditsPacksConfig() {
     const service = new AdminConfigService(supabaseAdmin);
     const config = await service.getCurrentConfig();
     return config.creditsPacks;
-  } catch {
+  } catch (error: any) {
+    console.error('Credits pack config load error:', error);
     return [];
   }
 }

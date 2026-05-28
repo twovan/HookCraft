@@ -303,7 +303,8 @@ export class MembershipService {
       const adminConfig = await configService.getCurrentConfig();
       const mergedTiers = mergeTierConfigsWithAdminConfig(Object.values(TIER_CONFIGS), adminConfig);
       return Object.fromEntries(mergedTiers.map((config) => [config.tier, config])) as Record<MembershipTier, TierConfig>;
-    } catch {
+    } catch (error) {
+      console.error('[membership] Failed to load admin pricing config, using default tiers:', error);
       return TIER_CONFIGS;
     }
   }

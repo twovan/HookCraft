@@ -342,7 +342,7 @@ export default function AdvancedArrangementTab({
   const isBusy = generateStatus === 'uploading' || generateStatus === 'queued' || generateStatus === 'generating';
   const canGenerate = uploadStatus === 'ready' && !isBusy && (
     !usesSelectedTemplate ||
-    Boolean(selectedTemplate && (isTemplateInstrumentalVariant ? effectiveTags.trim() : effectiveStyle.trim()))
+    Boolean(selectedTemplate && (isTemplateInstrumentalVariant || effectiveStyle.trim()))
   );
   const resultTracks = Array.isArray(result?.tracks) ? result.tracks : [];
   const playableTracks = resultTracks.some(hasTrackAudio)
@@ -427,7 +427,7 @@ export default function AdvancedArrangementTab({
             <div style={selectedTemplateStripStyle}>
               <div style={templateCoverThumbStyle(selectedTemplate.coverUrl)} />
               <div style={{ minWidth: 0 }}>
-                <div style={{ color: '#F7FAF2', fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div style={{ color: '#e8e8f0', fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {selectedTemplate.name}
                 </div>
                 <div style={{ color: '#9ca3af', fontSize: 11, marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -456,7 +456,7 @@ export default function AdvancedArrangementTab({
           {effectiveCustomMode && !instrumental && !isTemplateInstrumentalVariant && (
             <div style={lyricTagPanelStyle}>
               <div style={lyricTagHeaderStyle}>
-                <span style={{ ...labelStyle, color: '#F7FAF2' }}>歌词结构标签</span>
+                <span style={{ ...labelStyle, color: '#e8e8f0' }}>歌词结构标签</span>
                 <span style={lyricTagHintStyle}>点击插入右侧歌词</span>
               </div>
               <div style={lyricTagGridStyle}>
@@ -480,11 +480,11 @@ export default function AdvancedArrangementTab({
           )}
 
           <div style={hintBoxStyle}>
-            <div style={{ color: '#F7FAF2', fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
+            <div style={{ color: '#e8e8f0', fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
               {isTemplateInstrumentalVariant ? '模板伴奏说明' : isTemplateVariant ? '模板编曲说明' : '上传与参考说明'}
             </div>
             <p style={hintTextStyle}>上传参考音频后，系统会先完成音频处理，再创建高级编曲任务。</p>
-            <p style={hintTextStyle}>{isTemplateInstrumentalVariant ? '模板解析会自动生成风格标签，参考音频会作为需要补伴奏的主音频。' : isTemplateVariant ? '模板会锁定风格方向，参考音频影响旋律、情绪和声线，歌词控制最终表达。' : '参考音频仅支持 MP3/WAV，建议 6 秒到 8 分钟内；自定义模式下，非纯音乐请填写歌词，纯音乐可以补充创作描述。'}</p>
+            <p style={hintTextStyle}>{isTemplateInstrumentalVariant ? '模板风格会随任务自动传递，参考音频作为需要加伴奏的音频。' : isTemplateVariant ? '模板会锁定风格方向，参考音频影响旋律、情绪和声线，歌词控制最终表达。' : '参考音频仅支持 MP3/WAV，建议 6 秒到 8 分钟内；自定义模式下，非纯音乐请填写歌词，纯音乐可以补充创作描述。'}</p>
             {!usesSelectedTemplate && <p style={hintTextStyle}>参考音频会影响旋律、情绪和声线方向；右侧的风格、权重和歌词会控制最终改编强度。</p>}
             {audioDuration !== null && (
               <p style={hintTextStyle}>当前音频时长：{Math.round(audioDuration)} 秒</p>
@@ -506,14 +506,14 @@ export default function AdvancedArrangementTab({
 
           {usesSelectedTemplate && (
             <div style={templateModeNoticeStyle}>
-              <span style={{ color: '#B7FF4A', fontSize: 12, fontWeight: 800 }}>自定义模式</span>
+              <span style={{ color: '#c0a7fc', fontSize: 12, fontWeight: 800 }}>自定义模式</span>
               <span style={{ color: '#9ca3af', fontSize: 12 }}>{isTemplateInstrumentalVariant ? '风格标签已由模板自动填充' : '风格已由模板自动填充'}</span>
             </div>
           )}
 
           {!isTemplateInstrumentalVariant && <div style={instrumentalSettingStyle}>
             <div>
-              <div style={{ color: '#F7FAF2', fontSize: 13, fontWeight: 700 }}>纯音乐</div>
+              <div style={{ color: '#e8e8f0', fontSize: 13, fontWeight: 700 }}>纯音乐</div>
               <div style={{ color: '#6b7280', fontSize: 11, marginTop: 4 }}>
                 开启后不要求填写歌词，生成无主唱版本
               </div>
@@ -580,7 +580,7 @@ export default function AdvancedArrangementTab({
                     value={effectiveTags || '请选择带风格分析的模板'}
                     readOnly
                     disabled
-                    style={{ ...textareaStyle, minHeight: 118, color: effectiveTags ? '#F7FAF2' : '#6b7280' }}
+                    style={{ ...textareaStyle, minHeight: 118, color: effectiveTags ? '#e8e8f0' : '#6b7280' }}
                   />
                 </label>
               )}
@@ -639,13 +639,13 @@ export default function AdvancedArrangementTab({
               padding: '14px 24px',
               borderRadius: 24,
               border: 'none',
-              background: canGenerate ? 'linear-gradient(135deg, #B7FF4A 0%, #24E6C8 100%)' : 'rgba(148, 163, 184, 0.18)',
-              color: canGenerate ? '#08100e' : '#6b7280',
+              background: canGenerate ? 'linear-gradient(135deg, #7536d5 0%, #5a2db8 100%)' : '#2a2a40',
+              color: canGenerate ? 'white' : '#6b7280',
               fontSize: 15,
               fontWeight: 700,
               cursor: canGenerate ? 'pointer' : 'not-allowed',
               fontFamily: "'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif",
-              boxShadow: canGenerate ? '0 4px 20px rgba(183, 255, 74, 0.30)' : 'none',
+              boxShadow: canGenerate ? '0 4px 20px rgba(117, 54, 213, 0.4)' : 'none',
               transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
               display: 'flex',
               alignItems: 'center',
@@ -660,7 +660,7 @@ export default function AdvancedArrangementTab({
                   ? '请先选择模板'
                   : uploadStatus !== 'ready'
                     ? '请先上传参考音频'
-                    : isTemplateInstrumentalVariant ? 'V5.5 伴奏生成' : '模板编曲'}
+                    : isTemplateInstrumentalVariant ? 'V5.5 add-instrumental' : '模板编曲'}
               </span>
             )}
           </button>
@@ -672,8 +672,8 @@ export default function AdvancedArrangementTab({
           <div style={spinnerStyle} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
-              <div style={{ color: '#F7FAF2', fontSize: 14, fontWeight: 700 }}>{progressStage}</div>
-              <div style={{ color: '#B7FF4A', fontSize: 12, fontWeight: 700 }}>{progressPercent}%</div>
+              <div style={{ color: '#e8e8f0', fontSize: 14, fontWeight: 700 }}>{progressStage}</div>
+              <div style={{ color: '#c0a7fc', fontSize: 12, fontWeight: 700 }}>{progressPercent}%</div>
             </div>
             <div style={progressBarTrackStyle}>
               <div style={{ ...progressBarFillStyle, width: `${progressPercent}%` }} />
@@ -686,7 +686,7 @@ export default function AdvancedArrangementTab({
             </div>
           </div>
           <div style={{ display: 'none' }}>
-            <div style={{ color: '#F7FAF2', fontSize: 14, fontWeight: 600 }}>{progressText}</div>
+            <div style={{ color: '#e8e8f0', fontSize: 14, fontWeight: 600 }}>{progressText}</div>
             <div style={{ color: '#9ca3af', fontSize: 12, marginTop: 6 }}>
               {taskId ? `任务 ID：${taskId}` : '正在准备任务，请保持页面打开'}
             </div>
@@ -739,7 +739,7 @@ export default function AdvancedArrangementTab({
           {allLyricsText && (
             <div style={lyricsBoxStyle}>
               <div style={lyricsHeaderStyle}>
-                <div style={{ color: '#F7FAF2', fontSize: 13, fontWeight: 700 }}>{isInstrumentalResult ? '内容类型' : '歌词'}</div>
+                <div style={{ color: '#e8e8f0', fontSize: 13, fontWeight: 700 }}>{isInstrumentalResult ? '内容类型' : '歌词'}</div>
                 {!isInstrumentalResult && (
                   <button type="button" onClick={handleCopyLyrics} style={copyLyricsButtonStyle}>
                     {copiedLyrics ? '已复制' : '复制全部歌词'}
@@ -921,9 +921,9 @@ function ModeButton({
         flex: 1,
         padding: '9px 12px',
         borderRadius: 10,
-        border: active ? '1px solid #B7FF4A' : '1px solid rgba(148, 163, 184, 0.18)',
-        background: active ? 'rgba(183, 255, 74, 0.14)' : 'rgba(8, 11, 16, 0.82)',
-        color: active ? '#F7FAF2' : '#9ca3af',
+        border: active ? '1px solid #7536d5' : '1px solid #2a2a40',
+        background: active ? 'rgba(117, 54, 213, 0.14)' : '#12121e',
+        color: active ? '#e8e8f0' : '#9ca3af',
         fontSize: 13,
         fontWeight: 600,
         cursor: disabled ? 'not-allowed' : 'pointer',
@@ -968,7 +968,7 @@ function InstrumentalSwitch({
           width: 38,
           height: 20,
           borderRadius: 999,
-          background: checked ? '#B7FF4A' : 'rgba(148, 163, 184, 0.18)',
+          background: checked ? '#7536d5' : '#2a2a40',
           transition: 'background 0.2s ease',
           flexShrink: 0,
         }}
@@ -1002,7 +1002,7 @@ function SliderField({
 }) {
   return (
     <label style={fieldStyle}>
-      <span style={labelStyle}>{label} <strong style={{ color: '#B7FF4A' }}>{value.toFixed(2)}</strong></span>
+      <span style={labelStyle}>{label} <strong style={{ color: '#c0a7fc' }}>{value.toFixed(2)}</strong></span>
       <input
         type="range"
         min={0}
@@ -1011,7 +1011,7 @@ function SliderField({
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(Number(e.target.value))}
-        style={{ width: '100%', accentColor: '#B7FF4A' }}
+        style={{ width: '100%', accentColor: '#7536d5' }}
       />
     </label>
   );
@@ -1020,24 +1020,24 @@ function SliderField({
 function ResultMeta({ label, value }: { label: string; value: string }) {
   return (
     <div style={{
-      background: 'rgba(8, 11, 16, 0.82)',
-      border: '1px solid rgba(148, 163, 184, 0.18)',
+      background: '#12121e',
+      border: '1px solid #2a2a40',
       borderRadius: 10,
       padding: 12,
       minWidth: 0,
     }}>
       <div style={{ color: '#6b7280', fontSize: 11, marginBottom: 6 }}>{label}</div>
-      <div style={{ color: '#F7FAF2', fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</div>
+      <div style={{ color: '#e8e8f0', fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</div>
     </div>
   );
 }
 
 const panelStyle: CSSProperties = {
-  background: 'linear-gradient(180deg, rgba(13, 17, 23, 0.96), rgba(8, 11, 16, 0.92))',
+  background: 'linear-gradient(180deg, rgba(29, 29, 50, 0.98), rgba(24, 24, 42, 0.98))',
   borderRadius: 20,
   padding: 24,
-  border: '1px solid rgba(183, 255, 74, 0.18)',
-  boxShadow: '0 16px 40px rgba(0, 0, 0, 0.18), 0 4px 20px rgba(36, 230, 200, 0.08)',
+  border: '1px solid rgba(117, 54, 213, 0.18)',
+  boxShadow: '0 16px 40px rgba(0, 0, 0, 0.18), 0 4px 20px rgba(117, 54, 213, 0.06)',
   minWidth: 0,
 };
 
@@ -1053,15 +1053,15 @@ const titleStyle: CSSProperties = {
   fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
   fontSize: 18,
   fontWeight: 700,
-  color: '#F7FAF2',
+  color: '#e8e8f0',
   margin: 0,
 };
 
 const pillStyle: CSSProperties = {
   fontSize: 11,
-  color: '#B7FF4A',
-  background: 'rgba(183, 255, 74, 0.12)',
-  border: '1px solid rgba(183, 255, 74, 0.24)',
+  color: '#c0a7fc',
+  background: 'rgba(117, 54, 213, 0.12)',
+  border: '1px solid rgba(117, 54, 213, 0.28)',
   borderRadius: 999,
   padding: '5px 9px',
   whiteSpace: 'nowrap',
@@ -1069,9 +1069,9 @@ const pillStyle: CSSProperties = {
 
 const modelBadgeStyle: CSSProperties = {
   fontSize: 12,
-  color: '#F7FAF2',
-  background: 'rgba(8, 11, 16, 0.82)',
-  border: '1px solid rgba(148, 163, 184, 0.18)',
+  color: '#e8e8f0',
+  background: '#12121e',
+  border: '1px solid #2a2a40',
   borderRadius: 10,
   padding: '9px 12px',
   whiteSpace: 'nowrap',
@@ -1093,8 +1093,8 @@ const instrumentalSettingStyle: CSSProperties = {
   marginBottom: 18,
   padding: '12px 14px',
   borderRadius: 12,
-  border: '1px solid rgba(148, 163, 184, 0.18)',
-  background: 'rgba(8, 11, 16, 0.82)',
+  border: '1px solid #2a2a40',
+  background: '#12121e',
 };
 
 const templateModeNoticeStyle: CSSProperties = {
@@ -1105,8 +1105,8 @@ const templateModeNoticeStyle: CSSProperties = {
   marginBottom: 14,
   padding: '10px 12px',
   borderRadius: 10,
-  border: '1px solid rgba(183, 255, 74, 0.24)',
-  background: 'rgba(183, 255, 74, 0.10)',
+  border: '1px solid rgba(117, 54, 213, 0.28)',
+  background: 'rgba(117, 54, 213, 0.1)',
 };
 
 const selectedTemplateStripStyle: CSSProperties = {
@@ -1116,8 +1116,8 @@ const selectedTemplateStripStyle: CSSProperties = {
   marginBottom: 16,
   padding: 12,
   borderRadius: 12,
-  border: '1px solid rgba(183, 255, 74, 0.24)',
-  background: 'rgba(183, 255, 74, 0.10)',
+  border: '1px solid rgba(117, 54, 213, 0.24)',
+  background: 'rgba(117, 54, 213, 0.1)',
 };
 
 function templateCoverThumbStyle(coverUrl?: string): CSSProperties {
@@ -1126,17 +1126,17 @@ function templateCoverThumbStyle(coverUrl?: string): CSSProperties {
     height: 42,
     borderRadius: 8,
     flexShrink: 0,
-    border: '1px solid rgba(148, 163, 184, 0.18)',
+    border: '1px solid #2a2a40',
     background: coverUrl
       ? `url(${coverUrl}) center/cover`
-      : 'linear-gradient(135deg, rgba(36, 230, 200, 0.38), rgba(18, 18, 30, 0.95))',
+      : 'linear-gradient(135deg, rgba(117, 54, 213, 0.45), rgba(18, 18, 30, 0.95))',
   };
 }
 
 const hintBoxStyle: CSSProperties = {
   marginTop: 16,
-  background: 'rgba(8, 11, 16, 0.82)',
-  border: '1px solid rgba(148, 163, 184, 0.18)',
+  background: '#12121e',
+  border: '1px solid #2a2a40',
   borderRadius: 12,
   padding: 16,
 };
@@ -1193,9 +1193,9 @@ const inputStyle: CSSProperties = {
   width: '100%',
   boxSizing: 'border-box',
   borderRadius: 10,
-  border: '1px solid rgba(148, 163, 184, 0.18)',
-  background: 'rgba(8, 11, 16, 0.82)',
-  color: '#F7FAF2',
+  border: '1px solid #2a2a40',
+  background: '#12121e',
+  color: '#e8e8f0',
   padding: '10px 12px',
   outline: 'none',
   fontSize: 13,
@@ -1217,8 +1217,8 @@ const textareaStyle: CSSProperties = {
 const lockedStyleCardStyle: CSSProperties = {
   marginBottom: 14,
   borderRadius: 12,
-  border: '1px solid rgba(148, 163, 184, 0.18)',
-  background: 'rgba(8, 11, 16, 0.82)',
+  border: '1px solid #2a2a40',
+  background: '#12121e',
   padding: 12,
 };
 
@@ -1236,7 +1236,7 @@ const lockedStyleTextStyle: CSSProperties = {
 const lyricTagPanelStyle: CSSProperties = {
   margin: '16px 0',
   background: 'rgba(18, 18, 30, 0.82)',
-  border: '1px solid rgba(183, 255, 74, 0.20)',
+  border: '1px solid rgba(117, 54, 213, 0.2)',
   borderRadius: 12,
   padding: 14,
 };
@@ -1264,9 +1264,9 @@ const lyricTagGridStyle: CSSProperties = {
 const lyricTagButtonStyle: CSSProperties = {
   padding: '5px 10px',
   borderRadius: 7,
-  border: '1px solid rgba(183, 255, 74, 0.24)',
-  background: 'rgba(183, 255, 74, 0.10)',
-  color: '#F7FAF2',
+  border: '1px solid rgba(117, 54, 213, 0.28)',
+  background: 'rgba(117, 54, 213, 0.1)',
+  color: '#e8e8f0',
   fontSize: 12,
   fontFamily: 'monospace',
   transition: 'all 0.15s ease',
@@ -1290,8 +1290,8 @@ const errorStyle: CSSProperties = {
 
 const lyricsBoxStyle: CSSProperties = {
   marginTop: 16,
-  background: 'rgba(8, 11, 16, 0.82)',
-  border: '1px solid rgba(148, 163, 184, 0.18)',
+  background: '#12121e',
+  border: '1px solid #2a2a40',
   borderRadius: 12,
   padding: 14,
 };
@@ -1305,9 +1305,9 @@ const lyricsHeaderStyle: CSSProperties = {
 };
 
 const copyLyricsButtonStyle: CSSProperties = {
-  border: '1px solid rgba(36, 230, 200, 0.38)',
-  background: 'rgba(183, 255, 74, 0.14)',
-  color: '#B7FF4A',
+  border: '1px solid rgba(117, 54, 213, 0.45)',
+  background: 'rgba(117, 54, 213, 0.14)',
+  color: '#c0a7fc',
   borderRadius: 999,
   padding: '6px 12px',
   fontSize: 12,
@@ -1353,16 +1353,16 @@ const lyricLineStyle: CSSProperties = {
 const lyricSectionStyle: CSSProperties = {
   display: 'inline-flex',
   width: 'fit-content',
-  color: '#F7FAF2',
-  background: 'rgba(183, 255, 74, 0.24)',
-  border: '1px solid rgba(183, 255, 74, 0.32)',
+  color: '#f4eaff',
+  background: 'rgba(117, 54, 213, 0.28)',
+  border: '1px solid rgba(192, 167, 252, 0.32)',
   fontWeight: 800,
 };
 
 const lyricContentStyle: CSSProperties = {
   color: '#d8d9e6',
-  background: 'rgba(36, 230, 200, 0.055)',
-  borderLeft: '2px solid rgba(36, 230, 200, 0.55)',
+  background: 'rgba(192, 167, 252, 0.055)',
+  borderLeft: '2px solid rgba(117, 54, 213, 0.55)',
 };
 
 const creationLinkStyle: CSSProperties = {
@@ -1371,8 +1371,8 @@ const creationLinkStyle: CSSProperties = {
   justifyContent: 'center',
   padding: '9px 16px',
   borderRadius: 999,
-  border: '1px solid #B7FF4A',
-  color: '#B7FF4A',
+  border: '1px solid #7536d5',
+  color: '#c0a7fc',
   textDecoration: 'none',
   fontSize: 13,
   fontWeight: 700,
@@ -1384,16 +1384,16 @@ const progressBarTrackStyle: CSSProperties = {
   height: 8,
   marginTop: 10,
   borderRadius: 999,
-  background: 'rgba(148, 163, 184, 0.18)',
+  background: '#2a2a40',
   overflow: 'hidden',
 };
 
 const progressBarFillStyle: CSSProperties = {
   height: '100%',
   borderRadius: 999,
-  background: 'linear-gradient(90deg, #B7FF4A, #24E6C8)',
+  background: 'linear-gradient(90deg, #7536d5, #b66cff)',
   transition: 'width 0.8s ease',
-  boxShadow: '0 0 14px rgba(36, 230, 200, 0.38)',
+  boxShadow: '0 0 14px rgba(117, 54, 213, 0.45)',
 };
 
 const statusPanelStyle: CSSProperties = {
@@ -1406,8 +1406,8 @@ const statusPanelStyle: CSSProperties = {
 const spinnerStyle: CSSProperties = {
   width: 32,
   height: 32,
-  border: '3px solid rgba(148, 163, 184, 0.18)',
-  borderTopColor: '#B7FF4A',
+  border: '3px solid #2a2a40',
+  borderTopColor: '#7536d5',
   borderRadius: '50%',
   animation: 'advancedArrangementSpin 0.9s linear infinite',
   flexShrink: 0,
@@ -1418,8 +1418,8 @@ const trackRowStyle: CSSProperties = {
   flexDirection: 'column',
   alignItems: 'stretch',
   gap: 12,
-  background: 'rgba(8, 11, 16, 0.82)',
-  border: '1px solid rgba(148, 163, 184, 0.18)',
+  background: '#12121e',
+  border: '1px solid #2a2a40',
   borderRadius: 10,
   padding: 12,
 };
@@ -1441,9 +1441,9 @@ const stemActionButtonStyle: CSSProperties = {
   minHeight: 32,
   padding: '7px 12px',
   borderRadius: 8,
-  border: '1px solid rgba(183, 255, 74, 0.34)',
-  background: 'rgba(183, 255, 74, 0.14)',
-  color: '#B7FF4A',
+  border: '1px solid rgba(117, 54, 213, 0.42)',
+  background: 'rgba(117, 54, 213, 0.16)',
+  color: '#d8c4ff',
   fontSize: 12,
   fontWeight: 700,
   fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",

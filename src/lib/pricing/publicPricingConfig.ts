@@ -14,6 +14,7 @@ export function mergeTierConfigsWithAdminConfig(
 
     return {
       ...tier,
+      name: pricing?.name?.trim() || tier.name,
       monthlyPrice: pricing?.monthlyPrice ?? tier.monthlyPrice,
       yearlyPrice: pricing?.yearlyPrice ?? tier.yearlyPrice,
       monthlyCredits: quota?.monthlyCredits ?? tier.monthlyCredits,
