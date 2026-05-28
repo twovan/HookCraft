@@ -1,15 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser } from '@/lib/supabase/auth-helpers';
 import { supabaseAdmin } from '@/lib/supabase/server';
+import { normalizeStemMasterState } from '@/lib/stems/stemMixState';
 
 export const dynamic = 'force-dynamic';
 
 interface TrackStatePayload {
   volume: number;
+  pan: number;
   muted: boolean;
   solo: boolean;
   trimStart: number;
   trimEnd: number | null;
+  fadeIn: number;
+  fadeOut: number;
 }
 
 function normalizeTrackState(value: unknown): TrackStatePayload | null {
@@ -21,19 +25,31 @@ function normalizeTrackState(value: unknown): TrackStatePayload | null {
   const volume = typeof state.volume === 'number' && Number.isFinite(state.volume)
     ? Math.max(0, Math.min(1, state.volume))
     : 1;
+  const pan = typeof state.pan === 'number' && Number.isFinite(state.pan)
+    ? Math.max(-1, Math.min(1, state.pan))
+    : 0;
   const trimStart = typeof state.trimStart === 'number' && Number.isFinite(state.trimStart)
     ? Math.max(0, state.trimStart)
     : 0;
   const trimEnd = typeof state.trimEnd === 'number' && Number.isFinite(state.trimEnd)
     ? Math.max(0, state.trimEnd)
     : null;
+  const fadeIn = typeof state.fadeIn === 'number' && Number.isFinite(state.fadeIn)
+    ? Math.max(0, state.fadeIn)
+    : 0;
+  const fadeOut = typeof state.fadeOut === 'number' && Number.isFinite(state.fadeOut)
+    ? Math.max(0, state.fadeOut)
+    : 0;
 
   return {
     volume,
+    pan,
     muted: state.muted === true,
     solo: state.solo === true,
     trimStart,
     trimEnd,
+    fadeIn,
+    fadeOut,
   };
 }
 
@@ -59,6 +75,7 @@ function normalizeEditState(value: unknown) {
 
   return {
     tracks: normalizedTracks,
+    master: normalizeStemMasterState(editState?.master as any),
     savedAt: new Date().toISOString(),
   };
 }

@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   const apiKey = process.env.GEMINI_API_KEY;
 
   // 1. 检查 API Key 配置
@@ -46,7 +52,6 @@ export async function GET() {
     return NextResponse.json({
       step: "全部检查通过",
       status: "✅ 成功",
-      apiKeyPrefix: apiKey.substring(0, 10) + "...",
       totalModels: models.length,
       lyriaModels: lyriaModels.map((m: any) => m.name),
       hint: lyriaModels.length === 0

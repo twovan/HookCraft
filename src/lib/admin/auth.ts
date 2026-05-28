@@ -10,11 +10,19 @@ import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
 const ADMIN_JWT_SECRET = process.env.ADMIN_JWT_SECRET;
-if (!ADMIN_JWT_SECRET) {
+if (!ADMIN_JWT_SECRET && process.env.NODE_ENV !== 'production') {
   console.warn('[Admin Auth] ADMIN_JWT_SECRET 环境变量未设置，管理员认证将无法工作');
 }
-const JWT_SECRET = ADMIN_JWT_SECRET || 'hookcraft-admin-dev-only-secret';
 const COOKIE_NAME = 'admin_session';
+
+function getJwtSecret(): string {
+  const secret = process.env.ADMIN_JWT_SECRET || ADMIN_JWT_SECRET;
+  if (secret) return secret;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('[Admin Auth] ADMIN_JWT_SECRET 环境变量未设置，管理员认证将无法工作');
+  }
+  return 'hookcraft-admin-dev-only-secret';
+}
 
 export interface AdminSession {
   adminId: string;
@@ -54,7 +62,7 @@ export async function verifyAdminSession(
 
     if (!token) return null;
 
-    const payload = jwt.verify(token, JWT_SECRET) as AdminJwtPayload;
+    const payload = jwt.verify(token, getJwtSecret()) as AdminJwtPayload;
 
     return {
       adminId: payload.adminId,
@@ -87,7 +95,7 @@ export function createAdminSession(
       role: admin.role,
       displayName: admin.display_name || admin.username,
     },
-    JWT_SECRET,
+    getJwtSecret(),
     { expiresIn }
   );
 }

@@ -124,12 +124,12 @@ describe('validateAudioFile', () => {
       expect(result.duration).toBe(6);
     });
 
-    it('180 秒时长通过校验（上界）', async () => {
-      mockDecodeAudioData.mockResolvedValue({ duration: 180 });
+    it('360 秒时长通过校验（上界）', async () => {
+      mockDecodeAudioData.mockResolvedValue({ duration: 360 });
       const file = createMockFile({});
       const result = await validateAudioFile(file);
       expect(result.valid).toBe(true);
-      expect(result.duration).toBe(180);
+      expect(result.duration).toBe(360);
     });
 
     it('时长不足 6 秒返回错误', async () => {
@@ -140,12 +140,12 @@ describe('validateAudioFile', () => {
       expect(result.error).toBe('音频时长不能少于 6 秒');
     });
 
-    it('时长超过 180 秒返回错误', async () => {
-      mockDecodeAudioData.mockResolvedValue({ duration: 180.01 });
+    it('时长超过 360 秒返回错误', async () => {
+      mockDecodeAudioData.mockResolvedValue({ duration: 360.01 });
       const file = createMockFile({});
       const result = await validateAudioFile(file);
       expect(result.valid).toBe(false);
-      expect(result.error).toBe('音频时长不能超过 3 分钟');
+      expect(result.error).toBe('音频时长不能超过 6 分钟');
     });
 
     it('解码失败返回对应错误信息', async () => {

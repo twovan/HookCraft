@@ -1,4 +1,8 @@
 import { TIER_CONFIGS } from '@/config/tierConfig';
+import { getPublicCreditsPacks } from '@/config/creditsPack';
+import { AdminConfigService } from '@/lib/admin/AdminConfigService';
+import { mergeTierConfigsWithAdminConfig } from '@/lib/pricing/publicPricingConfig';
+import { supabaseAdmin } from '@/lib/supabase/server';
 import PricingContent from './PricingContent';
 
 export const metadata = {
@@ -6,9 +10,22 @@ export const metadata = {
   description: '选择适合你的 AI 音乐创作方案',
 };
 
-export default function PricingPage() {
-  // Pass tier configs as serializable data to client component
-  const tiers = Object.values(TIER_CONFIGS);
+export const dynamic = 'force-dynamic';
+
+async function loadPricingConfig() {
+  try {
+    const service = new AdminConfigService(supabaseAdmin);
+    return await service.getCurrentConfig();
+  } catch (error) {
+    console.error('[pricing] Failed to load admin pricing config:', error);
+    return null;
+  }
+}
+
+export default async function PricingPage() {
+  const adminConfig = await loadPricingConfig();
+  const tiers = mergeTierConfigsWithAdminConfig(Object.values(TIER_CONFIGS), adminConfig);
+  const creditsPacks = getPublicCreditsPacks(adminConfig?.creditsPacks);
 
   return (
     <div
@@ -67,7 +84,7 @@ export default function PricingPage() {
         </header>
 
         {/* Interactive pricing content (client component) */}
-        <PricingContent tiers={tiers} />
+        <PricingContent tiers={tiers} initialCreditsPacks={creditsPacks} />
       </div>
     </div>
   );

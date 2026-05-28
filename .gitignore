@@ -3,3 +3,10 @@ node_modules/
 .env.local
 .env*.local
 .vercel
+.superpowers/
+.deploy-*/
+.hotfix-deploy-*/
+.rewrite-backup/
+*.zip
+*.png
+tsconfig.tsbuildinfo

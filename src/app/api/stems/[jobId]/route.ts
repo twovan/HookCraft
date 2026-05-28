@@ -44,12 +44,12 @@ function readEditState(resultPayload: unknown) {
     : null;
 }
 
-function proxiedStems(req: NextRequest, resultPayload: unknown) {
+function proxiedStems(req: NextRequest, jobId: string, resultPayload: unknown) {
   const waveformPeaks = readWaveformPeaks(resultPayload);
   return readNormalizedStems(resultPayload).map((stem) => ({
     ...stem,
     sourceUrl: stem.url,
-    url: `${req.nextUrl.origin}/api/stems/audio?url=${encodeURIComponent(stem.url)}`,
+    url: `${req.nextUrl.origin}/api/stems/audio?jobId=${encodeURIComponent(jobId)}&stemType=${encodeURIComponent(stem.type)}&url=${encodeURIComponent(stem.url)}`,
     waveform: waveformPeaks[stem.type] || null,
   }));
 }
@@ -137,7 +137,7 @@ export async function GET(
         provider: 'kie',
         providerTaskId: details.taskId,
         sourceGenerationTaskId: null,
-        stems: proxiedStems(req, { response: details.response }),
+        stems: proxiedStems(req, params.jobId, { response: details.response }),
         editState: null,
         errorMessage: details.errorMessage || null,
         createdAt: null,
@@ -161,7 +161,7 @@ export async function GET(
 
     const refreshed = await refreshPersistedKieJob(data);
     const refreshedData = refreshed.job;
-    const stems = proxiedStems(req, refreshedData.result_payload);
+    const stems = proxiedStems(req, refreshedData.id, refreshedData.result_payload);
     const editState = readEditState(refreshedData.result_payload);
 
     return NextResponse.json({

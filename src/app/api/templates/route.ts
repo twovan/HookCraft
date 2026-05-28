@@ -7,6 +7,8 @@ import { supabaseAdmin } from '../../../lib/supabase/server';
 import type { MembershipTier } from '../../../types/membership';
 import { TIER_CONFIGS } from '../../../config/tierConfig';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);

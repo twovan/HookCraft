@@ -1,0 +1,11 @@
+node_modules/
+.next/
+.env.local
+.env*.local
+.vercel/
+.deploy-*/
+.hotfix-deploy-*/
+.rewrite-backup/
+*.zip
+**/*.test.ts
+**/*.test.tsx
