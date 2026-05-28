@@ -52,7 +52,7 @@ export default function Navbar() {
   }, []);
 
   // Hide navbar on login page and admin routes
-  if (pathname === '/login' || pathname.startsWith('/admin')) {
+  if (pathname === '/login' || pathname.startsWith('/admin') || pathname.startsWith('/studio/stem-editor')) {
     return null;
   }
 

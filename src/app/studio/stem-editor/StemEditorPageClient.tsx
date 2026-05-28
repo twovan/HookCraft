@@ -217,7 +217,7 @@ export default function StemEditorPageClient() {
   const hasLoadedStems = job?.status === 'completed' && job.stems.length > 0;
 
   return (
-    <main style={pageStyle}>
+    <main style={pageStyle(hasLoadedStems)}>
       <style>{`
         @keyframes stem-analyze-wave {
           0%, 100% { transform: scaleY(0.35); opacity: 0.45; }
@@ -228,16 +228,18 @@ export default function StemEditorPageClient() {
           100% { transform: translateX(220%); }
         }
       `}</style>
-      <header style={headerStyle}>
-        <Link href="/studio" style={backLinkStyle}>{TEXT.backToStudio}</Link>
-        <div>
-          <div style={eyebrowStyle}>HookCraft</div>
-          <h1 style={headingStyle}>{TEXT.songEditor}</h1>
-        </div>
-      </header>
+      {!hasLoadedStems && (
+        <header style={headerStyle}>
+          <Link href="/studio" style={backLinkStyle}>{TEXT.backToStudio}</Link>
+          <div>
+            <div style={eyebrowStyle}>HookCraft</div>
+            <h1 style={headingStyle}>{TEXT.songEditor}</h1>
+          </div>
+        </header>
+      )}
 
-      <section style={stageStyle}>
-        <div style={statusHeaderStyle}>
+      <section style={stageStyle(hasLoadedStems)}>
+        {!hasLoadedStems && <div style={statusHeaderStyle}>
           <div>
             <div style={statusTitleRowStyle}>
               <span style={statusTitleStyle}>{formatEditorStatus(job?.status, phase)}</span>
@@ -268,7 +270,7 @@ export default function StemEditorPageClient() {
               </button>
             )}
           </div>
-        </div>
+        </div>}
 
         {!hasLoadedStems && <AnalysisLoadingPanel phase={phase} />}
 
@@ -367,19 +369,25 @@ function formatAnalysisSource(source?: string | null) {
   return TEXT.savedResult;
 }
 
-const pageStyle: CSSProperties = {
-  minHeight: '100vh',
-  background: '#090a14',
-  color: '#f4f4fb',
-  padding: '36px clamp(16px, 4vw, 56px)',
-};
+function pageStyle(loaded: boolean): CSSProperties {
+  return {
+    minHeight: '100vh',
+    background: loaded ? '#070a11' : '#090a14',
+    color: '#f4f4fb',
+    padding: loaded ? 0 : '22px clamp(10px, 1.6vw, 24px)',
+    boxSizing: 'border-box',
+    overflowX: 'hidden',
+  };
+}
 
 const headerStyle: CSSProperties = {
-  maxWidth: 1240,
-  margin: '0 auto 24px',
+  width: '100%',
+  maxWidth: 'none',
+  margin: '0 0 18px',
   display: 'flex',
   flexDirection: 'column',
   gap: 18,
+  boxSizing: 'border-box',
 };
 
 const backLinkStyle: CSSProperties = {
@@ -406,20 +414,29 @@ const headingStyle: CSSProperties = {
   fontWeight: 900,
 };
 
-const stageStyle: CSSProperties = {
-  maxWidth: 1240,
-  margin: '0 auto',
-  borderRadius: 16,
-  border: '1px solid rgba(117, 54, 213, 0.24)',
-  background: 'linear-gradient(180deg, rgba(26, 28, 48, 0.98), rgba(15, 17, 31, 0.98))',
-  padding: 'clamp(16px, 2.4vw, 28px)',
-};
+function stageStyle(loaded: boolean): CSSProperties {
+  return {
+    width: '100%',
+    maxWidth: 'none',
+    margin: 0,
+    borderRadius: loaded ? 0 : 16,
+    border: loaded ? 'none' : '1px solid rgba(117, 54, 213, 0.24)',
+    background: loaded
+      ? '#050912'
+      : 'linear-gradient(180deg, rgba(26, 28, 48, 0.98), rgba(15, 17, 31, 0.98))',
+    padding: loaded ? 0 : 'clamp(10px, 1.4vw, 18px)',
+    boxSizing: 'border-box',
+    overflowX: 'hidden',
+  };
+}
 
 const statusHeaderStyle: CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
   gap: 16,
+  flexWrap: 'wrap',
+  minWidth: 0,
 };
 
 const statusTitleRowStyle: CSSProperties = {
@@ -466,6 +483,7 @@ const actionGroupStyle: CSSProperties = {
   alignItems: 'center',
   gap: 10,
   flexWrap: 'wrap',
+  minWidth: 0,
 };
 
 const refreshButtonStyle: CSSProperties = {

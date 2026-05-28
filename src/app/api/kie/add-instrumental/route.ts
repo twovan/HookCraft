@@ -16,6 +16,7 @@ const MAX_FILE_SIZE = 100 * 1024 * 1024;
 const DEFAULT_MODEL: KieSunoModel = 'V5_5';
 const MODELS: KieSunoModel[] = ['V5_5', 'V5', 'V4_5PLUS', 'V4_5', 'V4'];
 const DEFAULT_NEGATIVE_TAGS = 'low quality, distorted, clipping, harsh noise, off-key, messy arrangement';
+const TEMP_BYPASS_GENERATION_CREDITS = true;
 
 function parseNumber(value: FormDataEntryValue | null, fallback: number): number {
   const parsed = Number(value);
@@ -39,7 +40,7 @@ function buildPromptSummary(input: {
 }): string {
   return [
     input.title ? `Title: ${input.title}` : '',
-    input.tags ? `SUNO tags: ${input.tags}` : '',
+    input.tags ? `Style tags: ${input.tags}` : '',
     input.negativeTags ? `Negative tags: ${input.negativeTags}` : '',
   ].filter(Boolean).join('\n');
 }
@@ -80,21 +81,22 @@ export async function POST(req: NextRequest) {
     }
 
     if (!tags) {
-      return NextResponse.json({ error: '当前模板缺少 SUNO 解析 tags，请先在后台完成 SUNO 分析' }, { status: 400 });
+      return NextResponse.json({ error: '当前模板缺少风格标签，请先在后台完成模板分析' }, { status: 400 });
     }
 
     const textError =
       validateText(title, '歌曲名称', model === 'V4' ? 80 : 100) ||
-      validateText(tags, 'SUNO tags', 1000) ||
+      validateText(tags, '风格标签', 1000) ||
       validateText(negativeTags, '排除标签', 500);
 
     if (textError) {
       return NextResponse.json({ error: textError }, { status: 400 });
     }
 
-    const creditService = new CreditService(supabaseAdmin);
     const creditOperations: CreditOperationType[] = ['add_instrumental'];
-    if (!(await creditService.hasEnoughCredits(user.id, creditOperations))) {
+    const creditService = TEMP_BYPASS_GENERATION_CREDITS ? null : new CreditService(supabaseAdmin);
+    let creditsConsumed = 0;
+    if (creditService && !(await creditService.hasEnoughCredits(user.id, creditOperations))) {
       return NextResponse.json({ error: 'Credits 余额不足，请先充值或升级套餐' }, { status: 402 });
     }
 
@@ -189,42 +191,45 @@ export async function POST(req: NextRequest) {
       throw error;
     }
 
-    const consumeResult = await creditService.consumeCredits(user.id, creditOperations);
-    if (!consumeResult.success) {
-      const errorMessage = getConsumeCreditsErrorMessage(consumeResult.error);
-      console.error('[kie/add-instrumental] Credits consume failed:', {
-        userId: user.id,
-        operations: creditOperations,
-        error: consumeResult.error,
-        remaining: consumeResult.remaining,
-      });
+    if (creditService) {
+      const consumeResult = await creditService.consumeCredits(user.id, creditOperations);
+      if (!consumeResult.success) {
+        const errorMessage = getConsumeCreditsErrorMessage(consumeResult.error);
+        console.error('[kie/add-instrumental] Credits consume failed:', {
+          userId: user.id,
+          operations: creditOperations,
+          error: consumeResult.error,
+          remaining: consumeResult.remaining,
+        });
 
-      await supabaseAdmin
-        .from('generation_tasks')
-        .update({
-          status: 'failed',
-          error_code: 'CREDITS_NOT_ENOUGH',
-          error_message: errorMessage,
-          credits_consumed: 0,
-          updated_at: new Date().toISOString(),
-        } as any)
-        .eq('id', localTaskId)
-        .eq('user_id', user.id);
+        await supabaseAdmin
+          .from('generation_tasks')
+          .update({
+            status: 'failed',
+            error_code: 'CREDITS_NOT_ENOUGH',
+            error_message: errorMessage,
+            credits_consumed: 0,
+            updated_at: new Date().toISOString(),
+          } as any)
+          .eq('id', localTaskId)
+          .eq('user_id', user.id);
 
-      await supabaseAdmin
-        .from('generation_batches')
-        .update({ status: 'failed', updated_at: new Date().toISOString() } as any)
-        .eq('id', batchId)
-        .eq('user_id', user.id);
+        await supabaseAdmin
+          .from('generation_batches')
+          .update({ status: 'failed', updated_at: new Date().toISOString() } as any)
+          .eq('id', batchId)
+          .eq('user_id', user.id);
 
-      return NextResponse.json({ error: errorMessage, code: consumeResult.error }, { status: 402 });
+        return NextResponse.json({ error: errorMessage, code: consumeResult.error }, { status: 402 });
+      }
+      creditsConsumed = consumeResult.consumed;
     }
 
     await supabaseAdmin
       .from('generation_tasks')
       .update({
         raw_audio_path: `kie:${result.taskId}`,
-        credits_consumed: consumeResult.consumed,
+        credits_consumed: creditsConsumed,
         updated_at: new Date().toISOString(),
       } as any)
       .eq('id', localTaskId)

@@ -83,6 +83,7 @@ export default function AdvancedArrangementTab({
   const effectiveCustomMode = usesSelectedTemplate ? true : customMode;
   const effectiveStyle = lockedStyle ?? style;
   const effectiveTags = templateSunoTags;
+  const showTemplateInstrumentalTagsField = false;
 
   useEffect(() => {
     if (!usesSelectedTemplate) return;
@@ -173,9 +174,9 @@ export default function AdvancedArrangementTab({
     if (!audioFile) return '请先上传参考音频';
     if (usesSelectedTemplate && !selectedTemplate) return '请先选择一个模板';
     if (isTemplateInstrumentalVariant) {
-      if (!effectiveTags.trim()) return '当前模板缺少 SUNO 解析 tags，请先在后台完成 SUNO 分析';
+      if (!effectiveTags.trim()) return '当前模板缺少风格标签，请先在后台完成模板分析';
       if (!(title.trim() || templateTitle)) return '请填写作品标题';
-      if (effectiveTags.length > 1000) return 'SUNO tags 不能超过 1000 个字符';
+      if (effectiveTags.length > 1000) return '风格标签不能超过 1000 个字符';
       if (title.length > 100) return '标题不能超过 100 个字符';
       if (negativeTags.length > 500) return '排除标签不能超过 500 个字符';
       return null;
@@ -341,7 +342,7 @@ export default function AdvancedArrangementTab({
   const isBusy = generateStatus === 'uploading' || generateStatus === 'queued' || generateStatus === 'generating';
   const canGenerate = uploadStatus === 'ready' && !isBusy && (
     !usesSelectedTemplate ||
-    Boolean(selectedTemplate && (isTemplateInstrumentalVariant ? effectiveTags.trim() : effectiveStyle.trim()))
+    Boolean(selectedTemplate && (isTemplateInstrumentalVariant || effectiveStyle.trim()))
   );
   const resultTracks = Array.isArray(result?.tracks) ? result.tracks : [];
   const playableTracks = resultTracks.some(hasTrackAudio)
@@ -483,7 +484,7 @@ export default function AdvancedArrangementTab({
               {isTemplateInstrumentalVariant ? '模板伴奏说明' : isTemplateVariant ? '模板编曲说明' : '上传与参考说明'}
             </div>
             <p style={hintTextStyle}>上传参考音频后，系统会先完成音频处理，再创建高级编曲任务。</p>
-            <p style={hintTextStyle}>{isTemplateInstrumentalVariant ? '模板的 SUNO 解析会作为 tags 传给 add-instrumental，参考音频作为需要加伴奏的音频。' : isTemplateVariant ? '模板会锁定风格方向，参考音频影响旋律、情绪和声线，歌词控制最终表达。' : '参考音频仅支持 MP3/WAV，建议 6 秒到 8 分钟内；自定义模式下，非纯音乐请填写歌词，纯音乐可以补充创作描述。'}</p>
+            <p style={hintTextStyle}>{isTemplateInstrumentalVariant ? '模板风格会随任务自动传递，参考音频作为需要加伴奏的音频。' : isTemplateVariant ? '模板会锁定风格方向，参考音频影响旋律、情绪和声线，歌词控制最终表达。' : '参考音频仅支持 MP3/WAV，建议 6 秒到 8 分钟内；自定义模式下，非纯音乐请填写歌词，纯音乐可以补充创作描述。'}</p>
             {!usesSelectedTemplate && <p style={hintTextStyle}>参考音频会影响旋律、情绪和声线方向；右侧的风格、权重和歌词会控制最终改编强度。</p>}
             {audioDuration !== null && (
               <p style={hintTextStyle}>当前音频时长：{Math.round(audioDuration)} 秒</p>
@@ -506,7 +507,7 @@ export default function AdvancedArrangementTab({
           {usesSelectedTemplate && (
             <div style={templateModeNoticeStyle}>
               <span style={{ color: '#c0a7fc', fontSize: 12, fontWeight: 800 }}>自定义模式</span>
-              <span style={{ color: '#9ca3af', fontSize: 12 }}>{isTemplateInstrumentalVariant ? 'SUNO tags 已由模板自动填充' : '风格已由模板自动填充'}</span>
+              <span style={{ color: '#9ca3af', fontSize: 12 }}>{isTemplateInstrumentalVariant ? '风格标签已由模板自动填充' : '风格已由模板自动填充'}</span>
             </div>
           )}
 
@@ -569,14 +570,14 @@ export default function AdvancedArrangementTab({
                 </label>
               )}
 
-              {isTemplateInstrumentalVariant && (
+              {showTemplateInstrumentalTagsField && isTemplateInstrumentalVariant && (
                 <label style={fieldStyle}>
                   <span style={fieldHeaderStyle}>
-                    <span style={requiredLabelStyle}>SUNO Tags</span>
+                    <span style={requiredLabelStyle}>风格标签</span>
                     <span style={countTextStyle}>{effectiveTags.length}/1000</span>
                   </span>
                   <textarea
-                    value={effectiveTags || '请选择带 SUNO 分析的模板'}
+                    value={effectiveTags || '请选择带风格分析的模板'}
                     readOnly
                     disabled
                     style={{ ...textareaStyle, minHeight: 118, color: effectiveTags ? '#e8e8f0' : '#6b7280' }}

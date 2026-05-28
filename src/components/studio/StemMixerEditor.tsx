@@ -1,18 +1,28 @@
 ﻿'use client';
 
+import Image from 'next/image';
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, PointerEvent } from 'react';
+import type { CSSProperties, PointerEvent, WheelEvent } from 'react';
 import {
   defaultStemMasterState,
   normalizeStemMasterState,
   type StemMasterState,
 } from '@/lib/stems/stemMixState';
+import {
+  buildDawEditorLayoutMetrics,
+  resolveDawTrackHeight,
+  type DawEditorLayoutMetrics,
+} from '@/lib/stems/stemEditorDawLayout';
 import { resolveStemEditorShortcut } from '@/lib/stems/stemEditorShortcuts';
 import { resolveStemEditSaveBadge, type StemEditSaveBadgeTone } from '@/lib/stems/stemEditSaveBadge';
 import { resolveVisibleStemSelection } from '@/lib/stems/stemSelection';
 import { buildWaveformPeaksFromSamples } from '@/lib/stems/waveformPeaks';
 import { selectStemTypesForAudioLoad } from '@/lib/stems/stemAudioLoadPlan';
-import { resolveWaveformPointerIntent } from '@/lib/stems/waveformPointerIntent';
+import {
+  resolveTimelineTrimPointerIntent,
+  resolveWaveformPointerIntent,
+} from '@/lib/stems/waveformPointerIntent';
 import {
   resolveStemTrackAudioStatus,
   type StemTrackAudioStatus,
@@ -42,7 +52,7 @@ import {
 } from '@/lib/stems/stemExportStatus';
 import { resolveStemExportSaveIntent } from '@/lib/stems/stemExportSaveIntent';
 import { clampStemTimecodeInput, formatStemTimecode, parseStemTimecode } from '@/lib/stems/stemTimecode';
-import { nudgeStemTrimEdge, resolveStemTrimControlValues } from '@/lib/stems/stemTrackControls';
+import { nudgeStemTrimEdge, resolveStemTrimControlValues, shiftStemTrimRange } from '@/lib/stems/stemTrackControls';
 import {
   addStemMutedRange,
   buildAudibleStemSegments,
@@ -52,6 +62,15 @@ import {
   removeStemMutedRangeAtIndex,
   type StemMutedRange,
 } from '@/lib/stems/stemMuteRanges';
+import {
+  findStemClipAtTime,
+  getStemClipDuration,
+  moveStemClip,
+  normalizeStemClipState,
+  removeStemClipAtTime,
+  splitStemClipAtTime,
+  type StemClip,
+} from '@/lib/stems/stemClips';
 
 export interface EditableStem {
   type: string;
@@ -75,6 +94,7 @@ interface StemTrackState {
   fadeIn: number;
   fadeOut: number;
   mutedRanges: StemMutedRange[];
+  clips?: StemClip[];
 }
 
 export interface StemEditState {
@@ -87,14 +107,127 @@ type MixPreset = 'balanced' | 'vocal-focus' | 'instrumental-wide';
 type ExportMode = StemExportMode;
 type ExportReadiness = 'ready-only' | 'wait-all';
 type TrackViewMode = 'all' | 'active' | 'audible';
+type TrackDensity = 'comfortable' | 'compact';
+type InspectorTab = 'track' | 'mix' | 'export';
+type SideRailTab = InspectorTab | 'automation';
+type TimelineScrollState = {
+  canScroll: boolean;
+  progress: number;
+  viewRatio: number;
+};
+type TimelinePanState = {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  scrollLeft: number;
+  moved: boolean;
+};
+type TimelineRulerTrimDragState = {
+  pointerId: number;
+  kind: 'edge' | 'range';
+  edge?: 'start' | 'end';
+  anchorTime: number;
+  trimStart: number;
+  trimEnd: number;
+  moved: boolean;
+};
 type EditorPreferences = {
   exportMode?: ExportMode;
   exportReadiness?: ExportReadiness;
   showAdvancedControls?: boolean;
   trackViewMode?: TrackViewMode;
+  inspectorTab?: InspectorTab;
+  sideRailTab?: SideRailTab;
+  timelineZoom?: number;
+  followPlayhead?: boolean;
+  snapToGrid?: boolean;
+  snapStepSeconds?: number;
+  compactTransport?: boolean;
+  inspectorCollapsed?: boolean;
+  trackDensity?: TrackDensity;
 };
 
 const SELECTED_TRIM_NUDGE_SECONDS = 0.1;
+const STATUS_TOAST_VISIBLE_MS = 3600;
+const STATUS_TOAST_FADE_MS = 360;
+const TIMELINE_SNAP_STEPS_SECONDS = [0.1, 0.25, 0.5, 1] as const;
+const DEFAULT_TIMELINE_SNAP_STEP_SECONDS = 0.25;
+const MIN_TIMELINE_ZOOM = 1;
+const MAX_TIMELINE_ZOOM = 2.5;
+const TIMELINE_LABEL_WIDTH = 150;
+const TIMELINE_SIMPLE_BUTTON_WIDTH = 102;
+const TIMELINE_ADVANCED_BUTTON_WIDTH = 120;
+const TIMELINE_VOLUME_WIDTH = 132;
+const TIMELINE_ADVANCED_VOLUME_WIDTH = 142;
+const TIMELINE_TRIM_WIDTH = 240;
+const TIMELINE_GRID_GAP = 7;
+const TIMELINE_ROW_PADDING_X = 18;
+
+function clampTimelineZoom(value: number) {
+  if (!Number.isFinite(value)) return MIN_TIMELINE_ZOOM;
+  return Math.max(MIN_TIMELINE_ZOOM, Math.min(MAX_TIMELINE_ZOOM, Number(value.toFixed(2))));
+}
+
+function normalizeTimelineSnapStep(value: number | undefined) {
+  return TIMELINE_SNAP_STEPS_SECONDS.includes(value as typeof TIMELINE_SNAP_STEPS_SECONDS[number])
+    ? value as typeof TIMELINE_SNAP_STEPS_SECONDS[number]
+    : DEFAULT_TIMELINE_SNAP_STEP_SECONDS;
+}
+
+function getNextTimelineSnapStep(value: number) {
+  const currentIndex = TIMELINE_SNAP_STEPS_SECONDS.findIndex((step) => step === value);
+  return TIMELINE_SNAP_STEPS_SECONDS[(currentIndex + 1) % TIMELINE_SNAP_STEPS_SECONDS.length];
+}
+
+function snapStemEditorTime(value: number, duration: number, enabled: boolean, stepSeconds: number) {
+  if (!enabled || !Number.isFinite(value)) return value;
+  const safeStep = normalizeTimelineSnapStep(stepSeconds);
+  const snapped = Math.round(value / safeStep) * safeStep;
+  return Math.max(0, Math.min(duration || snapped, Number(snapped.toFixed(3))));
+}
+
+function shouldAutoDismissStatusToast(message: string) {
+  if (!message.trim()) return false;
+  if (/失败|错误|不能|不可用|还没有|暂时/.test(message)) return false;
+  if (/保存中|检查中/.test(message)) return false;
+  return true;
+}
+
+function buildTimelineGridColumns(advanced: boolean, laneWidth: number) {
+  return advanced
+    ? `${TIMELINE_LABEL_WIDTH}px ${laneWidth}px ${TIMELINE_ADVANCED_BUTTON_WIDTH}px ${TIMELINE_ADVANCED_VOLUME_WIDTH}px ${TIMELINE_ADVANCED_VOLUME_WIDTH}px ${TIMELINE_TRIM_WIDTH}px`
+    : `${TIMELINE_LABEL_WIDTH}px ${laneWidth}px ${TIMELINE_SIMPLE_BUTTON_WIDTH}px ${TIMELINE_VOLUME_WIDTH}px`;
+}
+
+function getTimelineFixedWidth(advanced: boolean) {
+  return advanced
+    ? TIMELINE_LABEL_WIDTH + TIMELINE_ADVANCED_BUTTON_WIDTH + TIMELINE_ADVANCED_VOLUME_WIDTH * 2 + TIMELINE_TRIM_WIDTH
+    : TIMELINE_LABEL_WIDTH + TIMELINE_SIMPLE_BUTTON_WIDTH + TIMELINE_VOLUME_WIDTH;
+}
+
+function getTimelineGapCount(advanced: boolean) {
+  return advanced ? 5 : 3;
+}
+
+function resolveTimelineBaseLaneWidth(advanced: boolean, viewportWidth: number) {
+  const designLaneWidth = advanced ? 420 : 520;
+  if (!Number.isFinite(viewportWidth) || viewportWidth <= 0) return designLaneWidth;
+
+  const minimumLaneWidth = advanced ? 180 : 220;
+  const availableLaneWidth = viewportWidth
+    - getTimelineFixedWidth(advanced)
+    - TIMELINE_GRID_GAP * getTimelineGapCount(advanced)
+    - TIMELINE_ROW_PADDING_X
+    - 4;
+
+  return Math.max(minimumLaneWidth, availableLaneWidth);
+}
+
+function buildTimelineMinWidth(advanced: boolean, laneWidth: number) {
+  const fixedWidth = getTimelineFixedWidth(advanced);
+  const gapCount = getTimelineGapCount(advanced);
+  return fixedWidth + laneWidth + TIMELINE_GRID_GAP * gapCount + TIMELINE_ROW_PADDING_X;
+}
 
 interface StemMixerEditorProps {
   stems: EditableStem[];
@@ -107,8 +240,8 @@ function defaultTrackState(): StemTrackState {
   return { volume: 1, pan: 0, muted: false, solo: false, trimStart: 0, trimEnd: null, fadeIn: 0, fadeOut: 0, mutedRanges: [] };
 }
 
-function normalizeTrackState(value: Partial<StemTrackState> | undefined | null): StemTrackState {
-  return {
+function normalizeTrackState(value: Partial<StemTrackState> | undefined | null, duration?: number): StemTrackState {
+  const normalized: StemTrackState = {
     volume: typeof value?.volume === 'number' ? Math.max(0, Math.min(1, value.volume)) : 1,
     pan: typeof value?.pan === 'number' ? Math.max(-1, Math.min(1, value.pan)) : 0,
     muted: value?.muted === true,
@@ -119,16 +252,52 @@ function normalizeTrackState(value: Partial<StemTrackState> | undefined | null):
     fadeOut: typeof value?.fadeOut === 'number' ? Math.max(0, value.fadeOut) : 0,
     mutedRanges: normalizeStemMutedRanges(value?.mutedRanges, typeof value?.trimEnd === 'number' ? value.trimEnd : Number.MAX_SAFE_INTEGER),
   };
+
+  if (!Number.isFinite(duration) || !duration || duration <= 0) {
+    return Array.isArray(value?.clips) && value.clips.length > 0
+      ? { ...normalized, clips: value.clips }
+      : normalized;
+  }
+
+  const clipState = normalizeStemClipState({
+    clips: value?.clips,
+    duration,
+    trimStart: normalized.trimStart,
+    trimEnd: normalized.trimEnd,
+  });
+
+  return clipState.clips.length > 0
+    ? {
+        ...normalized,
+        trimStart: clipState.trimStart,
+        trimEnd: clipState.trimEnd,
+        clips: clipState.clips,
+      }
+    : normalized;
 }
 
 function createTrackState(stems: EditableStem[], editState?: StemEditState | null) {
+  const fallbackDuration = stems.reduce((maxDuration, stem) => (
+    Math.max(maxDuration, stem.waveform?.duration || 0)
+  ), 0);
+
   return Object.fromEntries(stems.map((stem) => {
     const savedState = editState?.tracks?.[stem.type];
+    const stemDuration = stem.waveform?.duration || fallbackDuration;
     return [
       stem.type,
-      savedState ? normalizeTrackState(savedState) : defaultTrackState(),
+      savedState ? normalizeTrackState(savedState, stemDuration) : defaultTrackState(),
     ];
   })) as Record<string, StemTrackState>;
+}
+
+function resolveTrackClipState(state: StemTrackState, duration: number) {
+  return normalizeStemClipState({
+    clips: state.clips,
+    duration,
+    trimStart: state.trimStart,
+    trimEnd: state.trimEnd,
+  });
 }
 
 function areTrackStatesEqual(left: Record<string, StemTrackState>, right: Record<string, StemTrackState>) {
@@ -278,6 +447,21 @@ function formatExportTimestamp(date: Date) {
     pad(date.getMinutes()),
     pad(date.getSeconds()),
   ].join('');
+}
+
+function triggerDownloadUrl(url: string, fileName: string) {
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
+function downloadBlob(blob: Blob, fileName: string, revokeDelayMs = 1000) {
+  const url = URL.createObjectURL(blob);
+  triggerDownloadUrl(url, fileName);
+  window.setTimeout(() => URL.revokeObjectURL(url), revokeDelayMs);
 }
 
 const STEM_LOAD_CONCURRENCY = 3;
@@ -549,6 +733,37 @@ function scheduleTrackGain({
   }
 }
 
+function buildTrackClipAudioSegments(
+  state: StemTrackState,
+  timelineDuration: number,
+  audioDuration: number,
+  cursor = 0,
+) {
+  const clipState = resolveTrackClipState(state, Math.max(timelineDuration, audioDuration));
+
+  return clipState.clips.flatMap((clip) => {
+    const timelineStart = clip.start;
+    const timelineEnd = clip.start + getStemClipDuration(clip);
+    if (timelineEnd <= cursor) return [];
+
+    const cursorSourceOffset = Math.max(0, cursor - timelineStart);
+    const sourceStart = Math.max(clip.sourceStart, Math.min(audioDuration, clip.sourceStart + cursorSourceOffset));
+    const sourceEnd = Math.max(sourceStart, Math.min(audioDuration, clip.sourceEnd));
+    if (sourceEnd - sourceStart <= 0.001) return [];
+
+    return buildAudibleStemSegments({
+      start: sourceStart,
+      end: sourceEnd,
+      mutedRanges: state.mutedRanges,
+    }).map((segment) => ({
+      sourceStart: segment.start,
+      sourceEnd: segment.end,
+      timelineStart: clip.start + (segment.start - clip.sourceStart),
+      timelineEnd: clip.start + (segment.end - clip.sourceStart),
+    }));
+  });
+}
+
 function connectWithPan(
   context: BaseAudioContext,
   source: AudioNode,
@@ -642,6 +857,11 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
   const skipNextAutoSaveRef = useRef(true);
   const undoStackRef = useRef<Record<string, StemTrackState>[]>([]);
   const redoStackRef = useRef<Record<string, StemTrackState>[]>([]);
+  const timelineViewportRef = useRef<HTMLDivElement | null>(null);
+  const timelinePanRef = useRef<TimelinePanState | null>(null);
+  const timelineRulerTrimDragRef = useRef<TimelineRulerTrimDragState | null>(null);
+  const ignoreNextTrackClickRef = useRef(false);
+  const trackRowRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [tracks, setTracks] = useState<Record<string, StemTrackState>>(() => createTrackState(stems, initialEditState));
   const [masterState, setMasterState] = useState<StemMasterState>(() => normalizeStemMasterState(initialEditState?.master));
   const [isPlaying, setIsPlaying] = useState(false);
@@ -657,11 +877,18 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<string | null>(initialEditState?.savedAt ? '已读取上次保存的编辑状态。' : null);
   const [autoSaveStatus, setAutoSaveStatus] = useState<string | null>(null);
+  const [saveStatusDismissing, setSaveStatusDismissing] = useState(false);
+  const [autoSaveStatusDismissing, setAutoSaveStatusDismissing] = useState(false);
   const [hasPendingEditChanges, setHasPendingEditChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [exportingStemType, setExportingStemType] = useState<string | null>(null);
   const [exportStatusInput, setExportStatusInput] = useState<StemExportStatusInput>({ phase: 'idle' });
+  const [latestExportDownload, setLatestExportDownload] = useState<{
+    url: string;
+    fileName: string;
+    label: string;
+  } | null>(null);
   const [exportRecords, setExportRecords] = useState<StemExportRecord[]>([]);
   const [exportHistoryLoadedKey, setExportHistoryLoadedKey] = useState<string | null>(null);
   const [isAudioRetrying, setIsAudioRetrying] = useState(false);
@@ -670,7 +897,30 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
   const [exportReadiness, setExportReadiness] = useState<ExportReadiness>('wait-all');
   const [showAdvancedControls, setShowAdvancedControls] = useState(false);
   const [trackViewMode, setTrackViewMode] = useState<TrackViewMode>('all');
+  const [inspectorTab, setInspectorTab] = useState<InspectorTab>('track');
+  const [sideRailTab, setSideRailTab] = useState<SideRailTab>('track');
   const [loopSelectionPreview, setLoopSelectionPreview] = useState(false);
+  const [timelineZoom, setTimelineZoom] = useState(1);
+  const [timelineViewportWidth, setTimelineViewportWidth] = useState(0);
+  const [followPlayhead, setFollowPlayhead] = useState(true);
+  const [snapToGrid, setSnapToGrid] = useState(true);
+  const [snapStepSeconds, setSnapStepSeconds] = useState(DEFAULT_TIMELINE_SNAP_STEP_SECONDS);
+  const [compactTransport, setCompactTransport] = useState(true);
+  const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
+  const [trackDensity, setTrackDensity] = useState<TrackDensity>('comfortable');
+  const [showShortcutHelp, setShowShortcutHelp] = useState(false);
+  const [isTimelinePanning, setIsTimelinePanning] = useState(false);
+  const [timelineScrollState, setTimelineScrollState] = useState<TimelineScrollState>({
+    canScroll: false,
+    progress: 0,
+    viewRatio: 1,
+  });
+  const [timelineRulerGuide, setTimelineRulerGuide] = useState<{
+    ratio: number;
+    time: number;
+    active: boolean;
+    snapBypassed: boolean;
+  } | null>(null);
   const [historyVersion, setHistoryVersion] = useState(0);
   const [selectedTrackType, setSelectedTrackType] = useState<string | null>(() => stems[0]?.type ?? null);
   const [currentTimeInputDraft, setCurrentTimeInputDraft] = useState<string | null>(null);
@@ -697,6 +947,30 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     () => exportRecords.map((record) => ({ ...record, view: formatStemExportRecord(record) })),
     [exportRecords],
   );
+
+  useEffect(() => () => {
+    if (latestExportDownload?.url) {
+      URL.revokeObjectURL(latestExportDownload.url);
+    }
+  }, [latestExportDownload?.url]);
+  const timelineLaneWidth = useMemo(
+    () => Math.round(resolveTimelineBaseLaneWidth(showAdvancedControls, timelineViewportWidth) * timelineZoom),
+    [showAdvancedControls, timelineViewportWidth, timelineZoom],
+  );
+  const timelineMinWidth = useMemo(
+    () => buildTimelineMinWidth(showAdvancedControls, timelineLaneWidth),
+    [showAdvancedControls, timelineLaneWidth],
+  );
+  const timelineGridColumns = useMemo(
+    () => buildTimelineGridColumns(showAdvancedControls, timelineLaneWidth),
+    [showAdvancedControls, timelineLaneWidth],
+  );
+  const timelineRulerMarks = useMemo(() => {
+    const markCount = Math.max(5, Math.min(18, Math.floor(timelineLaneWidth / 84) + 1));
+    return Array.from({ length: markCount }, (_, index) => (
+      markCount <= 1 ? 0 : index / (markCount - 1)
+    ));
+  }, [timelineLaneWidth]);
   const exportSummary = useMemo(() => {
     const preflight = buildStemExportPreflight({
       tracks: stems.map((stem) => {
@@ -790,8 +1064,35 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     if (preferences.trackViewMode === 'all' || preferences.trackViewMode === 'active' || preferences.trackViewMode === 'audible') {
       setTrackViewMode(preferences.trackViewMode);
     }
+    if (preferences.inspectorTab === 'track' || preferences.inspectorTab === 'mix' || preferences.inspectorTab === 'export') {
+      setInspectorTab(preferences.inspectorTab);
+    }
+    if (preferences.sideRailTab === 'track' || preferences.sideRailTab === 'mix' || preferences.sideRailTab === 'automation' || preferences.sideRailTab === 'export') {
+      setSideRailTab(preferences.sideRailTab);
+    }
     if (typeof preferences.showAdvancedControls === 'boolean') {
       setShowAdvancedControls(preferences.showAdvancedControls);
+    }
+    if (typeof preferences.timelineZoom === 'number' && Number.isFinite(preferences.timelineZoom)) {
+      setTimelineZoom(clampTimelineZoom(preferences.timelineZoom));
+    }
+    if (typeof preferences.followPlayhead === 'boolean') {
+      setFollowPlayhead(preferences.followPlayhead);
+    }
+    if (typeof preferences.snapToGrid === 'boolean') {
+      setSnapToGrid(preferences.snapToGrid);
+    }
+    if (typeof preferences.snapStepSeconds === 'number') {
+      setSnapStepSeconds(normalizeTimelineSnapStep(preferences.snapStepSeconds));
+    }
+    if (typeof preferences.compactTransport === 'boolean') {
+      setCompactTransport(preferences.compactTransport);
+    }
+    if (typeof preferences.inspectorCollapsed === 'boolean') {
+      setInspectorCollapsed(preferences.inspectorCollapsed);
+    }
+    if (preferences.trackDensity === 'comfortable' || preferences.trackDensity === 'compact') {
+      setTrackDensity(preferences.trackDensity);
     }
     setEditorPreferencesLoaded(true);
   }, []);
@@ -803,8 +1104,217 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
       exportReadiness,
       showAdvancedControls,
       trackViewMode,
+      inspectorTab,
+      sideRailTab,
+      timelineZoom,
+      followPlayhead,
+      snapToGrid,
+      snapStepSeconds,
+      compactTransport,
+      inspectorCollapsed,
+      trackDensity,
     }));
-  }, [editorPreferencesLoaded, exportMode, exportReadiness, showAdvancedControls, trackViewMode]);
+  }, [compactTransport, editorPreferencesLoaded, exportMode, exportReadiness, followPlayhead, inspectorCollapsed, inspectorTab, showAdvancedControls, sideRailTab, snapStepSeconds, snapToGrid, timelineZoom, trackDensity, trackViewMode]);
+
+  useEffect(() => {
+    setSaveStatusDismissing(false);
+    if (!saveStatus || !shouldAutoDismissStatusToast(saveStatus)) return;
+
+    const statusSnapshot = saveStatus;
+    const fadeTimer = window.setTimeout(() => {
+      setSaveStatusDismissing(true);
+    }, STATUS_TOAST_VISIBLE_MS);
+    const clearTimer = window.setTimeout(() => {
+      setSaveStatus((current) => (current === statusSnapshot ? null : current));
+    }, STATUS_TOAST_VISIBLE_MS + STATUS_TOAST_FADE_MS);
+
+    return () => {
+      window.clearTimeout(fadeTimer);
+      window.clearTimeout(clearTimer);
+    };
+  }, [saveStatus]);
+
+  useEffect(() => {
+    setAutoSaveStatusDismissing(false);
+    if (!autoSaveStatus || !shouldAutoDismissStatusToast(autoSaveStatus)) return;
+
+    const statusSnapshot = autoSaveStatus;
+    const fadeTimer = window.setTimeout(() => {
+      setAutoSaveStatusDismissing(true);
+    }, STATUS_TOAST_VISIBLE_MS);
+    const clearTimer = window.setTimeout(() => {
+      setAutoSaveStatus((current) => (current === statusSnapshot ? null : current));
+    }, STATUS_TOAST_VISIBLE_MS + STATUS_TOAST_FADE_MS);
+
+    return () => {
+      window.clearTimeout(fadeTimer);
+      window.clearTimeout(clearTimer);
+    };
+  }, [autoSaveStatus]);
+
+  useEffect(() => {
+    if (!followPlayhead || !isPlaying || duration <= 0) return;
+    const viewport = timelineViewportRef.current;
+    if (!viewport) return;
+
+    const timelineScrollWidth = Math.max(viewport.scrollWidth, timelineMinWidth);
+    const playheadX = (Math.max(0, Math.min(duration, currentTime)) / duration) * timelineScrollWidth;
+    const comfortableLeft = viewport.clientWidth * 0.42;
+    const nextScrollLeft = Math.max(0, Math.min(viewport.scrollWidth - viewport.clientWidth, playheadX - comfortableLeft));
+
+    if (Math.abs(viewport.scrollLeft - nextScrollLeft) > 24) {
+      viewport.scrollTo({ left: nextScrollLeft, behavior: 'smooth' });
+    }
+  }, [currentTime, duration, followPlayhead, isPlaying, timelineMinWidth]);
+
+  useEffect(() => {
+    const viewport = timelineViewportRef.current;
+    if (!viewport) return;
+
+    const updateTimelineScrollState = () => {
+      const maxScroll = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+      setTimelineViewportWidth((current) => (
+        Math.abs(current - viewport.clientWidth) > 2 ? viewport.clientWidth : current
+      ));
+      setTimelineScrollState({
+        canScroll: maxScroll > 8,
+        progress: maxScroll > 0 ? Math.max(0, Math.min(1, viewport.scrollLeft / maxScroll)) : 0,
+        viewRatio: viewport.scrollWidth > 0 ? Math.max(0.08, Math.min(1, viewport.clientWidth / viewport.scrollWidth)) : 1,
+      });
+    };
+
+    updateTimelineScrollState();
+    viewport.addEventListener('scroll', updateTimelineScrollState, { passive: true });
+    const observer = new ResizeObserver(updateTimelineScrollState);
+    observer.observe(viewport);
+
+    return () => {
+      viewport.removeEventListener('scroll', updateTimelineScrollState);
+      observer.disconnect();
+    };
+  }, [bufferVersion, stems.length, timelineMinWidth, trackViewMode]);
+
+  const scrollTimelineFromNavigatorPointer = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    const viewport = timelineViewportRef.current;
+    if (!viewport) return;
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    const ratio = rect.width > 0
+      ? Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width))
+      : 0;
+    const maxScroll = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+    viewport.scrollTo({ left: maxScroll * ratio, behavior: 'auto' });
+  }, []);
+
+  const handleTimelineNavigatorPointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    scrollTimelineFromNavigatorPointer(event);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }, [scrollTimelineFromNavigatorPointer]);
+
+  const handleTimelineNavigatorPointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    if (event.buttons !== 1) return;
+    scrollTimelineFromNavigatorPointer(event);
+  }, [scrollTimelineFromNavigatorPointer]);
+
+  const centerTimelineOnPlaybackPosition = useCallback((
+    time = currentTime,
+    laneWidth = timelineLaneWidth,
+    behavior: ScrollBehavior = 'smooth',
+  ) => {
+    window.requestAnimationFrame(() => {
+      const viewport = timelineViewportRef.current;
+      if (!viewport || duration <= 0) return;
+
+      const maxScroll = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+      const playheadX = 8 + TIMELINE_LABEL_WIDTH + TIMELINE_GRID_GAP + (Math.max(0, Math.min(duration, time)) / duration) * laneWidth;
+      const nextScrollLeft = Math.max(0, Math.min(maxScroll, playheadX - viewport.clientWidth * 0.44));
+      viewport.scrollTo({ left: nextScrollLeft, behavior });
+    });
+  }, [currentTime, duration, timelineLaneWidth]);
+
+  const applyTimelineZoom = useCallback((nextZoom: number) => {
+    const safeZoom = clampTimelineZoom(nextZoom);
+    setTimelineZoom(safeZoom);
+    const nextLaneWidth = Math.round(resolveTimelineBaseLaneWidth(showAdvancedControls, timelineViewportWidth) * safeZoom);
+    centerTimelineOnPlaybackPosition(currentTime, nextLaneWidth);
+  }, [centerTimelineOnPlaybackPosition, currentTime, showAdvancedControls, timelineViewportWidth]);
+
+  const handleTimelineWheel = useCallback((event: WheelEvent<HTMLDivElement>) => {
+    const viewport = timelineViewportRef.current;
+    if (!viewport) return;
+
+    if (event.ctrlKey || event.metaKey) {
+      event.preventDefault();
+      const zoomStep = event.deltaY < 0 ? 0.25 : -0.25;
+      applyTimelineZoom(timelineZoom + zoomStep);
+      return;
+    }
+
+    if (event.shiftKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
+      event.preventDefault();
+      viewport.scrollLeft += event.deltaX + event.deltaY;
+    }
+  }, [applyTimelineZoom, timelineZoom]);
+
+  const shouldStartTimelinePan = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return false;
+    if (event.button !== 0 && event.button !== 1) return false;
+    if (target.closest('button,input,textarea,select,a,canvas')) return false;
+    if (target.closest('[data-timeline-seek-zone="true"]')) return false;
+    return event.button === 1 || Boolean(target.closest('[data-timeline-pan-zone="true"]'));
+  }, []);
+
+  const handleTimelinePanPointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    const viewport = timelineViewportRef.current;
+    if (!viewport || !shouldStartTimelinePan(event)) return;
+    if (viewport.scrollWidth <= viewport.clientWidth + 4) return;
+
+    timelinePanRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      scrollLeft: viewport.scrollLeft,
+      moved: false,
+    };
+    setIsTimelinePanning(true);
+    setFollowPlayhead(false);
+    event.currentTarget.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  }, [shouldStartTimelinePan]);
+
+  const handleTimelinePanPointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    const panState = timelinePanRef.current;
+    const viewport = timelineViewportRef.current;
+    if (!panState || !viewport || panState.pointerId !== event.pointerId) return;
+
+    const deltaX = event.clientX - panState.startX;
+    const deltaY = event.clientY - panState.startY;
+    if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) {
+      panState.moved = true;
+    }
+    viewport.scrollLeft = panState.scrollLeft - deltaX;
+    event.preventDefault();
+  }, []);
+
+  const finishTimelinePan = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    const panState = timelinePanRef.current;
+    if (!panState || panState.pointerId !== event.pointerId) return;
+
+    if (panState.moved) {
+      ignoreNextTrackClickRef.current = true;
+      window.setTimeout(() => {
+        ignoreNextTrackClickRef.current = false;
+      }, 0);
+    }
+    timelinePanRef.current = null;
+    setIsTimelinePanning(false);
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch {
+      // The browser may have already released capture on cancel.
+    }
+  }, []);
 
   const visibleStems = useMemo(() => stems.filter((stem) => {
     if (trackViewMode === 'all') return true;
@@ -815,6 +1325,17 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
 
     return stemHasDetectedContent(stem, audioBuffersRef.current[stem.type]);
   }), [bufferVersion, hasSoloTrack, stems, trackViewMode, tracks]);
+
+  useEffect(() => {
+    if (!selectedTrackType) return;
+    const selectedRow = trackRowRefs.current[selectedTrackType];
+    if (!selectedRow) return;
+
+    selectedRow.scrollIntoView({
+      block: 'nearest',
+      inline: 'nearest',
+    });
+  }, [selectedTrackType, trackViewMode]);
 
   const activeStemCount = useMemo(() => stems.filter((stem) => (
     stemHasDetectedContent(stem, audioBuffersRef.current[stem.type])
@@ -848,17 +1369,22 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     : null;
   const selectedTrackTrimEnd = selectedTrackTrimControls?.trimEnd ?? duration;
   const selectedTrackClipDuration = selectedTrackTrimControls?.clipDuration ?? 0;
+  const selectedTrackClipState = selectedTrackState
+    ? resolveTrackClipState(selectedTrackState, duration)
+    : null;
+  const selectedTrackClipCount = selectedTrackClipState?.clips.length ?? 0;
   const selectedTrackMutedRanges = selectedTrackState
     ? normalizeStemMutedRanges(selectedTrackState.mutedRanges, duration)
     : [];
   const selectedTrackBuffer = selectedTrack
     ? (audioBuffersRef.current[selectedTrack.type] || null)
     : null;
+  const playbackNudgeStepSeconds = normalizeTimelineSnapStep(snapToGrid ? snapStepSeconds : DEFAULT_TIMELINE_SNAP_STEP_SECONDS);
   const selectedTrackAudioStatus = selectedTrack
     ? resolveStemTrackAudioStatus({
-        knownEmpty: stemHasKnownEmptyWaveform(selectedTrack),
-        loaded: Boolean(selectedTrackBuffer),
-        loading: loadingStemTypes.has(selectedTrack.type),
+      knownEmpty: stemHasKnownEmptyWaveform(selectedTrack),
+      loaded: Boolean(selectedTrackBuffer),
+      loading: loadingStemTypes.has(selectedTrack.type),
         failed: failedStemTypes.has(selectedTrack.type),
       })
     : null;
@@ -1178,17 +1704,15 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
       playableStems.forEach((stem) => {
         const gain = context.createGain();
         const state = tracks[stem.type] || defaultTrackState();
+        const audioBuffer = audioBuffersRef.current[stem.type];
+        if (!audioBuffer) return;
         const isAudible = previewStemType ? state.volume > 0 : !state.muted && (!hasSoloTrack || state.solo);
         const trimStart = Math.max(0, Math.min(duration, state.trimStart));
         const trimEnd = Math.max(trimStart, Math.min(duration, state.trimEnd ?? duration));
         const cursor = playbackOffsetRef.current;
         const bufferOffset = Math.max(trimStart, cursor);
         const gainScheduleStartAt = startAt + Math.max(0, trimStart - cursor);
-        const segments = buildAudibleStemSegments({
-          start: bufferOffset,
-          end: trimEnd,
-          mutedRanges: state.mutedRanges,
-        });
+        const segments = buildTrackClipAudioSegments(state, duration, audioBuffer.duration, cursor);
 
         if (isAudible) {
           scheduleTrackGain({
@@ -1211,9 +1735,13 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
         }
         sourceNodesRef.current[stem.type] = segments.map((segment) => {
           const source = context.createBufferSource();
-          source.buffer = audioBuffersRef.current[stem.type];
+          source.buffer = audioBuffer;
           source.connect(gain);
-          source.start(startAt + Math.max(0, segment.start - cursor), segment.start, Math.max(0, segment.end - segment.start));
+          source.start(
+            startAt + Math.max(0, segment.timelineStart - cursor),
+            segment.sourceStart,
+            Math.max(0, segment.sourceEnd - segment.sourceStart),
+          );
           return source;
         });
       });
@@ -1263,6 +1791,16 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     previewStemTypeRef.current = null;
     void playAll();
   }, [clearLoopPreviewTimer, isPlaying, pauseAll, playAll]);
+
+  const stopPlaybackPreview = useCallback(() => {
+    pauseAll();
+    playbackStopAtRef.current = null;
+    previewStemTypeRef.current = null;
+    loopSelectionPreviewRef.current = false;
+    setLoopSelectionPreview(false);
+    setPlaybackError(null);
+    setSaveStatus('已停止播放并退出选区预听。');
+  }, [pauseAll]);
 
   const copyProjectLink = useCallback(async () => {
     try {
@@ -1461,6 +1999,259 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     }
   }, [clearLoopPreviewTimer, duration, isPlaying, playAll, stopSources]);
 
+  const setTrackTrim = useCallback((type: string, edge: 'start' | 'end', value: number, shouldSnap = snapToGrid) => {
+    commitTrackChange((current) => {
+      const state = current[type] || defaultTrackState();
+      const currentEnd = state.trimEnd ?? duration;
+      const nextTrim = clampTrimEdge(edge, snapStemEditorTime(value, duration, shouldSnap, snapStepSeconds), state.trimStart, currentEnd, duration);
+      const nextClipDuration = Math.max(0, Math.min(duration, nextTrim.trimEnd) - nextTrim.trimStart);
+      const clipState = normalizeStemClipState({
+        clips: null,
+        duration,
+        trimStart: nextTrim.trimStart,
+        trimEnd: nextTrim.trimEnd,
+      });
+
+      return {
+        ...current,
+        [type]: {
+          ...state,
+          trimStart: clipState.trimStart,
+          trimEnd: Math.min(duration, clipState.trimEnd ?? nextTrim.trimEnd),
+          fadeIn: Math.min(state.fadeIn, nextClipDuration),
+          fadeOut: Math.min(state.fadeOut, nextClipDuration),
+          clips: clipState.clips,
+        },
+      };
+    });
+  }, [commitTrackChange, duration, snapStepSeconds, snapToGrid]);
+
+  const setTrackTrimRange = useCallback((type: string, nextStart: number, shouldSnap = snapToGrid) => {
+    commitTrackChange((current) => {
+      const state = current[type] || defaultTrackState();
+      const currentEnd = state.trimEnd ?? duration;
+      const snappedStart = snapStemEditorTime(nextStart, duration, shouldSnap, snapStepSeconds);
+      const nextTrim = shiftStemTrimRange({
+        duration,
+        trimStart: state.trimStart,
+        trimEnd: currentEnd,
+        nextStart: snappedStart,
+      });
+      const nextClipDuration = Math.max(0, nextTrim.trimEnd - nextTrim.trimStart);
+      const clipState = normalizeStemClipState({
+        clips: null,
+        duration,
+        trimStart: nextTrim.trimStart,
+        trimEnd: nextTrim.trimEnd,
+      });
+
+      return {
+        ...current,
+        [type]: {
+          ...state,
+          trimStart: clipState.trimStart,
+          trimEnd: clipState.trimEnd ?? nextTrim.trimEnd,
+          fadeIn: Math.min(state.fadeIn, nextClipDuration),
+          fadeOut: Math.min(state.fadeOut, nextClipDuration),
+          clips: clipState.clips,
+        },
+      };
+    });
+  }, [commitTrackChange, duration, snapStepSeconds, snapToGrid]);
+
+  const setTrackClips = useCallback((type: string, clips: StemClip[]) => {
+    commitTrackChange((current) => {
+      const state = current[type] || defaultTrackState();
+      const clipState = normalizeStemClipState({
+        clips,
+        duration,
+        trimStart: state.trimStart,
+        trimEnd: state.trimEnd,
+      });
+      const clipDuration = Math.max(0, (clipState.trimEnd ?? 0) - clipState.trimStart);
+
+      return {
+        ...current,
+        [type]: {
+          ...state,
+          trimStart: clipState.trimStart,
+          trimEnd: clipState.trimEnd,
+          fadeIn: Math.min(state.fadeIn, clipDuration),
+          fadeOut: Math.min(state.fadeOut, clipDuration),
+          clips: clipState.clips,
+        },
+      };
+    });
+  }, [commitTrackChange, duration]);
+
+  const splitSelectedTrackClipAtPlayhead = useCallback(() => {
+    if (!selectedTrack || !selectedTrackState || duration <= 0) return;
+
+    const clipState = resolveTrackClipState(selectedTrackState, duration);
+    const nextClips = splitStemClipAtTime(clipState.clips, currentTime, duration);
+    if (nextClips.length === clipState.clips.length) {
+      setPlaybackError('播放头没有落在可切分的片段内部。');
+      return;
+    }
+
+    setTrackClips(selectedTrack.type, nextClips);
+    setPlaybackError(null);
+    setSaveStatus(`已在 ${formatStemTimecode(currentTime)} 切分“${getStemDisplayName(selectedTrack).zh}”。`);
+  }, [currentTime, duration, selectedTrack, selectedTrackState, setTrackClips]);
+
+  const deleteSelectedTrackClipAtPlayhead = useCallback(() => {
+    if (!selectedTrack || !selectedTrackState || duration <= 0) return;
+
+    const clipState = resolveTrackClipState(selectedTrackState, duration);
+    const targetClip = findStemClipAtTime(clipState.clips, currentTime);
+    if (!targetClip) {
+      setPlaybackError('播放头没有落在可删除的片段上。');
+      return;
+    }
+
+    setTrackClips(selectedTrack.type, removeStemClipAtTime(clipState.clips, currentTime));
+    setPlaybackError(null);
+    setSaveStatus(`已删除“${getStemDisplayName(selectedTrack).zh}”在 ${formatStemTimecode(currentTime)} 的片段。`);
+  }, [currentTime, duration, selectedTrack, selectedTrackState, setTrackClips]);
+
+  const moveTrackClip = useCallback((type: string, clipId: string, nextStart: number, shouldSnap = snapToGrid) => {
+    commitTrackChange((current) => {
+      const state = current[type] || defaultTrackState();
+      const clipState = resolveTrackClipState(state, duration);
+      const movedClips = moveStemClip(
+        clipState.clips,
+        clipId,
+        snapStemEditorTime(nextStart, duration, shouldSnap, snapStepSeconds),
+        duration,
+      );
+      const nextClipState = normalizeStemClipState({
+        clips: movedClips,
+        duration,
+        trimStart: state.trimStart,
+        trimEnd: state.trimEnd,
+      });
+      const clipDuration = Math.max(0, (nextClipState.trimEnd ?? 0) - nextClipState.trimStart);
+
+      return {
+        ...current,
+        [type]: {
+          ...state,
+          trimStart: nextClipState.trimStart,
+          trimEnd: nextClipState.trimEnd,
+          fadeIn: Math.min(state.fadeIn, clipDuration),
+          fadeOut: Math.min(state.fadeOut, clipDuration),
+          clips: nextClipState.clips,
+        },
+      };
+    });
+  }, [commitTrackChange, duration, snapStepSeconds, snapToGrid]);
+
+  const resolveTimelineRulerPointer = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const ratio = rect.width > 0 ? Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)) : 0;
+    const shouldSnap = snapToGrid && !event.altKey;
+    return {
+      ratio,
+      shouldSnap,
+      time: snapStemEditorTime(duration * ratio, duration, shouldSnap, snapStepSeconds),
+    };
+  }, [duration, snapStepSeconds, snapToGrid]);
+
+  const updateTimelineRulerGuide = useCallback((event: PointerEvent<HTMLDivElement>, active: boolean) => {
+    if (duration <= 0) return;
+    const guide = resolveTimelineRulerPointer(event);
+    setTimelineRulerGuide({
+      ratio: guide.ratio,
+      time: guide.time,
+      active,
+      snapBypassed: snapToGrid && !guide.shouldSnap,
+    });
+  }, [duration, resolveTimelineRulerPointer, snapToGrid]);
+
+  const resolveTimelineRulerTrimIntent = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    if (!selectedTrackTrimControls || duration <= 0) return null;
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    return resolveTimelineTrimPointerIntent({
+      pointerX: event.clientX - rect.left,
+      width: rect.width,
+      duration,
+      trimStart: selectedTrackTrimControls.trimStart,
+      trimEnd: selectedTrackTrimControls.trimEnd,
+      hitSize: 40,
+    });
+  }, [duration, selectedTrackTrimControls]);
+
+  const handleTimelineRulerPointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const trimIntent = resolveTimelineRulerTrimIntent(event);
+    if (selectedTrack && selectedTrackTrimControls && (trimIntent?.kind === 'trim' || trimIntent?.kind === 'move-trim')) {
+      timelineRulerTrimDragRef.current = {
+        pointerId: event.pointerId,
+        kind: trimIntent.kind === 'trim' ? 'edge' : 'range',
+        edge: trimIntent.kind === 'trim' ? trimIntent.edge : undefined,
+        anchorTime: trimIntent.time,
+        trimStart: selectedTrackTrimControls.trimStart,
+        trimEnd: selectedTrackTrimControls.trimEnd,
+        moved: false,
+      };
+      updateTimelineRulerGuide(event, true);
+      event.currentTarget.setPointerCapture(event.pointerId);
+      return;
+    }
+
+    timelineRulerTrimDragRef.current = null;
+    updateTimelineRulerGuide(event, false);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }, [resolveTimelineRulerTrimIntent, selectedTrack, selectedTrackTrimControls, updateTimelineRulerGuide]);
+
+  const handleTimelineRulerPointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    const trimDrag = timelineRulerTrimDragRef.current;
+    if (trimDrag && trimDrag.pointerId === event.pointerId && selectedTrack) {
+      const guide = resolveTimelineRulerPointer(event);
+      trimDrag.moved = true;
+      if (trimDrag.kind === 'edge' && trimDrag.edge) {
+        setTrackTrim(selectedTrack.type, trimDrag.edge, guide.time, guide.shouldSnap);
+      } else {
+        setTrackTrimRange(selectedTrack.type, trimDrag.trimStart + guide.time - trimDrag.anchorTime, guide.shouldSnap);
+      }
+      updateTimelineRulerGuide(event, true);
+      event.preventDefault();
+      return;
+    }
+
+    updateTimelineRulerGuide(event, event.buttons === 1);
+  }, [resolveTimelineRulerPointer, selectedTrack, setTrackTrim, setTrackTrimRange, updateTimelineRulerGuide]);
+
+  const handleTimelineRulerPointerUp = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    const trimDrag = timelineRulerTrimDragRef.current;
+    if (trimDrag && trimDrag.pointerId === event.pointerId && selectedTrack) {
+      const guide = resolveTimelineRulerPointer(event);
+      if (trimDrag.kind === 'edge' && trimDrag.edge) {
+        setTrackTrim(selectedTrack.type, trimDrag.edge, guide.time, guide.shouldSnap);
+        setSaveStatus(`已拖动“${getStemDisplayName(selectedTrack).zh}”${trimDrag.edge === 'start' ? '入点' : '出点'}到 ${formatTime(guide.time)}。`);
+      } else {
+        const nextStart = trimDrag.trimStart + guide.time - trimDrag.anchorTime;
+        const nextTrim = shiftStemTrimRange({
+          duration,
+          trimStart: trimDrag.trimStart,
+          trimEnd: trimDrag.trimEnd,
+          nextStart: snapStemEditorTime(nextStart, duration, guide.shouldSnap, snapStepSeconds),
+        });
+        setTrackTrimRange(selectedTrack.type, nextTrim.trimStart, false);
+        setSaveStatus(`已移动“${getStemDisplayName(selectedTrack).zh}”选区到 ${formatTime(nextTrim.trimStart)} - ${formatTime(nextTrim.trimEnd)}。`);
+      }
+      timelineRulerTrimDragRef.current = null;
+    }
+
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch {
+      // Pointer capture may already be released by the browser.
+    }
+    updateTimelineRulerGuide(event, false);
+  }, [duration, resolveTimelineRulerPointer, selectedTrack, setTrackTrim, setTrackTrimRange, snapStepSeconds, updateTimelineRulerGuide]);
+
   const commitCurrentTimeInput = useCallback((value: string) => {
     const parsedTime = parseStemTimecode(value);
     if (parsedTime === null) {
@@ -1541,26 +2332,6 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     });
   }, [commitTrackChange, duration]);
 
-  const setTrackTrim = useCallback((type: string, edge: 'start' | 'end', value: number) => {
-    commitTrackChange((current) => {
-      const state = current[type] || defaultTrackState();
-      const currentEnd = state.trimEnd ?? duration;
-      const nextTrim = clampTrimEdge(edge, value, state.trimStart, currentEnd, duration);
-      const nextClipDuration = Math.max(0, Math.min(duration, nextTrim.trimEnd) - nextTrim.trimStart);
-
-      return {
-        ...current,
-        [type]: {
-          ...state,
-          trimStart: nextTrim.trimStart,
-          trimEnd: Math.min(duration, nextTrim.trimEnd),
-          fadeIn: Math.min(state.fadeIn, nextClipDuration),
-          fadeOut: Math.min(state.fadeOut, nextClipDuration),
-        },
-      };
-    });
-  }, [commitTrackChange, duration]);
-
   const commitSelectedTrimInput = useCallback((edge: 'start' | 'end', value: string) => {
     if (!selectedTrack) return;
 
@@ -1571,7 +2342,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
       return;
     }
 
-    setTrackTrim(selectedTrack.type, edge, parsed.time);
+    setTrackTrim(selectedTrack.type, edge, parsed.time, false);
     setPlaybackError(null);
     setSelectedTrimInputDraft(null);
   }, [duration, selectedTrack, setTrackTrim]);
@@ -1658,18 +2429,55 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
   }, [commitTrackChange, duration, selectedTrack]);
 
   const resetTrackEdit = useCallback((type: string) => {
-    commitTrackChange((current) => ({
-      ...current,
-      [type]: {
-        ...(current[type] || defaultTrackState()),
+    commitTrackChange((current) => {
+      const clipState = normalizeStemClipState({
+        clips: null,
+        duration,
         trimStart: 0,
         trimEnd: duration,
-        fadeIn: 0,
-        fadeOut: 0,
-        mutedRanges: [],
-      },
-    }));
+      });
+
+      return {
+        ...current,
+        [type]: {
+          ...(current[type] || defaultTrackState()),
+          trimStart: clipState.trimStart,
+          trimEnd: clipState.trimEnd ?? duration,
+          fadeIn: 0,
+          fadeOut: 0,
+          mutedRanges: [],
+          clips: clipState.clips,
+        },
+      };
+    });
   }, [commitTrackChange, duration]);
+
+  const resetSelectedTrackTrimRange = useCallback(() => {
+    if (!selectedTrack) return;
+
+    commitTrackChange((current) => {
+      const state = current[selectedTrack.type] || defaultTrackState();
+      const clipState = normalizeStemClipState({
+        clips: null,
+        duration,
+        trimStart: 0,
+        trimEnd: duration,
+      });
+      return {
+        ...current,
+        [selectedTrack.type]: {
+          ...state,
+          trimStart: clipState.trimStart,
+          trimEnd: clipState.trimEnd ?? duration,
+          fadeIn: Math.min(state.fadeIn, duration),
+          fadeOut: Math.min(state.fadeOut, duration),
+          clips: clipState.clips,
+        },
+      };
+    });
+    setPlaybackError(null);
+    setSaveStatus(`已把“${getStemDisplayName(selectedTrack).zh}”选区恢复为全长。`);
+  }, [commitTrackChange, duration, selectedTrack]);
 
   const previewSelectedTrackRange = useCallback(() => {
     if (!selectedTrack || !selectedTrackState || !selectedTrackBuffer) {
@@ -1852,6 +2660,18 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     await persistEditState('manual');
   }, [persistEditState]);
 
+  const returnToStudioAfterSave = useCallback(async () => {
+    setPlaybackError(null);
+    setSaveStatus('正在自动保存当前项目，保存完成后返回创作中心...');
+    const saved = await persistEditState('manual');
+    if (!saved) return;
+
+    setSaveStatus('当前项目已自动保存，正在返回创作中心。');
+    window.setTimeout(() => {
+      window.location.assign('/studio');
+    }, 180);
+  }, [persistEditState]);
+
   const savePendingEditsBeforeExport = useCallback(async () => {
     const intent = resolveStemExportSaveIntent({
       hasPendingChanges: hasPendingEditChanges,
@@ -1884,6 +2704,55 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     });
   }, [visibleStems]);
 
+  const seekSelectedTrackTrimEdge = useCallback((edge: 'start' | 'end') => {
+    if (!selectedTrack || !selectedTrackTrimControls) return;
+
+    const time = edge === 'start'
+      ? selectedTrackTrimControls.trimStart
+      : selectedTrackTrimControls.trimEnd;
+    handleSeek(time);
+    centerTimelineOnPlaybackPosition(time);
+    setSaveStatus(`已定位到“${getStemDisplayName(selectedTrack).zh}”${edge === 'start' ? '入点' : '出点'}。`);
+  }, [centerTimelineOnPlaybackPosition, handleSeek, selectedTrack, selectedTrackTrimControls]);
+
+  const nudgePlaybackHead = useCallback((direction: -1 | 1, largeStep = false) => {
+    const step = largeStep ? 1 : playbackNudgeStepSeconds;
+    const nextTime = Math.max(0, Math.min(duration || currentTime, currentTime + direction * step));
+    handleSeek(nextTime);
+    centerTimelineOnPlaybackPosition(nextTime);
+    setPlaybackError(null);
+    setSaveStatus(`播放头已${direction < 0 ? '后退' : '前进'} ${step}s 到 ${formatStemTimecode(nextTime)}。`);
+  }, [centerTimelineOnPlaybackPosition, currentTime, duration, handleSeek, playbackNudgeStepSeconds]);
+
+  const setSelectedTrackTrimToCurrentTime = useCallback((edge: 'start' | 'end') => {
+    if (!selectedTrack || !selectedTrackState) return;
+
+    const proposedTime = snapStemEditorTime(currentTime, duration, snapToGrid, snapStepSeconds);
+    const currentEnd = selectedTrackState.trimEnd ?? duration;
+    const nextTrim = clampTrimEdge(edge, proposedTime, selectedTrackState.trimStart, currentEnd, duration);
+    const actualTime = edge === 'start' ? nextTrim.trimStart : nextTrim.trimEnd;
+    const wasClamped = Math.abs(actualTime - proposedTime) > 0.001;
+
+    setTrackTrim(selectedTrack.type, edge, actualTime, false);
+    centerTimelineOnPlaybackPosition(actualTime);
+    setPlaybackError(null);
+    setSaveStatus(wasClamped
+      ? `播放头离另一侧边界太近，已把“${getStemDisplayName(selectedTrack).zh}”${edge === 'start' ? '入点' : '出点'}安全设到 ${formatTime(actualTime)}。`
+      : `已把“${getStemDisplayName(selectedTrack).zh}”${edge === 'start' ? '入点' : '出点'}设到 ${formatTime(actualTime)}。`);
+  }, [centerTimelineOnPlaybackPosition, currentTime, duration, selectedTrack, selectedTrackState, setTrackTrim, snapStepSeconds, snapToGrid]);
+
+  const focusSelectedTrackRange = useCallback(() => {
+    if (!selectedTrack || !selectedTrackTrimControls || duration <= 0) return;
+
+    const clipDuration = Math.max(0.1, selectedTrackTrimControls.trimEnd - selectedTrackTrimControls.trimStart);
+    const midpoint = selectedTrackTrimControls.trimStart + clipDuration / 2;
+    const nextZoom = clampTimelineZoom((duration / clipDuration) * 0.52);
+    const nextLaneWidth = Math.round((showAdvancedControls ? 420 : 520) * nextZoom);
+    setTimelineZoom(nextZoom);
+    centerTimelineOnPlaybackPosition(midpoint, nextLaneWidth);
+    setSaveStatus(`已聚焦“${getStemDisplayName(selectedTrack).zh}”选区 ${formatStemTimecode(clipDuration)}。`);
+  }, [centerTimelineOnPlaybackPosition, duration, selectedTrack, selectedTrackTrimControls, showAdvancedControls]);
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       const action = resolveStemEditorShortcut(event);
@@ -1892,6 +2761,14 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
       event.preventDefault();
       if (action === 'toggle-playback') {
         handleTogglePlayback();
+        return;
+      }
+      if (action === 'stop-playback') {
+        stopPlaybackPreview();
+        return;
+      }
+      if (action === 'toggle-shortcut-help') {
+        setShowShortcutHelp((value) => !value);
         return;
       }
       if (action === 'save') {
@@ -1922,7 +2799,84 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
         handleSeek(duration);
         return;
       }
+      if (action === 'seek-backward') {
+        nudgePlaybackHead(-1);
+        return;
+      }
+      if (action === 'seek-forward') {
+        nudgePlaybackHead(1);
+        return;
+      }
+      if (action === 'seek-backward-large') {
+        nudgePlaybackHead(-1, true);
+        return;
+      }
+      if (action === 'seek-forward-large') {
+        nudgePlaybackHead(1, true);
+        return;
+      }
+      if (action === 'zoom-in') {
+        applyTimelineZoom(timelineZoom + 0.25);
+        return;
+      }
+      if (action === 'zoom-out') {
+        applyTimelineZoom(timelineZoom - 0.25);
+        return;
+      }
+      if (action === 'zoom-reset') {
+        applyTimelineZoom(MIN_TIMELINE_ZOOM);
+        return;
+      }
+      if (action === 'toggle-follow-playhead') {
+        setFollowPlayhead((value) => !value);
+        return;
+      }
+      if (action === 'toggle-snap-grid') {
+        setSnapToGrid((value) => {
+          const next = !value;
+          setSaveStatus(next ? `已开启时间吸附，当前步长 ${snapStepSeconds}s。` : '已关闭时间吸附。');
+          return next;
+        });
+        return;
+      }
+      if (action === 'toggle-transport-compact') {
+        setCompactTransport((value) => {
+          const next = !value;
+          setSaveStatus(next ? '底部工具条已切换为紧凑模式。' : '底部工具条已展开。');
+          return next;
+        });
+        return;
+      }
+      if (action === 'toggle-track-density') {
+        setTrackDensity((value) => {
+          const next = value === 'compact' ? 'comfortable' : 'compact';
+          setSaveStatus(next === 'compact' ? '轨道视图已切换为紧凑模式。' : '轨道视图已切换为舒展模式。');
+          return next;
+        });
+        return;
+      }
+      if (action === 'cycle-snap-step') {
+        setSnapToGrid(true);
+        setSnapStepSeconds((value) => {
+          const next = getNextTimelineSnapStep(value);
+          setSaveStatus(`吸附步长已切换为 ${next}s。`);
+          return next;
+        });
+        return;
+      }
       if (!selectedTrack) return;
+      if (action === 'focus-selected-range') {
+        focusSelectedTrackRange();
+        return;
+      }
+      if (action === 'preview-selected-range') {
+        previewSelectedTrackRange();
+        return;
+      }
+      if (action === 'toggle-loop-preview') {
+        toggleLoopSelectionPreview();
+        return;
+      }
       if (action === 'toggle-selected-mute') {
         toggleTrackFlag(selectedTrack.type, 'muted');
         return;
@@ -1932,13 +2886,11 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
         return;
       }
       if (action === 'set-selected-trim-start') {
-        setTrackTrim(selectedTrack.type, 'start', currentTime);
-        setSaveStatus(`已把“${getStemDisplayName(selectedTrack).zh}”入点设到 ${formatTime(currentTime)}。`);
+        setSelectedTrackTrimToCurrentTime('start');
         return;
       }
       if (action === 'set-selected-trim-end') {
-        setTrackTrim(selectedTrack.type, 'end', currentTime);
-        setSaveStatus(`已把“${getStemDisplayName(selectedTrack).zh}”出点设到 ${formatTime(currentTime)}。`);
+        setSelectedTrackTrimToCurrentTime('end');
         return;
       }
       if (action === 'nudge-selected-trim-start-back') {
@@ -1957,6 +2909,10 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
         restoreSelectedTrackRange();
         return;
       }
+      if (action === 'reset-selected-trim-range') {
+        resetSelectedTrackTrimRange();
+        return;
+      }
       resetTrackEdit(selectedTrack.type);
       setSaveStatus(`已重置“${getStemDisplayName(selectedTrack).zh}”的裁剪和淡入淡出。`);
     };
@@ -1964,19 +2920,29 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [
+    applyTimelineZoom,
     handleTogglePlayback,
     handleSeek,
     currentTime,
     duration,
+    focusSelectedTrackRange,
+    nudgePlaybackHead,
     redoTrackChange,
     resetTrackEdit,
+    resetSelectedTrackTrimRange,
     nudgeSelectedTrackTrim,
     muteSelectedTrackRange,
+    previewSelectedTrackRange,
     restoreSelectedTrackRange,
     saveEditState,
     selectAdjacentTrack,
     selectedTrack,
+    setSelectedTrackTrimToCurrentTime,
     setTrackTrim,
+    snapStepSeconds,
+    stopPlaybackPreview,
+    timelineZoom,
+    toggleLoopSelectionPreview,
     toggleTrackFlag,
     undoTrackChange,
   ]);
@@ -2030,9 +2996,13 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
   }, [skippedEmptyCount, stems.length]);
 
   const exportMix = useCallback(async () => {
+    setInspectorTab('export');
+    setSideRailTab('export');
+    setInspectorCollapsed(false);
     setIsExporting(true);
     setPlaybackError(null);
     setSaveStatus(null);
+    setLatestExportDownload(null);
     setExportStatusInput({
       phase: 'preparing',
       message: `正在准备“${exportModeLabel(exportMode)}”导出。`,
@@ -2055,9 +3025,12 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
       const anySolo = Object.values(tracks).some((track) => track.solo);
       const exportableStems = loadedStems.filter((stem) => {
         const state = tracks[stem.type] || defaultTrackState();
-        if (exportMode === 'all-tracks') return state.volume > 0;
-        if (exportMode === 'solo-only') return state.solo && state.volume > 0;
-        return !state.muted && (!anySolo || state.solo) && state.volume > 0;
+        const audioBuffer = audioBuffersRef.current[stem.type];
+        const clipState = resolveTrackClipState(state, Math.max(duration, audioBuffer?.duration || 0));
+        const hasClipAudio = (clipState.trimEnd ?? 0) - clipState.trimStart > 0.01;
+        if (exportMode === 'all-tracks') return state.volume > 0 && hasClipAudio;
+        if (exportMode === 'solo-only') return state.solo && state.volume > 0 && hasClipAudio;
+        return !state.muted && (!anySolo || state.solo) && state.volume > 0 && hasClipAudio;
       });
 
       if (exportableStems.length === 0) {
@@ -2092,9 +3065,8 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
         const state = tracks[stem.type] || defaultTrackState();
         const trimStart = Math.max(0, Math.min(renderDuration, state.trimStart));
         const trimEnd = Math.max(trimStart, Math.min(renderDuration, state.trimEnd ?? renderDuration));
-        const segmentEnd = Math.min(audioBuffer.duration, trimEnd);
-        const clipDuration = Math.max(0, segmentEnd - trimStart);
-        if (clipDuration <= 0) return;
+        const segments = buildTrackClipAudioSegments(state, renderDuration, audioBuffer.duration);
+        if (segments.length === 0) return;
 
         const gain = offlineContext.createGain();
         scheduleTrackGain({
@@ -2108,15 +3080,15 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
           fadeOut: state.fadeOut,
         });
         connectGainWithPan(offlineContext, gain, masterOutput.input, state.pan);
-        buildAudibleStemSegments({
-          start: trimStart,
-          end: segmentEnd,
-          mutedRanges: state.mutedRanges,
-        }).forEach((segment) => {
+        segments.forEach((segment) => {
           const source = offlineContext.createBufferSource();
           source.buffer = audioBuffer;
           source.connect(gain);
-          source.start(segment.start, segment.start, Math.max(0, segment.end - segment.start));
+          source.start(
+            Math.max(0, segment.timelineStart),
+            segment.sourceStart,
+            Math.max(0, segment.sourceEnd - segment.sourceStart),
+          );
         });
       });
 
@@ -2127,16 +3099,17 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
       const rendered = await offlineContext.startRendering();
       setExportStatusInput({ phase: 'encoding', fileType: 'WAV' });
       const blob = encodeWav(rendered);
+      const fileName = `hookcraft-${exportModeFileLabel(exportMode)}-${formatExportTimestamp(new Date())}.wav`;
       const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `hookcraft-${exportModeFileLabel(exportMode)}-${formatExportTimestamp(new Date())}.wav`;
-      document.body.appendChild(link);
       setExportStatusInput({ phase: 'downloading', fileType: 'WAV' });
-      link.click();
-      link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-      setExportStatusInput({ phase: 'done', fileType: 'WAV', exportedCount: exportableStems.length });
+      setLatestExportDownload({ url, fileName, label: `${exportModeLabel(exportMode)} WAV` });
+      triggerDownloadUrl(url, fileName);
+      setExportStatusInput({
+        phase: 'done',
+        fileType: 'WAV',
+        exportedCount: exportableStems.length,
+        message: 'WAV 已生成。如果浏览器没有自动下载，请点击下方下载链接。',
+      });
       setExportRecords((records) => appendStemExportRecord(records, createStemExportRecord({
         scope: 'mix',
         label: exportModeLabel(exportMode),
@@ -2154,9 +3127,13 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
   }, [duration, exportMode, exportReadiness, masterState, savePendingEditsBeforeExport, stems, tracks, waitForStemLoadingToSettle]);
 
   const exportSingleStem = useCallback(async (stem: EditableStem) => {
+    setInspectorTab('export');
+    setSideRailTab('export');
+    setInspectorCollapsed(false);
     setExportingStemType(stem.type);
     setPlaybackError(null);
     setSaveStatus(null);
+    setLatestExportDownload(null);
     setExportStatusInput({
       phase: 'preparing',
       message: `正在准备导出“${getStemDisplayName(stem).zh}”单轨。`,
@@ -2171,11 +3148,17 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
       }
 
       const state = tracks[stem.type] || defaultTrackState();
-      const trimStart = Math.max(0, Math.min(audioBuffer.duration, state.trimStart));
-      const trimEnd = Math.max(trimStart, Math.min(audioBuffer.duration, state.trimEnd ?? audioBuffer.duration));
+      const timelineDuration = Math.max(duration, audioBuffer.duration);
+      const clipState = resolveTrackClipState(state, timelineDuration);
+      const trimStart = clipState.trimStart;
+      const trimEnd = clipState.trimEnd ?? trimStart;
       const clipDuration = Math.max(0, trimEnd - trimStart);
+      const segments = buildTrackClipAudioSegments(state, timelineDuration, audioBuffer.duration);
       if (clipDuration <= 0) {
         throw new Error('这条分轨的裁剪区间为空，请调整入点和出点。');
+      }
+      if (segments.length === 0) {
+        throw new Error('这条分轨没有可导出的片段，请检查是否已删除全部片段。');
       }
 
       setSaveStatus(`正在导出“${getStemDisplayName(stem).zh}”单轨。`);
@@ -2199,30 +3182,31 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
         fadeOut: state.fadeOut,
       });
       connectGainWithPan(offlineContext, gain, offlineContext.destination, state.pan);
-      buildAudibleStemSegments({
-        start: trimStart,
-        end: trimEnd,
-        mutedRanges: state.mutedRanges,
-      }).forEach((segment) => {
+      segments.forEach((segment) => {
         const source = offlineContext.createBufferSource();
         source.buffer = audioBuffer;
         source.connect(gain);
-        source.start(segment.start - trimStart, segment.start, Math.max(0, segment.end - segment.start));
+        source.start(
+          Math.max(0, segment.timelineStart - trimStart),
+          segment.sourceStart,
+          Math.max(0, segment.sourceEnd - segment.sourceStart),
+        );
       });
 
       const rendered = await offlineContext.startRendering();
       setExportStatusInput({ phase: 'encoding', fileType: 'WAV' });
       const blob = encodeWav(rendered);
+      const fileName = `hookcraft-${normalizeStemType(stem.type)}-${formatExportTimestamp(new Date())}.wav`;
       const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `hookcraft-${normalizeStemType(stem.type)}-${formatExportTimestamp(new Date())}.wav`;
-      document.body.appendChild(link);
       setExportStatusInput({ phase: 'downloading', fileType: 'WAV' });
-      link.click();
-      link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-      setExportStatusInput({ phase: 'done', fileType: 'WAV', exportedCount: 1 });
+      setLatestExportDownload({ url, fileName, label: `${getStemDisplayName(stem).zh} 单轨 WAV` });
+      triggerDownloadUrl(url, fileName);
+      setExportStatusInput({
+        phase: 'done',
+        fileType: 'WAV',
+        exportedCount: 1,
+        message: '单轨 WAV 已生成。如果浏览器没有自动下载，请点击下方下载链接。',
+      });
       setExportRecords((records) => appendStemExportRecord(records, createStemExportRecord({
         scope: 'stem',
         label: getStemDisplayName(stem).zh,
@@ -2237,19 +3221,248 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     } finally {
       setExportingStemType(null);
     }
-  }, [savePendingEditsBeforeExport, tracks]);
+  }, [duration, savePendingEditsBeforeExport, tracks]);
+
+  const exportAllReadyStems = useCallback(async () => {
+    setInspectorTab('export');
+    setSideRailTab('export');
+    setInspectorCollapsed(false);
+    setIsExporting(true);
+    setExportingStemType(null);
+    setPlaybackError(null);
+    setSaveStatus(null);
+    setLatestExportDownload(null);
+    setExportStatusInput({
+      phase: 'preparing',
+      message: '正在准备批量导出所有已缓存分轨。',
+    });
+
+    try {
+      await savePendingEditsBeforeExport();
+
+      if (exportReadiness === 'wait-all' && loadingCountRef.current > 0) {
+        await waitForStemLoadingToSettle();
+      }
+
+      const readyStems = stems.filter((stem) => {
+        const audioBuffer = audioBuffersRef.current[stem.type];
+        if (!audioBuffer || stemHasKnownEmptyWaveform(stem)) return false;
+        const state = tracks[stem.type] || defaultTrackState();
+        const clipState = resolveTrackClipState(state, Math.max(duration, audioBuffer.duration));
+        return state.volume > 0 && (clipState.trimEnd ?? 0) - clipState.trimStart > 0.01;
+      });
+
+      if (readyStems.length === 0) {
+        throw new Error('当前没有可批量导出的已缓存分轨，请等待缓存完成或检查音量/裁剪区间。');
+      }
+
+      const timestamp = formatExportTimestamp(new Date());
+      setSaveStatus(`正在批量导出 ${readyStems.length} 条单轨 WAV。`);
+
+      for (let index = 0; index < readyStems.length; index += 1) {
+        const stem = readyStems[index];
+        const audioBuffer = audioBuffersRef.current[stem.type];
+        if (!audioBuffer) continue;
+
+        setExportingStemType(stem.type);
+        setExportStatusInput({
+          phase: 'rendering',
+          message: `正在渲染 ${index + 1}/${readyStems.length}：“${getStemDisplayName(stem).zh}”。`,
+        });
+
+        const state = tracks[stem.type] || defaultTrackState();
+        const timelineDuration = Math.max(duration, audioBuffer.duration);
+        const clipState = resolveTrackClipState(state, timelineDuration);
+        const trimStart = clipState.trimStart;
+        const trimEnd = clipState.trimEnd ?? trimStart;
+        const clipDuration = Math.max(0, trimEnd - trimStart);
+        const segments = buildTrackClipAudioSegments(state, timelineDuration, audioBuffer.duration);
+        if (clipDuration <= 0) continue;
+        if (segments.length === 0) continue;
+
+        const sampleRate = audioBuffer.sampleRate || 44100;
+        const frameCount = Math.max(1, Math.ceil(clipDuration * sampleRate));
+        const offlineContext = new OfflineAudioContext(2, frameCount, sampleRate);
+        const gain = offlineContext.createGain();
+
+        scheduleTrackGain({
+          gain: gain.gain,
+          baseVolume: state.volume,
+          startAt: 0,
+          playbackFrom: trimStart,
+          trimStart,
+          trimEnd,
+          fadeIn: state.fadeIn,
+          fadeOut: state.fadeOut,
+        });
+        connectGainWithPan(offlineContext, gain, offlineContext.destination, state.pan);
+        segments.forEach((segment) => {
+          const source = offlineContext.createBufferSource();
+          source.buffer = audioBuffer;
+          source.connect(gain);
+          source.start(
+            Math.max(0, segment.timelineStart - trimStart),
+            segment.sourceStart,
+            Math.max(0, segment.sourceEnd - segment.sourceStart),
+          );
+        });
+
+        const rendered = await offlineContext.startRendering();
+        setExportStatusInput({
+          phase: 'encoding',
+          fileType: 'WAV',
+          message: `正在编码 ${index + 1}/${readyStems.length}：“${getStemDisplayName(stem).zh}”。`,
+        });
+        downloadBlob(
+          encodeWav(rendered),
+          `hookcraft-stems-${timestamp}-${String(index + 1).padStart(2, '0')}-${normalizeStemType(stem.type)}.wav`,
+          4000,
+        );
+
+        if (index < readyStems.length - 1) {
+          await new Promise((resolve) => { window.setTimeout(resolve, 160); });
+        }
+      }
+
+      setExportStatusInput({ phase: 'done', fileType: 'WAV', exportedCount: readyStems.length });
+      setExportRecords((records) => appendStemExportRecord(records, createStemExportRecord({
+        scope: 'stem',
+        label: '全部单轨',
+        trackCount: readyStems.length,
+        fileType: 'WAV',
+      })));
+      setSaveStatus(`已批量导出 ${readyStems.length} 条单轨 WAV。`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '批量导出单轨失败，请稍后重试。';
+      setExportStatusInput({ phase: 'error', message });
+      setPlaybackError(message);
+    } finally {
+      setExportingStemType(null);
+      setIsExporting(false);
+    }
+  }, [duration, exportReadiness, savePendingEditsBeforeExport, stems, tracks, waitForStemLoadingToSettle]);
+
+  const focusTimelineSurface = useCallback(() => {
+    const viewport = timelineViewportRef.current;
+    if (!viewport) return;
+
+    viewport.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+    viewport.focus({ preventScroll: true });
+  }, []);
+
+  const activateSideRailTab = useCallback((tab: SideRailTab) => {
+    setSideRailTab(tab);
+
+    if (tab === 'track') {
+      setInspectorCollapsed(false);
+      setInspectorTab('track');
+      window.requestAnimationFrame(focusTimelineSurface);
+      setSaveStatus('已切换到轨道时间线。');
+      return;
+    }
+
+    if (tab === 'mix') {
+      setInspectorCollapsed(false);
+      setInspectorTab('mix');
+      setSaveStatus('已打开混音控制。');
+      return;
+    }
+
+    if (tab === 'automation') {
+      setShowAdvancedControls(true);
+      setInspectorCollapsed(false);
+      setInspectorTab('track');
+      window.requestAnimationFrame(focusTimelineSurface);
+      setSaveStatus('已打开自动化和高级轨道控制。');
+      return;
+    }
+
+    setInspectorCollapsed(false);
+    setInspectorTab('export');
+    setSaveStatus('已打开导出中心。');
+  }, [focusTimelineSurface]);
+
+  const selectInspectorTab = useCallback((tab: InspectorTab) => {
+    setInspectorTab(tab);
+    setSideRailTab(tab);
+  }, []);
+
+  const dawLayoutMetrics = useMemo(() => buildDawEditorLayoutMetrics({
+    compactTransport,
+    inspectorCollapsed,
+  }), [compactTransport, inspectorCollapsed]);
 
   return (
-    <section style={editorStyle}>
+    <section style={editorStyle(dawLayoutMetrics)}>
+      <div style={editorSideRailStyle} role="tablist" aria-label="编辑器工具栏">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={sideRailTab === 'track'}
+          aria-controls="stem-editor-timeline"
+          title="轨道：查看多轨时间线"
+          style={sideRailButtonStyle(sideRailTab === 'track')}
+          onClick={() => activateSideRailTab('track')}
+        >
+          轨道
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={sideRailTab === 'mix'}
+          aria-controls="stem-editor-inspector"
+          title="混音：打开右侧混音控制"
+          style={sideRailButtonStyle(sideRailTab === 'mix')}
+          onClick={() => activateSideRailTab('mix')}
+        >
+          混音
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={sideRailTab === 'automation'}
+          aria-controls="stem-editor-timeline"
+          title="自动化：展开高级轨道控制"
+          style={sideRailButtonStyle(sideRailTab === 'automation', showAdvancedControls)}
+          onClick={() => activateSideRailTab('automation')}
+        >
+          自动化
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={sideRailTab === 'export'}
+          aria-controls="stem-editor-inspector"
+          title="导出：打开右侧导出中心"
+          style={sideRailButtonStyle(sideRailTab === 'export')}
+          onClick={() => activateSideRailTab('export')}
+        >
+          导出
+        </button>
+      </div>
       <div style={editorHeaderStyle}>
-        <div>
-          <div style={editorEyebrowRowStyle}>
-            <span style={editorEyebrowStyle}>{versionLabel}</span>
-            <span style={saveBadgeStyle(saveBadge.tone)}>{saveBadge.label}</span>
+        <div style={editorHeaderPrimaryStyle}>
+          <Link href="/" aria-label="返回 HookCraft 首页" style={editorBrandStyle}>
+            <Image src="/logo-nav.svg" alt="HookCraft" width={140} height={36} priority />
+          </Link>
+          <div style={editorProjectTitleStyle}>
+            <span style={editorTitleStyle}>歌曲编辑</span>
           </div>
-          <h4 style={editorTitleStyle}>分轨编辑</h4>
+          <div style={editorStatusClusterStyle}>
+            <span style={saveBadgeStyle(saveBadge.tone)}>{saveBadge.label}</span>
+            <span>{formatStemTimecode(currentTime)}</span>
+          </div>
         </div>
         <div style={editorActionStyle}>
+          <button
+            type="button"
+            onClick={() => void returnToStudioAfterSave()}
+            disabled={isSaving}
+            title="自动保存当前项目后返回创作中心"
+            style={ghostButtonStyle}
+          >
+            返回创作中心
+          </button>
           <button type="button" onClick={undoTrackChange} disabled={!canUndo} style={historyButtonStyle(canUndo)}>
             撤销
           </button>
@@ -2268,7 +3481,26 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
           >
             {isExporting ? '导出中' : '导出 WAV'}
           </button>
-          <button type="button" onClick={() => setShowAdvancedControls((value) => !value)} style={ghostButtonStyle}>
+          <button
+            type="button"
+            onClick={() => void exportAllReadyStems()}
+            disabled={isExporting || exportSummary.loadedCount === 0}
+            title={exportSummary.loadedCount === 0 ? '等待至少一条分轨缓存完成' : '批量导出所有已缓存单轨 WAV'}
+            style={historyButtonStyle(!isExporting && exportSummary.loadedCount > 0)}
+          >
+            导出单轨包
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShowAdvancedControls((value) => {
+                const next = !value;
+                setSideRailTab(next ? 'automation' : inspectorTab);
+                return next;
+              });
+            }}
+            style={ghostButtonStyle}
+          >
             {showAdvancedControls ? '收起高级' : '高级参数'}
           </button>
           <button type="button" onClick={copyProjectLink} style={ghostButtonStyle}>
@@ -2284,11 +3516,37 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
       </div>
 
       <div style={workbenchTopStyle}>
-        <div style={transportPanelStyle}>
+        <div style={transportPanelStyle(compactTransport)}>
           <div style={transportStyle}>
-            <button type="button" onClick={handleTogglePlayback} style={playButtonStyle}>
-              {isPlaying ? '暂停' : '播放'}
-            </button>
+            <div style={transportButtonGroupStyle}>
+              <button type="button" title="回到开头" onClick={() => handleSeek(0)} style={transportIconButtonStyle(false)}>
+                |&lt;
+              </button>
+              <button type="button" title="后退 1 秒" onClick={() => nudgePlaybackHead(-1, true)} style={transportIconButtonStyle(false)}>
+                -1s
+              </button>
+              <button type="button" title="播放/暂停" onClick={handleTogglePlayback} style={playButtonStyle}>
+                {isPlaying ? '暂停' : '播放'}
+              </button>
+              <button type="button" title="停止预听" onClick={stopPlaybackPreview} style={transportIconButtonStyle(false)}>
+                停止
+              </button>
+              <button type="button" title="前进 1 秒" onClick={() => nudgePlaybackHead(1, true)} style={transportIconButtonStyle(false)}>
+                +1s
+              </button>
+              <button type="button" title="跳到结尾" onClick={() => handleSeek(duration)} style={transportIconButtonStyle(false)}>
+                &gt;|
+              </button>
+              <button
+                type="button"
+                title="B 收起或展开底部工具条"
+                aria-pressed={compactTransport}
+                onClick={() => setCompactTransport((value) => !value)}
+                style={transportIconButtonStyle(false)}
+              >
+                {compactTransport ? '展开' : '收起'}
+              </button>
+            </div>
             <input
               aria-label="播放头时间"
               type="text"
@@ -2328,18 +3586,108 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
             />
             <span style={timeStyle}>{formatStemTimecode(duration)}</span>
           </div>
-          <div style={mixerSummaryStyle}>
-            <span>{stems.length} 条分轨</span>
-            <span>{hasSoloTrack ? '独奏模式' : '全轨预听'}</span>
-            <span>
-              {loadingCount > 0
-                ? `缓存中 ${readyStemCount}/${loadableStemCount}${cachedLoadCount > 0 ? `，本地命中 ${cachedLoadCount}` : ''}`
-                : failedLoadCount > 0
-                  ? `可播放 ${loadableStemCount - failedLoadCount}/${loadableStemCount}`
-                  : `轨道就绪${cachedLoadCount > 0 ? `，本地命中 ${cachedLoadCount}` : ''}`}
-            </span>
-            {skippedEmptyCount > 0 && <span>已跳过空轨 {skippedEmptyCount}</span>}
+          {selectedTrack && !compactTransport && (
+            <div style={transportEditBarStyle}>
+              <span style={transportEditLabelStyle}>{getStemDisplayName(selectedTrack).zh}</span>
+              <button type="button" style={transportEditButtonStyle(false)} onClick={() => setSelectedTrackTrimToCurrentTime('start')}>
+                设入点
+              </button>
+              <button type="button" style={transportEditButtonStyle(false)} onClick={() => setSelectedTrackTrimToCurrentTime('end')}>
+                设出点
+              </button>
+              <button type="button" disabled={!selectedTrackBuffer} style={transportEditButtonStyle(!selectedTrackBuffer)} onClick={previewSelectedTrackRange}>
+                预听选区
+              </button>
+              <button type="button" disabled={duration <= 0} style={transportEditButtonStyle(duration <= 0)} onClick={splitSelectedTrackClipAtPlayhead}>
+                切分
+              </button>
+              <button type="button" disabled={duration <= 0 || selectedTrackClipCount === 0} style={transportEditButtonStyle(duration <= 0 || selectedTrackClipCount === 0)} onClick={deleteSelectedTrackClipAtPlayhead}>
+                删除片段
+              </button>
+              <button type="button" aria-pressed={loopSelectionPreview} style={transportLoopButtonStyle(loopSelectionPreview)} onClick={toggleLoopSelectionPreview}>
+                循环 {loopSelectionPreview ? '开' : '关'}
+              </button>
+            </div>
+          )}
+          {!compactTransport && (
+          <div style={transportOptionBarStyle}>
+            <button
+              type="button"
+              aria-pressed={snapToGrid}
+              title="G 开关吸附"
+              style={transportOptionButtonStyle(snapToGrid, false)}
+              onClick={() => setSnapToGrid((value) => {
+                const next = !value;
+                setSaveStatus(next ? `已开启时间吸附，当前步长 ${snapStepSeconds}s。` : '已关闭时间吸附。');
+                return next;
+              })}
+            >
+              吸附 {snapToGrid ? `${snapStepSeconds}s` : '关'}
+            </button>
+            <button
+              type="button"
+              disabled={!snapToGrid}
+              title="Shift+G 切换吸附步长"
+              style={transportOptionButtonStyle(false, !snapToGrid)}
+              onClick={() => setSnapStepSeconds((value) => {
+                const next = getNextTimelineSnapStep(value);
+                setSaveStatus(`吸附步长已切换为 ${next}s。`);
+                return next;
+              })}
+            >
+              步长
+            </button>
+            <button
+              type="button"
+              aria-pressed={followPlayhead}
+              style={transportOptionButtonStyle(followPlayhead, false)}
+              onClick={() => setFollowPlayhead((value) => !value)}
+            >
+              {followPlayhead ? '跟随开' : '跟随关'}
+            </button>
+            <button type="button" style={transportOptionButtonStyle(false, false)} onClick={() => applyTimelineZoom(MIN_TIMELINE_ZOOM)}>
+              适合视野
+            </button>
+            <button
+              type="button"
+              aria-pressed={showShortcutHelp}
+              style={transportOptionButtonStyle(showShortcutHelp, false)}
+              onClick={() => setShowShortcutHelp((value) => !value)}
+            >
+              快捷键
+            </button>
+            <button
+              type="button"
+              aria-pressed={!inspectorCollapsed}
+              style={transportOptionButtonStyle(!inspectorCollapsed, false)}
+              onClick={() => setInspectorCollapsed((value) => !value)}
+            >
+              检查器 {!inspectorCollapsed ? '开' : '收起'}
+            </button>
           </div>
+          )}
+          {!compactTransport && (
+            <div style={mixerSummaryStyle}>
+              <span>{stems.length} 条分轨</span>
+              <span>{hasSoloTrack ? '独奏模式' : '全轨预听'}</span>
+              <span>{selectedTrack ? `选中 ${getStemDisplayName(selectedTrack).zh}` : '未选轨道'}</span>
+              {selectedTrack && <span>选区 {formatStemTimecode(selectedTrackClipDuration)}</span>}
+              <span>
+                {loadingCount > 0
+                  ? `缓存中 ${readyStemCount}/${loadableStemCount}${cachedLoadCount > 0 ? `，本地命中 ${cachedLoadCount}` : ''}`
+                  : failedLoadCount > 0
+                    ? `可播放 ${loadableStemCount - failedLoadCount}/${loadableStemCount}`
+                    : `轨道就绪${cachedLoadCount > 0 ? `，本地命中 ${cachedLoadCount}` : ''}`}
+              </span>
+              <span>{snapToGrid ? `吸附 ${snapStepSeconds}s` : '自由定位'}</span>
+              <span>缩放 {Math.round(timelineZoom * 100)}%</span>
+              <span>{followPlayhead ? '跟随播放头' : '自由视野'}</span>
+              {skippedEmptyCount > 0 && <span>已跳过空轨 {skippedEmptyCount}</span>}
+            </div>
+          )}
+        </div>
+
+        <div style={readinessDockStyle}>
           <div style={readinessPanelStyle(editorReadiness.level)}>
             <div>
               <div style={readinessTitleStyle}>{editorReadiness.title}</div>
@@ -2354,7 +3702,44 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
           </div>
         </div>
 
-        <div style={controlGridStyle}>
+        <div id="stem-editor-inspector" style={controlGridStyle(inspectorCollapsed)}>
+          <div style={inspectorHeaderStyle(inspectorCollapsed)}>
+            <div>
+              <div style={inspectorEyebrowStyle}>Inspector</div>
+              <div style={inspectorTitleStyle}>
+                {inspectorCollapsed && '检查器'}
+                {!inspectorCollapsed && inspectorTab === 'track' && '轨道检查器'}
+                {!inspectorCollapsed && inspectorTab === 'mix' && '混音控制'}
+                {!inspectorCollapsed && inspectorTab === 'export' && '导出中心'}
+              </div>
+            </div>
+            {!inspectorCollapsed && <span style={inspectorBadgeStyle}>
+              {inspectorTab === 'track' && (selectedTrack ? getStemDisplayName(selectedTrack).zh : '未选')}
+              {inspectorTab === 'mix' && `${audibleStemCount} 条有声`}
+              {inspectorTab === 'export' && `${exportSummary.selectedCount} 条导出`}
+            </span>}
+            <button
+              type="button"
+              title={inspectorCollapsed ? '展开右侧检查器' : '收起右侧检查器'}
+              aria-pressed={inspectorCollapsed}
+              onClick={() => setInspectorCollapsed((value) => !value)}
+              style={inspectorCollapseButtonStyle(inspectorCollapsed)}
+            >
+              {inspectorCollapsed ? '展开' : '收起'}
+            </button>
+          </div>
+          {!inspectorCollapsed && <div style={inspectorTabsStyle}>
+            <button type="button" aria-pressed={inspectorTab === 'track'} style={inspectorTabButtonStyle(inspectorTab === 'track')} onClick={() => selectInspectorTab('track')}>
+              轨道
+            </button>
+            <button type="button" aria-pressed={inspectorTab === 'mix'} style={inspectorTabButtonStyle(inspectorTab === 'mix')} onClick={() => selectInspectorTab('mix')}>
+              混音
+            </button>
+            <button type="button" aria-pressed={inspectorTab === 'export'} style={inspectorTabButtonStyle(inspectorTab === 'export')} onClick={() => selectInspectorTab('export')}>
+              导出
+            </button>
+          </div>}
+          {!inspectorCollapsed && inspectorTab === 'track' && (
           <div style={selectedTrackPanelStyle}>
             {selectedTrack && selectedTrackState ? (
               <>
@@ -2391,6 +3776,22 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
                     </button>
                     <button
                       type="button"
+                      disabled={duration <= 0}
+                      style={presetButtonStyle}
+                      onClick={splitSelectedTrackClipAtPlayhead}
+                    >
+                      切分片段
+                    </button>
+                    <button
+                      type="button"
+                      disabled={duration <= 0 || selectedTrackClipCount === 0}
+                      style={presetButtonStyle}
+                      onClick={deleteSelectedTrackClipAtPlayhead}
+                    >
+                      删除片段
+                    </button>
+                    <button
+                      type="button"
                       style={exportModeButtonStyle(loopSelectionPreview)}
                       onClick={toggleLoopSelectionPreview}
                     >
@@ -2409,6 +3810,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
                 <div style={selectedTrackStatsStyle}>
                   <span>范围 {formatTime(selectedTrackState.trimStart)} - {formatTime(selectedTrackTrimEnd)}</span>
                   <span>片段 {formatTime(selectedTrackClipDuration)}</span>
+                  <span>剪辑 {selectedTrackClipCount}</span>
                   <span>音量 {Math.round(selectedTrackState.volume * 100)}%</span>
                   <span>声像 {formatPan(selectedTrackState.pan)}</span>
                   <span>淡入 {selectedTrackState.fadeIn.toFixed(2)}s</span>
@@ -2604,16 +4006,16 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
                   <button type="button" style={presetButtonStyle} onClick={restoreSelectedTrackRange}>
                     恢复选区
                   </button>
-                  <button type="button" style={presetButtonStyle} onClick={() => setTrackTrim(selectedTrack.type, 'start', currentTime)}>
+                  <button type="button" style={presetButtonStyle} onClick={() => setSelectedTrackTrimToCurrentTime('start')}>
                     入点到播放头
                   </button>
-                  <button type="button" style={presetButtonStyle} onClick={() => setTrackTrim(selectedTrack.type, 'end', currentTime)}>
+                  <button type="button" style={presetButtonStyle} onClick={() => setSelectedTrackTrimToCurrentTime('end')}>
                     出点到播放头
                   </button>
                   <button type="button" style={presetButtonStyle} onClick={() => resetTrackEdit(selectedTrack.type)}>
                     重置当前轨裁剪
                   </button>
-                  <span style={selectedTrackShortcutStyle}>快捷键：↑/↓ 选轨，M 静音，S 独奏，[ / ] 设置入出点，Shift+[ / Shift+] 微调，X 静音选区，Shift+X 恢复</span>
+                  <span style={selectedTrackShortcutStyle}>快捷键：↑/↓ 选轨，M 静音，S 独奏，[ / ] 设置入出点，Shift+[ / Shift+] 微调，X 静音选区，Shift+X 恢复，Shift+R 全长</span>
                 </div>
                 {selectedTrackMutedRanges.length > 0 && (
                   <div style={mutedRangeListStyle} aria-label={`${getStemDisplayName(selectedTrack).zh} 静音片段`}>
@@ -2638,9 +4040,15 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
               <div style={emptyTrackNoticeStyle}>当前筛选下没有选中的轨道。</div>
             )}
           </div>
+          )}
 
+          {!inspectorCollapsed && inspectorTab === 'mix' && (
+          <>
           <div style={controlPanelStyle}>
-            <span style={presetLabelStyle}>混音预设</span>
+            <div style={panelHeadingStyle}>
+              <span style={presetLabelStyle}>混音预设</span>
+              <span style={panelHeadingMetaStyle}>Mix</span>
+            </div>
             <div style={buttonWrapStyle}>
               <button type="button" style={presetButtonStyle} onClick={() => applyMixPreset('balanced')}>
                 标准平衡
@@ -2655,7 +4063,10 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
           </div>
 
           <div style={controlPanelStyle}>
-            <span style={presetLabelStyle}>快速操作</span>
+            <div style={panelHeadingStyle}>
+              <span style={presetLabelStyle}>快速操作</span>
+              <span style={panelHeadingMetaStyle}>Actions</span>
+            </div>
             <div style={buttonWrapStyle}>
               <button type="button" style={presetButtonStyle} onClick={() => applyQuickTrackAction('vocals-only')}>
                 只听人声
@@ -2673,7 +4084,10 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
           </div>
 
           <div style={controlPanelStyle}>
-            <span style={presetLabelStyle}>轨道视图</span>
+            <div style={panelHeadingStyle}>
+              <span style={presetLabelStyle}>轨道视图</span>
+              <span style={panelHeadingMetaStyle}>View</span>
+            </div>
             <div style={buttonWrapStyle}>
               <button type="button" style={viewModeButtonStyle(trackViewMode === 'all')} onClick={() => setTrackViewMode('all')}>
                 全部 {stems.length}
@@ -2688,7 +4102,10 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
           </div>
 
           <div style={controlPanelStyle}>
-            <span style={presetLabelStyle}>母带输出</span>
+            <div style={panelHeadingStyle}>
+              <span style={presetLabelStyle}>母带输出</span>
+              <span style={panelHeadingMetaStyle}>Master</span>
+            </div>
             <label style={masterOutputControlStyle}>
               <span>{Math.round(masterState.volume * 100)}%</span>
               <input
@@ -2707,10 +4124,16 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
               </button>
             </div>
           </div>
+          </>
+          )}
 
+          {!inspectorCollapsed && inspectorTab === 'export' && (
           <div style={exportPanelStyle}>
             <div style={exportPanelHeaderStyle}>
-              <span style={presetLabelStyle}>导出设置</span>
+              <div style={panelHeadingStyle}>
+                <span style={presetLabelStyle}>导出设置</span>
+                <span style={panelHeadingMetaStyle}>Export</span>
+              </div>
               <span>
                 已加载 {exportSummary.loadedCount}/{loadableStemCount}，将导出 {exportSummary.selectedCount} 条
               </span>
@@ -2732,6 +4155,24 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
               </button>
               <button type="button" style={exportModeButtonStyle(exportReadiness === 'ready-only')} onClick={() => setExportReadiness('ready-only')}>
                 立即导出已加载
+              </button>
+            </div>
+            <div style={exportActionGridStyle}>
+              <button
+                type="button"
+                disabled={!exportSummary.canExport}
+                style={exportPrimaryActionStyle(!exportSummary.canExport)}
+                onClick={() => void exportMix()}
+              >
+                导出混音 WAV
+              </button>
+              <button
+                type="button"
+                disabled={isExporting || exportSummary.loadedCount === 0}
+                style={exportPrimaryActionStyle(isExporting || exportSummary.loadedCount === 0)}
+                onClick={() => void exportAllReadyStems()}
+              >
+                批量导出单轨
               </button>
             </div>
             <div style={exportHintStyle}>
@@ -2781,6 +4222,15 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
               </div>
               <div style={exportStatusDetailStyle}>{exportStatus.detail}</div>
             </div>
+            {latestExportDownload && (
+              <a
+                href={latestExportDownload.url}
+                download={latestExportDownload.fileName}
+                style={exportDownloadLinkStyle}
+              >
+                下载 {latestExportDownload.label}
+              </a>
+            )}
             {recentExportRecords.length > 0 && (
               <div style={exportHistoryStyle}>
                 <div style={exportHistoryHeaderStyle}>
@@ -2803,6 +4253,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
               </div>
             )}
           </div>
+          )}
         </div>
       </div>
 
@@ -2820,13 +4271,356 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
           </button>
         </div>
       )}
-      {saveStatus && <div style={saveNoticeStyle}>{saveStatus}</div>}
-      {autoSaveStatus && <div style={autoSaveNoticeStyle}>{autoSaveStatus}</div>}
+      {(saveStatus || autoSaveStatus) && (
+        <div style={editorStatusToastDockStyle} aria-live="polite">
+          {saveStatus && (
+            <div style={editorStatusToastStyle('save', saveStatusDismissing)}>
+              <span style={editorStatusToastIconStyle('save')}>✓</span>
+              <span style={editorStatusToastTextStyle}>{saveStatus}</span>
+            </div>
+          )}
+          {autoSaveStatus && (
+            <div style={editorStatusToastStyle('auto', autoSaveStatusDismissing)}>
+              <span style={editorStatusToastIconStyle('auto')}>↻</span>
+              <span style={editorStatusToastTextStyle}>{autoSaveStatus}</span>
+            </div>
+          )}
+        </div>
+      )}
       {playbackError && <div style={playbackErrorStyle}>{playbackError}</div>}
 
-      <div style={trackListStyle}>
-        {visibleStems.map((stem) => {
+      <div
+        id="stem-editor-timeline"
+        ref={timelineViewportRef}
+        tabIndex={-1}
+        aria-label="多轨时间线"
+        style={trackListStyle(trackDensity, isTimelinePanning)}
+        onContextMenu={(event) => event.preventDefault()}
+        onDragStart={(event) => event.preventDefault()}
+        onWheel={handleTimelineWheel}
+        onPointerDown={handleTimelinePanPointerDown}
+        onPointerMove={handleTimelinePanPointerMove}
+        onPointerUp={finishTimelinePan}
+        onPointerCancel={finishTimelinePan}
+      >
+        <div
+          aria-hidden="true"
+          style={timelineGlobalPlayheadStyle(currentTime, duration, timelineLaneWidth)}
+        />
+        <div
+          aria-hidden="true"
+          style={timelineGlobalPlayheadBadgeStyle(currentTime, duration, timelineLaneWidth)}
+        >
+          {formatStemTimecode(currentTime)}
+        </div>
+        <div style={timelineToolbarStyle(timelineMinWidth)} data-timeline-pan-zone="true" title="拖动空白处移动时间线视野">
+          <div>
+            <div style={timelineToolbarEyebrowStyle}>Timeline</div>
+            <div style={timelineToolbarTitleStyle}>多轨时间线</div>
+          </div>
+          <div style={timelineZoomControlsStyle}>
+            <button
+              type="button"
+              disabled={timelineZoom <= MIN_TIMELINE_ZOOM}
+              style={timelineZoomButtonStyle(timelineZoom <= MIN_TIMELINE_ZOOM)}
+              onClick={() => applyTimelineZoom(timelineZoom - 0.25)}
+            >
+              -
+            </button>
+            <span style={timelineZoomValueStyle}>{Math.round(timelineZoom * 100)}%</span>
+            <button
+              type="button"
+              disabled={timelineZoom >= MAX_TIMELINE_ZOOM}
+              style={timelineZoomButtonStyle(timelineZoom >= MAX_TIMELINE_ZOOM)}
+              onClick={() => applyTimelineZoom(timelineZoom + 0.25)}
+            >
+              +
+            </button>
+            <button type="button" style={timelineZoomFitButtonStyle} onClick={() => applyTimelineZoom(MIN_TIMELINE_ZOOM)}>
+              适合
+            </button>
+          </div>
+          <div style={timelineToolbarStatsStyle}>
+            <span style={timelineToolbarPillStyle}>显示 {visibleStems.length}/{stems.length}</span>
+            <span style={timelineToolbarPillStyle}>时长 {formatStemTimecode(duration)}</span>
+            <span style={timelineToolbarPillStyle}>{selectedTrack ? `选中 ${getStemDisplayName(selectedTrack).zh}` : '未选轨道'}</span>
+            {selectedTrack && (
+              <span style={timelineToolbarPillStyle}>选区 {formatStemTimecode(selectedTrackClipDuration)}</span>
+            )}
+            {selectedTrack && (
+              <span style={timelineToolbarPillStyle}>片段 {selectedTrackClipCount}</span>
+            )}
+            {selectedTrack && selectedTrackTrimControls && (
+              <span style={timelineSelectionActionsStyle}>
+                <button
+                  type="button"
+                  title="跳到当前轨道入点"
+                  style={timelineSelectionActionButtonStyle(false)}
+                  onClick={() => seekSelectedTrackTrimEdge('start')}
+                >
+                  入点
+                </button>
+                <button
+                  type="button"
+                  title="[ 把入点设到当前播放头"
+                  style={timelineSelectionActionButtonStyle(false)}
+                  onClick={() => setSelectedTrackTrimToCurrentTime('start')}
+                >
+                  设入
+                </button>
+                <button
+                  type="button"
+                  title="跳到当前轨道出点"
+                  style={timelineSelectionActionButtonStyle(false)}
+                  onClick={() => seekSelectedTrackTrimEdge('end')}
+                >
+                  出点
+                </button>
+                <button
+                  type="button"
+                  title="] 把出点设到当前播放头"
+                  style={timelineSelectionActionButtonStyle(false)}
+                  onClick={() => setSelectedTrackTrimToCurrentTime('end')}
+                >
+                  设出
+                </button>
+                <button
+                  type="button"
+                  title="Shift+R 恢复当前轨道选区为整首全长"
+                  style={timelineSelectionActionButtonStyle(false)}
+                  onClick={resetSelectedTrackTrimRange}
+                >
+                  全长
+                </button>
+                <button
+                  type="button"
+                  title="Shift+F 聚焦当前选区"
+                  style={timelineSelectionActionButtonStyle(false)}
+                  onClick={focusSelectedTrackRange}
+                >
+                  聚焦
+                </button>
+                <button
+                  type="button"
+                  disabled={!selectedTrackBuffer}
+                  title="P 预听当前选区"
+                  style={timelineSelectionActionButtonStyle(!selectedTrackBuffer)}
+                  onClick={previewSelectedTrackRange}
+                >
+                  预听
+                </button>
+                <button
+                  type="button"
+                  disabled={duration <= 0}
+                  title="在播放头位置切分当前片段"
+                  style={timelineSelectionActionButtonStyle(duration <= 0)}
+                  onClick={splitSelectedTrackClipAtPlayhead}
+                >
+                  切分
+                </button>
+                <button
+                  type="button"
+                  disabled={duration <= 0 || selectedTrackClipCount === 0}
+                  title="删除播放头所在片段"
+                  style={timelineSelectionActionButtonStyle(duration <= 0 || selectedTrackClipCount === 0)}
+                  onClick={deleteSelectedTrackClipAtPlayhead}
+                >
+                  删除
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={loopSelectionPreview}
+                  title="L 开关循环预听"
+                  style={timelineSelectionLoopButtonStyle(loopSelectionPreview)}
+                  onClick={toggleLoopSelectionPreview}
+                >
+                  循环 {loopSelectionPreview ? '开' : '关'}
+                </button>
+              </span>
+            )}
+            <button
+              type="button"
+              aria-pressed={snapToGrid}
+              title="G 开关吸附"
+              onClick={() => setSnapToGrid((value) => {
+                const next = !value;
+                setSaveStatus(next ? `已开启时间吸附，当前步长 ${snapStepSeconds}s。` : '已关闭时间吸附。');
+                return next;
+              })}
+              style={timelineSnapButtonStyle(snapToGrid)}
+            >
+              吸附 {snapToGrid ? `${snapStepSeconds}s` : '关'}
+            </button>
+            <button
+              type="button"
+              disabled={!snapToGrid}
+              title="Shift+G 切换吸附步长"
+              onClick={() => setSnapStepSeconds((value) => {
+                const next = getNextTimelineSnapStep(value);
+                setSaveStatus(`吸附步长已切换为 ${next}s。`);
+                return next;
+              })}
+              style={timelineSnapStepButtonStyle(!snapToGrid)}
+            >
+              步长
+            </button>
+            <span style={timelinePrecisionHintStyle(snapToGrid)}>Alt 精修</span>
+            <span style={timelinePrecisionHintStyle(true)}>←/→ {playbackNudgeStepSeconds}s</span>
+            <button
+              type="button"
+              aria-pressed={trackDensity === 'compact'}
+              title="D 切换轨道密度"
+              onClick={() => setTrackDensity((value) => (value === 'compact' ? 'comfortable' : 'compact'))}
+              style={timelineDensityButtonStyle(trackDensity === 'compact')}
+            >
+              {trackDensity === 'compact' ? '紧凑' : '舒展'}
+            </button>
+            <button
+              type="button"
+              aria-pressed={showShortcutHelp}
+              title="? 显示或隐藏快捷键"
+              onClick={() => setShowShortcutHelp((value) => !value)}
+              style={timelineHelpButtonStyle(showShortcutHelp)}
+            >
+              快捷键
+            </button>
+            <span style={timelineSelectionActionsStyle}>
+              <button
+                type="button"
+                title={`播放头后退 ${playbackNudgeStepSeconds}s`}
+                style={timelineSelectionActionButtonStyle(duration <= 0)}
+                disabled={duration <= 0}
+                onClick={() => nudgePlaybackHead(-1)}
+              >
+                ←
+              </button>
+              <button
+                type="button"
+                title={`播放头前进 ${playbackNudgeStepSeconds}s`}
+                style={timelineSelectionActionButtonStyle(duration <= 0)}
+                disabled={duration <= 0}
+                onClick={() => nudgePlaybackHead(1)}
+              >
+                →
+              </button>
+              <button
+                type="button"
+                title="Shift+← 播放头后退 1s"
+                style={timelineSelectionActionButtonStyle(duration <= 0)}
+                disabled={duration <= 0}
+                onClick={() => nudgePlaybackHead(-1, true)}
+              >
+                -1s
+              </button>
+              <button
+                type="button"
+                title="Shift+→ 播放头前进 1s"
+                style={timelineSelectionActionButtonStyle(duration <= 0)}
+                disabled={duration <= 0}
+                onClick={() => nudgePlaybackHead(1, true)}
+              >
+                +1s
+              </button>
+            </span>
+            <button
+              type="button"
+              onClick={() => centerTimelineOnPlaybackPosition()}
+              style={timelineLocateButtonStyle}
+            >
+              定位播放头
+            </button>
+            <button
+              type="button"
+              aria-pressed={followPlayhead}
+              onClick={() => setFollowPlayhead((value) => !value)}
+              style={timelineFollowButtonStyle(followPlayhead)}
+            >
+              跟随播放头
+            </button>
+          </div>
+        </div>
+        {showShortcutHelp && (
+          <div style={timelineShortcutHelpStyle(timelineMinWidth)}>
+            <span><strong>播放</strong> 空格 / Esc / P / L</span>
+            <span><strong>选轨</strong> ↑ ↓ / M / S / R</span>
+            <span><strong>裁剪</strong> [ ] / Shift+[ ] / Shift+R</span>
+            <span><strong>时间线</strong> ← → / Shift+← → / G / Shift+G / B / D / Alt</span>
+            <span><strong>视野</strong> Ctrl+± / Ctrl+0 / Shift+F</span>
+            <span><strong>编辑</strong> Ctrl+S / Ctrl+Z / Ctrl+Y / X / Shift+X</span>
+          </div>
+        )}
+        {timelineScrollState.canScroll && (
+          <div
+            style={timelineScrollProgressStyle(timelineMinWidth, showShortcutHelp)}
+            onPointerDown={handleTimelineNavigatorPointerDown}
+            onPointerMove={handleTimelineNavigatorPointerMove}
+            title="拖动快速移动时间线视野"
+          >
+            <div style={timelineScrollThumbStyle(timelineScrollState.progress, timelineScrollState.viewRatio)} />
+          </div>
+        )}
+        <div style={timelineRulerStyle(timelineGridColumns, timelineMinWidth)} data-timeline-pan-zone="true">
+          <div style={timelineRulerLabelStyle} data-timeline-pan-zone="true">轨道</div>
+          <div
+            style={timelineRulerMarksStyle}
+            data-timeline-seek-zone="true"
+            onPointerDown={handleTimelineRulerPointerDown}
+            onPointerMove={handleTimelineRulerPointerMove}
+            onPointerUp={handleTimelineRulerPointerUp}
+            onPointerCancel={handleTimelineRulerPointerUp}
+            onPointerLeave={() => setTimelineRulerGuide(null)}
+            title="拖动时间尺定位播放头"
+          >
+            {selectedTrackTrimControls && duration > 0 && (
+              <>
+                <span
+                  aria-hidden="true"
+                  style={timelineSelectedRangeStyle(
+                    selectedTrackTrimControls.trimStart,
+                    selectedTrackTrimControls.trimEnd,
+                    duration,
+                  )}
+                />
+                <span
+                  aria-hidden="true"
+                  style={timelineSelectedRangeEdgeStyle(selectedTrackTrimControls.trimStart, duration, 'start')}
+                />
+                <span
+                  aria-hidden="true"
+                  style={timelineSelectedRangeEdgeStyle(selectedTrackTrimControls.trimEnd, duration, 'end')}
+                />
+              </>
+            )}
+            {timelineRulerGuide && (
+              <>
+                <span aria-hidden="true" style={timelineRulerGuideLineStyle(timelineRulerGuide.ratio, timelineRulerGuide.active)} />
+                <span style={timelineRulerGuideBadgeStyle(timelineRulerGuide.ratio, timelineRulerGuide.active)}>
+                  {formatStemTimecode(timelineRulerGuide.time)}
+                  {timelineRulerGuide.snapBypassed && <em>Alt</em>}
+                </span>
+              </>
+            )}
+            {timelineRulerMarks.map((ratio) => {
+              const time = Math.max(0, duration * ratio);
+              return (
+                <span key={ratio} style={timelineRulerMarkStyle(ratio)}>
+                  {formatStemTimecode(time)}
+                </span>
+              );
+            })}
+          </div>
+          <div style={timelineRulerMetaStyle} data-timeline-pan-zone="true">控制</div>
+          <div style={timelineRulerMetaStyle} data-timeline-pan-zone="true">音量</div>
+          {showAdvancedControls && (
+            <>
+              <div style={timelineRulerMetaStyle} data-timeline-pan-zone="true">声像</div>
+              <div style={timelineRulerMetaStyle} data-timeline-pan-zone="true">裁剪</div>
+            </>
+          )}
+        </div>
+        {visibleStems.map((stem, index) => {
           const state = tracks[stem.type] || defaultTrackState();
+          const trackClipState = resolveTrackClipState(state, duration);
           const trimEnd = state.trimEnd ?? duration;
           const clipDuration = Math.max(0, trimEnd - state.trimStart);
           const isAudible = !state.muted && (!hasSoloTrack || state.solo);
@@ -2842,18 +4636,35 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
           return (
             <div
               key={`${stem.type}-${stem.url}`}
-              onClick={() => setSelectedTrackType(stem.type)}
-              style={stemTrackStyle(isAudible, state.solo, showAdvancedControls, isSelectedTrack)}
+              ref={(node) => {
+                trackRowRefs.current[stem.type] = node;
+              }}
+              data-timeline-pan-zone="true"
+              onClick={() => {
+                if (ignoreNextTrackClickRef.current) return;
+                setSelectedTrackType(stem.type);
+              }}
+              style={stemTrackStyle(isAudible, state.solo, showAdvancedControls, isSelectedTrack, timelineGridColumns, timelineMinWidth, trackDensity)}
             >
-              <div style={stemNameStyle}>
+              <div style={stemNameStyle} data-timeline-pan-zone="true">
+                <span
+                  aria-hidden="true"
+                  title={stemAudioStatusLabel(audioStatus)}
+                  style={stemAudioCornerBadgeStyle(audioStatus)}
+                />
+                <span style={stemIndexStyle(isSelectedTrack)}>{String(index + 1).padStart(2, '0')}</span>
                 <span style={stemColorStyle(stem.type)} />
-                <div>
-                  <div style={stemLabelRowStyle}>
+                <div style={stemIdentityStyle}>
+                  <div style={stemTitleRowStyle}>
                     <span style={stemLabelStyle}>{displayName.zh}</span>
-                    {isSelectedTrack && <span style={selectedTrackBadgeStyle}>已选</span>}
-                    <span style={stemAudioStatusBadgeStyle(audioStatus)}>{stemAudioStatusLabel(audioStatus)}</span>
                   </div>
-                  <div style={stemTypeStyle}>{displayName.en}</div>
+                  <div style={stemStatusRowStyle}>
+                    <span style={stemTypeStyle}>{displayName.en}</span>
+                    {isSelectedTrack && <span style={selectedTrackBadgeStyle}>已选</span>}
+                    {state.solo && <span style={stemStateBadgeStyle('solo')}>独奏</span>}
+                    {state.muted && <span style={stemStateBadgeStyle('muted')}>静音</span>}
+                    {state.mutedRanges.length > 0 && <span style={stemStateBadgeStyle('range')}>{state.mutedRanges.length} 段</span>}
+                  </div>
                 </div>
               </div>
 
@@ -2865,48 +4676,57 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
                 duration={duration}
                 trimStart={state.trimStart}
                 trimEnd={trimEnd}
+                clips={trackClipState.clips}
                 mutedRanges={state.mutedRanges}
                 muted={!isAudible}
                 selected={isSelectedTrack}
-                editable={isSelectedTrack}
+                editable
+                snapEnabled={snapToGrid}
+                snapStepSeconds={snapStepSeconds}
                 bufferVersion={bufferVersion}
                 liveSeekOnDrag={!isPlaying}
+                compact={trackDensity === 'compact'}
                 onSelect={() => setSelectedTrackType(stem.type)}
-                onSeek={handleSeek}
-                onTrimChange={(edge, time) => setTrackTrim(stem.type, edge, time)}
+                onSeek={(time, shouldSnap) => handleSeek(snapStemEditorTime(time, duration, shouldSnap, snapStepSeconds))}
+                onTrimChange={(edge, time, shouldSnap) => setTrackTrim(stem.type, edge, time, shouldSnap)}
+                onTrimRangeMove={(nextStart, shouldSnap) => setTrackTrimRange(stem.type, nextStart, shouldSnap)}
+                onClipMove={(clipId, nextStart, shouldSnap) => moveTrackClip(stem.type, clipId, nextStart, shouldSnap)}
               />
 
               <div style={stemButtonsStyle}>
                 <button
                   type="button"
                   aria-pressed={state.muted}
+                  title={state.muted ? '取消静音' : '静音'}
                   onClick={() => toggleTrackFlag(stem.type, 'muted')}
-                  style={trackToggleStyle(state.muted)}
+                  style={trackToggleStyle(state.muted, 'mute')}
                 >
-                  静音
+                  M
                 </button>
                 <button
                   type="button"
                   aria-pressed={state.solo}
+                  title={state.solo ? '取消独奏' : '独奏'}
                   onClick={() => toggleTrackFlag(stem.type, 'solo')}
-                  style={trackToggleStyle(state.solo)}
+                  style={trackToggleStyle(state.solo, 'solo')}
                 >
-                  独奏
+                  S
                 </button>
                 <button
                   type="button"
+                  title="导出单轨 WAV"
                   disabled={!audioBuffer || exportingStemType === stem.type}
                   onClick={() => void exportSingleStem(stem)}
-                  style={trackToggleStyle(exportingStemType === stem.type)}
+                  style={trackToggleStyle(exportingStemType === stem.type, 'export')}
                 >
-                  {exportingStemType === stem.type ? '导出中' : '导出'}
+                  {exportingStemType === stem.type ? '...' : 'WAV'}
                 </button>
                 {(audioStatus === 'failed' || audioStatus === 'pending') && (
                   <button
                     type="button"
                     disabled={isAudioRetrying || loadingCount > 0}
                     onClick={() => void retrySingleStemAudio(stem)}
-                    style={trackToggleStyle(audioStatus === 'failed')}
+                    style={trackToggleStyle(audioStatus === 'failed', 'retry')}
                   >
                     重试
                   </button>
@@ -3059,21 +4879,285 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
   );
 }
 
-const editorStyle: CSSProperties = {
-  marginTop: 12,
-  borderRadius: 12,
-  border: '1px solid rgba(117, 54, 213, 0.28)',
-  background: 'linear-gradient(180deg, rgba(18, 20, 38, 0.92), rgba(8, 10, 20, 0.78))',
-  padding: 18,
-};
+function editorStyle(metrics: DawEditorLayoutMetrics): CSSProperties {
+  return {
+    position: 'relative',
+    width: '100%',
+    maxWidth: '100%',
+    minHeight: '100vh',
+    boxSizing: 'border-box',
+    marginTop: 0,
+    borderRadius: 0,
+    border: 'none',
+    background: `
+      linear-gradient(180deg, rgba(13, 18, 27, 0.99), rgba(4, 8, 14, 0.99)),
+      linear-gradient(90deg, rgba(18, 24, 35, 0.72), transparent 38%)
+    `,
+    padding: `${metrics.headerHeight + 8}px 12px ${metrics.bottomTransportHeight + 18}px ${metrics.sideRailWidth + 8}px`,
+    display: 'grid',
+    gridTemplateColumns: `minmax(0, 1fr) ${metrics.inspectorWidth}px`,
+    gridAutoFlow: 'row dense',
+    gap: 10,
+    alignItems: 'start',
+    overflowX: 'hidden',
+    userSelect: 'none',
+    WebkitUserSelect: 'none',
+    WebkitTouchCallout: 'none',
+  };
+}
+
+type EditorButtonTone = 'neutral' | 'primary' | 'info' | 'success' | 'warning' | 'danger' | 'purple';
+
+function editorButtonChromeStyle({
+  tone = 'neutral',
+  active = false,
+  disabled = false,
+  compact = false,
+  round = false,
+}: {
+  tone?: EditorButtonTone;
+  active?: boolean;
+  disabled?: boolean;
+  compact?: boolean;
+  round?: boolean;
+} = {}): CSSProperties {
+  const palette: Record<EditorButtonTone, {
+    border: string;
+    background: string;
+    activeBackground: string;
+    color: string;
+    activeColor: string;
+    glow: string;
+  }> = {
+    neutral: {
+      border: 'rgba(70, 76, 106, 0.86)',
+      background: 'linear-gradient(180deg, #20253a 0%, #141827 54%, #0d111d 100%)',
+      activeBackground: 'linear-gradient(180deg, #313650 0%, #222842 54%, #151a2c 100%)',
+      color: '#d9dced',
+      activeColor: '#ffffff',
+      glow: 'rgba(148, 163, 184, 0.16)',
+    },
+    primary: {
+      border: 'rgba(190, 167, 255, 0.78)',
+      background: 'linear-gradient(180deg, #9b5cff 0%, #7536d5 55%, #4c1d95 100%)',
+      activeBackground: 'linear-gradient(180deg, #b27aff 0%, #8547e8 55%, #5b21b6 100%)',
+      color: '#ffffff',
+      activeColor: '#ffffff',
+      glow: 'rgba(156, 108, 255, 0.38)',
+    },
+    purple: {
+      border: 'rgba(170, 142, 255, 0.58)',
+      background: 'linear-gradient(180deg, rgba(94, 54, 174, 0.92), rgba(47, 28, 95, 0.92))',
+      activeBackground: 'linear-gradient(180deg, rgba(126, 84, 220, 0.95), rgba(72, 42, 139, 0.95))',
+      color: '#e9ddff',
+      activeColor: '#ffffff',
+      glow: 'rgba(156, 108, 255, 0.3)',
+    },
+    info: {
+      border: 'rgba(96, 165, 250, 0.58)',
+      background: 'linear-gradient(180deg, rgba(37, 99, 235, 0.34), rgba(17, 42, 91, 0.82))',
+      activeBackground: 'linear-gradient(180deg, rgba(59, 130, 246, 0.52), rgba(29, 78, 216, 0.82))',
+      color: '#dbeafe',
+      activeColor: '#f8fbff',
+      glow: 'rgba(96, 165, 250, 0.28)',
+    },
+    success: {
+      border: 'rgba(52, 211, 153, 0.56)',
+      background: 'linear-gradient(180deg, rgba(16, 185, 129, 0.3), rgba(6, 78, 59, 0.78))',
+      activeBackground: 'linear-gradient(180deg, rgba(52, 211, 153, 0.5), rgba(5, 150, 105, 0.76))',
+      color: '#bbf7d0',
+      activeColor: '#ecfdf5',
+      glow: 'rgba(52, 211, 153, 0.25)',
+    },
+    warning: {
+      border: 'rgba(251, 191, 36, 0.58)',
+      background: 'linear-gradient(180deg, rgba(251, 191, 36, 0.27), rgba(120, 53, 15, 0.8))',
+      activeBackground: 'linear-gradient(180deg, rgba(251, 191, 36, 0.48), rgba(180, 83, 9, 0.75))',
+      color: '#fde68a',
+      activeColor: '#fff7d6',
+      glow: 'rgba(251, 191, 36, 0.24)',
+    },
+    danger: {
+      border: 'rgba(248, 113, 113, 0.58)',
+      background: 'linear-gradient(180deg, rgba(239, 68, 68, 0.3), rgba(127, 29, 29, 0.78))',
+      activeBackground: 'linear-gradient(180deg, rgba(248, 113, 113, 0.5), rgba(185, 28, 28, 0.76))',
+      color: '#fecaca',
+      activeColor: '#fff1f2',
+      glow: 'rgba(248, 113, 113, 0.24)',
+    },
+  };
+  const colors = palette[tone];
+
+  return {
+    minHeight: compact ? 24 : 32,
+    borderRadius: round ? 999 : 8,
+    border: `1px solid ${disabled ? 'rgba(48, 52, 76, 0.72)' : colors.border}`,
+    background: disabled ? 'linear-gradient(180deg, rgba(30, 34, 49, 0.62), rgba(13, 17, 29, 0.72))' : active ? colors.activeBackground : colors.background,
+    color: disabled ? '#62687c' : active ? colors.activeColor : colors.color,
+    boxShadow: disabled
+      ? 'inset 0 1px 0 rgba(255,255,255,0.03)'
+      : `inset 0 1px 0 rgba(255,255,255,0.16), inset 0 -2px 0 rgba(0,0,0,0.34), 0 1px 0 rgba(255,255,255,0.04), 0 0 16px ${active ? colors.glow : 'rgba(0,0,0,0)'}`,
+    textShadow: disabled ? 'none' : '0 1px 0 rgba(0,0,0,0.32)',
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    transition: 'border-color 140ms ease, background 140ms ease, box-shadow 140ms ease, color 140ms ease, transform 140ms ease',
+    whiteSpace: 'nowrap',
+  };
+}
 
 const editorHeaderStyle: CSSProperties = {
-  display: 'flex',
+  gridColumn: '1 / -1',
+  position: 'fixed',
+  top: 0,
+  left: 0,
+  right: 0,
+  zIndex: 20,
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr) auto',
   alignItems: 'center',
   justifyContent: 'space-between',
   gap: 12,
-  paddingBottom: 14,
-  borderBottom: '1px solid rgba(48, 52, 76, 0.74)',
+  minWidth: 0,
+  minHeight: 72,
+  padding: '9px 18px 9px 22px',
+  borderRadius: 0,
+  borderBottom: '1px solid rgba(48, 52, 76, 0.72)',
+  background: 'linear-gradient(180deg, rgba(13, 19, 29, 0.98), rgba(7, 11, 19, 0.96))',
+  boxShadow: '0 10px 26px rgba(0, 0, 0, 0.26)',
+};
+
+const editorSideRailStyle: CSSProperties = {
+  position: 'fixed',
+  left: 0,
+  top: 72,
+  bottom: 0,
+  zIndex: 18,
+  width: 48,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'stretch',
+  gap: 8,
+  padding: '10px 6px',
+  boxSizing: 'border-box',
+  borderRight: '1px solid rgba(48, 52, 76, 0.64)',
+  background: 'linear-gradient(180deg, rgba(12, 17, 27, 0.98), rgba(5, 9, 15, 0.98))',
+};
+
+function sideRailButtonStyle(active: boolean, armed = false): CSSProperties {
+  return {
+    ...editorButtonChromeStyle({ tone: active ? 'purple' : armed ? 'info' : 'neutral', active, disabled: false }),
+    minHeight: 54,
+    borderRadius: 9,
+    color: active ? '#f2ebff' : armed ? '#bfdbfe' : '#7e849b',
+    fontSize: 11,
+    fontWeight: 900,
+    writingMode: 'vertical-rl',
+    letterSpacing: 0,
+    boxShadow: active
+      ? 'inset 2px 0 0 rgba(196, 181, 253, 0.9), inset 0 1px 0 rgba(255,255,255,0.16), inset 0 -2px 0 rgba(0,0,0,0.34)'
+      : armed
+        ? 'inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -2px 0 rgba(0,0,0,0.3)'
+        : 'inset 0 1px 0 rgba(255,255,255,0.06), inset 0 -2px 0 rgba(0,0,0,0.24)',
+    transition: 'background 0.16s ease, border-color 0.16s ease, color 0.16s ease',
+  };
+}
+
+const editorHeaderPrimaryStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 18,
+  minWidth: 0,
+};
+
+const editorHeaderSecondaryStyle: CSSProperties = {
+  display: 'none',
+};
+
+const editorBrandStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  minWidth: 172,
+  paddingRight: 20,
+  borderRight: '1px solid rgba(48, 52, 76, 0.72)',
+  textDecoration: 'none',
+  flex: '0 0 auto',
+};
+
+const editorProjectTitleStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 7,
+  minWidth: 0,
+  color: '#f4f4fb',
+  fontSize: 17,
+  fontWeight: 900,
+  whiteSpace: 'nowrap',
+};
+
+const editorHeaderFactsStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 7,
+  minWidth: 0,
+  overflow: 'hidden',
+};
+
+function editorHeaderFactStyle(tone: 'project' | 'neutral' | 'ready' | 'loading' | 'snap'): CSSProperties {
+  const palette: Record<typeof tone, { border: string; background: string; color: string }> = {
+    project: {
+      border: 'rgba(156, 108, 255, 0.34)',
+      background: 'rgba(117, 54, 213, 0.12)',
+      color: '#d8ccff',
+    },
+    neutral: {
+      border: 'rgba(48, 52, 76, 0.78)',
+      background: 'rgba(15, 18, 32, 0.68)',
+      color: '#aeb2c9',
+    },
+    ready: {
+      border: 'rgba(52, 211, 153, 0.36)',
+      background: 'rgba(16, 185, 129, 0.12)',
+      color: '#a7f3d0',
+    },
+    loading: {
+      border: 'rgba(96, 165, 250, 0.38)',
+      background: 'rgba(37, 99, 235, 0.12)',
+      color: '#bfdbfe',
+    },
+    snap: {
+      border: 'rgba(251, 191, 36, 0.38)',
+      background: 'rgba(251, 191, 36, 0.12)',
+      color: '#fde68a',
+    },
+  };
+
+  return {
+    minHeight: 24,
+    maxWidth: tone === 'project' ? 190 : 132,
+    display: 'inline-flex',
+    alignItems: 'center',
+    borderRadius: 999,
+    border: `1px solid ${palette[tone].border}`,
+    background: palette[tone].background,
+    color: palette[tone].color,
+    padding: '0 9px',
+    fontSize: 11,
+    fontWeight: 850,
+    lineHeight: 1,
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    flex: tone === 'project' ? '1 1 128px' : '0 1 auto',
+  };
+}
+
+const editorStatusClusterStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 12,
+  color: '#9ca3af',
+  fontSize: 12,
+  fontVariantNumeric: 'tabular-nums',
+  whiteSpace: 'nowrap',
 };
 
 const editorActionStyle: CSSProperties = {
@@ -3082,18 +5166,15 @@ const editorActionStyle: CSSProperties = {
   justifyContent: 'flex-end',
   gap: 8,
   flexWrap: 'wrap',
+  minWidth: 0,
 };
 
 const primarySmallButtonStyle: CSSProperties = {
+  ...editorButtonChromeStyle({ tone: 'primary' }),
   minHeight: 32,
-  borderRadius: 8,
-  border: '1px solid rgba(156, 108, 255, 0.6)',
-  background: '#7536d5',
-  color: '#fff',
   padding: '6px 11px',
-  cursor: 'pointer',
   fontSize: 12,
-  fontWeight: 800,
+  fontWeight: 900,
 };
 
 const editorEyebrowRowStyle: CSSProperties = {
@@ -3107,6 +5188,18 @@ const editorEyebrowStyle: CSSProperties = {
   color: '#8f92aa',
   fontSize: 11,
   fontWeight: 700,
+};
+
+const editorModeBadgeStyle: CSSProperties = {
+  borderRadius: 999,
+  border: '1px solid rgba(45, 212, 191, 0.36)',
+  background: 'rgba(20, 184, 166, 0.12)',
+  color: '#99f6e4',
+  padding: '2px 8px',
+  fontSize: 10,
+  fontWeight: 900,
+  letterSpacing: 0,
+  textTransform: 'uppercase',
 };
 
 function saveBadgeStyle(tone: StemEditSaveBadgeTone): CSSProperties {
@@ -3152,22 +5245,29 @@ function saveBadgeStyle(tone: StemEditSaveBadgeTone): CSSProperties {
 }
 
 const editorTitleStyle: CSSProperties = {
-  margin: '4px 0 0',
+  margin: 0,
   color: '#f4f4fb',
-  fontSize: 16,
+  fontSize: 17,
+  fontWeight: 900,
+};
+
+const editorProjectMetaStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  flexWrap: 'wrap',
+  gap: 7,
+  marginTop: 7,
+  color: '#9ca3af',
+  fontSize: 11,
   fontWeight: 800,
 };
 
 const ghostButtonStyle: CSSProperties = {
+  ...editorButtonChromeStyle({ tone: 'neutral' }),
   minHeight: 32,
-  borderRadius: 8,
-  border: '1px solid #30344c',
-  background: '#141727',
-  color: '#d8d9e6',
   padding: '6px 11px',
-  cursor: 'pointer',
   fontSize: 12,
-  fontWeight: 700,
+  fontWeight: 850,
 };
 
 function historyButtonStyle(enabled: boolean): CSSProperties {
@@ -3179,38 +5279,134 @@ function historyButtonStyle(enabled: boolean): CSSProperties {
 }
 
 const workbenchTopStyle: CSSProperties = {
-  marginTop: 14,
-  display: 'grid',
-  gridTemplateColumns: 'minmax(320px, 1fr) minmax(360px, 0.92fr)',
-  gap: 12,
-  alignItems: 'stretch',
+  display: 'contents',
 };
 
-const transportPanelStyle: CSSProperties = {
-  borderRadius: 12,
-  border: '1px solid rgba(48, 52, 76, 0.76)',
-  background: 'rgba(7, 9, 18, 0.66)',
-  padding: 14,
-  minWidth: 0,
-};
+function transportPanelStyle(compactTransport: boolean): CSSProperties {
+  return {
+    gridColumn: '1 / -1',
+    order: 5,
+    position: 'fixed',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 40,
+    borderRadius: 0,
+    border: 'none',
+    borderTop: '1px solid rgba(48, 52, 76, 0.86)',
+    background: 'linear-gradient(180deg, rgba(15, 20, 30, 0.98), rgba(7, 11, 18, 0.99))',
+    boxShadow: '0 -18px 44px rgba(0, 0, 0, 0.45)',
+    padding: compactTransport ? '12px 22px' : '12px 22px 14px',
+    minWidth: 0,
+    maxWidth: '100vw',
+    boxSizing: 'border-box',
+    overflowX: 'hidden',
+    backdropFilter: 'blur(18px)',
+  };
+}
 
 const transportStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: '72px 74px minmax(0, 1fr) 62px',
-  gap: 10,
+  gridTemplateColumns: 'minmax(260px, 410px) 116px minmax(220px, 1fr) 84px',
+  gap: 16,
   alignItems: 'center',
 };
 
-const playButtonStyle: CSSProperties = {
-  minHeight: 36,
-  border: 'none',
-  borderRadius: 8,
-  background: '#7536d5',
-  color: '#fff',
-  fontSize: 13,
-  fontWeight: 800,
-  cursor: 'pointer',
+const transportButtonGroupStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  flexWrap: 'wrap',
+  gap: 4,
+  minWidth: 0,
+  padding: 3,
+  borderRadius: 9,
+  border: '1px solid rgba(48, 52, 76, 0.78)',
+  background: 'rgba(7, 9, 18, 0.72)',
 };
+
+const playButtonStyle: CSSProperties = {
+  ...editorButtonChromeStyle({ tone: 'primary', round: true, active: true }),
+  minHeight: 42,
+  minWidth: 58,
+  border: '1px solid rgba(243, 232, 255, 0.92)',
+  background: 'linear-gradient(180deg, #ffffff 0%, #e7ddff 42%, #a78bfa 100%)',
+  color: '#14111f',
+  fontSize: 13,
+  fontWeight: 900,
+  boxShadow: 'inset 0 2px 0 rgba(255,255,255,0.9), inset 0 -3px 0 rgba(91, 33, 182, 0.34), 0 0 22px rgba(167, 139, 250, 0.32)',
+  textShadow: '0 1px 0 rgba(255,255,255,0.44)',
+};
+
+function transportIconButtonStyle(disabled: boolean): CSSProperties {
+  return {
+    ...editorButtonChromeStyle({ tone: 'neutral', compact: false, disabled }),
+    minWidth: 42,
+    minHeight: 34,
+    padding: '0 8px',
+    fontSize: 11,
+    fontWeight: 900,
+    fontVariantNumeric: 'tabular-nums',
+    whiteSpace: 'nowrap',
+  };
+}
+
+const transportEditBarStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  flexWrap: 'wrap',
+  gap: 6,
+  marginTop: 7,
+  paddingTop: 7,
+  borderTop: '1px solid rgba(48, 52, 76, 0.56)',
+};
+
+const transportEditLabelStyle: CSSProperties = {
+  maxWidth: 180,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+  color: '#e8e6ff',
+  fontSize: 11,
+  fontWeight: 900,
+};
+
+function transportEditButtonStyle(disabled: boolean): CSSProperties {
+  return {
+    ...editorButtonChromeStyle({ tone: 'purple', compact: true, round: true, disabled }),
+    minHeight: 24,
+    padding: '0 9px',
+    fontSize: 11,
+    fontWeight: 900,
+  };
+}
+
+function transportLoopButtonStyle(active: boolean): CSSProperties {
+  return {
+    ...editorButtonChromeStyle({ tone: active ? 'success' : 'purple', compact: true, round: true, active }),
+    minHeight: 24,
+    padding: '0 9px',
+    fontSize: 11,
+    fontWeight: 900,
+  };
+}
+
+const transportOptionBarStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  flexWrap: 'wrap',
+  gap: 6,
+  marginTop: 6,
+};
+
+function transportOptionButtonStyle(active: boolean, disabled: boolean): CSSProperties {
+  return {
+    ...editorButtonChromeStyle({ tone: active ? 'success' : 'info', compact: true, round: true, active, disabled }),
+    minHeight: 24,
+    padding: '0 9px',
+    fontSize: 11,
+    fontWeight: 900,
+  };
+}
 
 const timeStyle: CSSProperties = {
   color: '#cfd0dc',
@@ -3241,10 +5437,17 @@ const timelineStyle: CSSProperties = {
 const mixerSummaryStyle: CSSProperties = {
   display: 'flex',
   flexWrap: 'wrap',
-  gap: 10,
-  marginTop: 12,
+  gap: 8,
+  marginTop: 7,
   color: '#9ca3af',
   fontSize: 11,
+};
+
+const readinessDockStyle: CSSProperties = {
+  gridColumn: '1 / -1',
+  order: 2,
+  minWidth: 0,
+  display: 'none',
 };
 
 function readinessPanelStyle(level: StemEditorReadinessLevel): CSSProperties {
@@ -3268,10 +5471,10 @@ function readinessPanelStyle(level: StemEditorReadinessLevel): CSSProperties {
   };
 
   return {
-    marginTop: 12,
+    marginTop: 8,
     borderRadius: 10,
     ...palette[level],
-    padding: '10px 12px',
+    padding: '8px 10px',
     display: 'grid',
     gridTemplateColumns: 'minmax(0, 1fr) auto',
     gap: 12,
@@ -3310,19 +5513,112 @@ const readinessMetricStyle: CSSProperties = {
   whiteSpace: 'nowrap',
 };
 
-const controlGridStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-  gap: 10,
-  minWidth: 0,
+function controlGridStyle(collapsed: boolean): CSSProperties {
+  return {
+    order: 4,
+    gridColumn: '2',
+    position: 'sticky',
+    top: 82,
+    display: 'grid',
+    gridTemplateColumns: 'minmax(0, 1fr)',
+    gap: 10,
+    minWidth: 0,
+    alignSelf: 'start',
+    maxHeight: 'calc(100vh - 104px)',
+    overflowY: 'auto',
+    overflowX: 'hidden',
+    paddingRight: collapsed ? 0 : 2,
+  };
+}
+
+function inspectorHeaderStyle(collapsed: boolean): CSSProperties {
+  return {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: collapsed ? 'center' : 'space-between',
+    flexDirection: collapsed ? 'column' : 'row',
+    gap: collapsed ? 6 : 10,
+    minHeight: collapsed ? 104 : 46,
+    padding: collapsed ? '9px 6px' : '8px 10px',
+    borderRadius: 8,
+    border: '1px solid rgba(48, 52, 76, 0.74)',
+    background: 'linear-gradient(180deg, rgba(15, 18, 32, 0.9), rgba(9, 11, 21, 0.88))',
+    textAlign: collapsed ? 'center' : 'left',
+  };
+}
+
+const inspectorEyebrowStyle: CSSProperties = {
+  color: '#717791',
+  fontSize: 10,
+  fontWeight: 900,
+  textTransform: 'uppercase',
+  letterSpacing: 0,
 };
 
+const inspectorTitleStyle: CSSProperties = {
+  marginTop: 2,
+  color: '#f4f4fb',
+  fontSize: 14,
+  fontWeight: 900,
+};
+
+const inspectorBadgeStyle: CSSProperties = {
+  maxWidth: 130,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+  borderRadius: 999,
+  border: '1px solid rgba(125, 211, 252, 0.34)',
+  background: 'rgba(14, 165, 233, 0.12)',
+  color: '#bae6fd',
+  padding: '3px 8px',
+  fontSize: 11,
+  fontWeight: 900,
+};
+
+const inspectorTabsStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+  gap: 4,
+  minWidth: 0,
+  padding: 3,
+  borderRadius: 9,
+  border: '1px solid rgba(48, 52, 76, 0.74)',
+  background: 'rgba(7, 9, 18, 0.72)',
+};
+
+function inspectorTabButtonStyle(active: boolean): CSSProperties {
+  return {
+    ...editorButtonChromeStyle({ tone: 'purple', compact: true, active }),
+    minHeight: 30,
+    borderRadius: 7,
+    color: active ? '#f2ebff' : '#9ca3af',
+    fontSize: 12,
+    fontWeight: 900,
+    boxShadow: active
+      ? 'inset 0 1px 0 rgba(255,255,255,0.14), inset 0 -2px 0 rgba(0,0,0,0.34), 0 0 14px rgba(156, 108, 255, 0.22)'
+      : 'inset 0 1px 0 rgba(255,255,255,0.04), inset 0 -2px 0 rgba(0,0,0,0.2)',
+  };
+}
+
+function inspectorCollapseButtonStyle(collapsed: boolean): CSSProperties {
+  return {
+    ...editorButtonChromeStyle({ tone: 'purple', compact: true, round: collapsed, active: collapsed }),
+    borderRadius: collapsed ? 999 : 7,
+    minHeight: collapsed ? 28 : 26,
+    padding: collapsed ? '0 8px' : '0 9px',
+    fontSize: 11,
+    fontWeight: 900,
+  };
+}
+
 const selectedTrackPanelStyle: CSSProperties = {
-  gridColumn: '1 / -1',
-  borderRadius: 10,
-  border: '1px solid rgba(156, 108, 255, 0.28)',
-  background: 'rgba(12, 15, 29, 0.72)',
-  padding: 12,
+  gridColumn: 'auto',
+  gridRow: 'auto',
+  borderRadius: 8,
+  border: '1px solid rgba(48, 52, 76, 0.82)',
+  background: 'linear-gradient(180deg, rgba(13, 18, 29, 0.94), rgba(7, 11, 20, 0.92))',
+  padding: 14,
   minWidth: 0,
 };
 
@@ -3358,6 +5654,7 @@ const selectedTrackActionsStyle: CSSProperties = {
   flexWrap: 'wrap',
   gap: 7,
   alignItems: 'center',
+  minWidth: 0,
 };
 
 const mutedRangeListStyle: CSSProperties = {
@@ -3390,20 +5687,17 @@ const mutedRangeTimeStyle: CSSProperties = {
 };
 
 const mutedRangeRestoreButtonStyle: CSSProperties = {
+  ...editorButtonChromeStyle({ tone: 'danger', compact: true }),
   minHeight: 22,
   borderRadius: 7,
-  border: '1px solid rgba(248, 113, 113, 0.5)',
-  background: 'rgba(127, 29, 29, 0.3)',
   padding: '3px 8px',
-  cursor: 'pointer',
-  color: '#fee2e2',
   fontSize: 11,
-  fontWeight: 800,
+  fontWeight: 900,
 };
 
 const selectedTrackStatsStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
   gap: 7,
   marginTop: 10,
   color: '#d8d9e6',
@@ -3413,7 +5707,7 @@ const selectedTrackStatsStyle: CSSProperties = {
 
 const selectedTrackControlsGridStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
   gap: 10,
   marginTop: 10,
 };
@@ -3448,7 +5742,7 @@ const selectedTrackNumberInputStyle: CSSProperties = {
 
 const selectedTrackNudgeGridStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(86px, 1fr))',
   gap: 7,
   marginTop: 10,
 };
@@ -3461,9 +5755,9 @@ const selectedTrackShortcutStyle: CSSProperties = {
 
 const controlPanelStyle: CSSProperties = {
   minWidth: 0,
-  borderRadius: 12,
-  border: '1px solid rgba(48, 52, 76, 0.74)',
-  background: 'rgba(12, 15, 27, 0.74)',
+  borderRadius: 8,
+  border: '1px solid rgba(48, 52, 76, 0.82)',
+  background: 'rgba(10, 14, 24, 0.92)',
   padding: '10px 12px',
 };
 
@@ -3487,39 +5781,57 @@ const masterOutputControlStyle: CSSProperties = {
 };
 
 const presetLabelStyle: CSSProperties = {
-  color: '#9ca3af',
+  color: '#e5e7f3',
   fontSize: 12,
-  fontWeight: 800,
+  fontWeight: 900,
   marginRight: 2,
 };
 
+const panelHeadingStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 8,
+  minWidth: 0,
+};
+
+const panelHeadingMetaStyle: CSSProperties = {
+  color: '#717791',
+  fontSize: 10,
+  fontWeight: 900,
+  textTransform: 'uppercase',
+  letterSpacing: 0,
+};
+
 const presetButtonStyle: CSSProperties = {
+  ...editorButtonChromeStyle({ tone: 'purple', compact: true }),
   minHeight: 30,
   borderRadius: 7,
-  border: '1px solid rgba(156, 108, 255, 0.42)',
-  background: 'rgba(117, 54, 213, 0.16)',
-  color: '#dfd7ff',
   padding: '5px 10px',
-  cursor: 'pointer',
   fontSize: 12,
-  fontWeight: 800,
+  fontWeight: 900,
+  minWidth: 0,
 };
 
 function viewModeButtonStyle(active: boolean): CSSProperties {
   return {
-    ...presetButtonStyle,
-    border: active ? '1px solid rgba(156, 108, 255, 0.82)' : presetButtonStyle.border,
-    background: active ? 'rgba(117, 54, 213, 0.34)' : presetButtonStyle.background,
-    color: active ? '#f2ebff' : presetButtonStyle.color,
+    ...editorButtonChromeStyle({ tone: 'purple', compact: true, active }),
+    minHeight: 30,
+    borderRadius: 7,
+    padding: '5px 10px',
+    fontSize: 12,
+    fontWeight: 900,
+    minWidth: 0,
   };
 }
 
 const exportPanelStyle: CSSProperties = {
+  gridColumn: 'auto',
   minWidth: 0,
   padding: '10px 12px',
-  borderRadius: 12,
-  border: '1px solid rgba(48, 52, 76, 0.74)',
-  background: 'rgba(12, 15, 27, 0.84)',
+  borderRadius: 8,
+  border: '1px solid rgba(48, 52, 76, 0.82)',
+  background: 'rgba(10, 14, 24, 0.94)',
 };
 
 const exportPanelHeaderStyle: CSSProperties = {
@@ -3534,7 +5846,7 @@ const exportPanelHeaderStyle: CSSProperties = {
 
 const exportModeGridStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(86px, 1fr))',
   gap: 8,
   marginTop: 8,
 };
@@ -3546,17 +5858,31 @@ const exportReadinessGridStyle: CSSProperties = {
   marginTop: 8,
 };
 
+const exportActionGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  gap: 8,
+  marginTop: 10,
+};
+
+function exportPrimaryActionStyle(disabled: boolean): CSSProperties {
+  return {
+    ...editorButtonChromeStyle({ tone: 'primary', disabled }),
+    minHeight: 34,
+    padding: '6px 10px',
+    fontSize: 12,
+    fontWeight: 900,
+  };
+}
+
 function exportModeButtonStyle(active: boolean): CSSProperties {
   return {
+    ...editorButtonChromeStyle({ tone: 'purple', active }),
     minHeight: 32,
     borderRadius: 8,
-    border: active ? '1px solid rgba(156, 108, 255, 0.86)' : '1px solid rgba(48, 52, 76, 0.9)',
-    background: active ? 'rgba(117, 54, 213, 0.34)' : '#141727',
-    color: active ? '#f2ebff' : '#c9ccdc',
     padding: '6px 8px',
-    cursor: 'pointer',
     fontSize: 12,
-    fontWeight: 800,
+    fontWeight: 900,
   };
 }
 
@@ -3667,6 +5993,21 @@ const exportStatusDetailStyle: CSSProperties = {
   lineHeight: 1.45,
 };
 
+const exportDownloadLinkStyle: CSSProperties = {
+  ...editorButtonChromeStyle({ tone: 'info', compact: true, active: true }),
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginTop: 8,
+  minHeight: 30,
+  padding: '0 12px',
+  borderRadius: 7,
+  color: '#cffafe',
+  fontSize: 12,
+  fontWeight: 900,
+  textDecoration: 'none',
+};
+
 const exportHistoryStyle: CSSProperties = {
   marginTop: 10,
   padding: '8px 10px',
@@ -3694,15 +6035,12 @@ const exportHistoryHeaderActionsStyle: CSSProperties = {
 };
 
 const exportHistoryClearButtonStyle: CSSProperties = {
+  ...editorButtonChromeStyle({ tone: 'neutral', compact: true }),
   minHeight: 24,
   borderRadius: 7,
-  border: '1px solid rgba(48, 52, 76, 0.9)',
-  background: '#141727',
-  color: '#cfd3e6',
   padding: '3px 7px',
-  cursor: 'pointer',
   fontSize: 11,
-  fontWeight: 800,
+  fontWeight: 900,
 };
 
 const exportHistoryListStyle: CSSProperties = {
@@ -3739,6 +6077,8 @@ const exportHistoryDetailStyle: CSSProperties = {
 };
 
 const playbackErrorStyle: CSSProperties = {
+  gridColumn: '1 / -1',
+  order: 2,
   marginTop: 10,
   borderRadius: 8,
   border: '1px solid rgba(248, 113, 113, 0.28)',
@@ -3749,19 +6089,18 @@ const playbackErrorStyle: CSSProperties = {
 };
 
 const inlineRetryButtonStyle: CSSProperties = {
+  ...editorButtonChromeStyle({ tone: 'danger', compact: true }),
   marginLeft: 10,
   minHeight: 26,
   borderRadius: 7,
-  border: '1px solid rgba(248, 113, 113, 0.42)',
-  background: 'rgba(239, 68, 68, 0.14)',
-  color: '#fecaca',
   padding: '4px 9px',
-  cursor: 'pointer',
   fontSize: 12,
-  fontWeight: 800,
+  fontWeight: 900,
 };
 
 const loadingNoticeStyle: CSSProperties = {
+  gridColumn: '1 / -1',
+  order: 2,
   marginTop: 10,
   borderRadius: 8,
   border: '1px solid rgba(192, 167, 252, 0.22)',
@@ -3771,34 +6110,96 @@ const loadingNoticeStyle: CSSProperties = {
   fontSize: 12,
 };
 
-const saveNoticeStyle: CSSProperties = {
-  marginTop: 10,
-  borderRadius: 8,
-  border: '1px solid rgba(34, 197, 94, 0.28)',
-  background: 'rgba(34, 197, 94, 0.1)',
-  color: '#86efac',
-  padding: '8px 10px',
-  fontSize: 12,
+const editorStatusToastDockStyle: CSSProperties = {
+  position: 'fixed',
+  top: 84,
+  right: 18,
+  zIndex: 19,
+  display: 'grid',
+  gap: 6,
+  width: 'min(390px, calc(100vw - 86px))',
+  pointerEvents: 'none',
 };
 
-const autoSaveNoticeStyle: CSSProperties = {
-  marginTop: 10,
-  borderRadius: 8,
-  border: '1px solid rgba(59, 130, 246, 0.24)',
-  background: 'rgba(37, 99, 235, 0.1)',
-  color: '#bfdbfe',
-  padding: '8px 10px',
-  fontSize: 12,
+function editorStatusToastStyle(tone: 'save' | 'auto', dismissing = false): CSSProperties {
+  const saveTone = tone === 'save';
+  return {
+    display: 'grid',
+    gridTemplateColumns: '18px minmax(0, 1fr)',
+    alignItems: 'center',
+    gap: 8,
+    minHeight: 32,
+    borderRadius: 8,
+    border: saveTone ? '1px solid rgba(34, 197, 94, 0.36)' : '1px solid rgba(59, 130, 246, 0.34)',
+    background: saveTone ? 'rgba(5, 46, 22, 0.86)' : 'rgba(15, 23, 42, 0.88)',
+    boxShadow: '0 12px 32px rgba(0, 0, 0, 0.28)',
+    backdropFilter: 'blur(14px)',
+    color: saveTone ? '#bbf7d0' : '#bfdbfe',
+    padding: '6px 10px',
+    fontSize: 11,
+    fontWeight: 800,
+    pointerEvents: 'auto',
+    opacity: dismissing ? 0 : 1,
+    transform: dismissing ? 'translateY(-6px) scale(0.98)' : 'translateY(0) scale(1)',
+    transition: `opacity ${STATUS_TOAST_FADE_MS}ms ease, transform ${STATUS_TOAST_FADE_MS}ms ease`,
+  };
+}
+
+function editorStatusToastIconStyle(tone: 'save' | 'auto'): CSSProperties {
+  const saveTone = tone === 'save';
+  return {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    border: saveTone ? '1px solid rgba(74, 222, 128, 0.46)' : '1px solid rgba(96, 165, 250, 0.46)',
+    background: saveTone ? 'rgba(34, 197, 94, 0.18)' : 'rgba(59, 130, 246, 0.18)',
+    color: saveTone ? '#86efac' : '#93c5fd',
+    fontSize: 11,
+    fontWeight: 900,
+  };
+}
+
+const editorStatusToastTextStyle: CSSProperties = {
+  minWidth: 0,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
 };
 
-const trackListStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 9,
-  marginTop: 14,
-  paddingTop: 12,
-  borderTop: '1px solid rgba(48, 52, 76, 0.74)',
-};
+function trackListStyle(trackDensity: TrackDensity, isPanning = false): CSSProperties {
+  return {
+    position: 'relative',
+    gridColumn: '1',
+    order: 3,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 0,
+    marginTop: 0,
+    padding: '0 0 8px',
+    border: '1px solid rgba(48, 52, 76, 0.84)',
+    borderRadius: 8,
+    background: `
+      linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px),
+      linear-gradient(180deg, rgba(255,255,255,0.035) 1px, transparent 1px),
+      linear-gradient(180deg, rgba(9, 13, 22, 0.96), rgba(4, 8, 15, 0.96))
+    `,
+    backgroundSize: trackDensity === 'compact' ? '76px 100%, 100% 54px, auto' : '76px 100%, 100% 66px, auto',
+    minWidth: 0,
+    maxWidth: '100%',
+    boxSizing: 'border-box',
+    overflowX: 'auto',
+    outline: 'none',
+    overscrollBehaviorX: 'contain',
+    cursor: isPanning ? 'grabbing' : 'default',
+    userSelect: 'none',
+    WebkitUserSelect: 'none',
+    WebkitTouchCallout: 'none',
+    touchAction: 'pan-y',
+  };
+}
 
 const emptyTrackNoticeStyle: CSSProperties = {
   borderRadius: 10,
@@ -3810,55 +6211,580 @@ const emptyTrackNoticeStyle: CSSProperties = {
   textAlign: 'center',
 };
 
-function stemTrackStyle(audible: boolean, solo: boolean, advanced: boolean, selectedTrack: boolean): CSSProperties {
+function timelineToolbarStyle(minWidth: number): CSSProperties {
   return {
+    position: 'sticky',
+    top: 0,
+    zIndex: 5,
     display: 'grid',
-    gridTemplateColumns: advanced
-      ? 'minmax(150px, 0.62fr) minmax(240px, 1.25fr) auto minmax(130px, 160px) minmax(130px, 160px) minmax(220px, 0.95fr)'
-      : 'minmax(150px, 0.7fr) minmax(280px, 1.6fr) auto minmax(140px, 180px)',
+    gridTemplateColumns: 'minmax(130px, auto) auto minmax(0, 1fr)',
     alignItems: 'center',
     gap: 12,
-    borderRadius: 10,
+    minWidth,
+    boxSizing: 'border-box',
+    minHeight: 44,
+    padding: '7px 10px',
+    borderRadius: 0,
+    border: 'none',
+    borderBottom: '1px solid rgba(48, 52, 76, 0.82)',
+    background: 'linear-gradient(180deg, rgba(10, 14, 24, 0.98), rgba(7, 10, 18, 0.98))',
+    boxShadow: '0 10px 22px rgba(0,0,0,0.18)',
+  };
+}
+
+const timelineToolbarEyebrowStyle: CSSProperties = {
+  color: '#717791',
+  fontSize: 10,
+  fontWeight: 900,
+  textTransform: 'uppercase',
+  letterSpacing: 0,
+};
+
+const timelineToolbarTitleStyle: CSSProperties = {
+  marginTop: 2,
+  color: '#f4f4fb',
+  fontSize: 14,
+  fontWeight: 900,
+};
+
+const timelineToolbarStatsStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'flex-end',
+  gap: 6,
+  flexWrap: 'wrap',
+};
+
+const timelineZoomControlsStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 4,
+  padding: 3,
+  borderRadius: 7,
+  border: '1px solid rgba(48, 52, 76, 0.74)',
+  background: 'rgba(7, 9, 18, 0.72)',
+};
+
+function timelineZoomButtonStyle(disabled: boolean): CSSProperties {
+  return {
+    ...editorButtonChromeStyle({ tone: 'purple', compact: true, disabled }),
+    width: 24,
+    height: 22,
+    borderRadius: 5,
+    fontSize: 13,
+    fontWeight: 900,
+    lineHeight: 1,
+  };
+}
+
+const timelineZoomValueStyle: CSSProperties = {
+  minWidth: 42,
+  color: '#cfd3e6',
+  fontSize: 11,
+  fontWeight: 900,
+  fontVariantNumeric: 'tabular-nums',
+  textAlign: 'center',
+};
+
+const timelineZoomFitButtonStyle: CSSProperties = {
+  ...editorButtonChromeStyle({ tone: 'neutral', compact: true }),
+  minHeight: 22,
+  borderRadius: 5,
+  padding: '0 7px',
+  fontSize: 10,
+  fontWeight: 900,
+};
+
+const timelineToolbarPillStyle: CSSProperties = {
+  borderRadius: 999,
+  border: '1px solid rgba(156, 108, 255, 0.3)',
+  background: 'rgba(117, 54, 213, 0.12)',
+  color: '#d8ccff',
+  padding: '3px 8px',
+  fontSize: 11,
+  fontWeight: 800,
+  whiteSpace: 'nowrap',
+};
+
+const timelineSelectionActionsStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 4,
+  minHeight: 24,
+  padding: 2,
+  borderRadius: 999,
+  border: '1px solid rgba(83, 88, 123, 0.52)',
+  background: 'rgba(10, 13, 24, 0.64)',
+  whiteSpace: 'nowrap',
+};
+
+function timelineSelectionActionButtonStyle(disabled: boolean): CSSProperties {
+  return {
+    ...editorButtonChromeStyle({ tone: 'info', compact: true, round: true, disabled }),
+    minHeight: 20,
+    padding: '0 7px',
+    fontSize: 10,
+    fontWeight: 900,
+  };
+}
+
+function timelineSelectionLoopButtonStyle(active: boolean): CSSProperties {
+  return {
+    ...editorButtonChromeStyle({ tone: active ? 'success' : 'info', compact: true, round: true, active }),
+    minHeight: 20,
+    padding: '0 7px',
+    fontSize: 10,
+    fontWeight: 900,
+  };
+}
+
+function timelineFollowButtonStyle(active: boolean): CSSProperties {
+  return {
+    ...editorButtonChromeStyle({ tone: 'success', compact: true, round: true, active }),
+    minHeight: 24,
+    padding: '0 9px',
+    fontSize: 11,
+    fontWeight: 900,
+  };
+}
+
+function timelineSnapButtonStyle(active: boolean): CSSProperties {
+  return {
+    ...editorButtonChromeStyle({ tone: 'warning', compact: true, round: true, active }),
+    minHeight: 24,
+    padding: '0 9px',
+    fontSize: 11,
+    fontWeight: 900,
+  };
+}
+
+function timelineSnapStepButtonStyle(disabled: boolean): CSSProperties {
+  return {
+    ...editorButtonChromeStyle({ tone: 'warning', compact: true, round: true, disabled }),
+    minHeight: 24,
+    padding: '0 9px',
+    fontSize: 11,
+    fontWeight: 900,
+  };
+}
+
+function timelinePrecisionHintStyle(active: boolean): CSSProperties {
+  return {
+    minHeight: 24,
+    display: 'inline-flex',
+    alignItems: 'center',
+    borderRadius: 999,
+    border: active ? '1px solid rgba(96, 165, 250, 0.34)' : '1px solid rgba(48, 52, 76, 0.72)',
+    background: active ? 'rgba(37, 99, 235, 0.12)' : 'rgba(10, 13, 24, 0.58)',
+    color: active ? '#bfdbfe' : '#6b7280',
+    padding: '0 9px',
+    fontSize: 11,
+    fontWeight: 900,
+    whiteSpace: 'nowrap',
+  };
+}
+
+function timelineDensityButtonStyle(active: boolean): CSSProperties {
+  return {
+    ...editorButtonChromeStyle({ tone: 'success', compact: true, round: true, active }),
+    minHeight: 24,
+    padding: '0 9px',
+    fontSize: 11,
+    fontWeight: 900,
+  };
+}
+
+function timelineHelpButtonStyle(active: boolean): CSSProperties {
+  return {
+    ...editorButtonChromeStyle({ tone: 'purple', compact: true, round: true, active }),
+    minHeight: 24,
+    padding: '0 9px',
+    fontSize: 11,
+    fontWeight: 900,
+  };
+}
+
+function timelineShortcutHelpStyle(minWidth: number): CSSProperties {
+  return {
+    position: 'sticky',
+    top: 49,
+    zIndex: 5,
+    display: 'grid',
+    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+    gap: 6,
+    minWidth,
+    boxSizing: 'border-box',
+    padding: '7px 10px',
+    borderRadius: 7,
+    border: '1px solid rgba(156, 108, 255, 0.28)',
+    background: 'linear-gradient(180deg, rgba(20, 23, 39, 0.96), rgba(10, 13, 24, 0.94))',
+    color: '#aeb2c9',
+    fontSize: 11,
+    lineHeight: 1.35,
+    boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+  };
+}
+
+const timelineLocateButtonStyle: CSSProperties = {
+  ...editorButtonChromeStyle({ tone: 'info', compact: true, round: true }),
+  minHeight: 24,
+  padding: '0 9px',
+  fontSize: 11,
+  fontWeight: 900,
+};
+
+function timelineScrollProgressStyle(minWidth: number, shortcutHelpOpen: boolean): CSSProperties {
+  return {
+    position: 'sticky',
+    top: shortcutHelpOpen ? 104 : 49,
+    zIndex: 5,
+    minWidth,
+    boxSizing: 'border-box',
+    height: 7,
+    borderRadius: 999,
+    background: 'rgba(255, 255, 255, 0.055)',
+    overflow: 'hidden',
+    cursor: 'ew-resize',
+    userSelect: 'none',
+  };
+}
+
+function timelineScrollThumbStyle(progress: number, viewRatio: number): CSSProperties {
+  const widthPercent = Math.max(10, Math.min(92, viewRatio * 100));
+  const leftPercent = Math.max(0, Math.min(100 - widthPercent, progress * (100 - widthPercent)));
+
+  return {
+    position: 'absolute',
+    left: `${leftPercent}%`,
+    width: `${widthPercent}%`,
+    height: '100%',
+    borderRadius: 999,
+    background: 'linear-gradient(90deg, rgba(125, 211, 252, 0.8), rgba(156, 108, 255, 0.92))',
+    boxShadow: '0 0 12px rgba(156, 108, 255, 0.46)',
+    pointerEvents: 'none',
+    userSelect: 'none',
+    WebkitUserSelect: 'none',
+    WebkitTouchCallout: 'none',
+  };
+}
+
+function timelineRulerStyle(gridColumns: string, minWidth: number): CSSProperties {
+  return {
+    position: 'sticky',
+    top: 44,
+    zIndex: 4,
+    display: 'grid',
+    gridTemplateColumns: gridColumns,
+    gap: TIMELINE_GRID_GAP,
+    alignItems: 'center',
+    minWidth,
+    boxSizing: 'border-box',
+    minHeight: 32,
+    padding: '0 10px',
+    borderRadius: 0,
+    borderBottom: '1px solid rgba(48, 52, 76, 0.72)',
+    background: 'rgba(7, 10, 18, 0.96)',
+    color: '#8f92aa',
+    fontSize: 10,
+    fontWeight: 800,
+    textTransform: 'uppercase',
+    letterSpacing: 0,
+  };
+}
+
+function timelineGlobalPlayheadStyle(currentTime: number, duration: number, laneWidth: number): CSSProperties {
+  const ratio = duration > 0 ? Math.max(0, Math.min(1, currentTime / duration)) : 0;
+  const playheadLeft = 8 + TIMELINE_LABEL_WIDTH + TIMELINE_GRID_GAP + laneWidth * ratio;
+
+  return {
+    position: 'absolute',
+    top: 76,
+    bottom: 10,
+    left: playheadLeft,
+    width: 2,
+    minHeight: 120,
+    borderRadius: 999,
+    background: 'linear-gradient(180deg, rgba(255,255,255,0), rgba(255,255,255,0.92) 8%, rgba(156,108,255,0.96) 50%, rgba(255,255,255,0.74) 92%, rgba(255,255,255,0))',
+    boxShadow: '0 0 0 1px rgba(156,108,255,0.18), 0 0 18px rgba(156,108,255,0.42)',
+    pointerEvents: 'none',
+    zIndex: 3,
+  };
+}
+
+function timelineGlobalPlayheadBadgeStyle(currentTime: number, duration: number, laneWidth: number): CSSProperties {
+  const ratio = duration > 0 ? Math.max(0, Math.min(1, currentTime / duration)) : 0;
+  const playheadLeft = 8 + TIMELINE_LABEL_WIDTH + TIMELINE_GRID_GAP + laneWidth * ratio;
+
+  return {
+    position: 'absolute',
+    top: 55,
+    left: playheadLeft,
+    transform: 'translateX(-50%)',
+    zIndex: 7,
+    borderRadius: 999,
+    border: '1px solid rgba(216, 201, 255, 0.7)',
+    background: 'linear-gradient(180deg, rgba(117, 54, 213, 0.96), rgba(88, 28, 135, 0.94))',
+    color: '#ffffff',
+    padding: '2px 7px',
+    fontSize: 10,
+    fontWeight: 900,
+    fontVariantNumeric: 'tabular-nums',
+    boxShadow: '0 8px 18px rgba(0, 0, 0, 0.28), 0 0 16px rgba(156, 108, 255, 0.38)',
+    pointerEvents: 'none',
+    whiteSpace: 'nowrap',
+  };
+}
+
+const timelineRulerLabelStyle: CSSProperties = {
+  position: 'sticky',
+  left: 8,
+  zIndex: 6,
+  color: '#aeb2c9',
+  alignSelf: 'stretch',
+  display: 'flex',
+  alignItems: 'center',
+  borderRadius: 5,
+  background: 'rgba(7, 9, 18, 0.96)',
+};
+
+const timelineRulerMarksStyle: CSSProperties = {
+  position: 'relative',
+  height: 24,
+  borderRadius: 5,
+  border: '1px solid rgba(48, 52, 76, 0.72)',
+  background: 'rgba(10, 13, 24, 0.74)',
+  overflow: 'visible',
+  cursor: 'pointer',
+  userSelect: 'none',
+  WebkitUserSelect: 'none',
+  WebkitTouchCallout: 'none',
+  touchAction: 'none',
+};
+
+function timelineSelectedRangeStyle(start: number, end: number, duration: number): CSSProperties {
+  const safeDuration = Math.max(duration, 0.001);
+  const startRatio = Math.max(0, Math.min(1, start / safeDuration));
+  const endRatio = Math.max(startRatio, Math.min(1, end / safeDuration));
+
+  return {
+    position: 'absolute',
+    left: `${startRatio * 100}%`,
+    top: 3,
+    width: `${Math.max(0.25, (endRatio - startRatio) * 100)}%`,
+    height: 18,
+    zIndex: 1,
+    borderRadius: 4,
+    border: '1px solid rgba(156, 108, 255, 0.56)',
+    background: 'linear-gradient(90deg, rgba(156, 108, 255, 0.2), rgba(56, 189, 248, 0.16))',
+    boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.045), 0 0 14px rgba(156,108,255,0.18)',
+    pointerEvents: 'none',
+    userSelect: 'none',
+    WebkitUserSelect: 'none',
+    WebkitTouchCallout: 'none',
+  };
+}
+
+function timelineSelectedRangeEdgeStyle(time: number, duration: number, edge: 'start' | 'end'): CSSProperties {
+  const safeRatio = duration > 0 ? Math.max(0, Math.min(1, time / duration)) : 0;
+
+  return {
+    position: 'absolute',
+    left: `${safeRatio * 100}%`,
+    top: -2,
+    bottom: -2,
+    zIndex: 8,
+    width: 7,
+    borderRadius: 999,
+    border: '1px solid rgba(255,255,255,0.86)',
+    background: edge === 'start'
+      ? 'linear-gradient(180deg, #f5f3ff, #a78bfa)'
+      : 'linear-gradient(180deg, #ecfeff, #22d3ee)',
+    boxShadow: edge === 'start'
+      ? '0 0 0 4px rgba(167, 139, 250, 0.18), 0 0 14px rgba(196, 181, 253, 0.56)'
+      : '0 0 0 4px rgba(34, 211, 238, 0.16), 0 0 14px rgba(103, 232, 249, 0.5)',
+    pointerEvents: 'none',
+  };
+}
+
+function timelineRulerGuideLineStyle(ratio: number, active: boolean): CSSProperties {
+  return {
+    position: 'absolute',
+    left: `${Math.max(0, Math.min(1, ratio)) * 100}%`,
+    top: -3,
+    bottom: -3,
+    zIndex: 4,
+    width: active ? 2 : 1,
+    borderRadius: 999,
+    background: active ? '#fef3c7' : 'rgba(191, 219, 254, 0.9)',
+    boxShadow: active ? '0 0 14px rgba(251, 191, 36, 0.58)' : '0 0 9px rgba(96, 165, 250, 0.42)',
+    pointerEvents: 'none',
+  };
+}
+
+function timelineRulerGuideBadgeStyle(ratio: number, active: boolean): CSSProperties {
+  const safeRatio = Math.max(0, Math.min(1, ratio));
+  const nearRightEdge = safeRatio > 0.86;
+  const nearLeftEdge = safeRatio < 0.14;
+
+  return {
+    position: 'absolute',
+    left: `${safeRatio * 100}%`,
+    top: -25,
+    zIndex: 5,
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 5,
+    height: 20,
+    borderRadius: 999,
+    border: active ? '1px solid rgba(251, 191, 36, 0.58)' : '1px solid rgba(96, 165, 250, 0.46)',
+    background: active ? 'rgba(113, 63, 18, 0.96)' : 'rgba(12, 15, 28, 0.94)',
+    color: active ? '#fef3c7' : '#dbeafe',
+    padding: '0 7px',
+    fontSize: 10,
+    fontWeight: 900,
+    fontVariantNumeric: 'tabular-nums',
+    whiteSpace: 'nowrap',
+    transform: nearRightEdge ? 'translateX(-100%)' : nearLeftEdge ? 'none' : 'translateX(-50%)',
+    boxShadow: '0 8px 18px rgba(0, 0, 0, 0.3)',
+    pointerEvents: 'none',
+  };
+}
+
+function timelineRulerMarkStyle(ratio: number): CSSProperties {
+  return {
+    position: 'absolute',
+    left: `${Math.max(0, Math.min(1, ratio)) * 100}%`,
+    top: 0,
+    height: '100%',
+    borderLeft: '1px solid rgba(255,255,255,0.12)',
+    paddingLeft: ratio >= 0.96 ? 0 : 5,
+    transform: ratio >= 0.96 ? 'translateX(-100%)' : 'none',
+    color: '#cfd3e6',
+    fontSize: 10,
+    lineHeight: '22px',
+    fontVariantNumeric: 'tabular-nums',
+    whiteSpace: 'nowrap',
+  };
+}
+
+const timelineRulerMetaStyle: CSSProperties = {
+  color: '#717791',
+  textAlign: 'center',
+};
+
+function stemTrackStyle(
+  audible: boolean,
+  solo: boolean,
+  advanced: boolean,
+  selectedTrack: boolean,
+  gridColumns: string,
+  minWidth: number,
+  trackDensity: TrackDensity,
+): CSSProperties {
+  const accent = selectedTrack
+    ? 'rgba(14, 165, 233, 0.16)'
+    : solo
+      ? 'rgba(117, 54, 213, 0.16)'
+      : 'rgba(16, 19, 33, 0.96)';
+  const compact = trackDensity === 'compact';
+  const rowHeight = resolveDawTrackHeight({ advanced, density: trackDensity, selected: selectedTrack });
+
+  return {
+    display: 'grid',
+    gridTemplateColumns: gridColumns,
+    alignItems: 'center',
+    gap: compact ? Math.max(6, TIMELINE_GRID_GAP - 2) : TIMELINE_GRID_GAP,
+    minWidth,
+    boxSizing: 'border-box',
+    minHeight: rowHeight,
+    borderRadius: 0,
     border: selectedTrack
       ? '1px solid rgba(125, 211, 252, 0.78)'
       : solo
         ? '1px solid rgba(156, 108, 255, 0.82)'
-        : '1px solid #262a40',
-    background: selectedTrack
-      ? 'rgba(14, 165, 233, 0.1)'
-      : solo
-        ? 'rgba(117, 54, 213, 0.12)'
-        : '#101321',
+        : '1px solid transparent',
+    borderBottom: selectedTrack
+      ? '1px solid rgba(125, 211, 252, 0.78)'
+      : '1px solid rgba(38, 42, 64, 0.86)',
+    background: `
+      linear-gradient(90deg, ${accent}, rgba(16, 19, 33, 0.92) 18%, rgba(8, 12, 21, 0.9)),
+      linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0))
+    `,
     boxShadow: selectedTrack
       ? '0 0 0 1px rgba(125, 211, 252, 0.12)'
       : solo
         ? '0 0 0 1px rgba(156, 108, 255, 0.12)'
         : 'none',
     opacity: audible ? 1 : 0.46,
-    padding: '12px 14px',
+    padding: selectedTrack
+      ? compact ? '7px 8px' : '9px 10px'
+      : compact ? '4px 8px' : '6px 10px',
     cursor: 'pointer',
-    transition: 'opacity 140ms ease, border-color 140ms ease, background 140ms ease',
+    transition: 'min-height 180ms ease, opacity 140ms ease, border-color 140ms ease, background 140ms ease, box-shadow 140ms ease, padding 180ms ease',
   };
 }
 
 const stemNameStyle: CSSProperties = {
-  display: 'flex',
+  position: 'sticky',
+  left: 8,
+  zIndex: 2,
+  display: 'grid',
+  gridTemplateColumns: '26px 8px minmax(0, 1fr)',
   alignItems: 'center',
-  gap: 10,
+  gap: 8,
   minWidth: 0,
+  maxWidth: '100%',
+  alignSelf: 'stretch',
+  padding: '4px 8px 4px 0',
+  borderRadius: 6,
+  background: 'linear-gradient(90deg, rgba(13, 16, 28, 0.98), rgba(13, 16, 28, 0.92) 82%, rgba(13, 16, 28, 0))',
+  overflow: 'hidden',
 };
 
-const stemLabelRowStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 7,
+function stemIndexStyle(selectedTrack: boolean): CSSProperties {
+  return {
+    width: 26,
+    flexShrink: 0,
+    color: selectedTrack ? '#e0f2fe' : '#717791',
+    fontSize: 11,
+    fontWeight: 900,
+    fontVariantNumeric: 'tabular-nums',
+    textAlign: 'right',
+  };
+}
+
+const stemIdentityStyle: CSSProperties = {
+  display: 'grid',
+  gap: 4,
   minWidth: 0,
+  overflow: 'hidden',
+};
+
+const stemTitleRowStyle: CSSProperties = {
+  minWidth: 0,
+  overflow: 'hidden',
 };
 
 const stemLabelStyle: CSSProperties = {
+  display: 'block',
   color: '#f0f1fb',
   fontSize: 13,
-  fontWeight: 800,
+  fontWeight: 900,
+  lineHeight: 1.15,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+};
+
+const stemStatusRowStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 4,
+  minWidth: 0,
+  maxWidth: '100%',
+  minHeight: 18,
+  overflow: 'hidden',
 };
 
 const selectedTrackBadgeStyle: CSSProperties = {
@@ -3866,18 +6792,42 @@ const selectedTrackBadgeStyle: CSSProperties = {
   border: '1px solid rgba(125, 211, 252, 0.42)',
   background: 'rgba(14, 165, 233, 0.14)',
   color: '#bae6fd',
-  padding: '1px 6px',
-  fontSize: 10,
-  fontWeight: 800,
+  padding: '1px 5px',
+  fontSize: 9,
+  fontWeight: 900,
+  lineHeight: 1.25,
   whiteSpace: 'nowrap',
+  flexShrink: 0,
 };
 
 function stemAudioStatusLabel(status: StemTrackAudioStatus) {
-  if (status === 'ready') return '已就绪';
-  if (status === 'loading') return '加载中';
+  if (status === 'ready') return '已缓存';
+  if (status === 'loading') return '缓存中';
   if (status === 'failed') return '失败';
   if (status === 'skipped') return '空轨';
   return '待加载';
+}
+
+function stemAudioCornerBadgeStyle(status: StemTrackAudioStatus): CSSProperties {
+  const palette: Record<StemTrackAudioStatus, string> = {
+    ready: '#34d399',
+    loading: '#60a5fa',
+    failed: '#f87171',
+    skipped: '#94a3b8',
+    pending: '#fbbf24',
+  };
+
+  return {
+    position: 'absolute',
+    top: 5,
+    left: 5,
+    width: 7,
+    height: 7,
+    borderRadius: 999,
+    background: palette[status],
+    boxShadow: `0 0 0 2px rgba(8, 12, 21, 0.96), 0 0 10px ${palette[status]}66`,
+    pointerEvents: 'none',
+  };
 }
 
 function stemAudioStatusBadgeStyle(status: StemTrackAudioStatus): CSSProperties {
@@ -3912,45 +6862,95 @@ function stemAudioStatusBadgeStyle(status: StemTrackAudioStatus): CSSProperties 
   return {
     borderRadius: 999,
     ...palette[status],
-    padding: '1px 6px',
-    fontSize: 10,
-    fontWeight: 800,
+    padding: '1px 5px',
+    fontSize: 9,
+    fontWeight: 900,
+    lineHeight: 1.25,
     whiteSpace: 'nowrap',
+    flexShrink: 0,
+  };
+}
+
+function stemStateBadgeStyle(tone: 'solo' | 'muted' | 'range' | 'volume'): CSSProperties {
+  const palette: Record<typeof tone, { border: string; background: string; color: string }> = {
+    solo: {
+      border: '1px solid rgba(251, 191, 36, 0.46)',
+      background: 'rgba(251, 191, 36, 0.14)',
+      color: '#fde68a',
+    },
+    muted: {
+      border: '1px solid rgba(248, 113, 113, 0.46)',
+      background: 'rgba(248, 113, 113, 0.14)',
+      color: '#fecaca',
+    },
+    range: {
+      border: '1px solid rgba(216, 180, 254, 0.42)',
+      background: 'rgba(126, 34, 206, 0.16)',
+      color: '#e9d5ff',
+    },
+    volume: {
+      border: '1px solid rgba(96, 165, 250, 0.42)',
+      background: 'rgba(37, 99, 235, 0.14)',
+      color: '#bfdbfe',
+    },
+  };
+
+  return {
+    borderRadius: 999,
+    ...palette[tone],
+    padding: '1px 5px',
+    fontSize: 9,
+    fontWeight: 900,
+    lineHeight: 1.25,
+    whiteSpace: 'nowrap',
+    flexShrink: 0,
   };
 }
 
 const stemTypeStyle: CSSProperties = {
   color: '#717791',
-  fontSize: 11,
-  marginTop: 2,
+  fontSize: 10,
+  fontWeight: 700,
+  lineHeight: 1.25,
   textTransform: 'capitalize',
+  minWidth: 0,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+  flex: '1 1 32px',
 };
 
 const stemButtonsStyle: CSSProperties = {
   display: 'flex',
-  gap: 6,
+  gap: 4,
+  justifyContent: 'center',
 };
 
-function trackToggleStyle(active: boolean): CSSProperties {
+function trackToggleStyle(active: boolean, tone: 'mute' | 'solo' | 'export' | 'retry' = 'export'): CSSProperties {
+  const palette: Record<typeof tone, EditorButtonTone> = {
+    mute: 'danger',
+    solo: 'warning',
+    export: 'purple',
+    retry: 'info',
+  };
+
   return {
-    minWidth: 42,
-    minHeight: 30,
-    padding: '0 9px',
-    borderRadius: 7,
-    border: active ? '1px solid rgba(156, 108, 255, 0.75)' : '1px solid #30344c',
-    background: active ? 'rgba(117, 54, 213, 0.28)' : '#171a2c',
-    color: active ? '#eadcff' : '#aeb2c9',
-    cursor: 'pointer',
-    fontSize: 11,
-    fontWeight: 800,
+    ...editorButtonChromeStyle({ tone: palette[tone], compact: true, active }),
+    minWidth: tone === 'export' ? 44 : 28,
+    minHeight: 26,
+    padding: tone === 'export' ? '0 7px' : '0 4px',
+    borderRadius: 6,
+    fontSize: 10,
+    fontWeight: 900,
+    fontVariantNumeric: 'tabular-nums',
   };
 }
 
 const volumeStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: '42px minmax(0, 1fr)',
+  gridTemplateColumns: '36px minmax(0, 1fr)',
   alignItems: 'center',
-  gap: 8,
+  gap: 7,
   color: '#9ca3af',
   fontSize: 11,
   fontWeight: 700,
@@ -3958,9 +6958,9 @@ const volumeStyle: CSSProperties = {
 
 const panStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: '42px minmax(0, 1fr)',
+  gridTemplateColumns: '36px minmax(0, 1fr)',
   alignItems: 'center',
-  gap: 8,
+  gap: 7,
   color: '#9ca3af',
   fontSize: 11,
   fontWeight: 700,
@@ -3992,15 +6992,12 @@ const trimHeaderActionsStyle: CSSProperties = {
 };
 
 const trimResetButtonStyle: CSSProperties = {
+  ...editorButtonChromeStyle({ tone: 'neutral', compact: true }),
   minHeight: 22,
   borderRadius: 6,
-  border: '1px solid #30344c',
-  background: '#171a2c',
-  color: '#aeb2c9',
   padding: '2px 7px',
-  cursor: 'pointer',
   fontSize: 10,
-  fontWeight: 800,
+  fontWeight: 900,
 };
 
 const trimControlStyle: CSSProperties = {
@@ -4032,15 +7029,21 @@ function WaveformTrackCanvas({
   duration,
   trimStart,
   trimEnd,
+  clips,
   mutedRanges,
   muted,
   selected,
   editable,
+  snapEnabled,
+  snapStepSeconds,
   bufferVersion,
   liveSeekOnDrag,
+  compact,
   onSelect,
   onSeek,
   onTrimChange,
+  onTrimRangeMove,
+  onClipMove,
 }: {
   buffer: AudioBuffer | null;
   waveform: StemWaveform | null;
@@ -4049,23 +7052,38 @@ function WaveformTrackCanvas({
   duration: number;
   trimStart: number;
   trimEnd: number;
+  clips: StemClip[];
   mutedRanges: StemMutedRange[];
   muted: boolean;
   selected: boolean;
   editable: boolean;
+  snapEnabled: boolean;
+  snapStepSeconds: number;
   bufferVersion: number;
   liveSeekOnDrag: boolean;
+  compact: boolean;
   onSelect: () => void;
-  onSeek: (time: number) => void;
-  onTrimChange: (edge: 'start' | 'end', time: number) => void;
+  onSeek: (time: number, shouldSnap: boolean) => void;
+  onTrimChange: (edge: 'start' | 'end', time: number, shouldSnap: boolean) => void;
+  onTrimRangeMove: (nextStart: number, shouldSnap: boolean) => void;
+  onClipMove: (clipId: string, nextStart: number, shouldSnap: boolean) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const pendingSeekRef = useRef<{ x: number; time: number; moved: boolean; mode: 'click' | 'playhead' } | null>(null);
   const trimDragRef = useRef<{ edge: 'start' | 'end'; moved: boolean } | null>(null);
-  const pendingTrimTimeRef = useRef<number | null>(null);
-  const pendingSeekTimeRef = useRef<number | null>(null);
+  const trimRangeDragRef = useRef<{ anchorTime: number; trimStart: number; trimEnd: number; moved: boolean } | null>(null);
+  const clipDragRef = useRef<{ clipId: string; anchorTime: number; clipStart: number; moved: boolean } | null>(null);
+  const pendingTrimRef = useRef<{ time: number; shouldSnap: boolean } | null>(null);
+  const pendingSeekTimeRef = useRef<{ time: number; shouldSnap: boolean } | null>(null);
   const trimFrameRef = useRef<number | null>(null);
   const seekFrameRef = useRef<number | null>(null);
+  const [pointerGuide, setPointerGuide] = useState<{
+    x: number;
+    time: number;
+    label: string;
+    active: boolean;
+    snapBypassed: boolean;
+  } | null>(null);
   const displayPeaks = useMemo(() => {
     if (waveform?.peaks?.length) return waveform.peaks;
     if (!buffer) return [];
@@ -4080,17 +7098,39 @@ function WaveformTrackCanvas({
     return ratio * duration;
   }, [duration]);
 
-  const scheduleTrimChange = useCallback((time: number) => {
-    pendingTrimTimeRef.current = time;
+  const interactionTimeFromPointer = useCallback((event: PointerEvent<HTMLCanvasElement>) => {
+    const shouldSnap = snapEnabled && !event.altKey;
+    const time = snapStemEditorTime(timeFromPointer(event), duration, shouldSnap, snapStepSeconds);
+    return { time, shouldSnap };
+  }, [duration, snapEnabled, snapStepSeconds, timeFromPointer]);
+
+  const updatePointerGuide = useCallback((
+    event: PointerEvent<HTMLCanvasElement>,
+    label = event.altKey && snapEnabled ? '精修' : '定位',
+    active = false,
+  ) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const { time, shouldSnap } = interactionTimeFromPointer(event);
+    setPointerGuide({
+      x: Math.max(0, Math.min(rect.width, event.clientX - rect.left)),
+      time,
+      label,
+      active,
+      snapBypassed: snapEnabled && !shouldSnap,
+    });
+  }, [interactionTimeFromPointer, snapEnabled]);
+
+  const scheduleTrimChange = useCallback((time: number, shouldSnap: boolean) => {
+    pendingTrimRef.current = { time, shouldSnap };
     if (trimFrameRef.current !== null) return;
 
     trimFrameRef.current = window.requestAnimationFrame(() => {
       trimFrameRef.current = null;
       const dragState = trimDragRef.current;
-      const nextTime = pendingTrimTimeRef.current;
-      pendingTrimTimeRef.current = null;
-      if (!dragState || nextTime === null) return;
-      onTrimChange(dragState.edge, nextTime);
+      const pendingTrim = pendingTrimRef.current;
+      pendingTrimRef.current = null;
+      if (!dragState || !pendingTrim) return;
+      onTrimChange(dragState.edge, pendingTrim.time, pendingTrim.shouldSnap);
     });
   }, [onTrimChange]);
 
@@ -4099,20 +7139,20 @@ function WaveformTrackCanvas({
       window.cancelAnimationFrame(trimFrameRef.current);
       trimFrameRef.current = null;
     }
-    pendingTrimTimeRef.current = null;
+    pendingTrimRef.current = null;
   }, []);
 
-  const scheduleSeekChange = useCallback((time: number) => {
-    pendingSeekTimeRef.current = time;
+  const scheduleSeekChange = useCallback((time: number, shouldSnap: boolean) => {
+    pendingSeekTimeRef.current = { time, shouldSnap };
     if (seekFrameRef.current !== null) return;
 
     seekFrameRef.current = window.requestAnimationFrame(() => {
       seekFrameRef.current = null;
       const pendingSeek = pendingSeekRef.current;
-      const nextTime = pendingSeekTimeRef.current;
+      const pendingSeekTime = pendingSeekTimeRef.current;
       pendingSeekTimeRef.current = null;
-      if (!pendingSeek || pendingSeek.mode !== 'playhead' || nextTime === null) return;
-      onSeek(nextTime);
+      if (!pendingSeek || pendingSeek.mode !== 'playhead' || !pendingSeekTime) return;
+      onSeek(pendingSeekTime.time, pendingSeekTime.shouldSnap);
     });
   }, [onSeek]);
 
@@ -4147,8 +7187,38 @@ function WaveformTrackCanvas({
       if (!context) return;
 
       context.clearRect(0, 0, width, height);
-      context.fillStyle = '#0b0e1c';
+      context.fillStyle = '#080b16';
       context.fillRect(0, 0, width, height);
+
+      const clipGradient = context.createLinearGradient(0, 0, 0, height);
+      clipGradient.addColorStop(0, selected ? 'rgba(156, 108, 255, 0.16)' : 'rgba(255,255,255,0.055)');
+      clipGradient.addColorStop(0.5, selected ? 'rgba(56, 189, 248, 0.08)' : 'rgba(255,255,255,0.025)');
+      clipGradient.addColorStop(1, 'rgba(0,0,0,0)');
+      context.fillStyle = clipGradient;
+      context.fillRect(0, 0, width, height);
+
+      const gridStep = snapEnabled && duration > 0
+        ? Math.max((normalizeTimelineSnapStep(snapStepSeconds) / duration) * width, 18 * ratio)
+        : Math.max(24 * ratio, width / 10);
+      const gridOpacity = snapEnabled ? 0.075 : 0.045;
+      context.strokeStyle = `rgba(255,255,255,${gridOpacity})`;
+      context.lineWidth = Math.max(1, ratio);
+      context.beginPath();
+      for (let x = gridStep; x < width; x += gridStep) {
+        context.moveTo(x, 0);
+        context.lineTo(x, height);
+      }
+      context.stroke();
+      if (snapEnabled && duration > 0) {
+        const majorGridStep = gridStep * 4;
+        context.strokeStyle = 'rgba(251,191,36,0.12)';
+        context.beginPath();
+        for (let x = majorGridStep; x < width; x += majorGridStep) {
+          context.moveTo(x, 0);
+          context.lineTo(x, height);
+        }
+        context.stroke();
+      }
 
       const centerY = height / 2;
       context.strokeStyle = 'rgba(255,255,255,0.08)';
@@ -4158,8 +7228,10 @@ function WaveformTrackCanvas({
       context.stroke();
 
       if (displayPeaks.length && duration > 0) {
-        context.strokeStyle = muted ? 'rgba(148, 163, 184, 0.46)' : color;
-        context.lineWidth = Math.max(1, ratio);
+        context.strokeStyle = muted ? 'rgba(148, 163, 184, 0.4)' : color;
+        context.lineWidth = selected ? Math.max(1.4, 1.4 * ratio) : Math.max(1, ratio);
+        context.shadowColor = muted ? 'transparent' : color;
+        context.shadowBlur = selected ? 6 * ratio : 2 * ratio;
         context.beginPath();
         const step = displayPeaks.length > 1 ? width / (displayPeaks.length - 1) : width;
         displayPeaks.forEach((peak, index) => {
@@ -4169,6 +7241,7 @@ function WaveformTrackCanvas({
           context.lineTo(x, centerY + y);
         });
         context.stroke();
+        context.shadowBlur = 0;
       }
 
       if (!displayPeaks.length) {
@@ -4187,8 +7260,23 @@ function WaveformTrackCanvas({
       context.fillRect(0, 0, startX, height);
       context.fillRect(endX, 0, Math.max(0, width - endX), height);
 
-      context.fillStyle = selected ? 'rgba(156, 108, 255, 0.11)' : 'rgba(255,255,255,0.04)';
+      context.fillStyle = selected ? 'rgba(156, 108, 255, 0.15)' : 'rgba(255,255,255,0.045)';
       context.fillRect(startX, 0, Math.max(0, endX - startX), height);
+
+      clips.forEach((clip) => {
+        const clipStartX = (Math.max(0, Math.min(duration, clip.start)) / duration) * width;
+        const clipEndX = (Math.max(0, Math.min(duration, clip.start + getStemClipDuration(clip))) / duration) * width;
+        if (clipEndX <= clipStartX) return;
+        context.fillStyle = selected ? 'rgba(129, 140, 248, 0.14)' : 'rgba(148, 163, 184, 0.055)';
+        context.fillRect(clipStartX, 0, clipEndX - clipStartX, height);
+        context.strokeStyle = selected ? 'rgba(216, 201, 255, 0.78)' : 'rgba(148, 163, 184, 0.22)';
+        context.lineWidth = Math.max(1, ratio);
+        context.strokeRect(clipStartX + 0.5 * ratio, 0.5 * ratio, Math.max(0, clipEndX - clipStartX - ratio), Math.max(0, height - ratio));
+        if (selected) {
+          context.fillStyle = 'rgba(216, 201, 255, 0.92)';
+          context.fillRect(clipStartX, 0, Math.max(2 * ratio, 3), height);
+        }
+      });
 
       const mutedRects = mapStemMutedRangesToPixels({ mutedRanges, duration, width });
       mutedRects.forEach((rect) => {
@@ -4252,10 +7340,11 @@ function WaveformTrackCanvas({
     const observer = new ResizeObserver(draw);
     observer.observe(canvas);
     return () => observer.disconnect();
-  }, [color, currentTime, displayPeaks, duration, muted, mutedRanges, selected, trimEnd, trimStart]);
+  }, [clips, color, currentTime, displayPeaks, duration, muted, mutedRanges, selected, snapEnabled, snapStepSeconds, trimEnd, trimStart]);
 
   const handlePointerDown = useCallback((event: PointerEvent<HTMLCanvasElement>) => {
     if (duration <= 0) return;
+    event.preventDefault();
     const rect = event.currentTarget.getBoundingClientRect();
     const pointerX = event.clientX - rect.left;
     const intent = resolveWaveformPointerIntent({
@@ -4275,27 +7364,83 @@ function WaveformTrackCanvas({
         edge: intent.edge,
         moved: false,
       };
+      trimRangeDragRef.current = null;
+      clipDragRef.current = null;
       pendingSeekRef.current = null;
-      event.preventDefault();
+      updatePointerGuide(event, intent.edge === 'start' ? '入点' : '出点', true);
     } else {
-      pendingSeekRef.current = {
-        x: event.clientX,
-        time: intent.time,
-        moved: false,
-        mode: intent.kind === 'playhead' ? 'playhead' : 'click',
-      };
-      trimDragRef.current = null;
-      if (intent.kind === 'playhead') {
-        event.preventDefault();
+      const { time } = interactionTimeFromPointer(event);
+      const targetClip = clips.length > 1 ? findStemClipAtTime(clips, time) : null;
+      if (targetClip) {
+        clipDragRef.current = {
+          clipId: targetClip.id,
+          anchorTime: time,
+          clipStart: targetClip.start,
+          moved: false,
+        };
+        trimDragRef.current = null;
+        trimRangeDragRef.current = null;
+        pendingSeekRef.current = null;
+        updatePointerGuide(event, '移动片段', true);
+        event.currentTarget.setPointerCapture(event.pointerId);
+        return;
+      }
+      if (intent.kind === 'move-trim') {
+        trimRangeDragRef.current = {
+          anchorTime: intent.time,
+          trimStart,
+          trimEnd,
+          moved: false,
+        };
+        trimDragRef.current = null;
+        clipDragRef.current = null;
+        pendingSeekRef.current = null;
+        updatePointerGuide(event, '移动选区', true);
+      } else {
+        trimDragRef.current = null;
+        trimRangeDragRef.current = null;
+        clipDragRef.current = null;
+        if (intent.kind === 'playhead') {
+          pendingSeekRef.current = {
+            x: event.clientX,
+            time,
+            moved: false,
+            mode: 'playhead',
+          };
+          updatePointerGuide(event, '播放头', true);
+        } else {
+          pendingSeekRef.current = null;
+          updatePointerGuide(event, '选择', false);
+        }
       }
     }
     event.currentTarget.setPointerCapture(event.pointerId);
-  }, [currentTime, duration, editable, onSelect, trimEnd, trimStart]);
+  }, [clips, currentTime, duration, editable, interactionTimeFromPointer, onSelect, trimEnd, trimStart, updatePointerGuide]);
 
   const handlePointerMove = useCallback((event: PointerEvent<HTMLCanvasElement>) => {
     if (trimDragRef.current) {
       trimDragRef.current.moved = true;
-      scheduleTrimChange(timeFromPointer(event));
+      const { time, shouldSnap } = interactionTimeFromPointer(event);
+      scheduleTrimChange(time, shouldSnap);
+      updatePointerGuide(event, trimDragRef.current.edge === 'start' ? '入点' : '出点', true);
+      event.preventDefault();
+      return;
+    }
+
+    if (trimRangeDragRef.current) {
+      trimRangeDragRef.current.moved = true;
+      const { time, shouldSnap } = interactionTimeFromPointer(event);
+      onTrimRangeMove(trimRangeDragRef.current.trimStart + time - trimRangeDragRef.current.anchorTime, shouldSnap);
+      updatePointerGuide(event, '移动选区', true);
+      event.preventDefault();
+      return;
+    }
+
+    if (clipDragRef.current) {
+      clipDragRef.current.moved = true;
+      const { time, shouldSnap } = interactionTimeFromPointer(event);
+      onClipMove(clipDragRef.current.clipId, clipDragRef.current.clipStart + time - clipDragRef.current.anchorTime, shouldSnap);
+      updatePointerGuide(event, '移动片段', true);
       event.preventDefault();
       return;
     }
@@ -4307,12 +7452,17 @@ function WaveformTrackCanvas({
       }
       if (pendingSeek.mode === 'playhead') {
         if (liveSeekOnDrag) {
-          scheduleSeekChange(timeFromPointer(event));
+          const { time, shouldSnap } = interactionTimeFromPointer(event);
+          scheduleSeekChange(time, shouldSnap);
         }
+        updatePointerGuide(event, '播放头', true);
         event.preventDefault();
       }
+      return;
     }
-  }, [liveSeekOnDrag, scheduleSeekChange, scheduleTrimChange, timeFromPointer]);
+
+    updatePointerGuide(event);
+  }, [interactionTimeFromPointer, liveSeekOnDrag, onClipMove, onTrimRangeMove, scheduleSeekChange, scheduleTrimChange, updatePointerGuide]);
 
   const handlePointerUp = useCallback((event: PointerEvent<HTMLCanvasElement>) => {
     try {
@@ -4323,13 +7473,34 @@ function WaveformTrackCanvas({
 
     if (trimDragRef.current) {
       cancelScheduledTrimChange();
+      const { time, shouldSnap } = interactionTimeFromPointer(event);
       if (!trimDragRef.current.moved) {
-        onTrimChange(trimDragRef.current.edge, timeFromPointer(event));
+        onTrimChange(trimDragRef.current.edge, time, shouldSnap);
       } else {
-        onTrimChange(trimDragRef.current.edge, timeFromPointer(event));
+        onTrimChange(trimDragRef.current.edge, time, shouldSnap);
       }
       trimDragRef.current = null;
       pendingSeekRef.current = null;
+      updatePointerGuide(event, '裁剪', false);
+      return;
+    }
+
+    if (trimRangeDragRef.current) {
+      const { time, shouldSnap } = interactionTimeFromPointer(event);
+      const nextStart = trimRangeDragRef.current.trimStart + time - trimRangeDragRef.current.anchorTime;
+      onTrimRangeMove(nextStart, shouldSnap);
+      trimRangeDragRef.current = null;
+      pendingSeekRef.current = null;
+      updatePointerGuide(event, '移动选区', false);
+      return;
+    }
+
+    if (clipDragRef.current) {
+      const { time, shouldSnap } = interactionTimeFromPointer(event);
+      onClipMove(clipDragRef.current.clipId, clipDragRef.current.clipStart + time - clipDragRef.current.anchorTime, shouldSnap);
+      clipDragRef.current = null;
+      pendingSeekRef.current = null;
+      updatePointerGuide(event, '移动片段', false);
       return;
     }
 
@@ -4337,38 +7508,133 @@ function WaveformTrackCanvas({
     cancelScheduledSeekChange();
     pendingSeekRef.current = null;
     if (pendingSeek?.mode === 'playhead') {
-      onSeek(timeFromPointer(event));
+      const { time, shouldSnap } = interactionTimeFromPointer(event);
+      onSeek(time, shouldSnap);
+      updatePointerGuide(event, '播放头', false);
       return;
     }
-    if (pendingSeek && !pendingSeek.moved) {
-      onSeek(pendingSeek.time);
-    }
-  }, [cancelScheduledSeekChange, cancelScheduledTrimChange, onSeek, onTrimChange, timeFromPointer]);
+    updatePointerGuide(event, '选择', false);
+  }, [cancelScheduledSeekChange, cancelScheduledTrimChange, interactionTimeFromPointer, onClipMove, onSeek, onTrimChange, onTrimRangeMove, updatePointerGuide]);
 
   return (
-    <canvas
-      ref={canvasRef}
-      aria-label="Stem waveform. Click to seek, drag the playhead, or drag trim handles to edit this track."
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
-      style={waveformCanvasStyle(selected, muted, editable)}
-    />
+    <div style={waveformCanvasWrapStyle}>
+      <canvas
+        ref={canvasRef}
+        draggable={false}
+        aria-label="Stem waveform. Select the track, drag the playhead, or drag trim handles to edit this track."
+        onContextMenu={(event) => event.preventDefault()}
+        onDragStart={(event) => event.preventDefault()}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        onPointerLeave={() => {
+          if (!trimDragRef.current && !trimRangeDragRef.current && !clipDragRef.current && !pendingSeekRef.current) {
+            setPointerGuide(null);
+          }
+        }}
+        style={waveformCanvasStyle(selected, muted, editable, compact)}
+      />
+      {duration > 0 && (
+        <>
+          <span
+            aria-hidden="true"
+            style={waveformTrimHandleStyle(trimStart, duration, selected, 'start')}
+          />
+          <span
+            aria-hidden="true"
+            style={waveformTrimHandleStyle(trimEnd, duration, selected, 'end')}
+          />
+        </>
+      )}
+      {pointerGuide && (
+        <div style={waveformPointerGuideStyle(pointerGuide.x, pointerGuide.active)}>
+          <span>{pointerGuide.label}</span>
+          <strong>{formatStemTimecode(pointerGuide.time)}</strong>
+          {pointerGuide.snapBypassed && <em>Alt</em>}
+        </div>
+      )}
+    </div>
   );
 }
 
-function waveformCanvasStyle(selected: boolean, muted: boolean, editable: boolean): CSSProperties {
+const waveformCanvasWrapStyle: CSSProperties = {
+  position: 'relative',
+  minWidth: 0,
+  userSelect: 'none',
+  WebkitUserSelect: 'none',
+  WebkitTouchCallout: 'none',
+};
+
+function waveformCanvasStyle(selected: boolean, muted: boolean, editable: boolean, compact: boolean): CSSProperties {
   return {
     width: '100%',
-    height: 58,
-    borderRadius: 8,
-    border: selected ? '1px solid rgba(156, 108, 255, 0.78)' : '1px solid rgba(48, 52, 76, 0.86)',
-    background: '#0b0e1c',
-    cursor: editable ? 'grab' : 'pointer',
+    height: selected
+      ? compact ? 56 : 66
+      : compact ? 36 : 46,
+    borderRadius: 4,
+    border: selected ? '1px solid rgba(216, 201, 255, 0.92)' : '1px solid rgba(55, 61, 83, 0.82)',
+    background: 'linear-gradient(180deg, #111827, #080c15)',
+    boxShadow: selected
+      ? 'inset 0 0 0 1px rgba(156, 108, 255, 0.22), 0 0 0 1px rgba(156, 108, 255, 0.24)'
+      : 'inset 0 1px 0 rgba(255,255,255,0.035)',
+    cursor: editable ? 'ew-resize' : 'default',
     opacity: muted ? 0.72 : 1,
     touchAction: 'none',
     userSelect: 'none',
+    WebkitUserSelect: 'none',
+    WebkitTouchCallout: 'none',
+    transition: 'height 180ms ease, border-color 140ms ease, box-shadow 140ms ease, opacity 140ms ease',
+  };
+}
+
+function waveformTrimHandleStyle(time: number, duration: number, selected: boolean, edge: 'start' | 'end'): CSSProperties {
+  const safeRatio = duration > 0 ? Math.max(0, Math.min(1, time / duration)) : 0;
+
+  return {
+    position: 'absolute',
+    top: selected ? -3 : 4,
+    bottom: selected ? -3 : 4,
+    left: `${safeRatio * 100}%`,
+    transform: edge === 'start' ? 'translateX(-1px)' : 'translateX(-100%)',
+    zIndex: selected ? 7 : 3,
+    width: selected ? 14 : 6,
+    borderRadius: 999,
+    border: selected ? '1px solid rgba(255,255,255,0.92)' : '1px solid rgba(216, 201, 255, 0.58)',
+    background: selected
+      ? edge === 'start'
+        ? 'linear-gradient(180deg, #f5f3ff, #a78bfa)'
+        : 'linear-gradient(180deg, #ecfeff, #22d3ee)'
+      : 'rgba(156, 108, 255, 0.58)',
+    boxShadow: selected
+      ? '0 0 0 5px rgba(167, 139, 250, 0.16), 0 0 18px rgba(156, 108, 255, 0.54)'
+      : '0 0 10px rgba(156, 108, 255, 0.18)',
+    pointerEvents: 'none',
+  };
+}
+
+function waveformPointerGuideStyle(x: number, active: boolean): CSSProperties {
+  return {
+    position: 'absolute',
+    left: x,
+    top: active ? -23 : -19,
+    transform: 'translateX(-50%)',
+    zIndex: 4,
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 5,
+    height: active ? 22 : 20,
+    padding: '0 7px',
+    borderRadius: 999,
+    border: active ? '1px solid rgba(216, 201, 255, 0.86)' : '1px solid rgba(83, 88, 123, 0.72)',
+    background: active ? 'rgba(75, 38, 144, 0.96)' : 'rgba(12, 15, 28, 0.92)',
+    boxShadow: active ? '0 8px 22px rgba(0, 0, 0, 0.28)' : '0 4px 12px rgba(0, 0, 0, 0.18)',
+    color: '#e8e6ff',
+    fontSize: 10,
+    fontWeight: 700,
+    lineHeight: 1,
+    whiteSpace: 'nowrap',
+    pointerEvents: 'none',
   };
 }
 

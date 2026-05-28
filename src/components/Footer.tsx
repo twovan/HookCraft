@@ -14,8 +14,8 @@ const footerLinkStyle: React.CSSProperties = {
 export default function Footer() {
   const pathname = usePathname();
 
-  // Hide footer on login page and admin routes
-  if (pathname === '/login' || pathname.startsWith('/admin')) {
+  // Hide footer on workspace-like pages where the app needs the full viewport.
+  if (pathname === '/login' || pathname.startsWith('/admin') || pathname.startsWith('/studio/stem-editor')) {
     return null;
   }
 

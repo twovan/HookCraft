@@ -1,7 +1,13 @@
 export type WaveformPointerIntent =
   | { kind: 'seek'; time: number }
   | { kind: 'playhead'; time: number }
-  | { kind: 'trim'; edge: 'start' | 'end'; time: number };
+  | { kind: 'trim'; edge: 'start' | 'end'; time: number }
+  | { kind: 'move-trim'; time: number };
+
+export type TimelineTrimPointerIntent =
+  | { kind: 'seek'; time: number }
+  | { kind: 'trim'; edge: 'start' | 'end'; time: number }
+  | { kind: 'move-trim'; time: number };
 
 export interface WaveformPointerIntentInput {
   editable: boolean;
@@ -29,7 +35,7 @@ export function resolveWaveformPointerIntent(input: WaveformPointerIntentInput):
   const trimEnd = Math.max(0, Math.min(duration, input.trimEnd));
   const startX = (trimStart / duration) * width;
   const endX = (trimEnd / duration) * width;
-  const hitSize = input.hitSize ?? 14;
+  const hitSize = input.hitSize ?? 36;
   const startDistance = Math.abs(input.pointerX - startX);
   const endDistance = Math.abs(input.pointerX - endX);
 
@@ -50,5 +56,23 @@ export function resolveWaveformPointerIntent(input: WaveformPointerIntentInput):
     }
   }
 
+  if ((trimStart > 0 || trimEnd < duration) && trimEnd - trimStart < duration && time > trimStart && time < trimEnd) {
+    return { kind: 'move-trim', time };
+  }
+
   return { kind: 'seek', time };
+}
+
+export function resolveTimelineTrimPointerIntent(
+  input: Omit<WaveformPointerIntentInput, 'editable' | 'currentTime' | 'playheadHitSize'>,
+): TimelineTrimPointerIntent {
+  const intent = resolveWaveformPointerIntent({
+    ...input,
+    editable: true,
+  });
+
+  return intent.kind === 'trim'
+    || intent.kind === 'move-trim'
+    ? intent
+    : { kind: 'seek', time: intent.time };
 }

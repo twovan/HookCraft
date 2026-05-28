@@ -23,6 +23,13 @@ export interface StemTrimNudgeInput {
   trimEnd: number;
 }
 
+export interface StemTrimRangeShiftInput {
+  duration: number;
+  trimStart: number;
+  trimEnd: number;
+  nextStart: number;
+}
+
 function clampNumber(value: number, min: number, max: number) {
   if (!Number.isFinite(value)) return min;
   return Math.max(min, Math.min(max, value));
@@ -60,4 +67,17 @@ export function nudgeStemTrimEdge(input: StemTrimNudgeInput) {
   }
 
   return roundTrimTime(clampNumber(trimEnd + delta, Math.min(duration, trimStart + minimumClipDuration), duration));
+}
+
+export function shiftStemTrimRange(input: StemTrimRangeShiftInput) {
+  const duration = Number.isFinite(input.duration) ? Math.max(0, input.duration) : 0;
+  const trimStart = clampNumber(input.trimStart, 0, duration);
+  const trimEnd = Math.max(trimStart, clampNumber(input.trimEnd, 0, duration));
+  const clipDuration = trimEnd - trimStart;
+  const nextStart = clampNumber(input.nextStart, 0, Math.max(0, duration - clipDuration));
+
+  return {
+    trimStart: roundTrimTime(nextStart),
+    trimEnd: roundTrimTime(nextStart + clipDuration),
+  };
 }

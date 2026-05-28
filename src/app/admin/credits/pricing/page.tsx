@@ -1,20 +1,41 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { TIER_CONFIGS } from '@/config/tierConfig';
 
 interface PriceConfig {
   tier: string;
+  name?: string;
   monthlyPrice: number;
   yearlyPrice: number;
 }
 
+const ORDERED_TIERS = ['free', 'pro', 'business'] as const;
+
 const TIER_LABELS: Record<string, string> = {
+  free: '免费版 Free',
   pro: '专业版 Pro',
   business: '商业版 Business',
 };
 
 function formatPrice(cents: number): string {
   return `¥${(cents / 100).toFixed(2)}`;
+}
+
+function normalizePricingConfig(pricing: PriceConfig[]): PriceConfig[] {
+  const pricingByTier = new Map(pricing.map((price) => [price.tier, price]));
+
+  return ORDERED_TIERS.map((tier) => {
+    const existing = pricingByTier.get(tier);
+    const defaults = TIER_CONFIGS[tier];
+
+    return {
+      tier,
+      name: existing?.name?.trim() || defaults.name,
+      monthlyPrice: existing?.monthlyPrice ?? defaults.monthlyPrice,
+      yearlyPrice: existing?.yearlyPrice ?? defaults.yearlyPrice,
+    };
+  });
 }
 
 export default function AdminPricingPage() {
@@ -34,15 +55,16 @@ export default function AdminPricingPage() {
     try {
       const res = await fetch('/api/admin/config/pricing');
       const data = await res.json();
-      setPricing(data.pricing || []);
-      setEditPricing(data.pricing || []);
+      const normalizedPricing = normalizePricingConfig(data.pricing || []);
+      setPricing(normalizedPricing);
+      setEditPricing(normalizedPricing);
     } catch {
       // silent
     }
     setLoading(false);
   }
 
-  function handleEdit(tier: string, field: 'monthlyPrice' | 'yearlyPrice', value: number) {
+  function handleEdit(tier: string, field: 'name' | 'monthlyPrice' | 'yearlyPrice', value: string | number) {
     setEditPricing((prev) =>
       prev.map((p) => (p.tier === tier ? { ...p, [field]: value } : p))
     );
@@ -52,10 +74,14 @@ export default function AdminPricingPage() {
     setSaving(true);
     setSaved(false);
     try {
+      const pricingToSave = editPricing.map((price) => ({
+        ...price,
+        name: price.name?.trim() || TIER_CONFIGS[price.tier as keyof typeof TIER_CONFIGS]?.name || price.tier,
+      }));
       const res = await fetch('/api/admin/config/pricing', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pricing: editPricing, operatorId: 'admin-001' }),
+        body: JSON.stringify({ pricing: pricingToSave, operatorId: 'admin-001' }),
       });
       if (res.ok) {
         setSaved(true);
@@ -108,8 +134,10 @@ export default function AdminPricingPage() {
               <thead>
                 <tr>
                   <th style={th}>等级</th>
+                  <th style={th}>套餐名称</th>
                   <th style={th}>月付价格</th>
                   <th style={th}>年付价格</th>
+                  {editing && <th style={th}>新套餐名称</th>}
                   {editing && <th style={th}>新月付价格（分）</th>}
                   {editing && <th style={th}>新年付价格（分）</th>}
                 </tr>
@@ -120,10 +148,21 @@ export default function AdminPricingPage() {
                     <td style={td}>
                       <span style={{ fontWeight: 600 }}>{TIER_LABELS[p.tier] || p.tier}</span>
                     </td>
+                    <td style={td}>{p.name || TIER_LABELS[p.tier] || p.tier}</td>
                     <td style={td}>{formatPrice(p.monthlyPrice)}/月</td>
                     <td style={td}>{formatPrice(p.yearlyPrice)}/年</td>
                     {editing && (
                       <>
+                        <td style={td}>
+                          <input
+                            type="text"
+                            value={editPricing.find((e) => e.tier === p.tier)?.name ?? ''}
+                            onChange={(e) =>
+                              handleEdit(p.tier, 'name', e.target.value)
+                            }
+                            style={{ ...formInput, width: 180 }}
+                          />
+                        </td>
                         <td style={td}>
                           <input
                             type="number"

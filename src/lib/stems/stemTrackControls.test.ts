@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { nudgeStemTrimEdge, resolveStemTrimControlValues } from './stemTrackControls';
+import { nudgeStemTrimEdge, resolveStemTrimControlValues, shiftStemTrimRange } from './stemTrackControls';
 
 describe('resolveStemTrimControlValues', () => {
   it('keeps selected stem trim controls bounded and independent', () => {
@@ -70,5 +70,30 @@ describe('resolveStemTrimControlValues', () => {
       trimStart: 1,
       trimEnd: 2,
     })).toBe(1.25);
+  });
+
+  it('moves a trimmed range while preserving clip duration', () => {
+    expect(shiftStemTrimRange({
+      duration: 120,
+      trimStart: 20,
+      trimEnd: 50,
+      nextStart: 35,
+    })).toEqual({ trimStart: 35, trimEnd: 65 });
+  });
+
+  it('keeps moved trim ranges inside the full duration', () => {
+    expect(shiftStemTrimRange({
+      duration: 60,
+      trimStart: 20,
+      trimEnd: 50,
+      nextStart: 45,
+    })).toEqual({ trimStart: 30, trimEnd: 60 });
+
+    expect(shiftStemTrimRange({
+      duration: 60,
+      trimStart: 20,
+      trimEnd: 50,
+      nextStart: -12,
+    })).toEqual({ trimStart: 0, trimEnd: 30 });
   });
 });

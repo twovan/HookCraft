@@ -23,6 +23,7 @@ export interface AdminCostRule {
 /** 管理员价格配置 */
 export interface AdminPriceConfig {
   tier: MembershipTier;
+  name?: string;            // 套餐名称（可选，兼容旧配置）
   monthlyPrice: number;     // 月付价格（分）
   yearlyPrice: number;      // 年付价格（分）
 }
