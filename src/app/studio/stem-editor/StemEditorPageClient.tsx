@@ -495,7 +495,7 @@ const headerFactsStyle: CSSProperties = {
 
 function headerFactStyle(tone: 'project' | 'neutral' | 'loading' | 'danger'): CSSProperties {
   const palette = {
-    project: { border: 'rgba(156, 108, 255, 0.34)', background: 'rgba(117, 54, 213, 0.12)', color: '#d8ccff' },
+    project: { border: 'rgba(206, 255, 53, 0.34)', background: 'rgba(206, 255, 53, 0.1)', color: '#eaff9d' },
     neutral: { border: 'rgba(48, 52, 76, 0.78)', background: 'rgba(15, 18, 32, 0.68)', color: '#aeb2c9' },
     loading: { border: 'rgba(96, 165, 250, 0.38)', background: 'rgba(37, 99, 235, 0.12)', color: '#bfdbfe' },
     danger: { border: 'rgba(248, 113, 113, 0.36)', background: 'rgba(239, 68, 68, 0.12)', color: '#fca5a5' },
@@ -529,11 +529,11 @@ const timeBadgeStyle: CSSProperties = {
 };
 
 const backLinkStyle: CSSProperties = {
-  color: '#e8ddff',
+  color: 'var(--hc-text)',
   textDecoration: 'none',
-  border: '1px solid rgba(139, 92, 246, 0.42)',
+  border: '1px solid rgba(206, 255, 53, 0.36)',
   borderRadius: 10,
-  background: 'rgba(139, 92, 246, 0.14)',
+  background: 'rgba(206, 255, 53, 0.1)',
   padding: '9px 13px',
   fontSize: 13,
   fontWeight: 900,
@@ -565,16 +565,16 @@ function sideRailButtonStyle(active: boolean): CSSProperties {
   return {
     minHeight: 54,
     borderRadius: 8,
-    border: active ? '1px solid rgba(156, 108, 255, 0.72)' : '1px solid transparent',
-    background: active ? 'linear-gradient(180deg, rgba(117, 54, 213, 0.34), rgba(76, 29, 149, 0.22))' : 'transparent',
-    color: active ? '#f2ebff' : '#7e849b',
+    border: active ? '1px solid rgba(206, 255, 53, 0.5)' : '1px solid transparent',
+    background: active ? 'linear-gradient(180deg, rgba(206, 255, 53, 0.18), rgba(82, 214, 198, 0.1))' : 'transparent',
+    color: active ? 'var(--hc-text)' : '#7e849b',
     fontSize: 11,
     fontWeight: 900,
     writingMode: 'vertical-rl',
     letterSpacing: 0,
     display: 'grid',
     placeItems: 'center',
-    boxShadow: active ? 'inset 2px 0 0 rgba(196, 181, 253, 0.9)' : 'none',
+    boxShadow: active ? 'inset 2px 0 0 var(--hc-lime)' : 'none',
   };
 }
 
@@ -660,9 +660,9 @@ const inspectorSegmentStyle: CSSProperties = {
 
 const inspectorSegmentActiveStyle: CSSProperties = {
   borderRadius: 6,
-  border: '1px solid rgba(156, 108, 255, 0.58)',
-  background: 'rgba(117, 54, 213, 0.34)',
-  color: '#f2ebff',
+  border: '1px solid rgba(206, 255, 53, 0.42)',
+  background: 'rgba(206, 255, 53, 0.12)',
+  color: 'var(--hc-lime)',
   padding: '7px 6px',
 };
 
@@ -745,10 +745,10 @@ const actionGroupStyle: CSSProperties = {
 
 const refreshButtonStyle: CSSProperties = {
   minHeight: 36,
-  border: '1px solid rgba(139, 92, 246, 0.48)',
+  border: '1px solid rgba(206, 255, 53, 0.38)',
   borderRadius: 10,
-  background: 'rgba(139, 92, 246, 0.16)',
-  color: '#e0d0ff',
+  background: 'rgba(206, 255, 53, 0.12)',
+  color: 'var(--hc-lime)',
   padding: '8px 13px',
   fontSize: 12,
   fontWeight: 900,
@@ -804,7 +804,7 @@ function waveBarStyle(index: number): CSSProperties {
     width: 5,
     height: 46,
     borderRadius: 999,
-    background: index % 2 === 0 ? '#8b5cf6' : '#38bdf8',
+    background: index % 2 === 0 ? 'var(--hc-lime)' : 'var(--hc-cyan)',
     transformOrigin: 'center',
     animation: `stem-analyze-wave ${0.86 + index * 0.05}s ease-in-out ${index * 0.06}s infinite`,
   };
@@ -845,13 +845,13 @@ const stepListStyle: CSSProperties = {
 function stepPillStyle(done: boolean, active: boolean): CSSProperties {
   return {
     borderRadius: 999,
-    border: active ? '1px solid rgba(192, 167, 252, 0.7)' : '1px solid rgba(48, 52, 76, 0.9)',
+    border: active ? '1px solid rgba(206, 255, 53, 0.58)' : '1px solid rgba(48, 52, 76, 0.9)',
     background: done
       ? 'rgba(34, 197, 94, 0.14)'
       : active
-        ? 'rgba(117, 54, 213, 0.22)'
+        ? 'rgba(206, 255, 53, 0.12)'
         : 'rgba(20, 23, 39, 0.9)',
-    color: done ? '#86efac' : active ? '#e0d0ff' : '#858ca5',
+    color: done ? '#86efac' : active ? 'var(--hc-lime)' : '#858ca5',
     padding: '7px 10px',
     fontSize: 12,
     fontWeight: 800,
@@ -901,7 +901,7 @@ const transportPlayGhostStyle: CSSProperties = {
   width: 42,
   height: 34,
   borderRadius: 999,
-  background: '#f4f1ff',
+  background: 'var(--hc-lime)',
 };
 
 const transportTimeGhostStyle: CSSProperties = {
