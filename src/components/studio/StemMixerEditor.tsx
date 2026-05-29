@@ -4660,7 +4660,6 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
                   </div>
                   <div style={stemStatusRowStyle}>
                     <span style={stemTypeStyle}>{displayName.en}</span>
-                    {isSelectedTrack && <span style={selectedTrackBadgeStyle}>已选</span>}
                     {state.solo && <span style={stemStateBadgeStyle('solo')}>独奏</span>}
                     {state.muted && <span style={stemStateBadgeStyle('muted')}>静音</span>}
                     {state.mutedRanges.length > 0 && <span style={stemStateBadgeStyle('range')}>{state.mutedRanges.length} 段</span>}
@@ -4938,20 +4937,20 @@ function editorButtonChromeStyle({
       glow: 'rgba(148, 163, 184, 0.16)',
     },
     primary: {
-      border: 'rgba(190, 167, 255, 0.78)',
-      background: 'linear-gradient(180deg, #9b5cff 0%, #7536d5 55%, #4c1d95 100%)',
-      activeBackground: 'linear-gradient(180deg, #b27aff 0%, #8547e8 55%, #5b21b6 100%)',
-      color: '#ffffff',
-      activeColor: '#ffffff',
-      glow: 'rgba(156, 108, 255, 0.38)',
+      border: 'rgba(206, 255, 53, 0.74)',
+      background: 'linear-gradient(180deg, #dfff5b 0%, #ceff35 52%, #7f9f18 100%)',
+      activeBackground: 'linear-gradient(180deg, #f1ff99 0%, #ceff35 52%, #8fb51d 100%)',
+      color: '#08090c',
+      activeColor: '#08090c',
+      glow: 'rgba(206, 255, 53, 0.34)',
     },
     purple: {
-      border: 'rgba(170, 142, 255, 0.58)',
-      background: 'linear-gradient(180deg, rgba(94, 54, 174, 0.92), rgba(47, 28, 95, 0.92))',
-      activeBackground: 'linear-gradient(180deg, rgba(126, 84, 220, 0.95), rgba(72, 42, 139, 0.95))',
-      color: '#e9ddff',
-      activeColor: '#ffffff',
-      glow: 'rgba(156, 108, 255, 0.3)',
+      border: 'rgba(206, 255, 53, 0.48)',
+      background: 'linear-gradient(180deg, rgba(206, 255, 53, 0.2), rgba(42, 54, 22, 0.86))',
+      activeBackground: 'linear-gradient(180deg, rgba(206, 255, 53, 0.42), rgba(60, 78, 26, 0.9))',
+      color: '#eaff9e',
+      activeColor: '#f6ffd0',
+      glow: 'rgba(206, 255, 53, 0.24)',
     },
     info: {
       border: 'rgba(96, 165, 250, 0.58)',
@@ -5053,7 +5052,7 @@ function sideRailButtonStyle(active: boolean, armed = false): CSSProperties {
     writingMode: 'vertical-rl',
     letterSpacing: 0,
     boxShadow: active
-      ? 'inset 2px 0 0 rgba(196, 181, 253, 0.9), inset 0 1px 0 rgba(255,255,255,0.16), inset 0 -2px 0 rgba(0,0,0,0.34)'
+      ? 'inset 2px 0 0 rgba(206, 255, 53, 0.92), inset 0 1px 0 rgba(255,255,255,0.16), inset 0 -2px 0 rgba(0,0,0,0.34)'
       : armed
         ? 'inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -2px 0 rgba(0,0,0,0.3)'
         : 'inset 0 1px 0 rgba(255,255,255,0.06), inset 0 -2px 0 rgba(0,0,0,0.24)',
@@ -5104,9 +5103,9 @@ const editorHeaderFactsStyle: CSSProperties = {
 function editorHeaderFactStyle(tone: 'project' | 'neutral' | 'ready' | 'loading' | 'snap'): CSSProperties {
   const palette: Record<typeof tone, { border: string; background: string; color: string }> = {
     project: {
-      border: 'rgba(156, 108, 255, 0.34)',
-      background: 'rgba(117, 54, 213, 0.12)',
-      color: '#d8ccff',
+      border: 'rgba(206, 255, 53, 0.34)',
+      background: 'rgba(206, 255, 53, 0.1)',
+      color: '#eaff9e',
     },
     neutral: {
       border: 'rgba(48, 52, 76, 0.78)',
@@ -5328,12 +5327,12 @@ const playButtonStyle: CSSProperties = {
   ...editorButtonChromeStyle({ tone: 'primary', round: true, active: true }),
   minHeight: 42,
   minWidth: 58,
-  border: '1px solid rgba(243, 232, 255, 0.92)',
-  background: 'linear-gradient(180deg, #ffffff 0%, #e7ddff 42%, #a78bfa 100%)',
-  color: '#14111f',
+  border: '1px solid rgba(206, 255, 53, 0.86)',
+  background: 'linear-gradient(180deg, #f7ffd0 0%, #ceff35 48%, #8fb51d 100%)',
+  color: '#08090c',
   fontSize: 13,
   fontWeight: 900,
-  boxShadow: 'inset 0 2px 0 rgba(255,255,255,0.9), inset 0 -3px 0 rgba(91, 33, 182, 0.34), 0 0 22px rgba(167, 139, 250, 0.32)',
+  boxShadow: 'inset 0 2px 0 rgba(255,255,255,0.86), inset 0 -3px 0 rgba(28, 48, 18, 0.28), 0 0 22px rgba(206, 255, 53, 0.24)',
   textShadow: '0 1px 0 rgba(255,255,255,0.44)',
 };
 
@@ -5596,7 +5595,7 @@ function inspectorTabButtonStyle(active: boolean): CSSProperties {
     fontSize: 12,
     fontWeight: 900,
     boxShadow: active
-      ? 'inset 0 1px 0 rgba(255,255,255,0.14), inset 0 -2px 0 rgba(0,0,0,0.34), 0 0 14px rgba(156, 108, 255, 0.22)'
+      ? 'inset 0 1px 0 rgba(255,255,255,0.14), inset 0 -2px 0 rgba(0,0,0,0.34), 0 0 14px rgba(206, 255, 53, 0.18)'
       : 'inset 0 1px 0 rgba(255,255,255,0.04), inset 0 -2px 0 rgba(0,0,0,0.2)',
   };
 }
@@ -5975,7 +5974,7 @@ function exportStatusProgressStyle(progress: number, tone: StemExportStatusTone)
       ? '#f87171'
       : tone === 'warning'
         ? '#fbbf24'
-        : '#8b5cf6';
+        : '#ceff35';
 
   return {
     width: `${Math.max(0, Math.min(100, progress))}%`,
@@ -6103,9 +6102,9 @@ const loadingNoticeStyle: CSSProperties = {
   order: 2,
   marginTop: 10,
   borderRadius: 8,
-  border: '1px solid rgba(192, 167, 252, 0.22)',
-  background: 'rgba(117, 54, 213, 0.1)',
-  color: '#cbb8ff',
+  border: '1px solid rgba(206, 255, 53, 0.22)',
+  background: 'rgba(206, 255, 53, 0.08)',
+  color: '#eaff9e',
   padding: '8px 10px',
   fontSize: 12,
 };
@@ -6203,9 +6202,9 @@ function trackListStyle(trackDensity: TrackDensity, isPanning = false): CSSPrope
 
 const emptyTrackNoticeStyle: CSSProperties = {
   borderRadius: 10,
-  border: '1px dashed rgba(156, 108, 255, 0.32)',
-  background: 'rgba(117, 54, 213, 0.08)',
-  color: '#cbb8ff',
+  border: '1px dashed rgba(206, 255, 53, 0.3)',
+  background: 'rgba(206, 255, 53, 0.06)',
+  color: '#eaff9e',
   padding: '18px 14px',
   fontSize: 12,
   textAlign: 'center',
@@ -6298,9 +6297,9 @@ const timelineZoomFitButtonStyle: CSSProperties = {
 
 const timelineToolbarPillStyle: CSSProperties = {
   borderRadius: 999,
-  border: '1px solid rgba(156, 108, 255, 0.3)',
-  background: 'rgba(117, 54, 213, 0.12)',
-  color: '#d8ccff',
+  border: '1px solid rgba(206, 255, 53, 0.28)',
+  background: 'rgba(206, 255, 53, 0.08)',
+  color: '#eaff9e',
   padding: '3px 8px',
   fontSize: 11,
   fontWeight: 800,
@@ -6417,7 +6416,7 @@ function timelineShortcutHelpStyle(minWidth: number): CSSProperties {
     boxSizing: 'border-box',
     padding: '7px 10px',
     borderRadius: 7,
-    border: '1px solid rgba(156, 108, 255, 0.28)',
+    border: '1px solid rgba(206, 255, 53, 0.24)',
     background: 'linear-gradient(180deg, rgba(20, 23, 39, 0.96), rgba(10, 13, 24, 0.94))',
     color: '#aeb2c9',
     fontSize: 11,
@@ -6460,8 +6459,8 @@ function timelineScrollThumbStyle(progress: number, viewRatio: number): CSSPrope
     width: `${widthPercent}%`,
     height: '100%',
     borderRadius: 999,
-    background: 'linear-gradient(90deg, rgba(125, 211, 252, 0.8), rgba(156, 108, 255, 0.92))',
-    boxShadow: '0 0 12px rgba(156, 108, 255, 0.46)',
+    background: 'linear-gradient(90deg, rgba(206, 255, 53, 0.86), rgba(82, 214, 198, 0.9))',
+    boxShadow: '0 0 12px rgba(206, 255, 53, 0.34)',
     pointerEvents: 'none',
     userSelect: 'none',
     WebkitUserSelect: 'none',
@@ -6524,13 +6523,13 @@ function timelineGlobalPlayheadBadgeStyle(currentTime: number, duration: number,
     zIndex: 7,
     borderRadius: 999,
     border: '1px solid rgba(216, 201, 255, 0.7)',
-    background: 'linear-gradient(180deg, rgba(117, 54, 213, 0.96), rgba(88, 28, 135, 0.94))',
-    color: '#ffffff',
+    background: 'linear-gradient(180deg, rgba(206, 255, 53, 0.92), rgba(82, 214, 198, 0.86))',
+    color: '#08090c',
     padding: '2px 7px',
     fontSize: 10,
     fontWeight: 900,
     fontVariantNumeric: 'tabular-nums',
-    boxShadow: '0 8px 18px rgba(0, 0, 0, 0.28), 0 0 16px rgba(156, 108, 255, 0.38)',
+    boxShadow: '0 8px 18px rgba(0, 0, 0, 0.28), 0 0 16px rgba(206, 255, 53, 0.28)',
     pointerEvents: 'none',
     whiteSpace: 'nowrap',
   };
@@ -6575,8 +6574,8 @@ function timelineSelectedRangeStyle(start: number, end: number, duration: number
     height: 18,
     zIndex: 1,
     borderRadius: 4,
-    border: '1px solid rgba(156, 108, 255, 0.56)',
-    background: 'linear-gradient(90deg, rgba(156, 108, 255, 0.2), rgba(56, 189, 248, 0.16))',
+    border: '1px solid rgba(206, 255, 53, 0.48)',
+    background: 'linear-gradient(90deg, rgba(206, 255, 53, 0.14), rgba(82, 214, 198, 0.12))',
     boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.045), 0 0 14px rgba(156,108,255,0.18)',
     pointerEvents: 'none',
     userSelect: 'none',
@@ -6598,10 +6597,10 @@ function timelineSelectedRangeEdgeStyle(time: number, duration: number, edge: 's
     borderRadius: 999,
     border: '1px solid rgba(255,255,255,0.86)',
     background: edge === 'start'
-      ? 'linear-gradient(180deg, #f5f3ff, #a78bfa)'
+      ? 'linear-gradient(180deg, #f7ffd0, #ceff35)'
       : 'linear-gradient(180deg, #ecfeff, #22d3ee)',
     boxShadow: edge === 'start'
-      ? '0 0 0 4px rgba(167, 139, 250, 0.18), 0 0 14px rgba(196, 181, 253, 0.56)'
+      ? '0 0 0 4px rgba(206, 255, 53, 0.16), 0 0 14px rgba(206, 255, 53, 0.38)'
       : '0 0 0 4px rgba(34, 211, 238, 0.16), 0 0 14px rgba(103, 232, 249, 0.5)',
     pointerEvents: 'none',
   };
@@ -6685,7 +6684,7 @@ function stemTrackStyle(
   const accent = selectedTrack
     ? 'rgba(14, 165, 233, 0.16)'
     : solo
-      ? 'rgba(117, 54, 213, 0.16)'
+      ? 'rgba(206, 255, 53, 0.1)'
       : 'rgba(16, 19, 33, 0.96)';
   const compact = trackDensity === 'compact';
   const rowHeight = resolveDawTrackHeight({ advanced, density: trackDensity, selected: selectedTrack });
@@ -6702,7 +6701,7 @@ function stemTrackStyle(
     border: selectedTrack
       ? '1px solid rgba(125, 211, 252, 0.78)'
       : solo
-        ? '1px solid rgba(156, 108, 255, 0.82)'
+        ? '1px solid rgba(206, 255, 53, 0.42)'
         : '1px solid transparent',
     borderBottom: selectedTrack
       ? '1px solid rgba(125, 211, 252, 0.78)'
@@ -6714,7 +6713,7 @@ function stemTrackStyle(
     boxShadow: selectedTrack
       ? '0 0 0 1px rgba(125, 211, 252, 0.12)'
       : solo
-        ? '0 0 0 1px rgba(156, 108, 255, 0.12)'
+        ? '0 0 0 1px rgba(206, 255, 53, 0.12)'
         : 'none',
     opacity: audible ? 1 : 0.46,
     padding: selectedTrack
@@ -6785,19 +6784,6 @@ const stemStatusRowStyle: CSSProperties = {
   maxWidth: '100%',
   minHeight: 18,
   overflow: 'hidden',
-};
-
-const selectedTrackBadgeStyle: CSSProperties = {
-  borderRadius: 999,
-  border: '1px solid rgba(125, 211, 252, 0.42)',
-  background: 'rgba(14, 165, 233, 0.14)',
-  color: '#bae6fd',
-  padding: '1px 5px',
-  fontSize: 9,
-  fontWeight: 900,
-  lineHeight: 1.25,
-  whiteSpace: 'nowrap',
-  flexShrink: 0,
 };
 
 function stemAudioStatusLabel(status: StemTrackAudioStatus) {
@@ -7191,7 +7177,7 @@ function WaveformTrackCanvas({
       context.fillRect(0, 0, width, height);
 
       const clipGradient = context.createLinearGradient(0, 0, 0, height);
-      clipGradient.addColorStop(0, selected ? 'rgba(156, 108, 255, 0.16)' : 'rgba(255,255,255,0.055)');
+      clipGradient.addColorStop(0, selected ? 'rgba(206, 255, 53, 0.12)' : 'rgba(255,255,255,0.055)');
       clipGradient.addColorStop(0.5, selected ? 'rgba(56, 189, 248, 0.08)' : 'rgba(255,255,255,0.025)');
       clipGradient.addColorStop(1, 'rgba(0,0,0,0)');
       context.fillStyle = clipGradient;
@@ -7245,7 +7231,7 @@ function WaveformTrackCanvas({
       }
 
       if (!displayPeaks.length) {
-        context.fillStyle = 'rgba(156, 108, 255, 0.13)';
+        context.fillStyle = 'rgba(206, 255, 53, 0.12)';
         context.fillRect(0, 0, width, height);
         context.fillStyle = '#8f92aa';
         context.font = `${Math.max(10, 11 * ratio)}px sans-serif`;
@@ -7260,7 +7246,7 @@ function WaveformTrackCanvas({
       context.fillRect(0, 0, startX, height);
       context.fillRect(endX, 0, Math.max(0, width - endX), height);
 
-      context.fillStyle = selected ? 'rgba(156, 108, 255, 0.15)' : 'rgba(255,255,255,0.045)';
+      context.fillStyle = selected ? 'rgba(206, 255, 53, 0.1)' : 'rgba(255,255,255,0.045)';
       context.fillRect(startX, 0, Math.max(0, endX - startX), height);
 
       clips.forEach((clip) => {
@@ -7330,7 +7316,7 @@ function WaveformTrackCanvas({
         context.beginPath();
         context.arc(playheadX, 8 * ratio, 4.5 * ratio, 0, Math.PI * 2);
         context.fill();
-        context.strokeStyle = 'rgba(156, 108, 255, 0.92)';
+        context.strokeStyle = 'rgba(206, 255, 53, 0.9)';
         context.lineWidth = Math.max(1, ratio);
         context.stroke();
       }
@@ -7576,7 +7562,7 @@ function waveformCanvasStyle(selected: boolean, muted: boolean, editable: boolea
     border: selected ? '1px solid rgba(216, 201, 255, 0.92)' : '1px solid rgba(55, 61, 83, 0.82)',
     background: 'linear-gradient(180deg, #111827, #080c15)',
     boxShadow: selected
-      ? 'inset 0 0 0 1px rgba(156, 108, 255, 0.22), 0 0 0 1px rgba(156, 108, 255, 0.24)'
+      ? 'inset 0 0 0 1px rgba(206, 255, 53, 0.18), 0 0 0 1px rgba(82, 214, 198, 0.18)'
       : 'inset 0 1px 0 rgba(255,255,255,0.035)',
     cursor: editable ? 'ew-resize' : 'default',
     opacity: muted ? 0.72 : 1,
@@ -7600,15 +7586,15 @@ function waveformTrimHandleStyle(time: number, duration: number, selected: boole
     zIndex: selected ? 7 : 3,
     width: selected ? 14 : 6,
     borderRadius: 999,
-    border: selected ? '1px solid rgba(255,255,255,0.92)' : '1px solid rgba(216, 201, 255, 0.58)',
+    border: selected ? '1px solid rgba(255,255,255,0.92)' : '1px solid rgba(206, 255, 53, 0.46)',
     background: selected
       ? edge === 'start'
-        ? 'linear-gradient(180deg, #f5f3ff, #a78bfa)'
+        ? 'linear-gradient(180deg, #f7ffd0, #ceff35)'
         : 'linear-gradient(180deg, #ecfeff, #22d3ee)'
-      : 'rgba(156, 108, 255, 0.58)',
+      : 'rgba(206, 255, 53, 0.5)',
     boxShadow: selected
-      ? '0 0 0 5px rgba(167, 139, 250, 0.16), 0 0 18px rgba(156, 108, 255, 0.54)'
-      : '0 0 10px rgba(156, 108, 255, 0.18)',
+      ? '0 0 0 5px rgba(206, 255, 53, 0.14), 0 0 18px rgba(82, 214, 198, 0.36)'
+      : '0 0 10px rgba(206, 255, 53, 0.16)',
     pointerEvents: 'none',
   };
 }

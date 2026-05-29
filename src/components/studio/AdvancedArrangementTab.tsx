@@ -506,7 +506,7 @@ export default function AdvancedArrangementTab({
 
           {usesSelectedTemplate && (
             <div style={templateModeNoticeStyle}>
-              <span style={{ color: '#c0a7fc', fontSize: 12, fontWeight: 800 }}>自定义模式</span>
+              <span style={{ color: 'var(--hc-lime)', fontSize: 12, fontWeight: 800 }}>自定义模式</span>
               <span style={{ color: '#9ca3af', fontSize: 12 }}>{isTemplateInstrumentalVariant ? '风格标签已由模板自动填充' : '风格已由模板自动填充'}</span>
             </div>
           )}
@@ -639,13 +639,13 @@ export default function AdvancedArrangementTab({
               padding: '14px 24px',
               borderRadius: 24,
               border: 'none',
-              background: canGenerate ? 'linear-gradient(135deg, #7536d5 0%, #5a2db8 100%)' : '#2a2a40',
-              color: canGenerate ? 'white' : '#6b7280',
+              background: canGenerate ? 'linear-gradient(135deg, var(--hc-lime), var(--hc-cyan))' : '#2a2a40',
+              color: canGenerate ? '#08090c' : '#6b7280',
               fontSize: 15,
               fontWeight: 700,
               cursor: canGenerate ? 'pointer' : 'not-allowed',
               fontFamily: "'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif",
-              boxShadow: canGenerate ? '0 4px 20px rgba(117, 54, 213, 0.4)' : 'none',
+              boxShadow: canGenerate ? '0 4px 20px rgba(206, 255, 53, 0.22)' : 'none',
               transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
               display: 'flex',
               alignItems: 'center',
@@ -673,7 +673,7 @@ export default function AdvancedArrangementTab({
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
               <div style={{ color: '#e8e8f0', fontSize: 14, fontWeight: 700 }}>{progressStage}</div>
-              <div style={{ color: '#c0a7fc', fontSize: 12, fontWeight: 700 }}>{progressPercent}%</div>
+              <div style={{ color: 'var(--hc-lime)', fontSize: 12, fontWeight: 700 }}>{progressPercent}%</div>
             </div>
             <div style={progressBarTrackStyle}>
               <div style={{ ...progressBarFillStyle, width: `${progressPercent}%` }} />
@@ -921,9 +921,9 @@ function ModeButton({
         flex: 1,
         padding: '9px 12px',
         borderRadius: 10,
-        border: active ? '1px solid #7536d5' : '1px solid #2a2a40',
-        background: active ? 'rgba(117, 54, 213, 0.14)' : '#12121e',
-        color: active ? '#e8e8f0' : '#9ca3af',
+        border: active ? '1px solid rgba(206, 255, 53, 0.48)' : '1px solid #2a2a40',
+        background: active ? 'rgba(206, 255, 53, 0.1)' : '#12121e',
+        color: active ? 'var(--hc-lime)' : '#9ca3af',
         fontSize: 13,
         fontWeight: 600,
         cursor: disabled ? 'not-allowed' : 'pointer',
@@ -968,7 +968,7 @@ function InstrumentalSwitch({
           width: 38,
           height: 20,
           borderRadius: 999,
-          background: checked ? '#7536d5' : '#2a2a40',
+          background: checked ? 'linear-gradient(135deg, var(--hc-lime), var(--hc-cyan))' : '#2a2a40',
           transition: 'background 0.2s ease',
           flexShrink: 0,
         }}
@@ -1002,7 +1002,7 @@ function SliderField({
 }) {
   return (
     <label style={fieldStyle}>
-      <span style={labelStyle}>{label} <strong style={{ color: '#c0a7fc' }}>{value.toFixed(2)}</strong></span>
+      <span style={labelStyle}>{label} <strong style={{ color: 'var(--hc-lime)' }}>{value.toFixed(2)}</strong></span>
       <input
         type="range"
         min={0}
@@ -1011,7 +1011,7 @@ function SliderField({
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(Number(e.target.value))}
-        style={{ width: '100%', accentColor: '#7536d5' }}
+        style={{ width: '100%', accentColor: 'var(--hc-lime)' }}
       />
     </label>
   );
@@ -1033,11 +1033,11 @@ function ResultMeta({ label, value }: { label: string; value: string }) {
 }
 
 const panelStyle: CSSProperties = {
-  background: 'linear-gradient(180deg, rgba(29, 29, 50, 0.98), rgba(24, 24, 42, 0.98))',
+  background: 'linear-gradient(180deg, rgba(24, 26, 34, 0.96), rgba(17, 18, 23, 0.96))',
   borderRadius: 20,
   padding: 24,
-  border: '1px solid rgba(117, 54, 213, 0.18)',
-  boxShadow: '0 16px 40px rgba(0, 0, 0, 0.18), 0 4px 20px rgba(117, 54, 213, 0.06)',
+  border: '1px solid var(--hc-border)',
+  boxShadow: 'var(--hc-shadow)',
   minWidth: 0,
 };
 
@@ -1059,9 +1059,9 @@ const titleStyle: CSSProperties = {
 
 const pillStyle: CSSProperties = {
   fontSize: 11,
-  color: '#c0a7fc',
-  background: 'rgba(117, 54, 213, 0.12)',
-  border: '1px solid rgba(117, 54, 213, 0.28)',
+  color: 'var(--hc-lime)',
+  background: 'rgba(206, 255, 53, 0.08)',
+  border: '1px solid rgba(206, 255, 53, 0.24)',
   borderRadius: 999,
   padding: '5px 9px',
   whiteSpace: 'nowrap',
@@ -1105,8 +1105,8 @@ const templateModeNoticeStyle: CSSProperties = {
   marginBottom: 14,
   padding: '10px 12px',
   borderRadius: 10,
-  border: '1px solid rgba(117, 54, 213, 0.28)',
-  background: 'rgba(117, 54, 213, 0.1)',
+  border: '1px solid rgba(206, 255, 53, 0.24)',
+  background: 'rgba(206, 255, 53, 0.08)',
 };
 
 const selectedTemplateStripStyle: CSSProperties = {
@@ -1116,8 +1116,8 @@ const selectedTemplateStripStyle: CSSProperties = {
   marginBottom: 16,
   padding: 12,
   borderRadius: 12,
-  border: '1px solid rgba(117, 54, 213, 0.24)',
-  background: 'rgba(117, 54, 213, 0.1)',
+  border: '1px solid rgba(206, 255, 53, 0.22)',
+  background: 'rgba(206, 255, 53, 0.08)',
 };
 
 function templateCoverThumbStyle(coverUrl?: string): CSSProperties {
@@ -1129,7 +1129,7 @@ function templateCoverThumbStyle(coverUrl?: string): CSSProperties {
     border: '1px solid #2a2a40',
     background: coverUrl
       ? `url(${coverUrl}) center/cover`
-      : 'linear-gradient(135deg, rgba(117, 54, 213, 0.45), rgba(18, 18, 30, 0.95))',
+      : 'linear-gradient(135deg, rgba(206, 255, 53, 0.42), rgba(82, 214, 198, 0.28))',
   };
 }
 
@@ -1236,7 +1236,7 @@ const lockedStyleTextStyle: CSSProperties = {
 const lyricTagPanelStyle: CSSProperties = {
   margin: '16px 0',
   background: 'rgba(18, 18, 30, 0.82)',
-  border: '1px solid rgba(117, 54, 213, 0.2)',
+  border: '1px solid rgba(206, 255, 53, 0.18)',
   borderRadius: 12,
   padding: 14,
 };
@@ -1264,8 +1264,8 @@ const lyricTagGridStyle: CSSProperties = {
 const lyricTagButtonStyle: CSSProperties = {
   padding: '5px 10px',
   borderRadius: 7,
-  border: '1px solid rgba(117, 54, 213, 0.28)',
-  background: 'rgba(117, 54, 213, 0.1)',
+  border: '1px solid rgba(206, 255, 53, 0.24)',
+  background: 'rgba(206, 255, 53, 0.08)',
   color: '#e8e8f0',
   fontSize: 12,
   fontFamily: 'monospace',
@@ -1305,9 +1305,9 @@ const lyricsHeaderStyle: CSSProperties = {
 };
 
 const copyLyricsButtonStyle: CSSProperties = {
-  border: '1px solid rgba(117, 54, 213, 0.45)',
-  background: 'rgba(117, 54, 213, 0.14)',
-  color: '#c0a7fc',
+  border: '1px solid rgba(206, 255, 53, 0.34)',
+  background: 'rgba(206, 255, 53, 0.1)',
+  color: 'var(--hc-lime)',
   borderRadius: 999,
   padding: '6px 12px',
   fontSize: 12,
@@ -1354,15 +1354,15 @@ const lyricSectionStyle: CSSProperties = {
   display: 'inline-flex',
   width: 'fit-content',
   color: '#f4eaff',
-  background: 'rgba(117, 54, 213, 0.28)',
-  border: '1px solid rgba(192, 167, 252, 0.32)',
+  background: 'rgba(206, 255, 53, 0.14)',
+  border: '1px solid rgba(206, 255, 53, 0.28)',
   fontWeight: 800,
 };
 
 const lyricContentStyle: CSSProperties = {
   color: '#d8d9e6',
   background: 'rgba(192, 167, 252, 0.055)',
-  borderLeft: '2px solid rgba(117, 54, 213, 0.55)',
+  borderLeft: '2px solid rgba(206, 255, 53, 0.48)',
 };
 
 const creationLinkStyle: CSSProperties = {
@@ -1371,8 +1371,8 @@ const creationLinkStyle: CSSProperties = {
   justifyContent: 'center',
   padding: '9px 16px',
   borderRadius: 999,
-  border: '1px solid #7536d5',
-  color: '#c0a7fc',
+  border: '1px solid rgba(206, 255, 53, 0.42)',
+  color: 'var(--hc-lime)',
   textDecoration: 'none',
   fontSize: 13,
   fontWeight: 700,
@@ -1391,9 +1391,9 @@ const progressBarTrackStyle: CSSProperties = {
 const progressBarFillStyle: CSSProperties = {
   height: '100%',
   borderRadius: 999,
-  background: 'linear-gradient(90deg, #7536d5, #b66cff)',
+  background: 'linear-gradient(90deg, var(--hc-lime), var(--hc-cyan))',
   transition: 'width 0.8s ease',
-  boxShadow: '0 0 14px rgba(117, 54, 213, 0.45)',
+  boxShadow: '0 0 14px rgba(206, 255, 53, 0.3)',
 };
 
 const statusPanelStyle: CSSProperties = {
@@ -1407,7 +1407,7 @@ const spinnerStyle: CSSProperties = {
   width: 32,
   height: 32,
   border: '3px solid #2a2a40',
-  borderTopColor: '#7536d5',
+  borderTopColor: 'var(--hc-lime)',
   borderRadius: '50%',
   animation: 'advancedArrangementSpin 0.9s linear infinite',
   flexShrink: 0,
@@ -1441,9 +1441,9 @@ const stemActionButtonStyle: CSSProperties = {
   minHeight: 32,
   padding: '7px 12px',
   borderRadius: 8,
-  border: '1px solid rgba(117, 54, 213, 0.42)',
-  background: 'rgba(117, 54, 213, 0.16)',
-  color: '#d8c4ff',
+  border: '1px solid rgba(206, 255, 53, 0.34)',
+  background: 'rgba(206, 255, 53, 0.1)',
+  color: 'var(--hc-lime)',
   fontSize: 12,
   fontWeight: 700,
   fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
