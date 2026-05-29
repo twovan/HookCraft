@@ -186,6 +186,57 @@ function snapStemEditorTime(value: number, duration: number, enabled: boolean, s
   return Math.max(0, Math.min(duration || snapped, Number(snapped.toFixed(3))));
 }
 
+type TransportIconName = 'skipStart' | 'skipEnd' | 'back' | 'forward' | 'play' | 'pause' | 'stop' | 'collapse' | 'expand';
+
+function TransportIcon({ name }: { name: TransportIconName }) {
+  const common = {
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 2,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+  };
+
+  return (
+    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" focusable="false" style={{ display: 'block' }}>
+      {name === 'skipStart' && (
+        <>
+          <path {...common} d="M6 5v14" />
+          <path {...common} d="M18 6l-9 6 9 6V6z" />
+        </>
+      )}
+      {name === 'skipEnd' && (
+        <>
+          <path {...common} d="M18 5v14" />
+          <path {...common} d="M6 6l9 6-9 6V6z" />
+        </>
+      )}
+      {name === 'back' && (
+        <>
+          <path {...common} d="M11 7l-5 5 5 5" />
+          <path {...common} d="M18 7l-5 5 5 5" />
+        </>
+      )}
+      {name === 'forward' && (
+        <>
+          <path {...common} d="M13 7l5 5-5 5" />
+          <path {...common} d="M6 7l5 5-5 5" />
+        </>
+      )}
+      {name === 'play' && <path d="M8 5v14l11-7L8 5z" fill="currentColor" />}
+      {name === 'pause' && (
+        <>
+          <path d="M8 5h3v14H8z" fill="currentColor" />
+          <path d="M13 5h3v14h-3z" fill="currentColor" />
+        </>
+      )}
+      {name === 'stop' && <path d="M7 7h10v10H7z" fill="currentColor" />}
+      {name === 'collapse' && <path {...common} d="M7 15l5-5 5 5" />}
+      {name === 'expand' && <path {...common} d="M7 9l5 5 5-5" />}
+    </svg>
+  );
+}
+
 function shouldAutoDismissStatusToast(message: string) {
   if (!message.trim()) return false;
   if (/失败|错误|不能|不可用|还没有|暂时/.test(message)) return false;
@@ -3519,32 +3570,35 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
         <div style={transportPanelStyle(compactTransport)}>
           <div style={transportStyle}>
             <div style={transportButtonGroupStyle}>
-              <button type="button" title="回到开头" onClick={() => handleSeek(0)} style={transportIconButtonStyle(false)}>
-                |&lt;
+              <button type="button" aria-label="回到开头" title="回到开头" onClick={() => handleSeek(0)} style={transportIconButtonStyle(false)}>
+                <TransportIcon name="skipStart" />
               </button>
-              <button type="button" title="后退 1 秒" onClick={() => nudgePlaybackHead(-1, true)} style={transportIconButtonStyle(false)}>
-                -1s
+              <button type="button" aria-label="后退 1 秒" title="后退 1 秒" onClick={() => nudgePlaybackHead(-1, true)} style={transportIconButtonStyle(false)}>
+                <TransportIcon name="back" />
+                <span style={transportNudgeBadgeStyle}>1s</span>
               </button>
-              <button type="button" title="播放/暂停" onClick={handleTogglePlayback} style={playButtonStyle}>
-                {isPlaying ? '暂停' : '播放'}
+              <button type="button" aria-label={isPlaying ? '暂停' : '播放'} title="播放/暂停" onClick={handleTogglePlayback} style={playButtonStyle}>
+                <TransportIcon name={isPlaying ? 'pause' : 'play'} />
               </button>
-              <button type="button" title="停止预听" onClick={stopPlaybackPreview} style={transportIconButtonStyle(false)}>
-                停止
+              <button type="button" aria-label="停止预听" title="停止预听" onClick={stopPlaybackPreview} style={transportIconButtonStyle(false)}>
+                <TransportIcon name="stop" />
               </button>
-              <button type="button" title="前进 1 秒" onClick={() => nudgePlaybackHead(1, true)} style={transportIconButtonStyle(false)}>
-                +1s
+              <button type="button" aria-label="前进 1 秒" title="前进 1 秒" onClick={() => nudgePlaybackHead(1, true)} style={transportIconButtonStyle(false)}>
+                <TransportIcon name="forward" />
+                <span style={transportNudgeBadgeStyle}>1s</span>
               </button>
-              <button type="button" title="跳到结尾" onClick={() => handleSeek(duration)} style={transportIconButtonStyle(false)}>
-                &gt;|
+              <button type="button" aria-label="跳到结尾" title="跳到结尾" onClick={() => handleSeek(duration)} style={transportIconButtonStyle(false)}>
+                <TransportIcon name="skipEnd" />
               </button>
               <button
                 type="button"
+                aria-label={compactTransport ? '展开底部工具条' : '收起底部工具条'}
                 title="B 收起或展开底部工具条"
                 aria-pressed={compactTransport}
                 onClick={() => setCompactTransport((value) => !value)}
                 style={transportIconButtonStyle(false)}
               >
-                {compactTransport ? '展开' : '收起'}
+                <TransportIcon name={compactTransport ? 'expand' : 'collapse'} />
               </button>
             </div>
             <input
@@ -5306,30 +5360,35 @@ function transportPanelStyle(compactTransport: boolean): CSSProperties {
 
 const transportStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'minmax(260px, 410px) 116px minmax(220px, 1fr) 84px',
-  gap: 16,
+  gridTemplateColumns: 'minmax(240px, 340px) 116px minmax(220px, 1fr) 84px',
+  gap: 14,
   alignItems: 'center',
 };
 
 const transportButtonGroupStyle: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
-  flexWrap: 'wrap',
-  gap: 4,
+  flexWrap: 'nowrap',
+  gap: 5,
   minWidth: 0,
-  padding: 3,
-  borderRadius: 9,
+  padding: 4,
+  borderRadius: 12,
   border: '1px solid rgba(48, 52, 76, 0.78)',
-  background: 'rgba(7, 9, 18, 0.72)',
+  background: 'linear-gradient(180deg, rgba(18, 23, 38, 0.9), rgba(7, 9, 18, 0.82))',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
 };
 
 const playButtonStyle: CSSProperties = {
   ...editorButtonChromeStyle({ tone: 'primary', round: true, active: true }),
-  minHeight: 42,
-  minWidth: 58,
+  minHeight: 38,
+  minWidth: 46,
   border: '1px solid rgba(206, 255, 53, 0.86)',
   background: 'linear-gradient(180deg, #f7ffd0 0%, #ceff35 48%, #8fb51d 100%)',
   color: '#08090c',
+  padding: 0,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
   fontSize: 13,
   fontWeight: 900,
   boxShadow: 'inset 0 2px 0 rgba(255,255,255,0.86), inset 0 -3px 0 rgba(28, 48, 18, 0.28), 0 0 22px rgba(206, 255, 53, 0.24)',
@@ -5339,15 +5398,30 @@ const playButtonStyle: CSSProperties = {
 function transportIconButtonStyle(disabled: boolean): CSSProperties {
   return {
     ...editorButtonChromeStyle({ tone: 'neutral', compact: false, disabled }),
-    minWidth: 42,
+    position: 'relative',
+    minWidth: 34,
     minHeight: 34,
-    padding: '0 8px',
+    padding: 0,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     fontSize: 11,
     fontWeight: 900,
     fontVariantNumeric: 'tabular-nums',
     whiteSpace: 'nowrap',
   };
 }
+
+const transportNudgeBadgeStyle: CSSProperties = {
+  position: 'absolute',
+  right: 3,
+  bottom: 2,
+  color: '#aeb4c8',
+  fontSize: 8,
+  fontWeight: 900,
+  lineHeight: 1,
+  pointerEvents: 'none',
+};
 
 const transportEditBarStyle: CSSProperties = {
   display: 'flex',
