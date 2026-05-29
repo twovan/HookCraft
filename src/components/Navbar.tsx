@@ -170,9 +170,13 @@ export default function Navbar() {
                   borderRadius: '50%',
                   background: 'linear-gradient(135deg, #ceff35, #52d6c6)',
                   border: '1px solid rgba(206, 255, 53, 0.26)',
+                  padding: 0,
+                  overflow: 'hidden',
+                  boxSizing: 'border-box',
                   color: '#08090c',
                   fontSize: 14,
                   fontWeight: 700,
+                  lineHeight: 1,
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
@@ -181,7 +185,7 @@ export default function Navbar() {
                 }}
               >
                 {avatarUrl ? (
-                  <img src={avatarUrl} alt="头像" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                  <img src={avatarUrl} alt="头像" style={{ display: 'block', width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
                 ) : (
                   avatarInitial
                 )}
