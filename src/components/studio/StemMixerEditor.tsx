@@ -154,11 +154,11 @@ const TIMELINE_SNAP_STEPS_SECONDS = [0.1, 0.25, 0.5, 1] as const;
 const DEFAULT_TIMELINE_SNAP_STEP_SECONDS = 0.25;
 const MIN_TIMELINE_ZOOM = 1;
 const MAX_TIMELINE_ZOOM = 2.5;
-const TIMELINE_LABEL_WIDTH = 150;
-const TIMELINE_SIMPLE_BUTTON_WIDTH = 102;
-const TIMELINE_ADVANCED_BUTTON_WIDTH = 120;
-const TIMELINE_VOLUME_WIDTH = 132;
-const TIMELINE_ADVANCED_VOLUME_WIDTH = 142;
+const TIMELINE_LABEL_WIDTH = 166;
+const TIMELINE_SIMPLE_BUTTON_WIDTH = 94;
+const TIMELINE_ADVANCED_BUTTON_WIDTH = 112;
+const TIMELINE_VOLUME_WIDTH = 112;
+const TIMELINE_ADVANCED_VOLUME_WIDTH = 126;
 const TIMELINE_TRIM_WIDTH = 240;
 const TIMELINE_GRID_GAP = 7;
 const TIMELINE_ROW_PADDING_X = 18;
@@ -4646,7 +4646,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
               }}
               style={stemTrackStyle(isAudible, state.solo, showAdvancedControls, isSelectedTrack, timelineGridColumns, timelineMinWidth, trackDensity)}
             >
-              <div style={stemNameStyle} data-timeline-pan-zone="true">
+              <div style={stemNameStyle(isSelectedTrack, isAudible)} data-timeline-pan-zone="true">
                 <span
                   aria-hidden="true"
                   title={stemAudioStatusLabel(audioStatus)}
@@ -6175,9 +6175,9 @@ function trackListStyle(trackDensity: TrackDensity, isPanning = false): CSSPrope
     order: 3,
     display: 'flex',
     flexDirection: 'column',
-    gap: 0,
+    gap: trackDensity === 'compact' ? 3 : 5,
     marginTop: 0,
-    padding: '0 0 8px',
+    padding: '0 6px 8px',
     border: '1px solid rgba(48, 52, 76, 0.84)',
     borderRadius: 8,
     background: `
@@ -6682,7 +6682,7 @@ function stemTrackStyle(
   trackDensity: TrackDensity,
 ): CSSProperties {
   const accent = selectedTrack
-    ? 'rgba(14, 165, 233, 0.16)'
+    ? 'rgba(206, 255, 53, 0.12)'
     : solo
       ? 'rgba(206, 255, 53, 0.1)'
       : 'rgba(16, 19, 33, 0.96)';
@@ -6697,23 +6697,20 @@ function stemTrackStyle(
     minWidth,
     boxSizing: 'border-box',
     minHeight: rowHeight,
-    borderRadius: 0,
+    borderRadius: 8,
     border: selectedTrack
-      ? '1px solid rgba(125, 211, 252, 0.78)'
+      ? '1px solid rgba(206, 255, 53, 0.46)'
       : solo
         ? '1px solid rgba(206, 255, 53, 0.42)'
-        : '1px solid transparent',
-    borderBottom: selectedTrack
-      ? '1px solid rgba(125, 211, 252, 0.78)'
-      : '1px solid rgba(38, 42, 64, 0.86)',
+        : '1px solid rgba(38, 42, 64, 0.68)',
     background: `
       linear-gradient(90deg, ${accent}, rgba(16, 19, 33, 0.92) 18%, rgba(8, 12, 21, 0.9)),
       linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0))
     `,
     boxShadow: selectedTrack
-      ? '0 0 0 1px rgba(125, 211, 252, 0.12)'
+      ? 'inset 3px 0 0 var(--hc-lime), 0 12px 28px rgba(0, 0, 0, 0.18)'
       : solo
-        ? '0 0 0 1px rgba(206, 255, 53, 0.12)'
+        ? 'inset 3px 0 0 rgba(206, 255, 53, 0.58)'
         : 'none',
     opacity: audible ? 1 : 0.46,
     padding: selectedTrack
@@ -6724,22 +6721,29 @@ function stemTrackStyle(
   };
 }
 
-const stemNameStyle: CSSProperties = {
-  position: 'sticky',
-  left: 8,
-  zIndex: 2,
-  display: 'grid',
-  gridTemplateColumns: '26px 8px minmax(0, 1fr)',
-  alignItems: 'center',
-  gap: 8,
-  minWidth: 0,
-  maxWidth: '100%',
-  alignSelf: 'stretch',
-  padding: '4px 8px 4px 0',
-  borderRadius: 6,
-  background: 'linear-gradient(90deg, rgba(13, 16, 28, 0.98), rgba(13, 16, 28, 0.92) 82%, rgba(13, 16, 28, 0))',
-  overflow: 'hidden',
-};
+function stemNameStyle(selectedTrack: boolean, audible: boolean): CSSProperties {
+  return {
+    position: 'sticky',
+    left: 8,
+    zIndex: 2,
+    display: 'grid',
+    gridTemplateColumns: '26px 8px minmax(0, 1fr)',
+    alignItems: 'center',
+    gap: 8,
+    minWidth: 0,
+    maxWidth: '100%',
+    alignSelf: 'stretch',
+    padding: '6px 9px',
+    borderRadius: 7,
+    border: selectedTrack ? '1px solid rgba(206, 255, 53, 0.2)' : '1px solid rgba(255, 255, 255, 0.04)',
+    background: selectedTrack
+      ? 'linear-gradient(90deg, rgba(206, 255, 53, 0.12), rgba(13, 16, 28, 0.96) 72%, rgba(13, 16, 28, 0.86))'
+      : 'linear-gradient(90deg, rgba(13, 16, 28, 0.98), rgba(13, 16, 28, 0.92) 82%, rgba(13, 16, 28, 0.78))',
+    boxShadow: selectedTrack ? '0 8px 18px rgba(0, 0, 0, 0.14)' : 'none',
+    overflow: 'hidden',
+    opacity: audible ? 1 : 0.8,
+  };
+}
 
 function stemIndexStyle(selectedTrack: boolean): CSSProperties {
   return {
@@ -6908,7 +6912,7 @@ const stemTypeStyle: CSSProperties = {
 
 const stemButtonsStyle: CSSProperties = {
   display: 'flex',
-  gap: 4,
+  gap: 3,
   justifyContent: 'center',
 };
 
@@ -6922,10 +6926,10 @@ function trackToggleStyle(active: boolean, tone: 'mute' | 'solo' | 'export' | 'r
 
   return {
     ...editorButtonChromeStyle({ tone: palette[tone], compact: true, active }),
-    minWidth: tone === 'export' ? 44 : 28,
-    minHeight: 26,
-    padding: tone === 'export' ? '0 7px' : '0 4px',
-    borderRadius: 6,
+    minWidth: tone === 'export' ? 38 : 25,
+    minHeight: 24,
+    padding: tone === 'export' ? '0 6px' : '0 3px',
+    borderRadius: 5,
     fontSize: 10,
     fontWeight: 900,
     fontVariantNumeric: 'tabular-nums',
@@ -6934,9 +6938,9 @@ function trackToggleStyle(active: boolean, tone: 'mute' | 'solo' | 'export' | 'r
 
 const volumeStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: '36px minmax(0, 1fr)',
+  gridTemplateColumns: '32px minmax(0, 1fr)',
   alignItems: 'center',
-  gap: 7,
+  gap: 6,
   color: '#9ca3af',
   fontSize: 11,
   fontWeight: 700,
