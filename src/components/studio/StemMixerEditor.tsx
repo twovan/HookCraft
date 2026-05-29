@@ -109,7 +109,7 @@ type ExportReadiness = 'ready-only' | 'wait-all';
 type TrackViewMode = 'all' | 'active' | 'audible';
 type TrackDensity = 'comfortable' | 'compact';
 type InspectorTab = 'track' | 'mix' | 'export';
-type SideRailTab = InspectorTab | 'automation';
+type SideRailTab = InspectorTab;
 type TimelineScrollState = {
   canScroll: boolean;
   progress: number;
@@ -134,7 +134,6 @@ type TimelineRulerTrimDragState = {
 type EditorPreferences = {
   exportMode?: ExportMode;
   exportReadiness?: ExportReadiness;
-  showAdvancedControls?: boolean;
   trackViewMode?: TrackViewMode;
   inspectorTab?: InspectorTab;
   sideRailTab?: SideRailTab;
@@ -154,7 +153,7 @@ const TIMELINE_SNAP_STEPS_SECONDS = [0.1, 0.25, 0.5, 1] as const;
 const DEFAULT_TIMELINE_SNAP_STEP_SECONDS = 0.25;
 const MIN_TIMELINE_ZOOM = 1;
 const MAX_TIMELINE_ZOOM = 2.5;
-const TIMELINE_LABEL_WIDTH = 166;
+const TIMELINE_LABEL_WIDTH = 136;
 const TIMELINE_SIMPLE_BUTTON_WIDTH = 94;
 const TIMELINE_ADVANCED_BUTTON_WIDTH = 112;
 const TIMELINE_VOLUME_WIDTH = 112;
@@ -267,7 +266,7 @@ function resolveTimelineChromeWidths(advanced: boolean, viewportWidth = 0): Time
   }
 
   return {
-    label: advanced ? 136 : 132,
+    label: advanced ? 116 : 112,
     buttons: advanced ? 92 : 80,
     volume: advanced ? 102 : 88,
     pan: 102,
@@ -981,7 +980,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
   const [editorPreferencesLoaded, setEditorPreferencesLoaded] = useState(false);
   const [exportMode, setExportMode] = useState<ExportMode>('current-mix');
   const [exportReadiness, setExportReadiness] = useState<ExportReadiness>('wait-all');
-  const [showAdvancedControls, setShowAdvancedControls] = useState(false);
+  const showAdvancedControls = false;
   const [trackViewMode, setTrackViewMode] = useState<TrackViewMode>('all');
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>('track');
   const [sideRailTab, setSideRailTab] = useState<SideRailTab>('track');
@@ -1161,11 +1160,8 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     if (preferences.inspectorTab === 'track' || preferences.inspectorTab === 'mix' || preferences.inspectorTab === 'export') {
       setInspectorTab(preferences.inspectorTab);
     }
-    if (preferences.sideRailTab === 'track' || preferences.sideRailTab === 'mix' || preferences.sideRailTab === 'automation' || preferences.sideRailTab === 'export') {
+    if (preferences.sideRailTab === 'track' || preferences.sideRailTab === 'mix' || preferences.sideRailTab === 'export') {
       setSideRailTab(preferences.sideRailTab);
-    }
-    if (typeof preferences.showAdvancedControls === 'boolean') {
-      setShowAdvancedControls(preferences.showAdvancedControls);
     }
     if (typeof preferences.timelineZoom === 'number' && Number.isFinite(preferences.timelineZoom)) {
       setTimelineZoom(clampTimelineZoom(preferences.timelineZoom));
@@ -1196,7 +1192,6 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     window.localStorage.setItem('hookcraft-stem-editor-prefs', JSON.stringify({
       exportMode,
       exportReadiness,
-      showAdvancedControls,
       trackViewMode,
       inspectorTab,
       sideRailTab,
@@ -1208,7 +1203,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
       inspectorCollapsed,
       trackDensity,
     }));
-  }, [compactTransport, editorPreferencesLoaded, exportMode, exportReadiness, followPlayhead, inspectorCollapsed, inspectorTab, showAdvancedControls, sideRailTab, snapStepSeconds, snapToGrid, timelineZoom, trackDensity, trackViewMode]);
+  }, [compactTransport, editorPreferencesLoaded, exportMode, exportReadiness, followPlayhead, inspectorCollapsed, inspectorTab, sideRailTab, snapStepSeconds, snapToGrid, timelineZoom, trackDensity, trackViewMode]);
 
   useEffect(() => {
     setSaveStatusDismissing(false);
@@ -3463,15 +3458,6 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
       return;
     }
 
-    if (tab === 'automation') {
-      setShowAdvancedControls(true);
-      setInspectorCollapsed(false);
-      setInspectorTab('track');
-      window.requestAnimationFrame(focusTimelineSurface);
-      setSaveStatus('已打开自动化和高级轨道控制。');
-      return;
-    }
-
     setInspectorCollapsed(false);
     setInspectorTab('export');
     setSaveStatus('已打开导出中心。');
@@ -3511,17 +3497,6 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
           onClick={() => activateSideRailTab('mix')}
         >
           混音
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={sideRailTab === 'automation'}
-          aria-controls="stem-editor-timeline"
-          title="自动化：展开高级轨道控制"
-          style={sideRailButtonStyle(sideRailTab === 'automation', showAdvancedControls)}
-          onClick={() => activateSideRailTab('automation')}
-        >
-          自动化
         </button>
         <button
           type="button"
@@ -3591,19 +3566,6 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
               单轨包
             </button>
           </span>
-          <button
-            type="button"
-            onClick={() => {
-              setShowAdvancedControls((value) => {
-                const next = !value;
-                setSideRailTab(next ? 'automation' : inspectorTab);
-                return next;
-              });
-            }}
-            style={ghostButtonStyle}
-          >
-            {showAdvancedControls ? '收起高级' : '高级参数'}
-          </button>
           <button type="button" onClick={copyProjectLink} style={ghostButtonStyle}>
             复制链接
           </button>
@@ -4723,18 +4685,11 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
           </div>
           <div style={timelineRulerMetaStyle} data-timeline-pan-zone="true">控制</div>
           <div style={timelineRulerMetaStyle} data-timeline-pan-zone="true">音量</div>
-          {showAdvancedControls && (
-            <>
-              <div style={timelineRulerMetaStyle} data-timeline-pan-zone="true">声像</div>
-              <div style={timelineRulerMetaStyle} data-timeline-pan-zone="true">裁剪</div>
-            </>
-          )}
         </div>
         {visibleStems.map((stem, index) => {
           const state = tracks[stem.type] || defaultTrackState();
           const trackClipState = resolveTrackClipState(state, duration);
           const trimEnd = state.trimEnd ?? duration;
-          const clipDuration = Math.max(0, trimEnd - state.trimStart);
           const isAudible = !state.muted && (!hasSoloTrack || state.solo);
           const displayName = getStemDisplayName(stem);
           const isSelectedTrack = selectedTrack?.type === stem.type;
@@ -4857,126 +4812,6 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
                 />
               </label>
 
-              {showAdvancedControls && (
-                <>
-                  <label style={panStyle}>
-                    <span>{formatPan(state.pan)}</span>
-                    <input
-                      aria-label={`${stem.label} 声像`}
-                      type="range"
-                      min={-1}
-                      max={1}
-                      step={0.01}
-                      value={state.pan}
-                      onChange={(event) => setTrackPan(stem.type, Number(event.target.value))}
-                    />
-                  </label>
-
-                  <div style={trimEditorStyle}>
-                    <div style={trimHeaderStyle}>
-                      <span>裁剪</span>
-                      <div style={trimHeaderActionsStyle}>
-                        <span>{formatTime(state.trimStart)} - {formatTime(trimEnd)}</span>
-                        <button
-                          type="button"
-                          style={trimResetButtonStyle}
-                          onClick={() => resetTrackEdit(stem.type)}
-                        >
-                          重置
-                        </button>
-                      </div>
-                    </div>
-                    <label style={trimControlStyle}>
-                      <span>入点</span>
-                      <input
-                        aria-label={`${stem.label} 裁剪入点`}
-                        type="range"
-                        min={0}
-                        max={Math.max(duration, 0.1)}
-                        step={0.05}
-                        value={state.trimStart}
-                        onChange={(event) => setTrackTrim(stem.type, 'start', Number(event.target.value))}
-                      />
-                      <input
-                        aria-label={`${stem.label} 入点秒数`}
-                        type="number"
-                        min={0}
-                        max={Math.max(duration, 0.1)}
-                        step={0.05}
-                        value={Number(state.trimStart.toFixed(2))}
-                        onChange={(event) => setTrackTrim(stem.type, 'start', Number(event.target.value))}
-                        style={trimNumberInputStyle}
-                      />
-                    </label>
-                    <label style={trimControlStyle}>
-                      <span>出点</span>
-                      <input
-                        aria-label={`${stem.label} 裁剪出点`}
-                        type="range"
-                        min={0}
-                        max={Math.max(duration, 0.1)}
-                        step={0.05}
-                        value={trimEnd}
-                        onChange={(event) => setTrackTrim(stem.type, 'end', Number(event.target.value))}
-                      />
-                      <input
-                        aria-label={`${stem.label} 出点秒数`}
-                        type="number"
-                        min={0}
-                        max={Math.max(duration, 0.1)}
-                        step={0.05}
-                        value={Number(trimEnd.toFixed(2))}
-                        onChange={(event) => setTrackTrim(stem.type, 'end', Number(event.target.value))}
-                        style={trimNumberInputStyle}
-                      />
-                    </label>
-                    <label style={trimControlStyle}>
-                      <span>淡入</span>
-                      <input
-                        aria-label={`${stem.label} 淡入时长`}
-                        type="range"
-                        min={0}
-                        max={Math.max(clipDuration, 0.1)}
-                        step={0.05}
-                        value={Math.min(state.fadeIn, clipDuration)}
-                        onChange={(event) => setTrackFade(stem.type, 'in', Number(event.target.value))}
-                      />
-                      <input
-                        aria-label={`${stem.label} 淡入秒数`}
-                        type="number"
-                        min={0}
-                        max={Math.max(clipDuration, 0.1)}
-                        step={0.05}
-                        value={Number(Math.min(state.fadeIn, clipDuration).toFixed(2))}
-                        onChange={(event) => setTrackFade(stem.type, 'in', Number(event.target.value))}
-                        style={trimNumberInputStyle}
-                      />
-                    </label>
-                    <label style={trimControlStyle}>
-                      <span>淡出</span>
-                      <input
-                        aria-label={`${stem.label} 淡出时长`}
-                        type="range"
-                        min={0}
-                        max={Math.max(clipDuration, 0.1)}
-                        step={0.05}
-                        value={Math.min(state.fadeOut, clipDuration)}
-                        onChange={(event) => setTrackFade(stem.type, 'out', Number(event.target.value))}
-                      />
-                      <input
-                        aria-label={`${stem.label} 淡出秒数`}
-                        type="number"
-                        min={0}
-                        max={Math.max(clipDuration, 0.1)}
-                        step={0.05}
-                        value={Number(Math.min(state.fadeOut, clipDuration).toFixed(2))}
-                        onChange={(event) => setTrackFade(stem.type, 'out', Number(event.target.value))}
-                        style={trimNumberInputStyle}
-                      />
-                    </label>
-                  </div>
-                </>
-              )}
             </div>
           );
         })}
@@ -6925,13 +6760,13 @@ function stemNameStyle(selectedTrack: boolean, audible: boolean): CSSProperties 
     left: 8,
     zIndex: 2,
     display: 'grid',
-    gridTemplateColumns: '26px 8px minmax(0, 1fr)',
+    gridTemplateColumns: '20px 7px minmax(0, 1fr)',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
     minWidth: 0,
     maxWidth: '100%',
     alignSelf: 'stretch',
-    padding: '6px 9px',
+    padding: '6px 7px',
     borderRadius: 7,
     border: selectedTrack ? '1px solid rgba(206, 255, 53, 0.2)' : '1px solid rgba(255, 255, 255, 0.04)',
     background: selectedTrack
@@ -6945,10 +6780,10 @@ function stemNameStyle(selectedTrack: boolean, audible: boolean): CSSProperties 
 
 function stemIndexStyle(selectedTrack: boolean): CSSProperties {
   return {
-    width: 26,
+    width: 20,
     flexShrink: 0,
     color: selectedTrack ? '#e0f2fe' : '#717791',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: 900,
     fontVariantNumeric: 'tabular-nums',
     textAlign: 'right',
@@ -6957,7 +6792,7 @@ function stemIndexStyle(selectedTrack: boolean): CSSProperties {
 
 const stemIdentityStyle: CSSProperties = {
   display: 'grid',
-  gap: 4,
+  gap: 3,
   minWidth: 0,
   overflow: 'hidden',
 };
@@ -6970,7 +6805,7 @@ const stemTitleRowStyle: CSSProperties = {
 const stemLabelStyle: CSSProperties = {
   display: 'block',
   color: '#f0f1fb',
-  fontSize: 13,
+  fontSize: 12,
   fontWeight: 900,
   lineHeight: 1.15,
   overflow: 'hidden',
@@ -6984,7 +6819,7 @@ const stemStatusRowStyle: CSSProperties = {
   gap: 4,
   minWidth: 0,
   maxWidth: '100%',
-  minHeight: 18,
+  minHeight: 16,
   overflow: 'hidden',
 };
 
