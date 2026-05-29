@@ -163,6 +163,15 @@ const TIMELINE_TRIM_WIDTH = 240;
 const TIMELINE_GRID_GAP = 7;
 const TIMELINE_ROW_PADDING_X = 18;
 
+type TimelineChromeWidths = {
+  label: number;
+  buttons: number;
+  volume: number;
+  pan: number;
+  trim: number;
+  compact: boolean;
+};
+
 function clampTimelineZoom(value: number) {
   if (!Number.isFinite(value)) return MIN_TIMELINE_ZOOM;
   return Math.max(MIN_TIMELINE_ZOOM, Math.min(MAX_TIMELINE_ZOOM, Number(value.toFixed(2))));
@@ -244,16 +253,41 @@ function shouldAutoDismissStatusToast(message: string) {
   return true;
 }
 
-function buildTimelineGridColumns(advanced: boolean, laneWidth: number) {
-  return advanced
-    ? `${TIMELINE_LABEL_WIDTH}px ${laneWidth}px ${TIMELINE_ADVANCED_BUTTON_WIDTH}px ${TIMELINE_ADVANCED_VOLUME_WIDTH}px ${TIMELINE_ADVANCED_VOLUME_WIDTH}px ${TIMELINE_TRIM_WIDTH}px`
-    : `${TIMELINE_LABEL_WIDTH}px ${laneWidth}px ${TIMELINE_SIMPLE_BUTTON_WIDTH}px ${TIMELINE_VOLUME_WIDTH}px`;
+function resolveTimelineChromeWidths(advanced: boolean, viewportWidth = 0): TimelineChromeWidths {
+  const compact = Number.isFinite(viewportWidth) && viewportWidth > 0 && viewportWidth < 1120;
+  if (!compact) {
+    return {
+      label: TIMELINE_LABEL_WIDTH,
+      buttons: advanced ? TIMELINE_ADVANCED_BUTTON_WIDTH : TIMELINE_SIMPLE_BUTTON_WIDTH,
+      volume: advanced ? TIMELINE_ADVANCED_VOLUME_WIDTH : TIMELINE_VOLUME_WIDTH,
+      pan: TIMELINE_ADVANCED_VOLUME_WIDTH,
+      trim: TIMELINE_TRIM_WIDTH,
+      compact: false,
+    };
+  }
+
+  return {
+    label: advanced ? 136 : 132,
+    buttons: advanced ? 92 : 80,
+    volume: advanced ? 102 : 88,
+    pan: 102,
+    trim: 190,
+    compact: true,
+  };
 }
 
-function getTimelineFixedWidth(advanced: boolean) {
+function buildTimelineGridColumns(advanced: boolean, laneWidth: number, viewportWidth = 0) {
+  const widths = resolveTimelineChromeWidths(advanced, viewportWidth);
   return advanced
-    ? TIMELINE_LABEL_WIDTH + TIMELINE_ADVANCED_BUTTON_WIDTH + TIMELINE_ADVANCED_VOLUME_WIDTH * 2 + TIMELINE_TRIM_WIDTH
-    : TIMELINE_LABEL_WIDTH + TIMELINE_SIMPLE_BUTTON_WIDTH + TIMELINE_VOLUME_WIDTH;
+    ? `${widths.label}px ${laneWidth}px ${widths.buttons}px ${widths.volume}px ${widths.pan}px ${widths.trim}px`
+    : `${widths.label}px ${laneWidth}px ${widths.buttons}px ${widths.volume}px`;
+}
+
+function getTimelineFixedWidth(advanced: boolean, viewportWidth = 0) {
+  const widths = resolveTimelineChromeWidths(advanced, viewportWidth);
+  return advanced
+    ? widths.label + widths.buttons + widths.volume + widths.pan + widths.trim
+    : widths.label + widths.buttons + widths.volume;
 }
 
 function getTimelineGapCount(advanced: boolean) {
@@ -264,18 +298,19 @@ function resolveTimelineBaseLaneWidth(advanced: boolean, viewportWidth: number) 
   const designLaneWidth = advanced ? 420 : 520;
   if (!Number.isFinite(viewportWidth) || viewportWidth <= 0) return designLaneWidth;
 
-  const minimumLaneWidth = advanced ? 180 : 220;
+  const widths = resolveTimelineChromeWidths(advanced, viewportWidth);
+  const minimumLaneWidth = widths.compact ? (advanced ? 140 : 160) : (advanced ? 180 : 220);
   const availableLaneWidth = viewportWidth
-    - getTimelineFixedWidth(advanced)
+    - getTimelineFixedWidth(advanced, viewportWidth)
     - TIMELINE_GRID_GAP * getTimelineGapCount(advanced)
     - TIMELINE_ROW_PADDING_X
-    - 4;
+    - 16;
 
   return Math.max(minimumLaneWidth, availableLaneWidth);
 }
 
-function buildTimelineMinWidth(advanced: boolean, laneWidth: number) {
-  const fixedWidth = getTimelineFixedWidth(advanced);
+function buildTimelineMinWidth(advanced: boolean, laneWidth: number, viewportWidth = 0) {
+  const fixedWidth = getTimelineFixedWidth(advanced, viewportWidth);
   const gapCount = getTimelineGapCount(advanced);
   return fixedWidth + laneWidth + TIMELINE_GRID_GAP * gapCount + TIMELINE_ROW_PADDING_X;
 }
@@ -1009,13 +1044,15 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     [showAdvancedControls, timelineViewportWidth, timelineZoom],
   );
   const timelineMinWidth = useMemo(
-    () => buildTimelineMinWidth(showAdvancedControls, timelineLaneWidth),
-    [showAdvancedControls, timelineLaneWidth],
+    () => buildTimelineMinWidth(showAdvancedControls, timelineLaneWidth, timelineViewportWidth),
+    [showAdvancedControls, timelineLaneWidth, timelineViewportWidth],
   );
   const timelineGridColumns = useMemo(
-    () => buildTimelineGridColumns(showAdvancedControls, timelineLaneWidth),
-    [showAdvancedControls, timelineLaneWidth],
+    () => buildTimelineGridColumns(showAdvancedControls, timelineLaneWidth, timelineViewportWidth),
+    [showAdvancedControls, timelineLaneWidth, timelineViewportWidth],
   );
+  const shouldAllowTimelineHorizontalScroll = timelineZoom > 1.01
+    || (timelineViewportWidth > 0 && timelineMinWidth > timelineViewportWidth + 8);
   const timelineRulerMarks = useMemo(() => {
     const markCount = Math.max(5, Math.min(18, Math.floor(timelineLaneWidth / 84) + 1));
     return Array.from({ length: markCount }, (_, index) => (
@@ -1277,11 +1314,12 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
       if (!viewport || duration <= 0) return;
 
       const maxScroll = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
-      const playheadX = 8 + TIMELINE_LABEL_WIDTH + TIMELINE_GRID_GAP + (Math.max(0, Math.min(duration, time)) / duration) * laneWidth;
+      const labelWidth = resolveTimelineChromeWidths(showAdvancedControls, timelineViewportWidth).label;
+      const playheadX = 8 + labelWidth + TIMELINE_GRID_GAP + (Math.max(0, Math.min(duration, time)) / duration) * laneWidth;
       const nextScrollLeft = Math.max(0, Math.min(maxScroll, playheadX - viewport.clientWidth * 0.44));
       viewport.scrollTo({ left: nextScrollLeft, behavior });
     });
-  }, [currentTime, duration, timelineLaneWidth]);
+  }, [currentTime, duration, showAdvancedControls, timelineLaneWidth, timelineViewportWidth]);
 
   const applyTimelineZoom = useCallback((nextZoom: number) => {
     const safeZoom = clampTimelineZoom(nextZoom);
@@ -4348,7 +4386,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
         ref={timelineViewportRef}
         tabIndex={-1}
         aria-label="多轨时间线"
-        style={trackListStyle(trackDensity, isTimelinePanning)}
+        style={trackListStyle(trackDensity, isTimelinePanning, shouldAllowTimelineHorizontalScroll)}
         onContextMenu={(event) => event.preventDefault()}
         onDragStart={(event) => event.preventDefault()}
         onWheel={handleTimelineWheel}
@@ -6242,7 +6280,7 @@ const editorStatusToastTextStyle: CSSProperties = {
   whiteSpace: 'nowrap',
 };
 
-function trackListStyle(trackDensity: TrackDensity, isPanning = false): CSSProperties {
+function trackListStyle(trackDensity: TrackDensity, isPanning = false, canScrollHorizontally = true): CSSProperties {
   return {
     position: 'relative',
     gridColumn: '1',
@@ -6263,7 +6301,7 @@ function trackListStyle(trackDensity: TrackDensity, isPanning = false): CSSPrope
     minWidth: 0,
     maxWidth: '100%',
     boxSizing: 'border-box',
-    overflowX: 'auto',
+    overflowX: canScrollHorizontally ? 'auto' : 'hidden',
     outline: 'none',
     overscrollBehaviorX: 'contain',
     cursor: isPanning ? 'grabbing' : 'default',
