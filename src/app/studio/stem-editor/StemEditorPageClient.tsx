@@ -218,7 +218,7 @@ export default function StemEditorPageClient() {
   const hasLoadedStems = job?.status === 'completed' && job.stems.length > 0;
 
   return (
-    <main style={pageStyle(hasLoadedStems)}>
+    <main className="stem-editor-page" style={pageStyle(hasLoadedStems)}>
       <style>{`
         @keyframes stem-analyze-wave {
           0%, 100% { transform: scaleY(0.35); opacity: 0.45; }
@@ -228,17 +228,94 @@ export default function StemEditorPageClient() {
           0% { transform: translateX(-120%); }
           100% { transform: translateX(220%); }
         }
+        .stem-editor-page {
+          background-image:
+            linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,.024) 1px, transparent 1px);
+          background-size: 72px 72px;
+        }
+        .stem-editor-header,
+        .stem-editor-rail,
+        .stem-editor-inspector,
+        .stem-editor-status,
+        .stem-editor-loading,
+        .stem-editor-transport {
+          backdrop-filter: blur(18px);
+        }
+        @media (max-width: 860px) {
+          .stem-editor-header {
+            position: static !important;
+            min-height: auto !important;
+            align-items: flex-start !important;
+            flex-direction: column !important;
+            padding: 12px 14px !important;
+          }
+          .stem-editor-header-primary {
+            width: 100% !important;
+            flex-wrap: wrap !important;
+            gap: 10px !important;
+          }
+          .stem-editor-brand,
+          .stem-editor-header-primary > a {
+            min-width: 128px !important;
+            padding-right: 12px !important;
+          }
+          .stem-editor-facts {
+            width: 100% !important;
+            flex-wrap: wrap !important;
+            overflow: visible !important;
+          }
+          .stem-editor-rail,
+          .stem-editor-page > aside {
+            display: none !important;
+          }
+          .stem-editor-stage {
+            min-height: auto !important;
+            padding: 16px 14px 88px !important;
+          }
+          .stem-editor-workspace {
+            grid-template-columns: 1fr !important;
+          }
+          .stem-editor-inspector,
+          .stem-editor-workspace > aside {
+            min-height: auto !important;
+          }
+          .stem-editor-loading {
+            grid-template-columns: 1fr !important;
+            min-height: auto !important;
+          }
+          .stem-editor-transport {
+            grid-template-columns: 34px 42px 86px minmax(0, 1fr) !important;
+          }
+          .stem-editor-transport > div:first-child {
+            display: none !important;
+          }
+        }
+        @media (max-width: 520px) {
+          .stem-editor-stage {
+            padding-left: 10px !important;
+            padding-right: 10px !important;
+          }
+          .stem-editor-transport {
+            grid-template-columns: 38px 72px minmax(0, 1fr) !important;
+            gap: 7px !important;
+            padding: 8px 10px !important;
+          }
+          .stem-editor-transport > div:nth-child(2) {
+            display: none !important;
+          }
+        }
       `}</style>
       {!hasLoadedStems && (
-        <header style={headerStyle}>
-          <div style={headerPrimaryStyle}>
+        <header className="stem-editor-header" style={headerStyle}>
+          <div className="stem-editor-header-primary" style={headerPrimaryStyle}>
             <Link href="/" aria-label="返回 HookCraft 首页" style={brandStyle}>
               <Image src="/logo-nav.svg" alt="HookCraft" width={140} height={36} priority />
             </Link>
             <div style={projectTitleStyle}>
               <span style={headingStyle}>{TEXT.songEditor}</span>
             </div>
-            <div style={headerFactsStyle}>
+            <div className="stem-editor-facts" style={headerFactsStyle}>
               <span style={headerFactStyle('project')}>{TEXT.editorProject}</span>
               <span style={headerFactStyle(phase === 'failed' ? 'danger' : 'loading')}>{formatEditorStatus(job?.status, phase)}</span>
               {job?.jobId && <span style={headerFactStyle('neutral')}>任务 {job.jobId.slice(0, 8)}</span>}
@@ -260,11 +337,11 @@ export default function StemEditorPageClient() {
         </aside>
       )}
 
-      <section style={stageStyle(hasLoadedStems)}>
+      <section className="stem-editor-stage" style={stageStyle(hasLoadedStems)}>
         {!hasLoadedStems && (
-          <div style={fallbackWorkspaceStyle}>
+          <div className="stem-editor-workspace" style={fallbackWorkspaceStyle}>
             <div style={fallbackTimelineColumnStyle}>
-              <div style={statusHeaderStyle}>
+              <div className="stem-editor-status" style={statusHeaderStyle}>
                 <div>
                   <div style={statusTitleRowStyle}>
                     <span style={statusTitleStyle}>{formatEditorStatus(job?.status, phase)}</span>
@@ -333,7 +410,7 @@ export default function StemEditorPageClient() {
           </div>
         )}
 
-        {!hasLoadedStems && <div style={fallbackTransportStyle} aria-hidden="true">
+        {!hasLoadedStems && <div className="stem-editor-transport" style={fallbackTransportStyle} aria-hidden="true">
           <div style={transportButtonGhostStyle} />
           <div style={transportButtonGhostStyle} />
           <div style={transportPlayGhostStyle} />
@@ -365,7 +442,7 @@ function AnalysisLoadingPanel({ phase }: { phase: LoadingPhase }) {
   const activeIndex = steps.findIndex((step) => step.id === phase);
 
   return (
-    <div style={loadingPanelStyle}>
+    <div className="stem-editor-loading" style={loadingPanelStyle}>
       <div style={waveLoaderStyle}>
         {Array.from({ length: 9 }).map((_, index) => (
           <span key={index} style={waveBarStyle(index)} />
@@ -454,9 +531,9 @@ const headerStyle: CSSProperties = {
   justifyContent: 'space-between',
   gap: 16,
   padding: '9px 18px 9px 22px',
-  borderBottom: '1px solid rgba(48, 52, 76, 0.72)',
-  background: 'linear-gradient(180deg, rgba(13, 19, 29, 0.98), rgba(7, 11, 19, 0.96))',
-  boxShadow: '0 10px 26px rgba(0, 0, 0, 0.26)',
+  borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+  background: 'linear-gradient(180deg, rgba(17, 18, 23, 0.96), rgba(7, 9, 14, 0.94))',
+  boxShadow: '0 14px 34px rgba(0, 0, 0, 0.34)',
   boxSizing: 'border-box',
 };
 
@@ -472,7 +549,7 @@ const brandStyle: CSSProperties = {
   alignItems: 'center',
   minWidth: 172,
   paddingRight: 20,
-  borderRight: '1px solid rgba(48, 52, 76, 0.72)',
+  borderRight: '1px solid rgba(255, 255, 255, 0.1)',
   textDecoration: 'none',
   flex: '0 0 auto',
 };
@@ -557,8 +634,8 @@ const sideRailStyle: CSSProperties = {
   gap: 8,
   padding: '10px 6px',
   boxSizing: 'border-box',
-  borderRight: '1px solid rgba(48, 52, 76, 0.64)',
-  background: 'linear-gradient(180deg, rgba(12, 17, 27, 0.98), rgba(5, 9, 15, 0.98))',
+  borderRight: '1px solid rgba(255, 255, 255, 0.1)',
+  background: 'linear-gradient(180deg, rgba(17, 18, 23, 0.96), rgba(5, 6, 8, 0.98))',
 };
 
 function sideRailButtonStyle(active: boolean): CSSProperties {
@@ -615,11 +692,11 @@ const fallbackTimelineColumnStyle: CSSProperties = {
 const fallbackInspectorStyle: CSSProperties = {
   minHeight: 520,
   borderRadius: 8,
-  border: '1px solid rgba(48, 52, 76, 0.74)',
-  background: 'linear-gradient(180deg, rgba(13, 18, 29, 0.94), rgba(7, 11, 20, 0.92))',
+  border: '1px solid rgba(255, 255, 255, 0.12)',
+  background: 'linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.018))',
   padding: 12,
   boxSizing: 'border-box',
-  boxShadow: '0 16px 44px rgba(0, 0, 0, 0.18)',
+  boxShadow: 'var(--hc-shadow-soft)',
 };
 
 const inspectorHeadingStyle: CSSProperties = {
@@ -690,9 +767,9 @@ const statusHeaderStyle: CSSProperties = {
   gap: 16,
   flexWrap: 'wrap',
   minWidth: 0,
-  border: '1px solid rgba(48, 52, 76, 0.72)',
+  border: '1px solid rgba(255, 255, 255, 0.12)',
   borderRadius: 8,
-  background: 'rgba(9, 13, 23, 0.82)',
+  background: 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.018))',
   padding: '12px 14px',
 };
 
@@ -769,7 +846,7 @@ const loadingPanelStyle: CSSProperties = {
   marginTop: 10,
   minHeight: 248,
   borderRadius: 8,
-  border: '1px solid rgba(48, 52, 76, 0.72)',
+  border: '1px solid rgba(255, 255, 255, 0.12)',
   background: `
     linear-gradient(90deg, rgba(32, 38, 55, 0.46) 1px, transparent 1px),
     linear-gradient(180deg, rgba(32, 38, 55, 0.28) 1px, transparent 1px),
@@ -782,7 +859,7 @@ const loadingPanelStyle: CSSProperties = {
   gap: 20,
   padding: 22,
   overflow: 'hidden',
-  boxShadow: '0 18px 48px rgba(0, 0, 0, 0.22)',
+  boxShadow: 'var(--hc-shadow-soft)',
 };
 
 const waveLoaderStyle: CSSProperties = {
@@ -884,8 +961,8 @@ const fallbackTransportStyle: CSSProperties = {
   alignItems: 'center',
   gap: 9,
   padding: '8px 18px',
-  borderTop: '1px solid rgba(48, 52, 76, 0.72)',
-  background: 'rgba(7, 10, 18, 0.96)',
+  borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+  background: 'rgba(7, 8, 11, 0.96)',
   boxSizing: 'border-box',
 };
 

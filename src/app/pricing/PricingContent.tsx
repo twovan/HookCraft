@@ -202,9 +202,10 @@ export default function PricingContent({ tiers, initialCreditsPacks }: PricingCo
           display: flex;
           gap: 4px;
           padding: 5px;
-          border: 1px solid var(--hc-line);
+          border: 1px solid rgba(255,255,255,.14);
           border-radius: 999px;
-          background: rgba(24, 26, 34, .78);
+          background: rgba(24, 26, 34, .84);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.08), var(--hc-shadow-soft);
         }
 
         .billing-toggle button {
@@ -220,7 +221,7 @@ export default function PricingContent({ tiers, initialCreditsPacks }: PricingCo
 
         .billing-toggle button.active {
           border-color: rgba(206,255,53,.36);
-          background: rgba(206,255,53,.12);
+          background: linear-gradient(180deg, rgba(206,255,53,.18), rgba(206,255,53,.1));
           color: var(--hc-lime);
         }
 
@@ -272,6 +273,20 @@ export default function PricingContent({ tiers, initialCreditsPacks }: PricingCo
           margin-bottom: 76px;
         }
 
+        .tier-card {
+          backdrop-filter: blur(18px);
+          overflow: hidden;
+        }
+
+        .tier-card::before {
+          content: "";
+          position: absolute;
+          inset: 0 0 auto 0;
+          height: 3px;
+          background: linear-gradient(90deg, var(--hc-cyan), var(--hc-lime), var(--hc-coral));
+          opacity: .58;
+        }
+
         .tier-card:hover {
           border-color: rgba(206,255,53,.42) !important;
         }
@@ -300,7 +315,9 @@ export default function PricingContent({ tiers, initialCreditsPacks }: PricingCo
 
         .section-heading h2 {
           margin: 8px 0 10px;
+          font-family: var(--hc-font-display);
           font-size: clamp(30px, 4vw, 44px);
+          letter-spacing: 0;
         }
 
         .section-heading p {
@@ -330,12 +347,12 @@ export default function PricingContent({ tiers, initialCreditsPacks }: PricingCo
         }
 
         .credits-pack-card {
-          border: 1px solid var(--hc-line);
+          border: 1px solid rgba(255,255,255,.13);
           border-radius: var(--hc-radius-lg);
           padding: 26px 22px;
           text-align: center;
-          background: rgba(24, 26, 34, .88);
-          box-shadow: var(--hc-shadow);
+          background: linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.02));
+          box-shadow: var(--hc-shadow-soft);
           transition: transform .22s ease, border-color .22s ease;
         }
 
@@ -401,6 +418,8 @@ export default function PricingContent({ tiers, initialCreditsPacks }: PricingCo
 
           .billing-toggle button {
             flex: 1;
+            padding-left: 10px;
+            padding-right: 10px;
           }
 
           .credits-grid {

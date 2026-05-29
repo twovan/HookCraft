@@ -483,15 +483,16 @@ export default function StudioPageClient({
           right: 0,
           bottom: 0,
           background:
-            'linear-gradient(180deg, rgba(82, 214, 198, 0.06), transparent 300px), radial-gradient(circle at 82% 12%, rgba(206, 255, 53, 0.12), transparent 300px)',
+            'linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.024) 1px, transparent 1px), linear-gradient(180deg, rgba(82, 214, 198, 0.07), transparent 320px), radial-gradient(circle at 82% 12%, rgba(206, 255, 53, 0.13), transparent 320px), radial-gradient(circle at 8% 24%, rgba(255, 90, 61, 0.08), transparent 360px)',
+          backgroundSize: '76px 76px, 76px 76px, auto, auto, auto',
           pointerEvents: 'none',
           zIndex: 0,
         }}
       />
 
-      <div style={{ position: 'relative', zIndex: 1, maxWidth: 1400, margin: '0 auto', padding: '48px clamp(20px, 4vw, 48px)' }}>
+      <div className="studio-shell-inner" style={{ position: 'relative', zIndex: 1, maxWidth: 1400, margin: '0 auto', padding: '48px clamp(20px, 4vw, 48px)' }}>
         {/* Page Header */}
-        <div style={{ marginBottom: '32px' }}>
+        <div className="studio-hero" style={{ marginBottom: '32px' }}>
           <h1
             style={{
               fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
@@ -526,6 +527,7 @@ export default function StudioPageClient({
 
         {/* Tab Navigation */}
         <div
+          className="studio-tabbar"
           style={{
             display: showStudioTabs ? 'flex' : 'none',
             gap: '4px',
@@ -785,6 +787,7 @@ export default function StudioPageClient({
         {!isGenerating && !batchId && !isSensitivityLoading && (
           <>
           <div
+            className="studio-create-grid"
             style={{
               display: 'grid',
               gridTemplateColumns: '1fr 1fr',
@@ -793,6 +796,7 @@ export default function StudioPageClient({
           >
             {/* Left Column: Template Selection */}
             <div
+              className="studio-card"
               style={{
                 background: 'var(--hc-panel)',
                 borderRadius: 14,
@@ -826,6 +830,7 @@ export default function StudioPageClient({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', minWidth: 0 }}>
               {/* Prompt Input */}
               <div
+                className="studio-card"
                 style={{
                   background: 'var(--hc-panel)',
                   borderRadius: 14,
@@ -843,6 +848,7 @@ export default function StudioPageClient({
 
               {/* Duration Selector */}
               <div
+                className="studio-card"
                 style={{
                   background: 'var(--hc-panel)',
                   borderRadius: 14,
@@ -861,6 +867,7 @@ export default function StudioPageClient({
 
               {/* Vocal Mode Section */}
               <div
+                className="studio-card"
                 style={{
                   background: 'var(--hc-panel)',
                   borderRadius: 14,
@@ -1328,6 +1335,52 @@ export default function StudioPageClient({
 }
 
 const studioPageStyles = `
+  .studio-page {
+    isolation: isolate;
+  }
+
+  .studio-shell-inner {
+    width: min(1400px, calc(100% - 48px));
+  }
+
+  .studio-hero {
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 18px;
+    padding: 26px;
+    background:
+      linear-gradient(135deg, rgba(255,255,255,.07), transparent 34%),
+      linear-gradient(180deg, rgba(17,18,23,.72), rgba(9,10,14,.54));
+    box-shadow: var(--hc-shadow-soft);
+  }
+
+  .studio-hero h1 {
+    font-family: var(--hc-font-display) !important;
+    font-size: clamp(34px, 5vw, 56px) !important;
+    line-height: .98 !important;
+    margin: 0 0 12px !important;
+    text-wrap: balance;
+  }
+
+  .studio-tabbar {
+    box-shadow: var(--hc-shadow-soft);
+    backdrop-filter: blur(16px);
+  }
+
+  .studio-tabbar button {
+    min-height: 44px;
+  }
+
+  .studio-create-grid {
+    align-items: start;
+  }
+
+  .studio-card {
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.052), rgba(255,255,255,.018)) !important;
+    border-color: rgba(255,255,255,.12) !important;
+    box-shadow: var(--hc-shadow-soft) !important;
+  }
+
   .studio-page section,
   .studio-page textarea,
   .studio-page input,
@@ -1338,7 +1391,7 @@ const studioPageStyles = `
   .studio-page textarea,
   .studio-page input {
     border-color: rgba(255,255,255,0.12) !important;
-    background: #0b0c10 !important;
+    background: rgba(7,8,11,.86) !important;
   }
 
   .studio-page button {
@@ -1381,11 +1434,25 @@ const studioPageStyles = `
   .studio-page select,
   .studio-page input[type="number"] {
     border-color: rgba(255,255,255,0.12) !important;
-    background: #0b0c10 !important;
+    background: rgba(7,8,11,.86) !important;
     color: var(--hc-text) !important;
   }
 
   @media (max-width: 980px) {
+    .studio-shell-inner {
+      width: min(100% - 32px, 760px);
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+    }
+
+    .studio-hero {
+      padding: 20px;
+    }
+
+    .studio-tabbar {
+      margin-bottom: 22px !important;
+    }
+
     .studio-page [style*="grid-template-columns: 1fr 1fr"],
     .studio-page [style*="grid-template-columns: minmax(260px, 320px) minmax(0, 1fr)"] {
       grid-template-columns: 1fr !important;
@@ -1393,6 +1460,36 @@ const studioPageStyles = `
 
     .studio-page [style*="position: sticky"] {
       position: static !important;
+    }
+  }
+
+  @media (max-width: 560px) {
+    .studio-shell-inner {
+      width: min(100% - 24px, 560px);
+      padding-top: 28px !important;
+    }
+
+    .studio-hero {
+      padding: 16px;
+      border-radius: 14px;
+    }
+
+    .studio-tabbar {
+      gap: 6px !important;
+      padding: 6px !important;
+    }
+
+    .studio-tabbar button {
+      min-width: max-content !important;
+      padding: 11px 13px !important;
+    }
+
+    .studio-card {
+      padding: 18px !important;
+    }
+
+    .studio-page [style*="display: flex"][style*="gap: 8px"] {
+      flex-wrap: wrap;
     }
   }
 `;

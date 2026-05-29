@@ -50,15 +50,19 @@ export default async function PricingPage() {
         .pricing-page {
           min-height: 100vh;
           background:
-            radial-gradient(circle at 10% 10%, rgba(206, 255, 53, 0.10), transparent 320px),
-            radial-gradient(circle at 90% 16%, rgba(82, 214, 198, 0.08), transparent 340px),
+            linear-gradient(rgba(255,255,255,.032) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px),
+            radial-gradient(circle at 10% 10%, rgba(206, 255, 53, 0.11), transparent 320px),
+            radial-gradient(circle at 90% 16%, rgba(82, 214, 198, 0.09), transparent 340px),
+            radial-gradient(circle at 42% 0%, rgba(255, 90, 61, 0.08), transparent 360px),
             var(--hc-bg);
+          background-size: 72px 72px, 72px 72px, auto, auto, auto, auto;
           color: var(--hc-text);
           padding-bottom: 78px;
         }
 
         .pricing-hero {
-          padding: 68px 22px 34px;
+          padding: 74px 22px 38px;
         }
 
         .pricing-hero-inner {
@@ -73,9 +77,11 @@ export default async function PricingPage() {
         .pricing-hero h1 {
           margin: 0 0 14px;
           max-width: 760px;
+          font-family: var(--hc-font-display);
           font-size: clamp(42px, 7vw, 78px);
           line-height: .94;
           letter-spacing: 0;
+          text-wrap: balance;
         }
 
         .pricing-hero p {
@@ -84,6 +90,7 @@ export default async function PricingPage() {
           color: var(--hc-muted);
           font-size: 17px;
           line-height: 1.8;
+          text-wrap: pretty;
         }
 
         .pricing-meter {
@@ -93,10 +100,12 @@ export default async function PricingPage() {
           align-items: end;
           gap: 4px;
           padding: 16px;
-          border: 1px solid var(--hc-line);
+          border: 1px solid rgba(255,255,255,.14);
           border-radius: var(--hc-radius-lg);
-          background: rgba(24, 26, 34, 0.72);
-          box-shadow: var(--hc-shadow);
+          background:
+            linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.02)),
+            rgba(24, 26, 34, 0.78);
+          box-shadow: var(--hc-shadow), inset 0 1px 0 rgba(255,255,255,.08);
         }
 
         .pricing-meter span {

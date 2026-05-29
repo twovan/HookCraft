@@ -95,8 +95,25 @@ export default function Navbar() {
   return (
     <>
     <style>{`
+      .hc-nav a,
+      .hc-nav button {
+        letter-spacing: 0;
+      }
+
+      .hc-nav::after {
+        content: "";
+        position: absolute;
+        left: 48px;
+        right: 48px;
+        bottom: -1px;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(206,255,53,.38), rgba(82,214,198,.22), transparent);
+        pointer-events: none;
+      }
+
       @media (max-width: 980px) {
         .hc-nav { padding: 0 20px !important; }
+        .hc-nav::after { left: 20px; right: 20px; }
         .hc-nav-logo img { width: 118px !important; height: auto !important; }
         .hc-nav-links {
           min-width: 0 !important;
@@ -113,16 +130,17 @@ export default function Navbar() {
 
       @media (max-width: 520px) {
         .hc-nav { padding: 0 14px !important; }
+        .hc-nav::after { left: 14px; right: 14px; }
         .hc-nav-logo img { width: 112px !important; }
       }
     `}</style>
     <nav style={{
       position: 'sticky', top: 0, height: 70, zIndex: 1000,
-      background: 'rgba(8, 9, 12, 0.92)', backdropFilter: 'blur(20px)',
-      borderBottom: '1px solid rgba(255,255,255,0.1)',
+      background: 'linear-gradient(180deg, rgba(8, 9, 12, 0.95), rgba(8, 9, 12, 0.88))', backdropFilter: 'blur(20px)',
+      borderBottom: '1px solid rgba(255,255,255,0.09)',
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       padding: '0 48px',
-      boxShadow: '0 8px 30px rgba(0,0,0,0.22)',
+      boxShadow: '0 12px 38px rgba(0,0,0,0.28)',
     }} className="hc-nav">
       <Link href="/" className="hc-nav-logo" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none', flex: '0 0 auto' }}>
         <Image

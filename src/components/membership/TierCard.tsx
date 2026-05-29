@@ -170,8 +170,8 @@ const cardStyle: React.CSSProperties = {
   padding: '30px 24px 24px',
   border: '1px solid var(--hc-line)',
   borderRadius: 'var(--hc-radius-lg)',
-  background: 'rgba(24, 26, 34, 0.9)',
-  boxShadow: 'var(--hc-shadow)',
+  background: 'linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.018))',
+  boxShadow: 'var(--hc-shadow-soft)',
   transition: 'transform .24s ease, border-color .24s ease, box-shadow .24s ease',
 };
 
@@ -262,7 +262,7 @@ const creditsStyle: React.CSSProperties = {
   border: '1px solid var(--hc-line)',
   borderRadius: 12,
   padding: '12px 14px',
-  background: 'rgba(8,9,12,.38)',
+  background: 'rgba(8,9,12,.48)',
   color: 'var(--hc-muted)',
   fontSize: 12,
   lineHeight: 1.55,
