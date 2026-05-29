@@ -169,7 +169,7 @@ export default function Navbar() {
                   height: 36,
                   borderRadius: '50%',
                   background: 'linear-gradient(135deg, #ceff35, #52d6c6)',
-                  border: '2px solid rgba(206, 255, 53, 0.28)',
+                  border: '1px solid rgba(206, 255, 53, 0.26)',
                   color: '#08090c',
                   fontSize: 14,
                   fontWeight: 700,

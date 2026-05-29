@@ -246,7 +246,9 @@ export default function HistoryList({
                   )}
 
                   <div style={metaStyle}>{formatDate(batch.createdAt)}</div>
-                  <div style={summaryStyle}>{getBatchSummary(batch)}</div>
+                  <div style={summaryStyle}>
+                    {batch.templateName ? `使用模版名称：${batch.templateName}` : getBatchSummary(batch)}
+                  </div>
                   {isFailed && (
                     <div style={failedMessageStyle}>
                       {batch.errorMessage || '生成过程中出现错误，请调整内容后重试。'}
