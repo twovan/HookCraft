@@ -1892,16 +1892,6 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     setSaveStatus('已停止播放并退出选区预听。');
   }, [pauseAll]);
 
-  const copyProjectLink = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      setSaveStatus('已复制当前编辑链接。');
-      setPlaybackError(null);
-    } catch {
-      setPlaybackError('复制链接失败，可以直接复制浏览器地址栏。');
-    }
-  }, []);
-
   const clearExportHistory = useCallback(() => {
     setExportRecords((records) => clearStemExportRecords(records));
     setSaveStatus('最近导出记录已清空。');
@@ -2633,12 +2623,6 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     }));
     setSaveStatus('母带防爆音设置已更新，自动保存后下次进入会恢复。');
   }, []);
-
-  const resetMix = useCallback(() => {
-    commitTrackChange(createTrackState(stems));
-    setMasterState(defaultStemMasterState());
-    setSaveStatus('混音已重置，保存后下次进入会使用新状态。');
-  }, [commitTrackChange, stems]);
 
   const applyMixPreset = useCallback((preset: MixPreset) => {
     commitTrackChange((current) => Object.fromEntries(stems.map((stem) => {
@@ -3533,47 +3517,23 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
           >
             返回创作中心
           </button>
-          <button type="button" onClick={undoTrackChange} disabled={!canUndo} style={historyButtonStyle(canUndo)}>
-            撤销
-          </button>
-          <button type="button" onClick={redoTrackChange} disabled={!canRedo} style={historyButtonStyle(canRedo)}>
-            重做
-          </button>
           <button type="button" onClick={saveEditState} disabled={isSaving} style={primarySmallButtonStyle}>
             {isSaving ? '保存中' : '保存编辑'}
           </button>
-          <span style={headerActionDividerStyle} aria-hidden="true" />
-          <span style={quickExportGroupStyle} aria-label="快捷导出">
-            <span style={quickExportCaptionStyle}>快捷导出</span>
-            <button
-              type="button"
-              onClick={() => void exportMix()}
-              disabled={!exportSummary.canExport}
-              title={mixExportDisabledReason || '按当前设置快速导出混音 WAV'}
-              aria-label={mixExportDisabledReason ? `混音 WAV 不可用：${mixExportDisabledReason}` : '快速导出混音 WAV'}
-              style={quickExportPrimaryButtonStyle(!exportSummary.canExport)}
-            >
-              {isExporting ? '导出中' : '混音 WAV'}
-            </button>
-            <button
-              type="button"
-              onClick={() => void exportAllReadyStems()}
-              disabled={Boolean(batchExportDisabledReason)}
-              title={batchExportDisabledReason || '批量导出所有已缓存单轨 WAV'}
-              aria-label={batchExportDisabledReason ? `单轨包不可用：${batchExportDisabledReason}` : '快速导出单轨包'}
-              style={quickExportSecondaryButtonStyle(Boolean(batchExportDisabledReason))}
-            >
-              单轨包
-            </button>
-          </span>
-          <button type="button" onClick={copyProjectLink} style={ghostButtonStyle}>
-            复制链接
+          <button
+            type="button"
+            onClick={() => {
+              setSideRailTab('export');
+              setInspectorTab('export');
+              setInspectorCollapsed(false);
+              setSaveStatus('已打开导出中心。');
+            }}
+            style={ghostButtonStyle}
+          >
+            导出中心
           </button>
           <button type="button" onClick={() => void reloadAudioCache()} disabled={loadingCount > 0 || isAudioRetrying} style={ghostButtonStyle}>
             {loadingCount > 0 || isAudioRetrying ? '检查中' : '检查音频'}
-          </button>
-          <button type="button" onClick={resetMix} style={ghostButtonStyle}>
-            重置混音
           </button>
         </div>
       </div>
@@ -3677,31 +3637,11 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
           )}
           {!compactTransport && (
           <div style={transportOptionBarStyle}>
-            <button
-              type="button"
-              aria-pressed={snapToGrid}
-              title="G 开关吸附"
-              style={transportOptionButtonStyle(snapToGrid, false)}
-              onClick={() => setSnapToGrid((value) => {
-                const next = !value;
-                setSaveStatus(next ? `已开启时间吸附，当前步长 ${snapStepSeconds}s。` : '已关闭时间吸附。');
-                return next;
-              })}
-            >
-              吸附 {snapToGrid ? `${snapStepSeconds}s` : '关'}
+            <button type="button" onClick={undoTrackChange} disabled={!canUndo} style={transportOptionButtonStyle(false, !canUndo)}>
+              撤销
             </button>
-            <button
-              type="button"
-              disabled={!snapToGrid}
-              title="Shift+G 切换吸附步长"
-              style={transportOptionButtonStyle(false, !snapToGrid)}
-              onClick={() => setSnapStepSeconds((value) => {
-                const next = getNextTimelineSnapStep(value);
-                setSaveStatus(`吸附步长已切换为 ${next}s。`);
-                return next;
-              })}
-            >
-              步长
+            <button type="button" onClick={redoTrackChange} disabled={!canRedo} style={transportOptionButtonStyle(false, !canRedo)}>
+              重做
             </button>
             <button
               type="button"
@@ -4514,43 +4454,6 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
             )}
             <button
               type="button"
-              aria-pressed={snapToGrid}
-              title="G 开关吸附"
-              onClick={() => setSnapToGrid((value) => {
-                const next = !value;
-                setSaveStatus(next ? `已开启时间吸附，当前步长 ${snapStepSeconds}s。` : '已关闭时间吸附。');
-                return next;
-              })}
-              style={timelineSnapButtonStyle(snapToGrid)}
-            >
-              吸附 {snapToGrid ? `${snapStepSeconds}s` : '关'}
-            </button>
-            <button
-              type="button"
-              disabled={!snapToGrid}
-              title="Shift+G 切换吸附步长"
-              onClick={() => setSnapStepSeconds((value) => {
-                const next = getNextTimelineSnapStep(value);
-                setSaveStatus(`吸附步长已切换为 ${next}s。`);
-                return next;
-              })}
-              style={timelineSnapStepButtonStyle(!snapToGrid)}
-            >
-              步长
-            </button>
-            <span style={timelinePrecisionHintStyle(snapToGrid)}>Alt 精修</span>
-            <span style={timelinePrecisionHintStyle(true)}>←/→ {playbackNudgeStepSeconds}s</span>
-            <button
-              type="button"
-              aria-pressed={trackDensity === 'compact'}
-              title="D 切换轨道密度"
-              onClick={() => setTrackDensity((value) => (value === 'compact' ? 'comfortable' : 'compact'))}
-              style={timelineDensityButtonStyle(trackDensity === 'compact')}
-            >
-              {trackDensity === 'compact' ? '紧凑' : '舒展'}
-            </button>
-            <button
-              type="button"
               aria-pressed={showShortcutHelp}
               title="? 显示或隐藏快捷键"
               onClick={() => setShowShortcutHelp((value) => !value)}
@@ -4558,44 +4461,6 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
             >
               快捷键
             </button>
-            <span style={timelineSelectionActionsStyle}>
-              <button
-                type="button"
-                title={`播放头后退 ${playbackNudgeStepSeconds}s`}
-                style={timelineSelectionActionButtonStyle(duration <= 0)}
-                disabled={duration <= 0}
-                onClick={() => nudgePlaybackHead(-1)}
-              >
-                ←
-              </button>
-              <button
-                type="button"
-                title={`播放头前进 ${playbackNudgeStepSeconds}s`}
-                style={timelineSelectionActionButtonStyle(duration <= 0)}
-                disabled={duration <= 0}
-                onClick={() => nudgePlaybackHead(1)}
-              >
-                →
-              </button>
-              <button
-                type="button"
-                title="Shift+← 播放头后退 1s"
-                style={timelineSelectionActionButtonStyle(duration <= 0)}
-                disabled={duration <= 0}
-                onClick={() => nudgePlaybackHead(-1, true)}
-              >
-                -1s
-              </button>
-              <button
-                type="button"
-                title="Shift+→ 播放头前进 1s"
-                style={timelineSelectionActionButtonStyle(duration <= 0)}
-                disabled={duration <= 0}
-                onClick={() => nudgePlaybackHead(1, true)}
-              >
-                +1s
-              </button>
-            </span>
             <button
               type="button"
               onClick={() => centerTimelineOnPlaybackPosition()}
@@ -5115,32 +4980,6 @@ const editorActionStyle: CSSProperties = {
   minWidth: 0,
 };
 
-const headerActionDividerStyle: CSSProperties = {
-  width: 1,
-  height: 24,
-  margin: '0 2px',
-  background: 'rgba(48, 52, 76, 0.82)',
-  flex: '0 0 auto',
-};
-
-const quickExportGroupStyle: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 6,
-  minHeight: 36,
-  padding: '3px 4px 3px 7px',
-  borderRadius: 9,
-  border: '1px solid rgba(206, 255, 53, 0.22)',
-  background: 'rgba(206, 255, 53, 0.05)',
-};
-
-const quickExportCaptionStyle: CSSProperties = {
-  color: '#aeb878',
-  fontSize: 10,
-  fontWeight: 900,
-  whiteSpace: 'nowrap',
-};
-
 const primarySmallButtonStyle: CSSProperties = {
   ...editorButtonChromeStyle({ tone: 'primary' }),
   minHeight: 32,
@@ -5148,28 +4987,6 @@ const primarySmallButtonStyle: CSSProperties = {
   fontSize: 12,
   fontWeight: 900,
 };
-
-function quickExportPrimaryButtonStyle(disabled: boolean): CSSProperties {
-  return {
-    ...editorButtonChromeStyle({ tone: 'primary', disabled }),
-    minHeight: 28,
-    padding: '4px 9px',
-    borderRadius: 7,
-    fontSize: 11,
-    fontWeight: 900,
-  };
-}
-
-function quickExportSecondaryButtonStyle(disabled: boolean): CSSProperties {
-  return {
-    ...editorButtonChromeStyle({ tone: 'purple', disabled }),
-    minHeight: 28,
-    padding: '4px 9px',
-    borderRadius: 7,
-    fontSize: 11,
-    fontWeight: 900,
-  };
-}
 
 const editorEyebrowRowStyle: CSSProperties = {
   display: 'flex',
@@ -6372,52 +6189,6 @@ function timelineSelectionLoopButtonStyle(active: boolean): CSSProperties {
 }
 
 function timelineFollowButtonStyle(active: boolean): CSSProperties {
-  return {
-    ...editorButtonChromeStyle({ tone: 'success', compact: true, round: true, active }),
-    minHeight: 24,
-    padding: '0 9px',
-    fontSize: 11,
-    fontWeight: 900,
-  };
-}
-
-function timelineSnapButtonStyle(active: boolean): CSSProperties {
-  return {
-    ...editorButtonChromeStyle({ tone: 'warning', compact: true, round: true, active }),
-    minHeight: 24,
-    padding: '0 9px',
-    fontSize: 11,
-    fontWeight: 900,
-  };
-}
-
-function timelineSnapStepButtonStyle(disabled: boolean): CSSProperties {
-  return {
-    ...editorButtonChromeStyle({ tone: 'warning', compact: true, round: true, disabled }),
-    minHeight: 24,
-    padding: '0 9px',
-    fontSize: 11,
-    fontWeight: 900,
-  };
-}
-
-function timelinePrecisionHintStyle(active: boolean): CSSProperties {
-  return {
-    minHeight: 22,
-    display: 'inline-flex',
-    alignItems: 'center',
-    borderRadius: 999,
-    border: '1px solid transparent',
-    background: 'transparent',
-    color: active ? '#8fb7e8' : '#6b7280',
-    padding: '0 4px',
-    fontSize: 11,
-    fontWeight: 800,
-    whiteSpace: 'nowrap',
-  };
-}
-
-function timelineDensityButtonStyle(active: boolean): CSSProperties {
   return {
     ...editorButtonChromeStyle({ tone: 'success', compact: true, round: true, active }),
     minHeight: 24,
