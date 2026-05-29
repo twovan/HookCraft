@@ -272,16 +272,7 @@ export default function PricingContent({ tiers, initialCreditsPacks }: PricingCo
           margin-bottom: 76px;
         }
 
-        @keyframes tier-card-hop {
-          0% { transform: translateY(0); }
-          52% { transform: translateY(-10px); }
-          76% { transform: translateY(-6px); }
-          100% { transform: translateY(-8px); }
-        }
-
         .tier-card:hover {
-          transform: translateY(-8px);
-          animation: tier-card-hop .34s cubic-bezier(.2, .78, .28, 1);
           border-color: rgba(206,255,53,.42) !important;
         }
 

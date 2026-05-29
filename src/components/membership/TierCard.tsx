@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import type { MembershipTier, BillingCycle } from '@/types/membership';
 import type { TierConfig } from '@/config/tierConfig';
 
@@ -68,6 +69,7 @@ export default function TierCard({
   isRecommended,
   onSubscribe,
 }: TierCardProps) {
+  const [hovered, setHovered] = useState(false);
   const displayPrice = billingCycle === 'monthly'
     ? `¥${formatPrice(config.monthlyPrice)}`
     : `¥${formatMonthlyFromYearly(config.yearlyPrice)}`;
@@ -96,10 +98,15 @@ export default function TierCard({
   return (
     <article
       className="tier-card"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
         ...cardStyle,
-        borderColor: isRecommended ? 'rgba(206, 255, 53, 0.52)' : 'var(--hc-line)',
-        transform: isRecommended ? 'translateY(-10px)' : 'none',
+        borderColor: hovered || isRecommended ? 'rgba(206, 255, 53, 0.52)' : 'var(--hc-line)',
+        transform: hovered
+          ? isRecommended ? 'translateY(-14px)' : 'translateY(-6px)'
+          : isRecommended ? 'translateY(-10px)' : 'none',
+        boxShadow: hovered ? '0 24px 70px rgba(0, 0, 0, 0.36)' : 'var(--hc-shadow)',
       }}
     >
       {isRecommended && <div style={recommendStyle}>最受欢迎</div>}
