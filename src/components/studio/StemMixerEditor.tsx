@@ -1095,6 +1095,12 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
       canExport: !isExporting && preflight.canExport,
     };
   }, [bufferVersion, exportMode, exportReadiness, hasSoloTrack, isExporting, stems, tracks]);
+  const mixExportDisabledReason = isExporting ? '正在导出中' : exportSummary.disabledReason;
+  const batchExportDisabledReason = isExporting
+    ? '正在导出中'
+    : exportSummary.loadedCount === 0
+      ? '等待至少一条分轨缓存完成'
+      : null;
   const editorReadiness = useMemo(() => buildStemEditorReadiness({
     loadableStemCount,
     readyStemCount,
@@ -3561,24 +3567,30 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
           <button type="button" onClick={saveEditState} disabled={isSaving} style={primarySmallButtonStyle}>
             {isSaving ? '保存中' : '保存编辑'}
           </button>
-          <button
-            type="button"
-            onClick={() => void exportMix()}
-            disabled={!exportSummary.canExport}
-            title={exportSummary.disabledReason || '导出当前设置为 WAV'}
-            style={primarySmallButtonStyle}
-          >
-            {isExporting ? '导出中' : '导出 WAV'}
-          </button>
-          <button
-            type="button"
-            onClick={() => void exportAllReadyStems()}
-            disabled={isExporting || exportSummary.loadedCount === 0}
-            title={exportSummary.loadedCount === 0 ? '等待至少一条分轨缓存完成' : '批量导出所有已缓存单轨 WAV'}
-            style={historyButtonStyle(!isExporting && exportSummary.loadedCount > 0)}
-          >
-            导出单轨包
-          </button>
+          <span style={headerActionDividerStyle} aria-hidden="true" />
+          <span style={quickExportGroupStyle} aria-label="快捷导出">
+            <span style={quickExportCaptionStyle}>快捷导出</span>
+            <button
+              type="button"
+              onClick={() => void exportMix()}
+              disabled={!exportSummary.canExport}
+              title={mixExportDisabledReason || '按当前设置快速导出混音 WAV'}
+              aria-label={mixExportDisabledReason ? `混音 WAV 不可用：${mixExportDisabledReason}` : '快速导出混音 WAV'}
+              style={quickExportPrimaryButtonStyle(!exportSummary.canExport)}
+            >
+              {isExporting ? '导出中' : '混音 WAV'}
+            </button>
+            <button
+              type="button"
+              onClick={() => void exportAllReadyStems()}
+              disabled={Boolean(batchExportDisabledReason)}
+              title={batchExportDisabledReason || '批量导出所有已缓存单轨 WAV'}
+              aria-label={batchExportDisabledReason ? `单轨包不可用：${batchExportDisabledReason}` : '快速导出单轨包'}
+              style={quickExportSecondaryButtonStyle(Boolean(batchExportDisabledReason))}
+            >
+              单轨包
+            </button>
+          </span>
           <button
             type="button"
             onClick={() => {
@@ -4254,17 +4266,25 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
                 type="button"
                 disabled={!exportSummary.canExport}
                 style={exportPrimaryActionStyle(!exportSummary.canExport)}
+                title={mixExportDisabledReason || '导出混音 WAV'}
                 onClick={() => void exportMix()}
               >
-                导出混音 WAV
+                <span>导出混音 WAV</span>
+                {!exportSummary.canExport && mixExportDisabledReason && (
+                  <small style={exportActionReasonStyle}>{mixExportDisabledReason}</small>
+                )}
               </button>
               <button
                 type="button"
-                disabled={isExporting || exportSummary.loadedCount === 0}
-                style={exportPrimaryActionStyle(isExporting || exportSummary.loadedCount === 0)}
+                disabled={Boolean(batchExportDisabledReason)}
+                style={exportPrimaryActionStyle(Boolean(batchExportDisabledReason))}
+                title={batchExportDisabledReason || '批量导出所有已缓存单轨 WAV'}
                 onClick={() => void exportAllReadyStems()}
               >
-                批量导出单轨
+                <span>批量导出单轨</span>
+                {batchExportDisabledReason && (
+                  <small style={exportActionReasonStyle}>{batchExportDisabledReason}</small>
+                )}
               </button>
             </div>
             <div style={exportHintStyle}>
@@ -5260,6 +5280,32 @@ const editorActionStyle: CSSProperties = {
   minWidth: 0,
 };
 
+const headerActionDividerStyle: CSSProperties = {
+  width: 1,
+  height: 24,
+  margin: '0 2px',
+  background: 'rgba(48, 52, 76, 0.82)',
+  flex: '0 0 auto',
+};
+
+const quickExportGroupStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 6,
+  minHeight: 36,
+  padding: '3px 4px 3px 7px',
+  borderRadius: 9,
+  border: '1px solid rgba(206, 255, 53, 0.22)',
+  background: 'rgba(206, 255, 53, 0.05)',
+};
+
+const quickExportCaptionStyle: CSSProperties = {
+  color: '#aeb878',
+  fontSize: 10,
+  fontWeight: 900,
+  whiteSpace: 'nowrap',
+};
+
 const primarySmallButtonStyle: CSSProperties = {
   ...editorButtonChromeStyle({ tone: 'primary' }),
   minHeight: 32,
@@ -5267,6 +5313,28 @@ const primarySmallButtonStyle: CSSProperties = {
   fontSize: 12,
   fontWeight: 900,
 };
+
+function quickExportPrimaryButtonStyle(disabled: boolean): CSSProperties {
+  return {
+    ...editorButtonChromeStyle({ tone: 'primary', disabled }),
+    minHeight: 28,
+    padding: '4px 9px',
+    borderRadius: 7,
+    fontSize: 11,
+    fontWeight: 900,
+  };
+}
+
+function quickExportSecondaryButtonStyle(disabled: boolean): CSSProperties {
+  return {
+    ...editorButtonChromeStyle({ tone: 'purple', disabled }),
+    minHeight: 28,
+    padding: '4px 9px',
+    borderRadius: 7,
+    fontSize: 11,
+    fontWeight: 900,
+  };
+}
 
 const editorEyebrowRowStyle: CSSProperties = {
   display: 'flex',
@@ -5979,12 +6047,30 @@ const exportActionGridStyle: CSSProperties = {
 function exportPrimaryActionStyle(disabled: boolean): CSSProperties {
   return {
     ...editorButtonChromeStyle({ tone: 'primary', disabled }),
-    minHeight: 34,
+    minHeight: disabled ? 44 : 34,
+    display: 'inline-flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
     padding: '6px 10px',
     fontSize: 12,
     fontWeight: 900,
+    lineHeight: 1.15,
   };
 }
+
+const exportActionReasonStyle: CSSProperties = {
+  display: 'block',
+  maxWidth: '100%',
+  color: '#8d93a8',
+  fontSize: 10,
+  fontWeight: 800,
+  lineHeight: 1.1,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+};
 
 function exportModeButtonStyle(active: boolean): CSSProperties {
   return {
@@ -6482,16 +6568,16 @@ function timelineSnapStepButtonStyle(disabled: boolean): CSSProperties {
 
 function timelinePrecisionHintStyle(active: boolean): CSSProperties {
   return {
-    minHeight: 24,
+    minHeight: 22,
     display: 'inline-flex',
     alignItems: 'center',
     borderRadius: 999,
-    border: active ? '1px solid rgba(96, 165, 250, 0.34)' : '1px solid rgba(48, 52, 76, 0.72)',
-    background: active ? 'rgba(37, 99, 235, 0.12)' : 'rgba(10, 13, 24, 0.58)',
-    color: active ? '#bfdbfe' : '#6b7280',
-    padding: '0 9px',
+    border: '1px solid transparent',
+    background: 'transparent',
+    color: active ? '#8fb7e8' : '#6b7280',
+    padding: '0 4px',
     fontSize: 11,
-    fontWeight: 900,
+    fontWeight: 800,
     whiteSpace: 'nowrap',
   };
 }
