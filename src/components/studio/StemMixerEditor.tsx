@@ -8800,10 +8800,13 @@ function WaveformTrackCanvas({
         const usableHeight = Math.max(1, height - takeBarHeight - 2 * ratio);
         const waveformCenterY = takeBarHeight + usableHeight / 2;
         const waveformScale = usableHeight * (recording ? 0.5 : 0.49);
+        const visualPeakMax = Math.max(0.08, ...displayPeaks);
         const smoothedPeaks = displayPeaks.map((peak, index) => {
           const previous = displayPeaks[Math.max(0, index - 1)] ?? peak;
           const next = displayPeaks[Math.min(displayPeaks.length - 1, index + 1)] ?? peak;
-          return Math.max(0.025, Math.min(1, previous * 0.18 + peak * 0.64 + next * 0.18));
+          const normalizedPeak = Math.min(1, (previous * 0.18 + peak * 0.64 + next * 0.18) / visualPeakMax);
+          const boostedPeak = Math.pow(normalizedPeak, 0.68) * 1.08;
+          return Math.max(0.045, Math.min(1, boostedPeak));
         });
 
         const waveformFill = context.createLinearGradient(0, takeBarHeight, 0, height);
