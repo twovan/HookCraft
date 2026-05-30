@@ -8761,8 +8761,8 @@ function WaveformTrackCanvas({
         context.fillRect(rect.x + rect.width - Math.max(1, ratio), 0, Math.max(1, ratio), height);
       });
 
-      const handleColor = selected ? '#e7f8ff' : colorWithAlpha(baseColor, 0.52);
-      const handleWidth = selected ? 4 * ratio : 3 * ratio;
+      const handleColor = selected ? '#ceff35' : colorWithAlpha(baseColor, 0.52);
+      const handleWidth = selected ? 5 * ratio : 3 * ratio;
       const startHandleX = Math.max(0, Math.min(width - handleWidth, startX));
       const endHandleX = Math.max(0, Math.min(width - handleWidth, endX - handleWidth));
       const startLineX = startHandleX;
@@ -8782,7 +8782,7 @@ function WaveformTrackCanvas({
       if (selected) {
         context.fillStyle = 'rgba(206, 255, 53, 0.88)';
         context.fillRect(startHandleX + handleWidth - ratio, 8 * ratio, ratio, height - 16 * ratio);
-        context.fillStyle = 'rgba(34, 211, 238, 0.9)';
+        context.fillStyle = 'rgba(206, 255, 53, 0.88)';
         context.fillRect(endHandleX, 8 * ratio, ratio, height - 16 * ratio);
 
         context.fillStyle = 'rgba(255,255,255,0.78)';
@@ -9084,20 +9084,23 @@ function waveformCanvasStyle(selected: boolean, muted: boolean, editable: boolea
 
 function waveformTrimHandleStyle(time: number, duration: number, selected: boolean, edge: 'start' | 'end'): CSSProperties {
   const safeRatio = duration > 0 ? Math.max(0, Math.min(1, time / duration)) : 0;
+  const stickToStart = edge === 'start' && safeRatio <= 0.002;
+  const stickToEnd = edge === 'end' && safeRatio >= 0.998;
 
   return {
     position: 'absolute',
-    top: selected ? 2 : 6,
-    bottom: selected ? 2 : 6,
-    left: `${safeRatio * 100}%`,
-    transform: edge === 'start' ? 'translateX(0)' : 'translateX(-100%)',
-    zIndex: selected ? 7 : 3,
-    width: selected ? 5 : 3,
+    top: selected ? 1 : 6,
+    bottom: selected ? 1 : 6,
+    left: stickToEnd ? undefined : `${safeRatio * 100}%`,
+    right: stickToEnd ? 0 : undefined,
+    transform: stickToStart || stickToEnd ? 'none' : edge === 'start' ? 'translateX(0)' : 'translateX(-100%)',
+    zIndex: selected ? 12 : 3,
+    width: selected ? 7 : 3,
     borderRadius: 999,
-    border: selected ? '1px solid rgba(255,255,255,0.72)' : '1px solid rgba(206, 255, 53, 0.36)',
-    background: selected ? 'linear-gradient(180deg, #f7ffd0, #b9ff2f)' : 'rgba(206, 255, 53, 0.42)',
+    border: selected ? '1px solid rgba(255,255,255,0.78)' : '1px solid rgba(206, 255, 53, 0.36)',
+    background: selected ? 'linear-gradient(180deg, #f7ffd0, #ceff35)' : 'rgba(206, 255, 53, 0.42)',
     boxShadow: selected
-      ? '0 0 0 2px rgba(6, 10, 18, 0.78), 0 0 12px rgba(206, 255, 53, 0.26)'
+      ? '0 0 0 2px rgba(6, 10, 18, 0.82), 0 0 14px rgba(206, 255, 53, 0.34)'
       : '0 0 8px rgba(206, 255, 53, 0.12)',
     pointerEvents: 'none',
   };
