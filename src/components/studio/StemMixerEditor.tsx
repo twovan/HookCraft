@@ -169,7 +169,7 @@ const TIMELINE_SNAP_STEPS_SECONDS = [0.1, 0.25, 0.5, 1] as const;
 const DEFAULT_TIMELINE_SNAP_STEP_SECONDS = 0.25;
 const MIN_TIMELINE_ZOOM = 1;
 const MAX_TIMELINE_ZOOM = 2.5;
-const TIMELINE_LABEL_WIDTH = 136;
+const TIMELINE_LABEL_WIDTH = 286;
 const TIMELINE_SIMPLE_BUTTON_WIDTH = 94;
 const TIMELINE_ADVANCED_BUTTON_WIDTH = 112;
 const TIMELINE_VOLUME_WIDTH = 112;
@@ -295,7 +295,7 @@ function buildTimelineGridColumns(advanced: boolean, laneWidth: number, viewport
   const widths = resolveTimelineChromeWidths(advanced, viewportWidth);
   return advanced
     ? `${widths.label}px ${laneWidth}px ${widths.buttons}px ${widths.volume}px ${widths.pan}px ${widths.trim}px`
-    : `${widths.label}px ${laneWidth}px ${widths.buttons}px ${widths.volume}px`;
+    : `${widths.label}px ${laneWidth}px`;
 }
 
 function getTimelineFixedWidth(advanced: boolean, viewportWidth = 0) {
@@ -5514,7 +5514,29 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
           </div>
         )}
         <div style={timelineRulerStyle(timelineGridColumns, timelineMinWidth)} data-timeline-pan-zone="true">
-          <div style={timelineRulerLabelStyle} data-timeline-pan-zone="true">轨道</div>
+          <div style={timelineRulerLabelStyle} data-timeline-pan-zone="true">
+            <button
+              type="button"
+              style={timelineRulerAddTrackButtonStyle}
+              onClick={createEmptyCustomTrack}
+            >
+              + Add Track
+            </button>
+            <button
+              type="button"
+              title="显示轨道连接"
+              style={timelineRulerToolButtonStyle}
+            >
+              ↔
+            </button>
+            <button
+              type="button"
+              title="轨道设置"
+              style={timelineRulerToolButtonStyle}
+            >
+              ⚙
+            </button>
+          </div>
           <div
             style={timelineRulerMarksStyle}
             data-timeline-seek-zone="true"
@@ -5563,8 +5585,6 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
               );
             })}
           </div>
-          <div style={timelineRulerMetaStyle} data-timeline-pan-zone="true">控制</div>
-          <div style={timelineRulerMetaStyle} data-timeline-pan-zone="true">音量</div>
         </div>
         {visibleStems.map((stem, index) => {
           const state = tracks[stem.type] || defaultTrackState();
@@ -5628,6 +5648,110 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                     {state.mutedRanges.length > 0 && <span style={stemStateBadgeStyle('range')}>{state.mutedRanges.length} 段</span>}
                   </div>
                 </div>
+                <button
+                  type="button"
+                  aria-label={`${displayName.zh} 更多`}
+                  title="轨道菜单"
+                  style={trackMenuButtonStyle}
+                >
+                  ⋮
+                </button>
+                <div style={trackHeaderSwitchesStyle}>
+                  <button
+                    type="button"
+                    aria-pressed={state.muted}
+                    title={state.muted ? '取消静音' : '静音'}
+                    onClick={() => toggleTrackFlag(stem.type, 'muted')}
+                    style={trackToggleStyle(state.muted, 'mute')}
+                  >
+                    M
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={state.solo}
+                    title={state.solo ? '取消独奏' : '独奏'}
+                    onClick={() => toggleTrackFlag(stem.type, 'solo')}
+                    style={trackToggleStyle(state.solo, 'solo')}
+                  >
+                    S
+                  </button>
+                  <button
+                    type="button"
+                    title="收起/展开轨道"
+                    style={trackCollapseButtonStyle}
+                  >
+                    ✓
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  title="轨道效果"
+                  style={trackFxButtonStyle}
+                  onClick={() => {
+                    setInspectorTab('mix');
+                    setSideRailTab('mix');
+                    setInspectorCollapsed(false);
+                    setSaveStatus(`已打开“${displayName.zh}”的混音控制。`);
+                  }}
+                >
+                  +Fx
+                </button>
+                <div style={trackMiniActionsStyle}>
+                  <button
+                    type="button"
+                    title="导出单轨 WAV"
+                    disabled={!audioBuffer || exportingStemType === stem.type}
+                    onClick={() => void exportSingleStem(stem)}
+                    style={trackMiniActionStyle(Boolean(!audioBuffer || exportingStemType === stem.type))}
+                  >
+                    {exportingStemType === stem.type ? '...' : 'WAV'}
+                  </button>
+                  {(audioStatus === 'failed' || audioStatus === 'pending') && (
+                    <button
+                      type="button"
+                      disabled={isAudioRetrying || loadingCount > 0}
+                      onClick={() => void retrySingleStemAudio(stem)}
+                      style={trackMiniActionStyle(isAudioRetrying || loadingCount > 0)}
+                    >
+                      重试
+                    </button>
+                  )}
+                </div>
+                <label style={trackHeaderVolumeStyle}>
+                  <span>Vol</span>
+                  <input
+                    aria-label={`${stem.label} 音量`}
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={state.volume}
+                    onFocus={beginContinuousControlEdit}
+                    onPointerDown={beginContinuousControlEdit}
+                    onPointerUp={finishContinuousControlEdit}
+                    onBlur={finishContinuousControlEdit}
+                    onKeyUp={finishContinuousControlEdit}
+                    onChange={(event) => setTrackVolume(stem.type, Number(event.target.value), 'deferred')}
+                  />
+                </label>
+                <label style={trackHeaderPanStyle}>
+                  <span>L</span>
+                  <input
+                    aria-label={`${stem.label} 声像`}
+                    type="range"
+                    min={-1}
+                    max={1}
+                    step={0.01}
+                    value={state.pan}
+                    onFocus={beginContinuousControlEdit}
+                    onPointerDown={beginContinuousControlEdit}
+                    onPointerUp={finishContinuousControlEdit}
+                    onBlur={finishContinuousControlEdit}
+                    onKeyUp={finishContinuousControlEdit}
+                    onChange={(event) => setTrackPan(stem.type, Number(event.target.value), 'deferred')}
+                  />
+                  <span>R</span>
+                </label>
               </div>
 
               <WaveformTrackCanvas
@@ -5649,6 +5773,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                 liveSeekOnDrag={!isPlaying}
                 compact={trackDensity === 'compact'}
                 recording={isRecordingTarget}
+                trackLabel={displayName.zh}
                 onSelect={() => setSelectedTrackType(stem.type)}
                 onSeek={(time, shouldSnap) => handleSeek(snapStemEditorTime(time, duration, shouldSnap, snapStepSeconds))}
                 onTrimChange={(edge, time, shouldSnap, phase) => {
@@ -5664,64 +5789,6 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                   if (phase === 'commit') commitDeferredHistory();
                 }}
               />
-
-              <div style={stemButtonsStyle}>
-                <button
-                  type="button"
-                  aria-pressed={state.muted}
-                  title={state.muted ? '取消静音' : '静音'}
-                  onClick={() => toggleTrackFlag(stem.type, 'muted')}
-                  style={trackToggleStyle(state.muted, 'mute')}
-                >
-                  M
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={state.solo}
-                  title={state.solo ? '取消独奏' : '独奏'}
-                  onClick={() => toggleTrackFlag(stem.type, 'solo')}
-                  style={trackToggleStyle(state.solo, 'solo')}
-                >
-                  S
-                </button>
-                <button
-                  type="button"
-                  title="导出单轨 WAV"
-                  disabled={!audioBuffer || exportingStemType === stem.type}
-                  onClick={() => void exportSingleStem(stem)}
-                  style={trackToggleStyle(exportingStemType === stem.type, 'export')}
-                >
-                  {exportingStemType === stem.type ? '...' : 'WAV'}
-                </button>
-                {(audioStatus === 'failed' || audioStatus === 'pending') && (
-                  <button
-                    type="button"
-                    disabled={isAudioRetrying || loadingCount > 0}
-                    onClick={() => void retrySingleStemAudio(stem)}
-                    style={trackToggleStyle(audioStatus === 'failed', 'retry')}
-                  >
-                    重试
-                  </button>
-                )}
-              </div>
-
-              <label style={volumeStyle}>
-                <span>{Math.round(state.volume * 100)}%</span>
-                <input
-                  aria-label={`${stem.label} 音量`}
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  value={state.volume}
-                  onFocus={beginContinuousControlEdit}
-                  onPointerDown={beginContinuousControlEdit}
-                  onPointerUp={finishContinuousControlEdit}
-                  onBlur={finishContinuousControlEdit}
-                  onKeyUp={finishContinuousControlEdit}
-                  onChange={(event) => setTrackVolume(stem.type, Number(event.target.value), 'deferred')}
-                />
-              </label>
 
             </div>
           );
@@ -7711,12 +7778,35 @@ const timelineRulerLabelStyle: CSSProperties = {
   position: 'sticky',
   left: 8,
   zIndex: 6,
-  color: '#aeb2c9',
   alignSelf: 'stretch',
   display: 'flex',
   alignItems: 'center',
-  borderRadius: 5,
-  background: 'rgba(7, 9, 18, 0.96)',
+  gap: 8,
+  borderRadius: 0,
+  background: 'linear-gradient(180deg, rgba(10, 14, 18, 0.98), rgba(5, 8, 12, 0.98))',
+  borderRight: '1px solid rgba(255,255,255,0.06)',
+};
+
+const timelineRulerAddTrackButtonStyle: CSSProperties = {
+  ...editorButtonChromeStyle({ tone: 'neutral', compact: true, round: true }),
+  minHeight: 32,
+  padding: '0 13px',
+  borderColor: 'rgba(255,255,255,0.1)',
+  background: 'linear-gradient(180deg, #262c35, #171c23)',
+  color: '#f8fafc',
+  fontSize: 13,
+  fontWeight: 950,
+};
+
+const timelineRulerToolButtonStyle: CSSProperties = {
+  ...editorButtonChromeStyle({ tone: 'neutral', compact: true, round: true }),
+  width: 32,
+  height: 32,
+  minHeight: 32,
+  padding: 0,
+  color: '#dbeafe',
+  fontSize: 14,
+  fontWeight: 900,
 };
 
 const timelineRulerMarksStyle: CSSProperties = {
@@ -7868,7 +7958,7 @@ function stemTrackStyle(
     gap: compact ? Math.max(6, TIMELINE_GRID_GAP - 2) : TIMELINE_GRID_GAP,
     minWidth,
     boxSizing: 'border-box',
-    minHeight: rowHeight,
+    minHeight: Math.max(rowHeight, compact ? 78 : 98),
     borderRadius: 8,
     border: selectedTrack
       ? '1px solid rgba(206, 255, 53, 0.46)'
@@ -7906,19 +7996,21 @@ function stemNameStyle(selectedTrack: boolean, audible: boolean, reordering = fa
     left: 8,
     zIndex: 2,
     display: 'grid',
-    gridTemplateColumns: '20px 7px minmax(0, 1fr)',
+    gridTemplateColumns: '18px 10px minmax(0, 1fr) 22px auto',
+    gridTemplateRows: 'auto auto auto',
     alignItems: 'center',
     gap: 6,
     minWidth: 0,
     maxWidth: '100%',
     alignSelf: 'stretch',
-    padding: '6px 7px',
-    borderRadius: 7,
-    border: selectedTrack ? '1px solid rgba(206, 255, 53, 0.2)' : '1px solid rgba(255, 255, 255, 0.04)',
+    padding: '7px 9px',
+    borderRadius: 0,
+    border: 'none',
+    borderRight: selectedTrack ? '1px solid rgba(192, 132, 252, 0.42)' : '1px solid rgba(255, 255, 255, 0.06)',
     background: selectedTrack
-      ? 'linear-gradient(90deg, rgba(206, 255, 53, 0.12), rgba(13, 16, 28, 0.96) 72%, rgba(13, 16, 28, 0.86))'
-      : 'linear-gradient(90deg, rgba(13, 16, 28, 0.98), rgba(13, 16, 28, 0.92) 82%, rgba(13, 16, 28, 0.78))',
-    boxShadow: selectedTrack ? '0 8px 18px rgba(0, 0, 0, 0.14)' : 'none',
+      ? 'linear-gradient(90deg, rgba(26, 20, 34, 0.98), rgba(15, 18, 24, 0.98))'
+      : 'linear-gradient(90deg, rgba(18, 22, 28, 0.98), rgba(13, 17, 22, 0.96))',
+    boxShadow: selectedTrack ? 'inset 3px 0 0 #a855f7' : 'none',
     overflow: 'hidden',
     opacity: audible ? 1 : 0.8,
     cursor: reordering ? 'grabbing' : 'grab',
@@ -7928,9 +8020,9 @@ function stemNameStyle(selectedTrack: boolean, audible: boolean, reordering = fa
 
 function stemIndexStyle(selectedTrack: boolean): CSSProperties {
   return {
-    width: 20,
+    width: 18,
     flexShrink: 0,
-    color: selectedTrack ? '#e0f2fe' : '#717791',
+    color: selectedTrack ? '#f8fafc' : '#cbd5e1',
     fontSize: 10,
     fontWeight: 900,
     fontVariantNumeric: 'tabular-nums',
@@ -7940,7 +8032,7 @@ function stemIndexStyle(selectedTrack: boolean): CSSProperties {
 
 const stemIdentityStyle: CSSProperties = {
   display: 'grid',
-  gap: 3,
+  gap: 1,
   minWidth: 0,
   overflow: 'hidden',
 };
@@ -7952,7 +8044,7 @@ const stemTitleRowStyle: CSSProperties = {
 
 const stemLabelStyle: CSSProperties = {
   display: 'block',
-  color: '#f0f1fb',
+  color: '#f8fafc',
   fontSize: 12,
   fontWeight: 900,
   lineHeight: 1.15,
@@ -7967,7 +8059,7 @@ const stemStatusRowStyle: CSSProperties = {
   gap: 4,
   minWidth: 0,
   maxWidth: '100%',
-  minHeight: 16,
+  minHeight: 13,
   overflow: 'hidden',
 };
 
@@ -7990,10 +8082,10 @@ function stemAudioCornerBadgeStyle(status: StemTrackAudioStatus): CSSProperties 
 
   return {
     position: 'absolute',
-    top: 5,
-    left: 5,
-    width: 7,
-    height: 7,
+    top: 8,
+    left: 2,
+    width: 10,
+    height: 10,
     borderRadius: 999,
     background: palette[status],
     boxShadow: `0 0 0 2px rgba(8, 12, 21, 0.96), 0 0 10px ${palette[status]}66`,
@@ -8079,7 +8171,7 @@ function stemStateBadgeStyle(tone: 'solo' | 'muted' | 'range' | 'volume'): CSSPr
 }
 
 const stemTypeStyle: CSSProperties = {
-  color: '#717791',
+  color: '#b7bdc9',
   fontSize: 10,
   fontWeight: 700,
   lineHeight: 1.25,
@@ -8089,6 +8181,95 @@ const stemTypeStyle: CSSProperties = {
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
   flex: '1 1 32px',
+};
+
+const trackMenuButtonStyle: CSSProperties = {
+  gridColumn: '4',
+  gridRow: '1',
+  width: 22,
+  height: 22,
+  border: 'none',
+  background: 'transparent',
+  color: '#f8fafc',
+  fontSize: 18,
+  fontWeight: 900,
+  cursor: 'pointer',
+};
+
+const trackHeaderSwitchesStyle: CSSProperties = {
+  gridColumn: '5',
+  gridRow: '1',
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 3,
+  justifyContent: 'flex-end',
+};
+
+const trackCollapseButtonStyle: CSSProperties = {
+  ...editorButtonChromeStyle({ tone: 'neutral', compact: true, round: true }),
+  width: 24,
+  minWidth: 24,
+  minHeight: 24,
+  padding: 0,
+  fontSize: 11,
+  fontWeight: 950,
+};
+
+const trackFxButtonStyle: CSSProperties = {
+  gridColumn: '1 / 3',
+  gridRow: '2',
+  justifySelf: 'start',
+  ...editorButtonChromeStyle({ tone: 'neutral', compact: true, round: true }),
+  minHeight: 20,
+  padding: '0 7px',
+  color: '#f8fafc',
+  fontSize: 10,
+  fontWeight: 950,
+};
+
+const trackMiniActionsStyle: CSSProperties = {
+  gridColumn: '4 / 6',
+  gridRow: '2',
+  justifySelf: 'end',
+  display: 'inline-flex',
+  gap: 4,
+  alignItems: 'center',
+};
+
+function trackMiniActionStyle(disabled: boolean): CSSProperties {
+  return {
+    ...editorButtonChromeStyle({ tone: 'purple', compact: true, round: true, disabled }),
+    minHeight: 20,
+    padding: '0 7px',
+    fontSize: 10,
+    fontWeight: 950,
+  };
+}
+
+const trackHeaderVolumeStyle: CSSProperties = {
+  gridColumn: '1 / 4',
+  gridRow: '3',
+  display: 'grid',
+  gridTemplateColumns: '28px minmax(0, 1fr)',
+  alignItems: 'center',
+  gap: 7,
+  minWidth: 0,
+  color: '#f8fafc',
+  fontSize: 10,
+  fontWeight: 900,
+};
+
+const trackHeaderPanStyle: CSSProperties = {
+  gridColumn: '4 / 6',
+  gridRow: '3',
+  display: 'grid',
+  gridTemplateColumns: '10px 44px 10px',
+  alignItems: 'center',
+  gap: 3,
+  minWidth: 0,
+  color: '#cbd5e1',
+  fontSize: 9,
+  fontWeight: 900,
 };
 
 const stemButtonsStyle: CSSProperties = {
@@ -8211,6 +8392,7 @@ function WaveformTrackCanvas({
   liveSeekOnDrag,
   compact,
   recording,
+  trackLabel,
   onSelect,
   onSeek,
   onTrimChange,
@@ -8235,6 +8417,7 @@ function WaveformTrackCanvas({
   liveSeekOnDrag: boolean;
   compact: boolean;
   recording: boolean;
+  trackLabel: string;
   onSelect: () => void;
   onSeek: (time: number, shouldSnap: boolean) => void;
   onTrimChange: (edge: 'start' | 'end', time: number, shouldSnap: boolean, phase: StemInteractionPhase) => void;
@@ -8360,7 +8543,7 @@ function WaveformTrackCanvas({
       if (!context) return;
 
       context.clearRect(0, 0, width, height);
-      context.fillStyle = '#080b16';
+      context.fillStyle = recording ? '#1f1116' : '#250044';
       context.fillRect(0, 0, width, height);
 
       const clipGradient = context.createLinearGradient(0, 0, 0, height);
@@ -8369,6 +8552,18 @@ function WaveformTrackCanvas({
       clipGradient.addColorStop(1, 'rgba(0,0,0,0)');
       context.fillStyle = clipGradient;
       context.fillRect(0, 0, width, height);
+
+      const takeBarHeight = selected ? 18 * ratio : 15 * ratio;
+      const takeGradient = context.createLinearGradient(0, 0, width, 0);
+      takeGradient.addColorStop(0, recording ? 'rgba(185, 28, 28, 0.96)' : 'rgba(109, 0, 180, 0.98)');
+      takeGradient.addColorStop(0.72, recording ? 'rgba(159, 18, 57, 0.88)' : 'rgba(88, 28, 135, 0.92)');
+      takeGradient.addColorStop(1, recording ? 'rgba(127, 29, 29, 0.72)' : 'rgba(49, 8, 87, 0.84)');
+      context.fillStyle = takeGradient;
+      context.fillRect(0, 0, width, takeBarHeight);
+      context.fillStyle = '#fff7ff';
+      context.font = `${Math.max(8, 9 * ratio)}px sans-serif`;
+      context.textAlign = 'left';
+      context.fillText(`♛ Takes   ${trackLabel}`, 7 * ratio, Math.max(10 * ratio, takeBarHeight - 5 * ratio));
 
       const gridStep = snapEnabled && duration > 0
         ? Math.max((normalizeTimelineSnapStep(snapStepSeconds) / duration) * width, 18 * ratio)
@@ -8401,9 +8596,9 @@ function WaveformTrackCanvas({
       context.stroke();
 
       if (displayPeaks.length && duration > 0) {
-        context.strokeStyle = recording ? '#f97316' : muted ? 'rgba(148, 163, 184, 0.4)' : color;
-        context.lineWidth = recording ? Math.max(1.5, 1.5 * ratio) : selected ? Math.max(1.4, 1.4 * ratio) : Math.max(1, ratio);
-        context.shadowColor = recording ? 'rgba(249, 115, 22, 0.78)' : muted ? 'transparent' : color;
+        context.strokeStyle = recording ? '#f97316' : muted ? 'rgba(192, 132, 252, 0.42)' : '#c026ff';
+        context.lineWidth = recording ? Math.max(1.5, 1.5 * ratio) : selected ? Math.max(1.55, 1.55 * ratio) : Math.max(1.25, 1.25 * ratio);
+        context.shadowColor = recording ? 'rgba(249, 115, 22, 0.78)' : muted ? 'transparent' : 'rgba(217, 70, 239, 0.82)';
         context.shadowBlur = recording ? 9 * ratio : selected ? 6 * ratio : 2 * ratio;
         context.beginPath();
         const step = displayPeaks.length > 1 ? width / (displayPeaks.length - 1) : width;
@@ -8433,7 +8628,7 @@ function WaveformTrackCanvas({
       context.fillRect(0, 0, startX, height);
       context.fillRect(endX, 0, Math.max(0, width - endX), height);
 
-      context.fillStyle = selected ? 'rgba(206, 255, 53, 0.1)' : 'rgba(255,255,255,0.045)';
+      context.fillStyle = selected ? 'rgba(217, 70, 239, 0.12)' : 'rgba(255,255,255,0.055)';
       context.fillRect(startX, 0, Math.max(0, endX - startX), height);
 
       clips.forEach((clip) => {
@@ -8523,7 +8718,7 @@ function WaveformTrackCanvas({
     const observer = new ResizeObserver(draw);
     observer.observe(canvas);
     return () => observer.disconnect();
-  }, [clips, color, currentTime, displayPeaks, duration, muted, mutedRanges, recording, selected, snapEnabled, snapStepSeconds, trimEnd, trimStart]);
+  }, [clips, currentTime, displayPeaks, duration, muted, mutedRanges, recording, selected, snapEnabled, snapStepSeconds, trackLabel, trimEnd, trimStart]);
 
   const handlePointerDown = useCallback((event: PointerEvent<HTMLCanvasElement>) => {
     if (duration <= 0) return;
@@ -8753,11 +8948,11 @@ function waveformCanvasStyle(selected: boolean, muted: boolean, editable: boolea
   return {
     width: '100%',
     height: selected
-      ? compact ? 56 : 66
-      : compact ? 36 : 46,
+      ? compact ? 66 : 78
+      : compact ? 58 : 68,
     borderRadius: 4,
-    border: recording ? '1px solid rgba(251, 113, 133, 0.92)' : selected ? '1px solid rgba(216, 201, 255, 0.92)' : '1px solid rgba(55, 61, 83, 0.82)',
-    background: recording ? 'linear-gradient(180deg, #241317, #090b12)' : 'linear-gradient(180deg, #111827, #080c15)',
+    border: recording ? '1px solid rgba(251, 113, 133, 0.92)' : selected ? '1px solid rgba(217, 70, 239, 0.76)' : '1px solid rgba(88, 28, 135, 0.64)',
+    background: recording ? 'linear-gradient(180deg, #241317, #090b12)' : 'linear-gradient(180deg, #36005f, #19002f)',
     boxShadow: selected
       ? recording
         ? 'inset 0 0 0 1px rgba(251, 113, 133, 0.22), 0 0 22px rgba(248, 113, 113, 0.16)'
