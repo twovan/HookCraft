@@ -91,6 +91,7 @@ interface StemTrackState {
   pan: number;
   muted: boolean;
   solo: boolean;
+  collapsed?: boolean;
   trimStart: number;
   trimEnd: number | null;
   fadeIn: number;
@@ -210,7 +211,7 @@ function snapStemEditorTime(value: number, duration: number, enabled: boolean, s
   return Math.max(0, Math.min(duration || snapped, Number(snapped.toFixed(3))));
 }
 
-type TransportIconName = 'skipStart' | 'skipEnd' | 'back' | 'forward' | 'play' | 'pause' | 'stop' | 'collapse' | 'expand';
+type TransportIconName = 'skipStart' | 'skipEnd' | 'back' | 'forward' | 'play' | 'pause' | 'stop' | 'collapse' | 'expand' | 'chevronRight' | 'chevronDown';
 
 function TransportIcon({ name }: { name: TransportIconName }) {
   const common = {
@@ -257,6 +258,8 @@ function TransportIcon({ name }: { name: TransportIconName }) {
       {name === 'stop' && <path d="M7 7h10v10H7z" fill="currentColor" />}
       {name === 'collapse' && <path {...common} d="M7 15l5-5 5 5" />}
       {name === 'expand' && <path {...common} d="M7 9l5 5 5-5" />}
+      {name === 'chevronRight' && <path {...common} d="M9 6l6 6-6 6" />}
+      {name === 'chevronDown' && <path {...common} d="M6 9l6 6 6-6" />}
     </svg>
   );
 }
@@ -302,11 +305,11 @@ function getTimelineFixedWidth(advanced: boolean, viewportWidth = 0) {
   const widths = resolveTimelineChromeWidths(advanced, viewportWidth);
   return advanced
     ? widths.label + widths.buttons + widths.volume + widths.pan + widths.trim
-    : widths.label + widths.buttons + widths.volume;
+    : widths.label;
 }
 
 function getTimelineGapCount(advanced: boolean) {
-  return advanced ? 5 : 3;
+  return advanced ? 5 : 1;
 }
 
 function resolveTimelineBaseLaneWidth(advanced: boolean, viewportWidth: number) {
@@ -338,7 +341,7 @@ interface StemMixerEditorProps {
 }
 
 function defaultTrackState(): StemTrackState {
-  return { volume: 1, pan: 0, muted: false, solo: false, trimStart: 0, trimEnd: null, fadeIn: 0, fadeOut: 0, mutedRanges: [] };
+  return { volume: 1, pan: 0, muted: false, solo: false, collapsed: false, trimStart: 0, trimEnd: null, fadeIn: 0, fadeOut: 0, mutedRanges: [] };
 }
 
 function normalizeTrackState(value: Partial<StemTrackState> | undefined | null, duration?: number): StemTrackState {
@@ -347,6 +350,7 @@ function normalizeTrackState(value: Partial<StemTrackState> | undefined | null, 
     pan: typeof value?.pan === 'number' ? Math.max(-1, Math.min(1, value.pan)) : 0,
     muted: value?.muted === true,
     solo: value?.solo === true,
+    collapsed: value?.collapsed === true,
     trimStart: typeof value?.trimStart === 'number' ? Math.max(0, value.trimStart) : 0,
     trimEnd: typeof value?.trimEnd === 'number' ? Math.max(0, value.trimEnd) : null,
     fadeIn: typeof value?.fadeIn === 'number' ? Math.max(0, value.fadeIn) : 0,
@@ -1203,6 +1207,10 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   const timelineLaneWidth = useMemo(
     () => Math.round(resolveTimelineBaseLaneWidth(showAdvancedControls, timelineViewportWidth) * timelineZoom),
     [showAdvancedControls, timelineViewportWidth, timelineZoom],
+  );
+  const timelineLabelWidth = useMemo(
+    () => resolveTimelineChromeWidths(showAdvancedControls, timelineViewportWidth).label,
+    [showAdvancedControls, timelineViewportWidth],
   );
   const timelineMinWidth = useMemo(
     () => buildTimelineMinWidth(showAdvancedControls, timelineLaneWidth, timelineViewportWidth),
@@ -2760,11 +2768,12 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     setSaveStatus('拖到另一条轨道上即可互换位置。');
   }, []);
 
-  const startTrackReorderPress = useCallback((event: PointerEvent<HTMLDivElement>, type: string) => {
+  const startTrackReorderPress = useCallback((event: PointerEvent<HTMLElement>, type: string) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     const target = event.target instanceof HTMLElement ? event.target : null;
-    if (target?.closest('button, input, textarea, select, a')) return;
+    if (!target?.closest('[data-track-drag-handle="true"]') && target?.closest('button, input, textarea, select, a')) return;
 
+    event.preventDefault();
     event.stopPropagation();
     setSelectedTrackType(type);
     clearTrackReorderPress();
@@ -2786,14 +2795,19 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     }
   }, [beginTrackReorder, clearTrackReorderPress]);
 
-  const moveTrackReorderPointer = useCallback((event: PointerEvent<HTMLDivElement>) => {
+  const moveTrackReorderPointer = useCallback((event: PointerEvent<HTMLElement>) => {
     const pending = trackReorderPressRef.current;
     if (pending && pending.pointerId === event.pointerId && !trackReorderDragTypeRef.current) {
       const moved = Math.hypot(event.clientX - pending.x, event.clientY - pending.y);
-      if (moved > 10) {
-        clearTrackReorderPress();
+      if (moved > 6) {
+        if (trackReorderPressTimerRef.current !== null) {
+          window.clearTimeout(trackReorderPressTimerRef.current);
+          trackReorderPressTimerRef.current = null;
+        }
+        beginTrackReorder(pending.type);
+      } else {
+        return;
       }
-      return;
     }
 
     const activeType = trackReorderDragTypeRef.current;
@@ -2809,9 +2823,9 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     if (targetType && targetType !== activeType) {
       swapTrackOrder(activeType, targetType, 'deferred');
     }
-  }, [clearTrackReorderPress, swapTrackOrder]);
+  }, [beginTrackReorder, swapTrackOrder]);
 
-  const finishTrackReorderPointer = useCallback((event: PointerEvent<HTMLDivElement>) => {
+  const finishTrackReorderPointer = useCallback((event: PointerEvent<HTMLElement>) => {
     const activeType = trackReorderDragTypeRef.current;
     clearTrackReorderPress();
     trackReorderDragTypeRef.current = null;
@@ -3125,6 +3139,19 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         [flag]: !current[type]?.[flag],
       },
     }));
+  }, [commitTrackChange]);
+
+  const toggleTrackCollapsed = useCallback((type: string) => {
+    commitTrackChange((current) => {
+      const state = current[type] || defaultTrackState();
+      return {
+        ...current,
+        [type]: {
+          ...state,
+          collapsed: !state.collapsed,
+        },
+      };
+    });
   }, [commitTrackChange]);
 
   const soloOnlyTrack = useCallback((type: string) => {
@@ -5336,11 +5363,11 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       >
         <div
           aria-hidden="true"
-          style={timelineGlobalPlayheadStyle(currentTime, duration, timelineLaneWidth)}
+          style={timelineGlobalPlayheadStyle(currentTime, duration, timelineLaneWidth, timelineLabelWidth)}
         />
         <div
           aria-hidden="true"
-          style={timelineGlobalPlayheadBadgeStyle(currentTime, duration, timelineLaneWidth)}
+          style={timelineGlobalPlayheadBadgeStyle(currentTime, duration, timelineLaneWidth, timelineLabelWidth)}
         >
           {formatStemTimecode(currentTime)}
         </div>
@@ -5602,6 +5629,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
           const isAudible = !state.muted && (!hasSoloTrack || state.solo);
           const displayName = getStemDisplayName(stem);
           const isSelectedTrack = selectedTrack?.type === stem.type;
+          const isTrackCollapsed = state.collapsed === true;
           const audioBuffer = audioBuffersRef.current[stem.type] || null;
           const isRecordingTarget = isRecording && recordingTrackType === stem.type;
           const waveformForTrack = isRecordingTarget
@@ -5626,18 +5654,14 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                 setSelectedTrackType(stem.type);
               }}
               style={{
-                ...stemTrackStyle(isAudible, state.solo, showAdvancedControls, isSelectedTrack, timelineGridColumns, timelineMinWidth, trackDensity),
+                ...stemTrackStyle(isAudible, state.solo, showAdvancedControls, isSelectedTrack, timelineGridColumns, timelineMinWidth, trackDensity, isTrackCollapsed),
                 ...(reorderingTrackType === stem.type ? activeTrackReorderStyle : {}),
               }}
             >
               <div
-                style={stemNameStyle(isSelectedTrack, isAudible, reorderingTrackType === stem.type)}
+                style={stemNameStyle(isSelectedTrack, isAudible, reorderingTrackType === stem.type, isTrackCollapsed)}
                 data-timeline-pan-zone="true"
-                title="长按并拖到另一条轨道上互换位置"
-                onPointerDown={(event) => startTrackReorderPress(event, stem.type)}
-                onPointerMove={moveTrackReorderPointer}
-                onPointerUp={finishTrackReorderPointer}
-                onPointerCancel={finishTrackReorderPointer}
+                title="点击选择轨道"
               >
                 <span
                   aria-hidden="true"
@@ -5659,9 +5683,15 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                 </div>
                 <button
                   type="button"
-                  aria-label={`${displayName.zh} 更多`}
-                  title="轨道菜单"
-                  style={trackMenuButtonStyle}
+                  data-track-drag-handle="true"
+                  aria-label={`拖动排序 ${displayName.zh}`}
+                  title="长按并拖到另一条轨道上互换位置"
+                  style={trackDragHandleStyle(reorderingTrackType === stem.type)}
+                  onPointerDown={(event) => startTrackReorderPress(event, stem.type)}
+                  onPointerMove={moveTrackReorderPointer}
+                  onPointerUp={finishTrackReorderPointer}
+                  onPointerCancel={finishTrackReorderPointer}
+                  onClick={(event) => event.preventDefault()}
                 >
                   ⋮
                 </button>
@@ -5686,81 +5716,90 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                   </button>
                   <button
                     type="button"
-                    title="收起/展开轨道"
-                    style={trackCollapseButtonStyle}
+                    aria-pressed={isTrackCollapsed}
+                    title={isTrackCollapsed ? '展开轨道' : '折叠轨道'}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      toggleTrackCollapsed(stem.type);
+                    }}
+                    style={trackCollapseButtonStyle(isTrackCollapsed)}
                   >
-                    ✓
+                    <TransportIcon name={isTrackCollapsed ? 'chevronRight' : 'chevronDown'} />
                   </button>
                 </div>
-                <button
-                  type="button"
-                  title="轨道效果"
-                  style={trackFxButtonStyle}
-                  onClick={() => {
-                    setInspectorTab('mix');
-                    setSideRailTab('mix');
-                    setInspectorCollapsed(false);
-                    setSaveStatus(`已打开“${displayName.zh}”的混音控制。`);
-                  }}
-                >
-                  +Fx
-                </button>
-                <div style={trackMiniActionsStyle}>
-                  <button
-                    type="button"
-                    title="导出单轨 WAV"
-                    disabled={!audioBuffer || exportingStemType === stem.type}
-                    onClick={() => void exportSingleStem(stem)}
-                    style={trackMiniActionStyle(Boolean(!audioBuffer || exportingStemType === stem.type))}
-                  >
-                    {exportingStemType === stem.type ? '...' : 'WAV'}
-                  </button>
-                  {(audioStatus === 'failed' || audioStatus === 'pending') && (
+                {!isTrackCollapsed && (
+                  <>
                     <button
                       type="button"
-                      disabled={isAudioRetrying || loadingCount > 0}
-                      onClick={() => void retrySingleStemAudio(stem)}
-                      style={trackMiniActionStyle(isAudioRetrying || loadingCount > 0)}
+                      title="轨道效果"
+                      style={trackFxButtonStyle}
+                      onClick={() => {
+                        setInspectorTab('mix');
+                        setSideRailTab('mix');
+                        setInspectorCollapsed(false);
+                        setSaveStatus(`已打开“${displayName.zh}”的混音控制。`);
+                      }}
                     >
-                      重试
+                      +Fx
                     </button>
-                  )}
-                </div>
-                <label style={trackHeaderVolumeStyle}>
-                  <span>Vol</span>
-                  <input
-                    aria-label={`${stem.label} 音量`}
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    value={state.volume}
-                    onFocus={beginContinuousControlEdit}
-                    onPointerDown={beginContinuousControlEdit}
-                    onPointerUp={finishContinuousControlEdit}
-                    onBlur={finishContinuousControlEdit}
-                    onKeyUp={finishContinuousControlEdit}
-                    onChange={(event) => setTrackVolume(stem.type, Number(event.target.value), 'deferred')}
-                  />
-                </label>
-                <label style={trackHeaderPanStyle}>
-                  <span>L</span>
-                  <input
-                    aria-label={`${stem.label} 声像`}
-                    type="range"
-                    min={-1}
-                    max={1}
-                    step={0.01}
-                    value={state.pan}
-                    onFocus={beginContinuousControlEdit}
-                    onPointerDown={beginContinuousControlEdit}
-                    onPointerUp={finishContinuousControlEdit}
-                    onBlur={finishContinuousControlEdit}
-                    onKeyUp={finishContinuousControlEdit}
-                    onChange={(event) => setTrackPan(stem.type, Number(event.target.value), 'deferred')}
-                  />
-                  <span>R</span>
-                </label>
+                    <div style={trackMiniActionsStyle}>
+                      <button
+                        type="button"
+                        title="导出单轨 WAV"
+                        disabled={!audioBuffer || exportingStemType === stem.type}
+                        onClick={() => void exportSingleStem(stem)}
+                        style={trackMiniActionStyle(Boolean(!audioBuffer || exportingStemType === stem.type))}
+                      >
+                        {exportingStemType === stem.type ? '...' : 'WAV'}
+                      </button>
+                      {(audioStatus === 'failed' || audioStatus === 'pending') && (
+                        <button
+                          type="button"
+                          disabled={isAudioRetrying || loadingCount > 0}
+                          onClick={() => void retrySingleStemAudio(stem)}
+                          style={trackMiniActionStyle(isAudioRetrying || loadingCount > 0)}
+                        >
+                          重试
+                        </button>
+                      )}
+                    </div>
+                    <label style={trackHeaderVolumeStyle}>
+                      <span>Vol</span>
+                      <input
+                        aria-label={`${stem.label} 音量`}
+                        type="range"
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        value={state.volume}
+                        onFocus={beginContinuousControlEdit}
+                        onPointerDown={beginContinuousControlEdit}
+                        onPointerUp={finishContinuousControlEdit}
+                        onBlur={finishContinuousControlEdit}
+                        onKeyUp={finishContinuousControlEdit}
+                        onChange={(event) => setTrackVolume(stem.type, Number(event.target.value), 'deferred')}
+                      />
+                    </label>
+                    <label style={trackHeaderPanStyle}>
+                      <span>L</span>
+                      <input
+                        aria-label={`${stem.label} 声像`}
+                        type="range"
+                        min={-1}
+                        max={1}
+                        step={0.01}
+                        value={state.pan}
+                        onFocus={beginContinuousControlEdit}
+                        onPointerDown={beginContinuousControlEdit}
+                        onPointerUp={finishContinuousControlEdit}
+                        onBlur={finishContinuousControlEdit}
+                        onKeyUp={finishContinuousControlEdit}
+                        onChange={(event) => setTrackPan(stem.type, Number(event.target.value), 'deferred')}
+                      />
+                      <span>R</span>
+                    </label>
+                  </>
+                )}
               </div>
 
               <WaveformTrackCanvas
@@ -5781,6 +5820,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                 bufferVersion={bufferVersion}
                 liveSeekOnDrag={!isPlaying}
                 compact={trackDensity === 'compact'}
+                collapsed={isTrackCollapsed}
                 recording={isRecordingTarget}
                 trackLabel={displayName.zh}
                 onSelect={() => setSelectedTrackType(stem.type)}
@@ -7740,9 +7780,9 @@ function timelineRulerStyle(gridColumns: string, minWidth: number): CSSPropertie
   };
 }
 
-function timelineGlobalPlayheadStyle(currentTime: number, duration: number, laneWidth: number): CSSProperties {
+function timelineGlobalPlayheadStyle(currentTime: number, duration: number, laneWidth: number, labelWidth: number): CSSProperties {
   const ratio = duration > 0 ? Math.max(0, Math.min(1, currentTime / duration)) : 0;
-  const playheadLeft = 8 + TIMELINE_LABEL_WIDTH + TIMELINE_GRID_GAP + laneWidth * ratio;
+  const playheadLeft = 8 + labelWidth + TIMELINE_GRID_GAP + laneWidth * ratio;
 
   return {
     position: 'absolute',
@@ -7759,9 +7799,9 @@ function timelineGlobalPlayheadStyle(currentTime: number, duration: number, lane
   };
 }
 
-function timelineGlobalPlayheadBadgeStyle(currentTime: number, duration: number, laneWidth: number): CSSProperties {
+function timelineGlobalPlayheadBadgeStyle(currentTime: number, duration: number, laneWidth: number, labelWidth: number): CSSProperties {
   const ratio = duration > 0 ? Math.max(0, Math.min(1, currentTime / duration)) : 0;
-  const playheadLeft = 8 + TIMELINE_LABEL_WIDTH + TIMELINE_GRID_GAP + laneWidth * ratio;
+  const playheadLeft = 8 + labelWidth + TIMELINE_GRID_GAP + laneWidth * ratio;
 
   return {
     position: 'absolute',
@@ -7951,6 +7991,7 @@ function stemTrackStyle(
   gridColumns: string,
   minWidth: number,
   trackDensity: TrackDensity,
+  collapsed: boolean,
 ): CSSProperties {
   const accent = selectedTrack
     ? 'rgba(206, 255, 53, 0.12)'
@@ -7959,6 +8000,7 @@ function stemTrackStyle(
       : 'rgba(16, 19, 33, 0.96)';
   const compact = trackDensity === 'compact';
   const rowHeight = resolveDawTrackHeight({ advanced, density: trackDensity, selected: selectedTrack });
+  const collapsedHeight = compact ? 48 : 56;
 
   return {
     display: 'grid',
@@ -7967,7 +8009,7 @@ function stemTrackStyle(
     gap: compact ? Math.max(6, TIMELINE_GRID_GAP - 2) : TIMELINE_GRID_GAP,
     minWidth,
     boxSizing: 'border-box',
-    minHeight: Math.max(rowHeight, compact ? 78 : 98),
+    minHeight: collapsed ? collapsedHeight : Math.max(rowHeight, compact ? 78 : 98),
     borderRadius: 8,
     border: selectedTrack
       ? '1px solid rgba(206, 255, 53, 0.46)'
@@ -7985,8 +8027,8 @@ function stemTrackStyle(
         : 'none',
     opacity: audible ? 1 : 0.46,
     padding: selectedTrack
-      ? compact ? '7px 8px' : '9px 10px'
-      : compact ? '4px 8px' : '6px 10px',
+      ? collapsed ? '5px 8px' : compact ? '7px 8px' : '9px 10px'
+      : collapsed ? '4px 8px' : compact ? '4px 8px' : '6px 10px',
     cursor: 'pointer',
     transition: 'min-height 180ms ease, opacity 140ms ease, border-color 140ms ease, background 140ms ease, box-shadow 140ms ease, padding 180ms ease',
   };
@@ -7999,20 +8041,20 @@ const activeTrackReorderStyle: CSSProperties = {
   opacity: 1,
 };
 
-function stemNameStyle(selectedTrack: boolean, audible: boolean, reordering = false): CSSProperties {
+function stemNameStyle(selectedTrack: boolean, audible: boolean, reordering = false, collapsed = false): CSSProperties {
   return {
     position: 'sticky',
     left: 8,
     zIndex: 2,
     display: 'grid',
     gridTemplateColumns: '18px 10px minmax(0, 1fr) 22px auto',
-    gridTemplateRows: 'auto auto auto',
+    gridTemplateRows: collapsed ? 'auto' : 'auto auto auto',
     alignItems: 'center',
     gap: 6,
     minWidth: 0,
     maxWidth: '100%',
     alignSelf: 'stretch',
-    padding: '7px 9px',
+    padding: collapsed ? '5px 9px' : '7px 9px',
     borderRadius: 0,
     border: 'none',
     borderRight: selectedTrack ? '1px solid rgba(192, 132, 252, 0.42)' : '1px solid rgba(255, 255, 255, 0.06)',
@@ -8192,18 +8234,30 @@ const stemTypeStyle: CSSProperties = {
   flex: '1 1 32px',
 };
 
-const trackMenuButtonStyle: CSSProperties = {
-  gridColumn: '4',
-  gridRow: '1',
-  width: 22,
-  height: 22,
-  border: 'none',
-  background: 'transparent',
-  color: '#f8fafc',
-  fontSize: 18,
-  fontWeight: 900,
-  cursor: 'pointer',
-};
+function trackDragHandleStyle(active: boolean): CSSProperties {
+  return {
+    gridColumn: '4',
+    gridRow: '1',
+    width: 20,
+    height: 24,
+    display: 'inline-grid',
+    placeItems: 'center',
+    justifySelf: 'center',
+    padding: 0,
+    borderRadius: 7,
+    border: active ? '1px solid rgba(206, 255, 53, 0.62)' : '1px solid transparent',
+    background: active ? 'rgba(206, 255, 53, 0.13)' : 'transparent',
+    color: active ? '#ceff35' : '#f8fafc',
+    appearance: 'none',
+    fontSize: 18,
+    fontWeight: 900,
+    lineHeight: 1,
+    cursor: active ? 'grabbing' : 'grab',
+    touchAction: 'none',
+    userSelect: 'none',
+    WebkitUserSelect: 'none',
+  };
+}
 
 const trackHeaderSwitchesStyle: CSSProperties = {
   gridColumn: '5',
@@ -8214,15 +8268,16 @@ const trackHeaderSwitchesStyle: CSSProperties = {
   justifyContent: 'flex-end',
 };
 
-const trackCollapseButtonStyle: CSSProperties = {
-  ...editorButtonChromeStyle({ tone: 'neutral', compact: true, round: true }),
-  width: 24,
-  minWidth: 24,
-  minHeight: 24,
-  padding: 0,
-  fontSize: 11,
-  fontWeight: 950,
-};
+function trackCollapseButtonStyle(active: boolean): CSSProperties {
+  return {
+    ...editorButtonChromeStyle({ tone: active ? 'info' : 'neutral', compact: true, round: true, active }),
+    width: 24,
+    minWidth: 24,
+    minHeight: 24,
+    padding: 0,
+    color: active ? '#081018' : '#f8fafc',
+  };
+}
 
 const trackFxButtonStyle: CSSProperties = {
   gridColumn: '1 / 3',
@@ -8400,6 +8455,7 @@ function WaveformTrackCanvas({
   bufferVersion,
   liveSeekOnDrag,
   compact,
+  collapsed,
   recording,
   trackLabel,
   onSelect,
@@ -8425,6 +8481,7 @@ function WaveformTrackCanvas({
   bufferVersion: number;
   liveSeekOnDrag: boolean;
   compact: boolean;
+  collapsed: boolean;
   recording: boolean;
   trackLabel: string;
   onSelect: () => void;
@@ -8672,10 +8729,10 @@ function WaveformTrackCanvas({
         context.fillRect(rect.x + rect.width - Math.max(1, ratio), 0, Math.max(1, ratio), height);
       });
 
-      const handleColor = selected ? '#d8c9ff' : colorWithAlpha(baseColor, 0.52);
-      const handleWidth = selected ? 10 * ratio : 4 * ratio;
+      const handleColor = selected ? '#e7f8ff' : colorWithAlpha(baseColor, 0.52);
+      const handleWidth = selected ? 4 * ratio : 3 * ratio;
       context.strokeStyle = handleColor;
-      context.lineWidth = Math.max(2, 2 * ratio);
+      context.lineWidth = Math.max(1, ratio);
       context.beginPath();
       context.moveTo(startX, 0);
       context.lineTo(startX, height);
@@ -8687,9 +8744,10 @@ function WaveformTrackCanvas({
       context.fillRect(startX - handleWidth / 2, 0, handleWidth, height);
       context.fillRect(endX - handleWidth / 2, 0, handleWidth, height);
       if (selected) {
-        context.fillStyle = 'rgba(255,255,255,0.95)';
-        context.fillRect(startX - 1 * ratio, 6 * ratio, 2 * ratio, height - 12 * ratio);
-        context.fillRect(endX - 1 * ratio, 6 * ratio, 2 * ratio, height - 12 * ratio);
+        context.fillStyle = 'rgba(206, 255, 53, 0.88)';
+        context.fillRect(startX - 0.5 * ratio, 8 * ratio, ratio, height - 16 * ratio);
+        context.fillStyle = 'rgba(34, 211, 238, 0.9)';
+        context.fillRect(endX - 0.5 * ratio, 8 * ratio, ratio, height - 16 * ratio);
 
         context.fillStyle = 'rgba(255,255,255,0.78)';
         context.font = `${Math.max(9, 10 * ratio)}px sans-serif`;
@@ -8928,7 +8986,7 @@ function WaveformTrackCanvas({
             setPointerGuide(null);
           }
         }}
-        style={waveformCanvasStyle(selected, muted, editable, compact, recording)}
+        style={waveformCanvasStyle(selected, muted, editable, compact, collapsed, recording)}
       />
       {duration > 0 && (
         <>
@@ -8961,10 +9019,12 @@ const waveformCanvasWrapStyle: CSSProperties = {
   WebkitTouchCallout: 'none',
 };
 
-function waveformCanvasStyle(selected: boolean, muted: boolean, editable: boolean, compact: boolean, recording = false): CSSProperties {
+function waveformCanvasStyle(selected: boolean, muted: boolean, editable: boolean, compact: boolean, collapsed: boolean, recording = false): CSSProperties {
   return {
     width: '100%',
-    height: selected
+    height: collapsed
+      ? compact ? 34 : 40
+      : selected
       ? compact ? 66 : 78
       : compact ? 58 : 68,
     borderRadius: 4,
@@ -8990,22 +9050,22 @@ function waveformTrimHandleStyle(time: number, duration: number, selected: boole
 
   return {
     position: 'absolute',
-    top: selected ? -3 : 4,
-    bottom: selected ? -3 : 4,
+    top: selected ? 2 : 6,
+    bottom: selected ? 2 : 6,
     left: `${safeRatio * 100}%`,
-    transform: edge === 'start' ? 'translateX(-1px)' : 'translateX(-100%)',
+    transform: edge === 'start' ? 'translateX(-50%)' : 'translateX(-50%)',
     zIndex: selected ? 7 : 3,
-    width: selected ? 14 : 6,
+    width: selected ? 5 : 3,
     borderRadius: 999,
-    border: selected ? '1px solid rgba(255,255,255,0.92)' : '1px solid rgba(206, 255, 53, 0.46)',
+    border: selected ? '1px solid rgba(255,255,255,0.72)' : '1px solid rgba(206, 255, 53, 0.36)',
     background: selected
       ? edge === 'start'
-        ? 'linear-gradient(180deg, #f7ffd0, #ceff35)'
-        : 'linear-gradient(180deg, #ecfeff, #22d3ee)'
-      : 'rgba(206, 255, 53, 0.5)',
+        ? 'linear-gradient(180deg, #f7ffd0, #b9ff2f)'
+        : 'linear-gradient(180deg, #ecfeff, #20c7dc)'
+      : 'rgba(206, 255, 53, 0.42)',
     boxShadow: selected
-      ? '0 0 0 5px rgba(206, 255, 53, 0.14), 0 0 18px rgba(82, 214, 198, 0.36)'
-      : '0 0 10px rgba(206, 255, 53, 0.16)',
+      ? '0 0 0 2px rgba(6, 10, 18, 0.78), 0 0 12px rgba(82, 214, 198, 0.24)'
+      : '0 0 8px rgba(206, 255, 53, 0.12)',
     pointerEvents: 'none',
   };
 }
