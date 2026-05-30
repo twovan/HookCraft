@@ -4335,7 +4335,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   }), [compactTransport, inspectorCollapsed]);
 
   return (
-    <section style={editorStyle(dawLayoutMetrics)}>
+    <section className="stem-mixer-editor" style={editorStyle(dawLayoutMetrics)}>
       <style dangerouslySetInnerHTML={{ __html: timelineScrollbarCss }} />
       <input
         ref={fileInputRef}
@@ -4619,7 +4619,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
           </div>
         </div>
 
-        <div id="stem-editor-inspector" style={controlGridStyle(inspectorCollapsed)}>
+        <div id="stem-editor-inspector" className="stem-editor-vertical-scroll" style={controlGridStyle(inspectorCollapsed)}>
           <div style={inspectorHeaderStyle(inspectorCollapsed)}>
             <div>
               <div style={inspectorEyebrowStyle}>Inspector</div>
@@ -5963,6 +5963,66 @@ const timelineScrollbarCss = `
 
   #stem-editor-timeline::-webkit-scrollbar-corner {
     background: rgba(7, 10, 18, 0.98);
+  }
+
+  html:has(.stem-mixer-editor),
+  body:has(.stem-mixer-editor),
+  .stem-editor-vertical-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(87, 219, 199, 0.88) rgba(5, 9, 16, 0.92);
+  }
+
+  html:has(.stem-mixer-editor)::-webkit-scrollbar,
+  body:has(.stem-mixer-editor)::-webkit-scrollbar,
+  .stem-editor-vertical-scroll::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+
+  html:has(.stem-mixer-editor)::-webkit-scrollbar-track,
+  body:has(.stem-mixer-editor)::-webkit-scrollbar-track,
+  .stem-editor-vertical-scroll::-webkit-scrollbar-track {
+    border-radius: 999px;
+    background:
+      linear-gradient(180deg, rgba(15, 20, 32, 0.98), rgba(4, 8, 14, 0.98)),
+      radial-gradient(circle at 50% 0%, rgba(206, 255, 53, 0.12), transparent 38%);
+    box-shadow:
+      inset 0 0 0 1px rgba(48, 52, 76, 0.72),
+      inset 0 0 18px rgba(0, 0, 0, 0.35);
+  }
+
+  html:has(.stem-mixer-editor)::-webkit-scrollbar-thumb,
+  body:has(.stem-mixer-editor)::-webkit-scrollbar-thumb,
+  .stem-editor-vertical-scroll::-webkit-scrollbar-thumb {
+    min-height: 52px;
+    border: 3px solid rgba(5, 9, 16, 0.96);
+    border-radius: 999px;
+    background:
+      linear-gradient(180deg, #cfff35 0%, #72e486 45%, #57dbc7 100%);
+    box-shadow:
+      0 0 16px rgba(87, 219, 199, 0.28),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.24);
+  }
+
+  html:has(.stem-mixer-editor)::-webkit-scrollbar-thumb:hover,
+  body:has(.stem-mixer-editor)::-webkit-scrollbar-thumb:hover,
+  .stem-editor-vertical-scroll::-webkit-scrollbar-thumb:hover {
+    background:
+      linear-gradient(180deg, #ddff57 0%, #8ef59c 46%, #62efe0 100%);
+  }
+
+  html:has(.stem-mixer-editor)::-webkit-scrollbar-button,
+  body:has(.stem-mixer-editor)::-webkit-scrollbar-button,
+  .stem-editor-vertical-scroll::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  html:has(.stem-mixer-editor)::-webkit-scrollbar-corner,
+  body:has(.stem-mixer-editor)::-webkit-scrollbar-corner,
+  .stem-editor-vertical-scroll::-webkit-scrollbar-corner {
+    background: rgba(5, 9, 16, 0.98);
   }
 
   #stem-editor-timeline .stem-add-track-dropzone:hover,
