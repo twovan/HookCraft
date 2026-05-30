@@ -2692,7 +2692,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
 
   const deleteSelectedTrack = useCallback(() => {
     if (!selectedTrack || !selectedTrackIsCustom) {
-      setPlaybackError('只能删除手动添加的轨道。');
+      setPlaybackError('系统原始分轨不能删除；请选中你通过“添加轨道”、导入音频或现场录音新增的轨道后再删除。');
       return;
     }
     if (isRecording) {
@@ -5395,7 +5395,11 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
           )}
         </div>
       )}
-      {playbackError && <div style={playbackErrorStyle}>{playbackError}</div>}
+      {playbackError && (
+        <div style={playbackErrorToastStyle(dawLayoutMetrics)} aria-live="assertive">
+          {playbackError}
+        </div>
+      )}
 
       <div
         id="stem-editor-timeline"
@@ -7596,6 +7600,30 @@ const playbackErrorStyle: CSSProperties = {
   padding: '8px 10px',
   fontSize: 12,
 };
+
+function playbackErrorToastStyle(metrics: DawEditorLayoutMetrics): CSSProperties {
+  return {
+    position: 'fixed',
+    left: metrics.sideRailWidth + 16,
+    right: metrics.inspectorWidth + 24,
+    bottom: metrics.bottomTransportHeight + 32,
+    zIndex: 58,
+    minHeight: 38,
+    display: 'flex',
+    alignItems: 'center',
+    borderRadius: 9,
+    border: '1px solid rgba(248, 113, 113, 0.38)',
+    background: 'linear-gradient(180deg, rgba(49, 14, 26, 0.96), rgba(30, 12, 20, 0.94))',
+    boxShadow: '0 18px 42px rgba(0, 0, 0, 0.34), 0 0 0 1px rgba(255, 255, 255, 0.04)',
+    backdropFilter: 'blur(14px)',
+    color: '#fecaca',
+    padding: '8px 14px',
+    fontSize: 12,
+    fontWeight: 850,
+    lineHeight: 1.45,
+    pointerEvents: 'none',
+  };
+}
 
 const inlineRetryButtonStyle: CSSProperties = {
   ...editorButtonChromeStyle({ tone: 'danger', compact: true }),
