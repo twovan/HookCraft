@@ -144,6 +144,8 @@ type StemEditorHistorySnapshot = {
   skippedEmptyCount: number;
   selectedTrackType: string | null;
 };
+type StemHistoryMode = 'immediate' | 'deferred' | 'none';
+type StemInteractionPhase = 'preview' | 'commit';
 type EditorPreferences = {
   exportMode?: ExportMode;
   exportReadiness?: ExportReadiness;
@@ -417,6 +419,10 @@ function cloneEditorHistorySnapshot(snapshot: StemEditorHistorySnapshot): StemEd
     skippedEmptyCount: snapshot.skippedEmptyCount,
     selectedTrackType: snapshot.selectedTrackType,
   };
+}
+
+function areEditorHistorySnapshotsEqual(left: StemEditorHistorySnapshot, right: StemEditorHistorySnapshot) {
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 
 function formatTime(seconds: number) {
@@ -978,8 +984,11 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   const failedLoadCountRef = useRef(0);
   const autoSaveTimerRef = useRef<number | null>(null);
   const skipNextAutoSaveRef = useRef(true);
+  const lastAutoSaveSignatureRef = useRef<string | null>(null);
   const undoStackRef = useRef<StemEditorHistorySnapshot[]>([]);
   const redoStackRef = useRef<StemEditorHistorySnapshot[]>([]);
+  const deferredHistorySnapshotRef = useRef<StemEditorHistorySnapshot | null>(null);
+  const deferredHistoryChangedRef = useRef(false);
   const editorHistoryRef = useRef<StemEditorHistorySnapshot>({
     tracks: createTrackState(initialStems, initialEditState),
     master: normalizeStemMasterState(initialEditState?.master),
@@ -1036,6 +1045,8 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   const [saveStatusDismissing, setSaveStatusDismissing] = useState(false);
   const [autoSaveStatusDismissing, setAutoSaveStatusDismissing] = useState(false);
   const [hasPendingEditChanges, setHasPendingEditChanges] = useState(false);
+  const [isContinuousEditing, setIsContinuousEditing] = useState(false);
+  const [saveRequestVersion, setSaveRequestVersion] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [exportingStemType, setExportingStemType] = useState<string | null>(null);
@@ -1603,6 +1614,26 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     setHistoryVersion((version) => version + 1);
   }, []);
 
+  const beginDeferredHistory = useCallback((snapshot?: StemEditorHistorySnapshot) => {
+    if (!deferredHistorySnapshotRef.current) {
+      deferredHistorySnapshotRef.current = cloneEditorHistorySnapshot(snapshot || editorHistoryRef.current);
+      deferredHistoryChangedRef.current = false;
+    }
+    setIsContinuousEditing(true);
+  }, []);
+
+  const commitDeferredHistory = useCallback(() => {
+    const snapshot = deferredHistorySnapshotRef.current;
+    deferredHistorySnapshotRef.current = null;
+    const hasChanged = deferredHistoryChangedRef.current;
+    deferredHistoryChangedRef.current = false;
+    setIsContinuousEditing(false);
+    if (!snapshot) return;
+    if (!hasChanged && areEditorHistorySnapshotsEqual(snapshot, editorHistoryRef.current)) return;
+    pushHistorySnapshot(snapshot);
+    setSaveRequestVersion((version) => version + 1);
+  }, [pushHistorySnapshot]);
+
   const rememberEditorHistory = useCallback(() => {
     pushHistorySnapshot(editorHistoryRef.current);
   }, [pushHistorySnapshot]);
@@ -1621,16 +1652,29 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
 
   const commitTrackChange = useCallback((
     updater: Record<string, StemTrackState> | ((current: Record<string, StemTrackState>) => Record<string, StemTrackState>),
+    historyMode: StemHistoryMode = 'immediate',
   ) => {
+    if (historyMode === 'deferred') {
+      beginDeferredHistory();
+      deferredHistoryChangedRef.current = true;
+    }
     setTracks((current) => {
       const next = typeof updater === 'function' ? updater(current) : updater;
       if (areTrackStatesEqual(current, next)) return current;
-      pushHistorySnapshot({ ...editorHistoryRef.current, tracks: current });
+      if (historyMode === 'immediate') {
+        pushHistorySnapshot({ ...editorHistoryRef.current, tracks: current });
+      } else if (historyMode === 'deferred') {
+        beginDeferredHistory({ ...editorHistoryRef.current, tracks: current });
+        deferredHistoryChangedRef.current = true;
+      }
       return next;
     });
-  }, [pushHistorySnapshot]);
+  }, [beginDeferredHistory, pushHistorySnapshot]);
 
   const undoTrackChange = useCallback(() => {
+    deferredHistorySnapshotRef.current = null;
+    deferredHistoryChangedRef.current = false;
+    setIsContinuousEditing(false);
     const previous = undoStackRef.current.pop();
     if (!previous) return;
     redoStackRef.current = [...redoStackRef.current.slice(-59), cloneEditorHistorySnapshot(editorHistoryRef.current)];
@@ -1640,6 +1684,9 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   }, [restoreEditorHistorySnapshot]);
 
   const redoTrackChange = useCallback(() => {
+    deferredHistorySnapshotRef.current = null;
+    deferredHistoryChangedRef.current = false;
+    setIsContinuousEditing(false);
     const next = redoStackRef.current.pop();
     if (!next) return;
     undoStackRef.current = [...undoStackRef.current.slice(-59), cloneEditorHistorySnapshot(editorHistoryRef.current)];
@@ -1784,6 +1831,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     setExportStatusInput({ phase: 'idle' });
     setSelectedTrackType(initialStems[0]?.type ?? null);
     skipNextAutoSaveRef.current = true;
+    lastAutoSaveSignatureRef.current = null;
     undoStackRef.current = [];
     redoStackRef.current = [];
     setHistoryVersion((version) => version + 1);
@@ -2222,9 +2270,13 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     }
   }, [failedStemTypes, getAudioContext, isAudioRetrying, jobId, loadingStemTypes, pauseAll]);
 
-  const renameTrack = useCallback((type: string, value: string) => {
+  const renameTrack = useCallback((type: string, value: string, historyMode: StemHistoryMode = 'immediate') => {
     const label = sanitizeTrackLabel(value);
     const fallback = stems.find((stem) => stem.type === type);
+    if (historyMode === 'deferred') {
+      beginDeferredHistory();
+      deferredHistoryChangedRef.current = true;
+    }
     setTrackLabels((current) => {
       const next = { ...current };
       if (!label || label === getStemDisplayName({ ...(fallback || { type, label: type, url: '' }), displayLabel: undefined }).zh) {
@@ -2233,12 +2285,17 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         next[type] = label;
       }
       if (JSON.stringify(current) !== JSON.stringify(next)) {
-        pushHistorySnapshot({ ...editorHistoryRef.current, trackLabels: current });
+        if (historyMode === 'immediate') {
+          pushHistorySnapshot({ ...editorHistoryRef.current, trackLabels: current });
+        } else if (historyMode === 'deferred') {
+          beginDeferredHistory({ ...editorHistoryRef.current, trackLabels: current });
+          deferredHistoryChangedRef.current = true;
+        }
       }
       return next;
     });
     setSaveStatus(label ? `轨道已重命名为“${label}”。` : '轨道名称已恢复默认。');
-  }, [pushHistorySnapshot, stems]);
+  }, [beginDeferredHistory, pushHistorySnapshot, stems]);
 
   const createEmptyCustomTrack = useCallback(() => {
     const type = `custom_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
@@ -2554,8 +2611,12 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     trackReorderPressRef.current = null;
   }, []);
 
-  const swapTrackOrder = useCallback((fromType: string, toType: string) => {
+  const swapTrackOrder = useCallback((fromType: string, toType: string, historyMode: StemHistoryMode = 'immediate') => {
     if (fromType === toType) return;
+    if (historyMode === 'deferred') {
+      beginDeferredHistory();
+      deferredHistoryChangedRef.current = true;
+    }
     setTrackOrder((current) => {
       const normalized = normalizeTrackOrderForStems(current, stems);
       const fromIndex = normalized.indexOf(fromType);
@@ -2563,10 +2624,15 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       if (fromIndex < 0 || toIndex < 0) return normalized;
       const next = [...normalized];
       [next[fromIndex], next[toIndex]] = [next[toIndex], next[fromIndex]];
-      pushHistorySnapshot({ ...editorHistoryRef.current, trackOrder: current });
+      if (historyMode === 'immediate') {
+        pushHistorySnapshot({ ...editorHistoryRef.current, trackOrder: current });
+      } else if (historyMode === 'deferred') {
+        beginDeferredHistory({ ...editorHistoryRef.current, trackOrder: current });
+        deferredHistoryChangedRef.current = true;
+      }
       return next;
     });
-  }, [pushHistorySnapshot, stems]);
+  }, [beginDeferredHistory, pushHistorySnapshot, stems]);
 
   const beginTrackReorder = useCallback((type: string) => {
     trackReorderDragTypeRef.current = type;
@@ -2623,7 +2689,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       : null;
     const targetType = targetRow?.dataset.trackReorderType;
     if (targetType && targetType !== activeType) {
-      swapTrackOrder(activeType, targetType);
+      swapTrackOrder(activeType, targetType, 'deferred');
     }
   }, [clearTrackReorderPress, swapTrackOrder]);
 
@@ -2640,6 +2706,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     }
 
     if (activeType) {
+      commitDeferredHistory();
       event.preventDefault();
       event.stopPropagation();
       setSaveStatus('轨道顺序已更新，会随编辑状态自动保存。');
@@ -2648,7 +2715,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         ignoreNextTrackClickRef.current = false;
       }, 0);
     }
-  }, [clearTrackReorderPress]);
+  }, [clearTrackReorderPress, commitDeferredHistory]);
 
   const handleSeek = useCallback((nextTime: number) => {
     const safeTime = Math.max(0, Math.min(duration || nextTime, nextTime));
@@ -2664,7 +2731,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     }
   }, [clearLoopPreviewTimer, duration, isPlaying, playAll, stopSources]);
 
-  const setTrackTrim = useCallback((type: string, edge: 'start' | 'end', value: number, shouldSnap = snapToGrid) => {
+  const setTrackTrim = useCallback((type: string, edge: 'start' | 'end', value: number, shouldSnap = snapToGrid, historyMode: StemHistoryMode = 'immediate') => {
     commitTrackChange((current) => {
       const state = current[type] || defaultTrackState();
       const currentEnd = state.trimEnd ?? duration;
@@ -2688,10 +2755,10 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
           clips: clipState.clips,
         },
       };
-    });
+    }, historyMode);
   }, [commitTrackChange, duration, snapStepSeconds, snapToGrid]);
 
-  const setTrackTrimRange = useCallback((type: string, nextStart: number, shouldSnap = snapToGrid) => {
+  const setTrackTrimRange = useCallback((type: string, nextStart: number, shouldSnap = snapToGrid, historyMode: StemHistoryMode = 'immediate') => {
     commitTrackChange((current) => {
       const state = current[type] || defaultTrackState();
       const currentEnd = state.trimEnd ?? duration;
@@ -2721,7 +2788,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
           clips: clipState.clips,
         },
       };
-    });
+    }, historyMode);
   }, [commitTrackChange, duration, snapStepSeconds, snapToGrid]);
 
   const setTrackClips = useCallback((type: string, clips: StemClip[]) => {
@@ -2779,7 +2846,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     setSaveStatus(`已删除“${getStemDisplayName(selectedTrack).zh}”在 ${formatStemTimecode(currentTime)} 的片段。`);
   }, [currentTime, duration, selectedTrack, selectedTrackState, setTrackClips]);
 
-  const moveTrackClip = useCallback((type: string, clipId: string, nextStart: number, shouldSnap = snapToGrid) => {
+  const moveTrackClip = useCallback((type: string, clipId: string, nextStart: number, shouldSnap = snapToGrid, historyMode: StemHistoryMode = 'immediate') => {
     commitTrackChange((current) => {
       const state = current[type] || defaultTrackState();
       const clipState = resolveTrackClipState(state, duration);
@@ -2808,7 +2875,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
           clips: nextClipState.clips,
         },
       };
-    });
+    }, historyMode);
   }, [commitTrackChange, duration, snapStepSeconds, snapToGrid]);
 
   const resolveTimelineRulerPointer = useCallback((event: PointerEvent<HTMLDivElement>) => {
@@ -2876,9 +2943,9 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       const guide = resolveTimelineRulerPointer(event);
       trimDrag.moved = true;
       if (trimDrag.kind === 'edge' && trimDrag.edge) {
-        setTrackTrim(selectedTrack.type, trimDrag.edge, guide.time, guide.shouldSnap);
+        setTrackTrim(selectedTrack.type, trimDrag.edge, guide.time, guide.shouldSnap, 'deferred');
       } else {
-        setTrackTrimRange(selectedTrack.type, trimDrag.trimStart + guide.time - trimDrag.anchorTime, guide.shouldSnap);
+        setTrackTrimRange(selectedTrack.type, trimDrag.trimStart + guide.time - trimDrag.anchorTime, guide.shouldSnap, 'deferred');
       }
       updateTimelineRulerGuide(event, true);
       event.preventDefault();
@@ -2893,7 +2960,8 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     if (trimDrag && trimDrag.pointerId === event.pointerId && selectedTrack) {
       const guide = resolveTimelineRulerPointer(event);
       if (trimDrag.kind === 'edge' && trimDrag.edge) {
-        setTrackTrim(selectedTrack.type, trimDrag.edge, guide.time, guide.shouldSnap);
+        setTrackTrim(selectedTrack.type, trimDrag.edge, guide.time, guide.shouldSnap, 'deferred');
+        commitDeferredHistory();
         setSaveStatus(`已拖动“${getStemDisplayName(selectedTrack).zh}”${trimDrag.edge === 'start' ? '入点' : '出点'}到 ${formatTime(guide.time)}。`);
       } else {
         const nextStart = trimDrag.trimStart + guide.time - trimDrag.anchorTime;
@@ -2903,7 +2971,8 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
           trimEnd: trimDrag.trimEnd,
           nextStart: snapStemEditorTime(nextStart, duration, guide.shouldSnap, snapStepSeconds),
         });
-        setTrackTrimRange(selectedTrack.type, nextTrim.trimStart, false);
+        setTrackTrimRange(selectedTrack.type, nextTrim.trimStart, false, 'deferred');
+        commitDeferredHistory();
         setSaveStatus(`已移动“${getStemDisplayName(selectedTrack).zh}”选区到 ${formatTime(nextTrim.trimStart)} - ${formatTime(nextTrim.trimEnd)}。`);
       }
       timelineRulerTrimDragRef.current = null;
@@ -2915,7 +2984,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       // Pointer capture may already be released by the browser.
     }
     updateTimelineRulerGuide(event, false);
-  }, [duration, resolveTimelineRulerPointer, selectedTrack, setTrackTrim, setTrackTrimRange, snapStepSeconds, updateTimelineRulerGuide]);
+  }, [commitDeferredHistory, duration, resolveTimelineRulerPointer, selectedTrack, setTrackTrim, setTrackTrimRange, snapStepSeconds, updateTimelineRulerGuide]);
 
   const commitCurrentTimeInput = useCallback((value: string) => {
     const parsedTime = parseStemTimecode(value);
@@ -2961,27 +3030,27 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       : '已切换为只听当前轨道。');
   }, [commitTrackChange, stems]);
 
-  const setTrackVolume = useCallback((type: string, volume: number) => {
+  const setTrackVolume = useCallback((type: string, volume: number, historyMode: StemHistoryMode = 'immediate') => {
     commitTrackChange((current) => ({
       ...current,
       [type]: {
         ...(current[type] || defaultTrackState()),
         volume,
       },
-    }));
+    }), historyMode);
   }, [commitTrackChange]);
 
-  const setTrackPan = useCallback((type: string, pan: number) => {
+  const setTrackPan = useCallback((type: string, pan: number, historyMode: StemHistoryMode = 'immediate') => {
     commitTrackChange((current) => ({
       ...current,
       [type]: {
         ...(current[type] || defaultTrackState()),
         pan: Math.max(-1, Math.min(1, pan)),
       },
-    }));
+    }), historyMode);
   }, [commitTrackChange]);
 
-  const setTrackFade = useCallback((type: string, edge: 'in' | 'out', value: number) => {
+  const setTrackFade = useCallback((type: string, edge: 'in' | 'out', value: number, historyMode: StemHistoryMode = 'immediate') => {
     commitTrackChange((current) => {
       const state = current[type] || defaultTrackState();
       const trimEnd = state.trimEnd ?? duration;
@@ -2994,7 +3063,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
           [edge === 'in' ? 'fadeIn' : 'fadeOut']: nextValue,
         },
       };
-    });
+    }, historyMode);
   }, [commitTrackChange, duration]);
 
   const commitSelectedTrimInput = useCallback((edge: 'start' | 'end', value: string) => {
@@ -3194,13 +3263,26 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     });
   }, [clearLoopPreviewTimer]);
 
-  const setMasterVolume = useCallback((volume: number) => {
-    rememberEditorHistory();
+  const beginContinuousControlEdit = useCallback(() => {
+    beginDeferredHistory();
+  }, [beginDeferredHistory]);
+
+  const finishContinuousControlEdit = useCallback(() => {
+    commitDeferredHistory();
+  }, [commitDeferredHistory]);
+
+  const setMasterVolume = useCallback((volume: number, historyMode: StemHistoryMode = 'immediate') => {
+    if (historyMode === 'immediate') {
+      rememberEditorHistory();
+    } else if (historyMode === 'deferred') {
+      beginDeferredHistory({ ...editorHistoryRef.current, master: masterState });
+      deferredHistoryChangedRef.current = true;
+    }
     setMasterState((current) => normalizeStemMasterState({
       ...current,
       volume,
     }));
-  }, [rememberEditorHistory]);
+  }, [beginDeferredHistory, masterState, rememberEditorHistory]);
 
   const toggleMasterLimiter = useCallback(() => {
     rememberEditorHistory();
@@ -3608,15 +3690,28 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     undoTrackChange,
   ]);
 
+  const editStateSignature = useMemo(() => JSON.stringify({
+    tracks,
+    master: masterState,
+    trackLabels,
+    trackOrder: stems.map((stem) => stem.type),
+  }), [masterState, stems, trackLabels, tracks]);
+
   useEffect(() => {
     if (!jobId) return;
     if (skipNextAutoSaveRef.current) {
       skipNextAutoSaveRef.current = false;
+      lastAutoSaveSignatureRef.current = editStateSignature;
       return;
     }
+    if (lastAutoSaveSignatureRef.current === editStateSignature) return;
 
     setHasPendingEditChanges(true);
     setAutoSaveStatus('有未保存编辑，稍后自动保存...');
+
+    if (isContinuousEditing) {
+      return;
+    }
 
     if (autoSaveTimerRef.current !== null) {
       window.clearTimeout(autoSaveTimerRef.current);
@@ -3624,6 +3719,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
 
     autoSaveTimerRef.current = window.setTimeout(() => {
       autoSaveTimerRef.current = null;
+      lastAutoSaveSignatureRef.current = editStateSignature;
       void persistEditState('auto');
     }, 1400);
 
@@ -3633,7 +3729,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         autoSaveTimerRef.current = null;
       }
     };
-  }, [jobId, masterState, persistEditState, trackLabels, trackOrder, tracks]);
+  }, [editStateSignature, isContinuousEditing, jobId, persistEditState, saveRequestVersion]);
 
   const waitForStemLoadingToSettle = useCallback(async () => {
     const startedAt = Date.now();
@@ -4436,7 +4532,14 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                         type="text"
                         value={getStemDisplayName(selectedTrack).zh}
                         maxLength={40}
-                        onChange={(event) => renameTrack(selectedTrack.type, event.target.value)}
+                        onFocus={beginContinuousControlEdit}
+                        onBlur={finishContinuousControlEdit}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.currentTarget.blur();
+                          }
+                        }}
+                        onChange={(event) => renameTrack(selectedTrack.type, event.target.value, 'deferred')}
                         style={selectedTrackNameInputStyle}
                       />
                       <div style={selectedTrackSubStyle}>{getStemDisplayName(selectedTrack).en}</div>
@@ -4528,7 +4631,12 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                         max={selectedTrackTrimControls?.durationMax ?? Math.max(duration, 0.1)}
                         step={0.05}
                         value={selectedTrackTrimControls?.trimStart ?? 0}
-                        onChange={(event) => setTrackTrim(selectedTrack.type, 'start', Number(event.target.value))}
+                        onFocus={beginContinuousControlEdit}
+                        onPointerDown={beginContinuousControlEdit}
+                        onPointerUp={finishContinuousControlEdit}
+                        onBlur={finishContinuousControlEdit}
+                        onKeyUp={finishContinuousControlEdit}
+                        onChange={(event) => setTrackTrim(selectedTrack.type, 'start', Number(event.target.value), snapToGrid, 'deferred')}
                       />
                       <input
                         aria-label={`${getStemDisplayName(selectedTrack).zh} 入点时间码`}
@@ -4579,7 +4687,12 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                         max={selectedTrackTrimControls?.durationMax ?? Math.max(duration, 0.1)}
                         step={0.05}
                         value={selectedTrackTrimControls?.trimEnd ?? duration}
-                        onChange={(event) => setTrackTrim(selectedTrack.type, 'end', Number(event.target.value))}
+                        onFocus={beginContinuousControlEdit}
+                        onPointerDown={beginContinuousControlEdit}
+                        onPointerUp={finishContinuousControlEdit}
+                        onBlur={finishContinuousControlEdit}
+                        onKeyUp={finishContinuousControlEdit}
+                        onChange={(event) => setTrackTrim(selectedTrack.type, 'end', Number(event.target.value), snapToGrid, 'deferred')}
                       />
                       <input
                         aria-label={`${getStemDisplayName(selectedTrack).zh} 出点时间码`}
@@ -4629,7 +4742,12 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                       max={1}
                       step={0.01}
                       value={selectedTrackState.volume}
-                      onChange={(event) => setTrackVolume(selectedTrack.type, Number(event.target.value))}
+                      onFocus={beginContinuousControlEdit}
+                      onPointerDown={beginContinuousControlEdit}
+                      onPointerUp={finishContinuousControlEdit}
+                      onBlur={finishContinuousControlEdit}
+                      onKeyUp={finishContinuousControlEdit}
+                      onChange={(event) => setTrackVolume(selectedTrack.type, Number(event.target.value), 'deferred')}
                     />
                   </label>
                   <label style={selectedTrackControlStyle}>
@@ -4641,7 +4759,12 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                       max={1}
                       step={0.01}
                       value={selectedTrackState.pan}
-                      onChange={(event) => setTrackPan(selectedTrack.type, Number(event.target.value))}
+                      onFocus={beginContinuousControlEdit}
+                      onPointerDown={beginContinuousControlEdit}
+                      onPointerUp={finishContinuousControlEdit}
+                      onBlur={finishContinuousControlEdit}
+                      onKeyUp={finishContinuousControlEdit}
+                      onChange={(event) => setTrackPan(selectedTrack.type, Number(event.target.value), 'deferred')}
                     />
                   </label>
                   <label style={selectedTrackControlStyle}>
@@ -4653,7 +4776,12 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                       max={Math.max(selectedTrackClipDuration, 0.1)}
                       step={0.05}
                       value={selectedTrackTrimControls?.fadeIn ?? 0}
-                      onChange={(event) => setTrackFade(selectedTrack.type, 'in', Number(event.target.value))}
+                      onFocus={beginContinuousControlEdit}
+                      onPointerDown={beginContinuousControlEdit}
+                      onPointerUp={finishContinuousControlEdit}
+                      onBlur={finishContinuousControlEdit}
+                      onKeyUp={finishContinuousControlEdit}
+                      onChange={(event) => setTrackFade(selectedTrack.type, 'in', Number(event.target.value), 'deferred')}
                     />
                   </label>
                   <label style={selectedTrackControlStyle}>
@@ -4665,7 +4793,12 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                       max={Math.max(selectedTrackClipDuration, 0.1)}
                       step={0.05}
                       value={selectedTrackTrimControls?.fadeOut ?? 0}
-                      onChange={(event) => setTrackFade(selectedTrack.type, 'out', Number(event.target.value))}
+                      onFocus={beginContinuousControlEdit}
+                      onPointerDown={beginContinuousControlEdit}
+                      onPointerUp={finishContinuousControlEdit}
+                      onBlur={finishContinuousControlEdit}
+                      onKeyUp={finishContinuousControlEdit}
+                      onChange={(event) => setTrackFade(selectedTrack.type, 'out', Number(event.target.value), 'deferred')}
                     />
                   </label>
                 </div>
@@ -4816,7 +4949,12 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                 max={1}
                 step={0.01}
                 value={masterState.volume}
-                onChange={(event) => setMasterVolume(Number(event.target.value))}
+                onFocus={beginContinuousControlEdit}
+                onPointerDown={beginContinuousControlEdit}
+                onPointerUp={finishContinuousControlEdit}
+                onBlur={finishContinuousControlEdit}
+                onKeyUp={finishContinuousControlEdit}
+                onChange={(event) => setMasterVolume(Number(event.target.value), 'deferred')}
               />
             </label>
             <div style={buttonWrapStyle}>
@@ -5333,9 +5471,18 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                 compact={trackDensity === 'compact'}
                 onSelect={() => setSelectedTrackType(stem.type)}
                 onSeek={(time, shouldSnap) => handleSeek(snapStemEditorTime(time, duration, shouldSnap, snapStepSeconds))}
-                onTrimChange={(edge, time, shouldSnap) => setTrackTrim(stem.type, edge, time, shouldSnap)}
-                onTrimRangeMove={(nextStart, shouldSnap) => setTrackTrimRange(stem.type, nextStart, shouldSnap)}
-                onClipMove={(clipId, nextStart, shouldSnap) => moveTrackClip(stem.type, clipId, nextStart, shouldSnap)}
+                onTrimChange={(edge, time, shouldSnap, phase) => {
+                  setTrackTrim(stem.type, edge, time, shouldSnap, 'deferred');
+                  if (phase === 'commit') commitDeferredHistory();
+                }}
+                onTrimRangeMove={(nextStart, shouldSnap, phase) => {
+                  setTrackTrimRange(stem.type, nextStart, shouldSnap, 'deferred');
+                  if (phase === 'commit') commitDeferredHistory();
+                }}
+                onClipMove={(clipId, nextStart, shouldSnap, phase) => {
+                  moveTrackClip(stem.type, clipId, nextStart, shouldSnap, 'deferred');
+                  if (phase === 'commit') commitDeferredHistory();
+                }}
               />
 
               <div style={stemButtonsStyle}>
@@ -5387,7 +5534,12 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                   max={1}
                   step={0.01}
                   value={state.volume}
-                  onChange={(event) => setTrackVolume(stem.type, Number(event.target.value))}
+                  onFocus={beginContinuousControlEdit}
+                  onPointerDown={beginContinuousControlEdit}
+                  onPointerUp={finishContinuousControlEdit}
+                  onBlur={finishContinuousControlEdit}
+                  onKeyUp={finishContinuousControlEdit}
+                  onChange={(event) => setTrackVolume(stem.type, Number(event.target.value), 'deferred')}
                 />
               </label>
 
@@ -7779,9 +7931,9 @@ function WaveformTrackCanvas({
   compact: boolean;
   onSelect: () => void;
   onSeek: (time: number, shouldSnap: boolean) => void;
-  onTrimChange: (edge: 'start' | 'end', time: number, shouldSnap: boolean) => void;
-  onTrimRangeMove: (nextStart: number, shouldSnap: boolean) => void;
-  onClipMove: (clipId: string, nextStart: number, shouldSnap: boolean) => void;
+  onTrimChange: (edge: 'start' | 'end', time: number, shouldSnap: boolean, phase: StemInteractionPhase) => void;
+  onTrimRangeMove: (nextStart: number, shouldSnap: boolean, phase: StemInteractionPhase) => void;
+  onClipMove: (clipId: string, nextStart: number, shouldSnap: boolean, phase: StemInteractionPhase) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const pendingSeekRef = useRef<{ x: number; time: number; moved: boolean; mode: 'click' | 'playhead' } | null>(null);
@@ -7845,7 +7997,7 @@ function WaveformTrackCanvas({
       const pendingTrim = pendingTrimRef.current;
       pendingTrimRef.current = null;
       if (!dragState || !pendingTrim) return;
-      onTrimChange(dragState.edge, pendingTrim.time, pendingTrim.shouldSnap);
+      onTrimChange(dragState.edge, pendingTrim.time, pendingTrim.shouldSnap, 'preview');
     });
   }, [onTrimChange]);
 
@@ -8145,7 +8297,7 @@ function WaveformTrackCanvas({
     if (trimRangeDragRef.current) {
       trimRangeDragRef.current.moved = true;
       const { time, shouldSnap } = interactionTimeFromPointer(event);
-      onTrimRangeMove(trimRangeDragRef.current.trimStart + time - trimRangeDragRef.current.anchorTime, shouldSnap);
+      onTrimRangeMove(trimRangeDragRef.current.trimStart + time - trimRangeDragRef.current.anchorTime, shouldSnap, 'preview');
       updatePointerGuide(event, '移动选区', true);
       event.preventDefault();
       return;
@@ -8154,7 +8306,7 @@ function WaveformTrackCanvas({
     if (clipDragRef.current) {
       clipDragRef.current.moved = true;
       const { time, shouldSnap } = interactionTimeFromPointer(event);
-      onClipMove(clipDragRef.current.clipId, clipDragRef.current.clipStart + time - clipDragRef.current.anchorTime, shouldSnap);
+      onClipMove(clipDragRef.current.clipId, clipDragRef.current.clipStart + time - clipDragRef.current.anchorTime, shouldSnap, 'preview');
       updatePointerGuide(event, '移动片段', true);
       event.preventDefault();
       return;
@@ -8190,9 +8342,9 @@ function WaveformTrackCanvas({
       cancelScheduledTrimChange();
       const { time, shouldSnap } = interactionTimeFromPointer(event);
       if (!trimDragRef.current.moved) {
-        onTrimChange(trimDragRef.current.edge, time, shouldSnap);
+        onTrimChange(trimDragRef.current.edge, time, shouldSnap, 'commit');
       } else {
-        onTrimChange(trimDragRef.current.edge, time, shouldSnap);
+        onTrimChange(trimDragRef.current.edge, time, shouldSnap, 'commit');
       }
       trimDragRef.current = null;
       pendingSeekRef.current = null;
@@ -8203,7 +8355,7 @@ function WaveformTrackCanvas({
     if (trimRangeDragRef.current) {
       const { time, shouldSnap } = interactionTimeFromPointer(event);
       const nextStart = trimRangeDragRef.current.trimStart + time - trimRangeDragRef.current.anchorTime;
-      onTrimRangeMove(nextStart, shouldSnap);
+      onTrimRangeMove(nextStart, shouldSnap, 'commit');
       trimRangeDragRef.current = null;
       pendingSeekRef.current = null;
       updatePointerGuide(event, '移动选区', false);
@@ -8212,7 +8364,7 @@ function WaveformTrackCanvas({
 
     if (clipDragRef.current) {
       const { time, shouldSnap } = interactionTimeFromPointer(event);
-      onClipMove(clipDragRef.current.clipId, clipDragRef.current.clipStart + time - clipDragRef.current.anchorTime, shouldSnap);
+      onClipMove(clipDragRef.current.clipId, clipDragRef.current.clipStart + time - clipDragRef.current.anchorTime, shouldSnap, 'commit');
       clipDragRef.current = null;
       pendingSeekRef.current = null;
       updatePointerGuide(event, '移动片段', false);
