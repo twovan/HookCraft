@@ -8796,20 +8796,65 @@ function WaveformTrackCanvas({
       context.stroke();
 
       if (displayPeaks.length && duration > 0) {
-        context.strokeStyle = waveformColor;
-        context.lineWidth = recording ? Math.max(1.5, 1.5 * ratio) : selected ? Math.max(1.55, 1.55 * ratio) : Math.max(1.25, 1.25 * ratio);
-        context.shadowColor = recording ? 'rgba(249, 115, 22, 0.78)' : muted ? 'transparent' : colorWithAlpha(baseColor, 0.72);
-        context.shadowBlur = recording ? 9 * ratio : selected ? 6 * ratio : 2 * ratio;
-        context.beginPath();
         const step = displayPeaks.length > 1 ? width / (displayPeaks.length - 1) : width;
-        displayPeaks.forEach((peak, index) => {
+        const usableHeight = Math.max(1, height - takeBarHeight - 2 * ratio);
+        const waveformCenterY = takeBarHeight + usableHeight / 2;
+        const waveformScale = usableHeight * (recording ? 0.5 : 0.49);
+        const smoothedPeaks = displayPeaks.map((peak, index) => {
+          const previous = displayPeaks[Math.max(0, index - 1)] ?? peak;
+          const next = displayPeaks[Math.min(displayPeaks.length - 1, index + 1)] ?? peak;
+          return Math.max(0.025, Math.min(1, previous * 0.18 + peak * 0.64 + next * 0.18));
+        });
+
+        const waveformFill = context.createLinearGradient(0, takeBarHeight, 0, height);
+        waveformFill.addColorStop(0, muted ? colorWithAlpha(baseColor, 0.46) : colorWithAlpha(waveformColor, recording ? 0.94 : 0.96));
+        waveformFill.addColorStop(0.5, muted ? colorWithAlpha(baseColor, 0.36) : colorWithAlpha(waveformColor, recording ? 0.9 : 0.88));
+        waveformFill.addColorStop(1, muted ? colorWithAlpha(baseColor, 0.28) : colorWithAlpha(waveformColor, recording ? 0.72 : 0.7));
+
+        context.save();
+        context.shadowColor = recording ? 'rgba(249, 115, 22, 0.68)' : muted ? 'transparent' : colorWithAlpha(baseColor, selected ? 0.48 : 0.3);
+        context.shadowBlur = recording ? 8 * ratio : selected ? 5 * ratio : 2 * ratio;
+        context.fillStyle = waveformFill;
+        context.beginPath();
+        smoothedPeaks.forEach((peak, index) => {
           const x = index * step;
-          const y = Math.max(1, Math.min(centerY, peak * centerY * 0.9));
-          context.moveTo(x, centerY - y);
-          context.lineTo(x, centerY + y);
+          const y = Math.min(waveformScale, peak * waveformScale);
+          const topY = waveformCenterY - y;
+          if (index === 0) {
+            context.moveTo(x, topY);
+          } else {
+            context.lineTo(x, topY);
+          }
+        });
+        for (let index = smoothedPeaks.length - 1; index >= 0; index -= 1) {
+          const x = index * step;
+          const y = Math.min(waveformScale, smoothedPeaks[index] * waveformScale);
+          context.lineTo(x, waveformCenterY + y);
+        }
+        context.closePath();
+        context.fill();
+        context.restore();
+
+        context.strokeStyle = muted ? colorWithAlpha(baseColor, 0.4) : colorWithAlpha(waveformColor, selected ? 0.92 : 0.74);
+        context.lineWidth = Math.max(1, selected ? 1.35 * ratio : ratio);
+        context.beginPath();
+        smoothedPeaks.forEach((peak, index) => {
+          const x = index * step;
+          const y = Math.min(waveformScale, peak * waveformScale);
+          const topY = waveformCenterY - y;
+          if (index === 0) context.moveTo(x, topY);
+          else context.lineTo(x, topY);
         });
         context.stroke();
-        context.shadowBlur = 0;
+        context.beginPath();
+        smoothedPeaks.forEach((peak, index) => {
+          const x = index * step;
+          const y = Math.min(waveformScale, peak * waveformScale);
+          const bottomY = waveformCenterY + y;
+          if (index === 0) context.moveTo(x, bottomY);
+          else context.lineTo(x, bottomY);
+        });
+        context.stroke();
       }
 
       if (!displayPeaks.length) {
