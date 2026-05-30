@@ -102,6 +102,7 @@ export interface StemEditState {
   tracks: Record<string, StemTrackState>;
   master?: StemMasterState;
   trackLabels?: Record<string, string>;
+  trackOrder?: string[];
   savedAt?: string;
 }
 
@@ -962,9 +963,18 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordingStreamRef = useRef<MediaStream | null>(null);
   const recordingChunksRef = useRef<Blob[]>([]);
+  const trackReorderPressTimerRef = useRef<number | null>(null);
+  const trackReorderDragTypeRef = useRef<string | null>(null);
+  const trackReorderPressRef = useRef<{
+    type: string;
+    pointerId: number;
+    x: number;
+    y: number;
+  } | null>(null);
   const [customStems, setCustomStems] = useState<EditableStem[]>([]);
   const [trackLabels, setTrackLabels] = useState<Record<string, string>>(() => normalizeTrackLabels(initialEditState?.trackLabels));
-  const sourceStems = useMemo(() => [...initialStems, ...customStems], [customStems, initialStems]);
+  const [trackOrder, setTrackOrder] = useState<string[]>(() => normalizeTrackOrderForStems(initialEditState?.trackOrder, initialStems));
+  const sourceStems = useMemo(() => applyTrackOrder([...initialStems, ...customStems], trackOrder), [customStems, initialStems, trackOrder]);
   const stems = useMemo(() => sourceStems.map((stem) => {
     const label = trackLabels[stem.type];
     return label ? { ...stem, displayLabel: label } : stem;
@@ -1040,6 +1050,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   const [addTrackMode, setAddTrackMode] = useState<'import' | 'record'>('import');
   const [isRecording, setIsRecording] = useState(false);
   const [recordingStatus, setRecordingStatus] = useState<string | null>(null);
+  const [reorderingTrackType, setReorderingTrackType] = useState<string | null>(null);
 
   const masterStem = stems[0] || null;
   const hasSoloTrack = useMemo(
@@ -1069,6 +1080,10 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     customObjectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     customObjectUrlsRef.current.clear();
     recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+    if (trackReorderPressTimerRef.current !== null) {
+      window.clearTimeout(trackReorderPressTimerRef.current);
+      trackReorderPressTimerRef.current = null;
+    }
   }, []);
   const timelineLaneWidth = useMemo(
     () => Math.round(resolveTimelineBaseLaneWidth(showAdvancedControls, timelineViewportWidth) * timelineZoom),
@@ -1638,9 +1653,13 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     setTracks(createTrackState(initialStems, initialEditState));
     setMasterState(normalizeStemMasterState(initialEditState?.master));
     setTrackLabels(normalizeTrackLabels(initialEditState?.trackLabels));
+    setTrackOrder(normalizeTrackOrderForStems(initialEditState?.trackOrder, initialStems));
     customObjectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     customObjectUrlsRef.current.clear();
     setCustomStems([]);
+    setReorderingTrackType(null);
+    trackReorderDragTypeRef.current = null;
+    trackReorderPressRef.current = null;
     setIsPlaying(false);
     setCurrentTime(0);
     setDuration(getInitialWaveformDuration(initialStems));
@@ -2144,6 +2163,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       customObjectUrlsRef.current.add(url);
       audioBuffersRef.current[type] = audioBuffer;
       setCustomStems((current) => [...current, stem]);
+      setTrackOrder((current) => [...current.filter((item) => item !== type), type]);
       setTracks((current) => ({
         ...current,
         [type]: defaultTrackState(),
@@ -2243,6 +2263,109 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     recordingStreamRef.current = null;
     setIsRecording(false);
   }, []);
+
+  const clearTrackReorderPress = useCallback(() => {
+    if (trackReorderPressTimerRef.current !== null) {
+      window.clearTimeout(trackReorderPressTimerRef.current);
+      trackReorderPressTimerRef.current = null;
+    }
+    trackReorderPressRef.current = null;
+  }, []);
+
+  const swapTrackOrder = useCallback((fromType: string, toType: string) => {
+    if (fromType === toType) return;
+    setTrackOrder((current) => {
+      const normalized = normalizeTrackOrderForStems(current, stems);
+      const fromIndex = normalized.indexOf(fromType);
+      const toIndex = normalized.indexOf(toType);
+      if (fromIndex < 0 || toIndex < 0) return normalized;
+      const next = [...normalized];
+      [next[fromIndex], next[toIndex]] = [next[toIndex], next[fromIndex]];
+      return next;
+    });
+  }, [stems]);
+
+  const beginTrackReorder = useCallback((type: string) => {
+    trackReorderDragTypeRef.current = type;
+    setReorderingTrackType(type);
+    setSelectedTrackType(type);
+    ignoreNextTrackClickRef.current = true;
+    setSaveStatus('拖到另一条轨道上即可互换位置。');
+  }, []);
+
+  const startTrackReorderPress = useCallback((event: PointerEvent<HTMLDivElement>, type: string) => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    const target = event.target instanceof HTMLElement ? event.target : null;
+    if (target?.closest('button, input, textarea, select, a')) return;
+
+    event.stopPropagation();
+    setSelectedTrackType(type);
+    clearTrackReorderPress();
+    trackReorderPressRef.current = {
+      type,
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+    };
+    trackReorderPressTimerRef.current = window.setTimeout(() => {
+      trackReorderPressTimerRef.current = null;
+      beginTrackReorder(type);
+    }, 360);
+
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // The pointer may already be captured by the browser.
+    }
+  }, [beginTrackReorder, clearTrackReorderPress]);
+
+  const moveTrackReorderPointer = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    const pending = trackReorderPressRef.current;
+    if (pending && pending.pointerId === event.pointerId && !trackReorderDragTypeRef.current) {
+      const moved = Math.hypot(event.clientX - pending.x, event.clientY - pending.y);
+      if (moved > 10) {
+        clearTrackReorderPress();
+      }
+      return;
+    }
+
+    const activeType = trackReorderDragTypeRef.current;
+    if (!activeType) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    const target = document.elementFromPoint(event.clientX, event.clientY);
+    const targetRow = target instanceof HTMLElement
+      ? target.closest<HTMLElement>('[data-track-reorder-type]')
+      : null;
+    const targetType = targetRow?.dataset.trackReorderType;
+    if (targetType && targetType !== activeType) {
+      swapTrackOrder(activeType, targetType);
+    }
+  }, [clearTrackReorderPress, swapTrackOrder]);
+
+  const finishTrackReorderPointer = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    const activeType = trackReorderDragTypeRef.current;
+    clearTrackReorderPress();
+    trackReorderDragTypeRef.current = null;
+    setReorderingTrackType(null);
+
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch {
+      // Pointer capture may already be released.
+    }
+
+    if (activeType) {
+      event.preventDefault();
+      event.stopPropagation();
+      setSaveStatus('轨道顺序已更新，会随编辑状态自动保存。');
+      ignoreNextTrackClickRef.current = true;
+      window.setTimeout(() => {
+        ignoreNextTrackClickRef.current = false;
+      }, 0);
+    }
+  }, [clearTrackReorderPress]);
 
   const handleSeek = useCallback((nextTime: number) => {
     const safeTime = Math.max(0, Math.min(duration || nextTime, nextTime));
@@ -2876,7 +2999,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       const response = await fetch('/api/stems/edit-state', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobId, editState: { tracks, master: masterState, trackLabels } }),
+        body: JSON.stringify({ jobId, editState: { tracks, master: masterState, trackLabels, trackOrder: stems.map((stem) => stem.type) } }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -2907,7 +3030,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         setIsSaving(false);
       }
     }
-  }, [jobId, masterState, trackLabels, tracks]);
+  }, [jobId, masterState, stems, trackLabels, tracks]);
 
   const saveEditState = useCallback(async () => {
     await persistEditState('manual');
@@ -3225,7 +3348,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         autoSaveTimerRef.current = null;
       }
     };
-  }, [jobId, masterState, persistEditState, trackLabels, tracks]);
+  }, [jobId, masterState, persistEditState, trackLabels, trackOrder, tracks]);
 
   const waitForStemLoadingToSettle = useCallback(async () => {
     const startedAt = Date.now();
@@ -4825,14 +4948,26 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
               ref={(node) => {
                 trackRowRefs.current[stem.type] = node;
               }}
+              data-track-reorder-type={stem.type}
               data-timeline-pan-zone="true"
               onClick={() => {
                 if (ignoreNextTrackClickRef.current) return;
                 setSelectedTrackType(stem.type);
               }}
-              style={stemTrackStyle(isAudible, state.solo, showAdvancedControls, isSelectedTrack, timelineGridColumns, timelineMinWidth, trackDensity)}
+              style={{
+                ...stemTrackStyle(isAudible, state.solo, showAdvancedControls, isSelectedTrack, timelineGridColumns, timelineMinWidth, trackDensity),
+                ...(reorderingTrackType === stem.type ? activeTrackReorderStyle : {}),
+              }}
             >
-              <div style={stemNameStyle(isSelectedTrack, isAudible)} data-timeline-pan-zone="true">
+              <div
+                style={stemNameStyle(isSelectedTrack, isAudible, reorderingTrackType === stem.type)}
+                data-timeline-pan-zone="true"
+                title="长按并拖到另一条轨道上互换位置"
+                onPointerDown={(event) => startTrackReorderPress(event, stem.type)}
+                onPointerMove={moveTrackReorderPointer}
+                onPointerUp={finishTrackReorderPointer}
+                onPointerCancel={finishTrackReorderPointer}
+              >
                 <span
                   aria-hidden="true"
                   title={stemAudioStatusLabel(audioStatus)}
@@ -6062,6 +6197,30 @@ function normalizeTrackLabels(value: unknown) {
   ) as Record<string, string>;
 }
 
+function normalizeTrackOrderForStems(value: unknown, stems: EditableStem[]) {
+  const stemTypes = stems.map((stem) => stem.type);
+  const stemTypeSet = new Set(stemTypes);
+  const orderedTypes = Array.isArray(value)
+    ? value
+        .map((type) => String(type || '').trim())
+        .filter((type, index, values) => stemTypeSet.has(type) && values.indexOf(type) === index)
+    : [];
+
+  return [
+    ...orderedTypes,
+    ...stemTypes.filter((type) => !orderedTypes.includes(type)),
+  ];
+}
+
+function applyTrackOrder(stems: EditableStem[], order: string[]) {
+  const orderIndex = new Map(order.map((type, index) => [type, index]));
+  return [...stems].sort((left, right) => {
+    const leftIndex = orderIndex.get(left.type) ?? Number.MAX_SAFE_INTEGER;
+    const rightIndex = orderIndex.get(right.type) ?? Number.MAX_SAFE_INTEGER;
+    return leftIndex - rightIndex;
+  });
+}
+
 const exportActionReasonStyle: CSSProperties = {
   display: 'block',
   maxWidth: '100%',
@@ -6911,7 +7070,14 @@ function stemTrackStyle(
   };
 }
 
-function stemNameStyle(selectedTrack: boolean, audible: boolean): CSSProperties {
+const activeTrackReorderStyle: CSSProperties = {
+  transform: 'translateY(-1px)',
+  borderColor: 'rgba(206, 255, 53, 0.72)',
+  boxShadow: 'inset 3px 0 0 var(--hc-lime), 0 18px 36px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(206, 255, 53, 0.18)',
+  opacity: 1,
+};
+
+function stemNameStyle(selectedTrack: boolean, audible: boolean, reordering = false): CSSProperties {
   return {
     position: 'sticky',
     left: 8,
@@ -6932,6 +7098,8 @@ function stemNameStyle(selectedTrack: boolean, audible: boolean): CSSProperties 
     boxShadow: selectedTrack ? '0 8px 18px rgba(0, 0, 0, 0.14)' : 'none',
     overflow: 'hidden',
     opacity: audible ? 1 : 0.8,
+    cursor: reordering ? 'grabbing' : 'grab',
+    touchAction: 'none',
   };
 }
 

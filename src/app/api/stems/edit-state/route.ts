@@ -69,6 +69,16 @@ function normalizeTrackLabels(value: unknown) {
   );
 }
 
+function normalizeTrackOrder(value: unknown, knownTrackTypes: string[]) {
+  if (!Array.isArray(value)) return [];
+  const knownTrackTypeSet = new Set(knownTrackTypes);
+
+  return value
+    .map((type) => String(type || '').trim().slice(0, 80))
+    .filter((type, index, types) => type.length > 0 && knownTrackTypeSet.has(type) && types.indexOf(type) === index)
+    .slice(0, 64);
+}
+
 function normalizeEditState(value: unknown) {
   const editState = value && typeof value === 'object'
     ? value as Record<string, unknown>
@@ -90,11 +100,13 @@ function normalizeEditState(value: unknown) {
   }
 
   const trackLabels = normalizeTrackLabels(editState?.trackLabels);
+  const trackOrder = normalizeTrackOrder(editState?.trackOrder, Object.keys(normalizedTracks));
 
   return {
     tracks: normalizedTracks,
     master: normalizeStemMasterState(editState?.master as any),
     ...(Object.keys(trackLabels).length > 0 ? { trackLabels } : {}),
+    ...(trackOrder.length > 0 ? { trackOrder } : {}),
     savedAt: new Date().toISOString(),
   };
 }
