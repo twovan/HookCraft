@@ -426,6 +426,15 @@ function areEditorHistorySnapshotsEqual(left: StemEditorHistorySnapshot, right: 
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
+function colorWithAlpha(hexColor: string, alpha: number) {
+  const normalized = hexColor.replace('#', '');
+  if (!/^[0-9a-f]{6}$/i.test(normalized)) return `rgba(148, 163, 184, ${alpha})`;
+  const red = parseInt(normalized.slice(0, 2), 16);
+  const green = parseInt(normalized.slice(2, 4), 16);
+  const blue = parseInt(normalized.slice(4, 6), 16);
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+}
+
 function formatTime(seconds: number) {
   if (!Number.isFinite(seconds)) return '0:00';
   const safeSeconds = Math.max(0, Math.floor(seconds));
@@ -8542,22 +8551,30 @@ function WaveformTrackCanvas({
       const context = canvas.getContext('2d');
       if (!context) return;
 
+      const baseColor = recording ? '#f97316' : color;
+      const backgroundColor = recording ? '#1f1116' : colorWithAlpha(baseColor, 0.22);
+      const laneGlowColor = colorWithAlpha(baseColor, selected ? 0.34 : 0.22);
+      const waveformColor = recording
+        ? '#f97316'
+        : muted
+          ? colorWithAlpha(baseColor, 0.42)
+          : baseColor;
       context.clearRect(0, 0, width, height);
-      context.fillStyle = recording ? '#1f1116' : '#250044';
+      context.fillStyle = backgroundColor;
       context.fillRect(0, 0, width, height);
 
       const clipGradient = context.createLinearGradient(0, 0, 0, height);
-      clipGradient.addColorStop(0, recording ? 'rgba(248, 113, 113, 0.23)' : selected ? 'rgba(206, 255, 53, 0.12)' : 'rgba(255,255,255,0.055)');
-      clipGradient.addColorStop(0.5, recording ? 'rgba(251, 191, 36, 0.1)' : selected ? 'rgba(56, 189, 248, 0.08)' : 'rgba(255,255,255,0.025)');
+      clipGradient.addColorStop(0, colorWithAlpha(baseColor, recording ? 0.28 : selected ? 0.26 : 0.18));
+      clipGradient.addColorStop(0.5, colorWithAlpha(baseColor, recording ? 0.13 : 0.1));
       clipGradient.addColorStop(1, 'rgba(0,0,0,0)');
       context.fillStyle = clipGradient;
       context.fillRect(0, 0, width, height);
 
       const takeBarHeight = selected ? 18 * ratio : 15 * ratio;
       const takeGradient = context.createLinearGradient(0, 0, width, 0);
-      takeGradient.addColorStop(0, recording ? 'rgba(185, 28, 28, 0.96)' : 'rgba(109, 0, 180, 0.98)');
-      takeGradient.addColorStop(0.72, recording ? 'rgba(159, 18, 57, 0.88)' : 'rgba(88, 28, 135, 0.92)');
-      takeGradient.addColorStop(1, recording ? 'rgba(127, 29, 29, 0.72)' : 'rgba(49, 8, 87, 0.84)');
+      takeGradient.addColorStop(0, colorWithAlpha(baseColor, recording ? 0.92 : 0.88));
+      takeGradient.addColorStop(0.72, colorWithAlpha(baseColor, recording ? 0.76 : 0.68));
+      takeGradient.addColorStop(1, colorWithAlpha(baseColor, recording ? 0.5 : 0.42));
       context.fillStyle = takeGradient;
       context.fillRect(0, 0, width, takeBarHeight);
       context.fillStyle = '#fff7ff';
@@ -8596,9 +8613,9 @@ function WaveformTrackCanvas({
       context.stroke();
 
       if (displayPeaks.length && duration > 0) {
-        context.strokeStyle = recording ? '#f97316' : muted ? 'rgba(192, 132, 252, 0.42)' : '#c026ff';
+        context.strokeStyle = waveformColor;
         context.lineWidth = recording ? Math.max(1.5, 1.5 * ratio) : selected ? Math.max(1.55, 1.55 * ratio) : Math.max(1.25, 1.25 * ratio);
-        context.shadowColor = recording ? 'rgba(249, 115, 22, 0.78)' : muted ? 'transparent' : 'rgba(217, 70, 239, 0.82)';
+        context.shadowColor = recording ? 'rgba(249, 115, 22, 0.78)' : muted ? 'transparent' : colorWithAlpha(baseColor, 0.72);
         context.shadowBlur = recording ? 9 * ratio : selected ? 6 * ratio : 2 * ratio;
         context.beginPath();
         const step = displayPeaks.length > 1 ? width / (displayPeaks.length - 1) : width;
@@ -8624,24 +8641,24 @@ function WaveformTrackCanvas({
 
       const startX = (Math.max(0, trimStart) / duration) * width;
       const endX = (Math.min(duration, trimEnd) / duration) * width;
-      context.fillStyle = 'rgba(5, 7, 14, 0.58)';
+      context.fillStyle = 'rgba(5, 7, 14, 0.22)';
       context.fillRect(0, 0, startX, height);
       context.fillRect(endX, 0, Math.max(0, width - endX), height);
 
-      context.fillStyle = selected ? 'rgba(217, 70, 239, 0.12)' : 'rgba(255,255,255,0.055)';
+      context.fillStyle = selected ? colorWithAlpha(baseColor, 0.14) : 'rgba(255,255,255,0.055)';
       context.fillRect(startX, 0, Math.max(0, endX - startX), height);
 
       clips.forEach((clip) => {
         const clipStartX = (Math.max(0, Math.min(duration, clip.start)) / duration) * width;
         const clipEndX = (Math.max(0, Math.min(duration, clip.start + getStemClipDuration(clip))) / duration) * width;
         if (clipEndX <= clipStartX) return;
-        context.fillStyle = selected ? 'rgba(129, 140, 248, 0.14)' : 'rgba(148, 163, 184, 0.055)';
+        context.fillStyle = selected ? colorWithAlpha(baseColor, 0.18) : colorWithAlpha(baseColor, 0.08);
         context.fillRect(clipStartX, 0, clipEndX - clipStartX, height);
-        context.strokeStyle = selected ? 'rgba(216, 201, 255, 0.78)' : 'rgba(148, 163, 184, 0.22)';
+        context.strokeStyle = selected ? colorWithAlpha(baseColor, 0.72) : colorWithAlpha(baseColor, 0.28);
         context.lineWidth = Math.max(1, ratio);
         context.strokeRect(clipStartX + 0.5 * ratio, 0.5 * ratio, Math.max(0, clipEndX - clipStartX - ratio), Math.max(0, height - ratio));
         if (selected) {
-          context.fillStyle = 'rgba(216, 201, 255, 0.92)';
+          context.fillStyle = colorWithAlpha(baseColor, 0.92);
           context.fillRect(clipStartX, 0, Math.max(2 * ratio, 3), height);
         }
       });
@@ -8655,7 +8672,7 @@ function WaveformTrackCanvas({
         context.fillRect(rect.x + rect.width - Math.max(1, ratio), 0, Math.max(1, ratio), height);
       });
 
-      const handleColor = selected ? '#d8c9ff' : 'rgba(148, 163, 184, 0.42)';
+      const handleColor = selected ? '#d8c9ff' : colorWithAlpha(baseColor, 0.52);
       const handleWidth = selected ? 10 * ratio : 4 * ratio;
       context.strokeStyle = handleColor;
       context.lineWidth = Math.max(2, 2 * ratio);
@@ -8718,7 +8735,7 @@ function WaveformTrackCanvas({
     const observer = new ResizeObserver(draw);
     observer.observe(canvas);
     return () => observer.disconnect();
-  }, [clips, currentTime, displayPeaks, duration, muted, mutedRanges, recording, selected, snapEnabled, snapStepSeconds, trackLabel, trimEnd, trimStart]);
+  }, [clips, color, currentTime, displayPeaks, duration, muted, mutedRanges, recording, selected, snapEnabled, snapStepSeconds, trackLabel, trimEnd, trimStart]);
 
   const handlePointerDown = useCallback((event: PointerEvent<HTMLCanvasElement>) => {
     if (duration <= 0) return;
@@ -8951,8 +8968,8 @@ function waveformCanvasStyle(selected: boolean, muted: boolean, editable: boolea
       ? compact ? 66 : 78
       : compact ? 58 : 68,
     borderRadius: 4,
-    border: recording ? '1px solid rgba(251, 113, 133, 0.92)' : selected ? '1px solid rgba(217, 70, 239, 0.76)' : '1px solid rgba(88, 28, 135, 0.64)',
-    background: recording ? 'linear-gradient(180deg, #241317, #090b12)' : 'linear-gradient(180deg, #36005f, #19002f)',
+    border: recording ? '1px solid rgba(251, 113, 133, 0.92)' : selected ? '1px solid rgba(206, 255, 53, 0.46)' : '1px solid rgba(55, 61, 83, 0.82)',
+    background: recording ? 'linear-gradient(180deg, #241317, #090b12)' : 'linear-gradient(180deg, #111827, #080c15)',
     boxShadow: selected
       ? recording
         ? 'inset 0 0 0 1px rgba(251, 113, 133, 0.22), 0 0 22px rgba(248, 113, 113, 0.16)'
