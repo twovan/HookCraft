@@ -26,10 +26,10 @@ describe('stem editor DAW layout metrics', () => {
     expect(resolveDawTrackHeight({ advanced: true, density: 'comfortable' })).toBe(104);
   });
 
-  it('expands only the selected track for easier waveform editing', () => {
-    expect(resolveDawTrackHeight({ advanced: false, density: 'compact', selected: true })).toBe(74);
-    expect(resolveDawTrackHeight({ advanced: false, density: 'comfortable', selected: true })).toBe(92);
-    expect(resolveDawTrackHeight({ advanced: true, density: 'compact', selected: true })).toBe(104);
-    expect(resolveDawTrackHeight({ advanced: true, density: 'comfortable', selected: true })).toBe(128);
+  it('keeps selected tracks the same height as unselected tracks', () => {
+    expect(resolveDawTrackHeight({ advanced: false, density: 'compact', selected: true })).toBe(54);
+    expect(resolveDawTrackHeight({ advanced: false, density: 'comfortable', selected: true })).toBe(66);
+    expect(resolveDawTrackHeight({ advanced: true, density: 'compact', selected: true })).toBe(82);
+    expect(resolveDawTrackHeight({ advanced: true, density: 'comfortable', selected: true })).toBe(104);
   });
 });

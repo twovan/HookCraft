@@ -31,17 +31,16 @@ export function buildDawEditorLayoutMetrics(input: DawEditorLayoutInput): DawEdi
 export function resolveDawTrackHeight({
   advanced,
   density,
-  selected = false,
 }: {
   advanced: boolean;
   density: DawTrackDensity;
   selected?: boolean;
 }) {
   if (advanced) {
-    if (density === 'compact') return selected ? 104 : 82;
-    return selected ? 128 : 104;
+    if (density === 'compact') return 82;
+    return 104;
   }
 
-  if (density === 'compact') return selected ? 74 : 54;
-  return selected ? 92 : 66;
+  if (density === 'compact') return 54;
+  return 66;
 }

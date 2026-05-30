@@ -3049,11 +3049,12 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   const handleTimelineRulerPointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
     event.preventDefault();
     const trimIntent = resolveTimelineRulerTrimIntent(event);
-    if (selectedTrack && selectedTrackTrimControls && (trimIntent?.kind === 'trim' || trimIntent?.kind === 'move-trim')) {
+    const guide = resolveTimelineRulerPointer(event);
+    if (selectedTrack && selectedTrackTrimControls && trimIntent?.kind === 'trim') {
       timelineRulerTrimDragRef.current = {
         pointerId: event.pointerId,
-        kind: trimIntent.kind === 'trim' ? 'edge' : 'range',
-        edge: trimIntent.kind === 'trim' ? trimIntent.edge : undefined,
+        kind: 'edge',
+        edge: trimIntent.edge,
         anchorTime: trimIntent.time,
         trimStart: selectedTrackTrimControls.trimStart,
         trimEnd: selectedTrackTrimControls.trimEnd,
@@ -3064,10 +3065,26 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       return;
     }
 
+    if (selectedTrack && selectedTrackTrimControls && trimIntent?.kind === 'move-trim') {
+      timelineRulerTrimDragRef.current = {
+        pointerId: event.pointerId,
+        kind: 'range',
+        anchorTime: trimIntent.time,
+        trimStart: selectedTrackTrimControls.trimStart,
+        trimEnd: selectedTrackTrimControls.trimEnd,
+        moved: false,
+      };
+      handleSeek(guide.time);
+      updateTimelineRulerGuide(event, true);
+      event.currentTarget.setPointerCapture(event.pointerId);
+      return;
+    }
+
     timelineRulerTrimDragRef.current = null;
+    handleSeek(guide.time);
     updateTimelineRulerGuide(event, false);
     event.currentTarget.setPointerCapture(event.pointerId);
-  }, [resolveTimelineRulerTrimIntent, selectedTrack, selectedTrackTrimControls, updateTimelineRulerGuide]);
+  }, [handleSeek, resolveTimelineRulerPointer, resolveTimelineRulerTrimIntent, selectedTrack, selectedTrackTrimControls, updateTimelineRulerGuide]);
 
   const handleTimelineRulerPointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
     const trimDrag = timelineRulerTrimDragRef.current;
@@ -3084,14 +3101,27 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       return;
     }
 
-    updateTimelineRulerGuide(event, event.buttons === 1);
-  }, [resolveTimelineRulerPointer, selectedTrack, setTrackTrim, setTrackTrimRange, updateTimelineRulerGuide]);
+    if (event.buttons === 1) {
+      const guide = resolveTimelineRulerPointer(event);
+      handleSeek(guide.time);
+      updateTimelineRulerGuide(event, true);
+      event.preventDefault();
+      return;
+    }
+
+    updateTimelineRulerGuide(event, false);
+  }, [handleSeek, resolveTimelineRulerPointer, selectedTrack, setTrackTrim, setTrackTrimRange, updateTimelineRulerGuide]);
 
   const handleTimelineRulerPointerUp = useCallback((event: PointerEvent<HTMLDivElement>) => {
     const trimDrag = timelineRulerTrimDragRef.current;
     if (trimDrag && trimDrag.pointerId === event.pointerId && selectedTrack) {
       const guide = resolveTimelineRulerPointer(event);
-      if (trimDrag.kind === 'edge' && trimDrag.edge) {
+      if (!trimDrag.moved) {
+        if (trimDrag.kind === 'range') {
+          handleSeek(guide.time);
+        }
+        timelineRulerTrimDragRef.current = null;
+      } else if (trimDrag.kind === 'edge' && trimDrag.edge) {
         setTrackTrim(selectedTrack.type, trimDrag.edge, guide.time, guide.shouldSnap, 'deferred');
         commitDeferredHistory();
         setSaveStatus(`已拖动“${getStemDisplayName(selectedTrack).zh}”${trimDrag.edge === 'start' ? '入点' : '出点'}到 ${formatTime(guide.time)}。`);
@@ -3116,7 +3146,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       // Pointer capture may already be released by the browser.
     }
     updateTimelineRulerGuide(event, false);
-  }, [commitDeferredHistory, duration, resolveTimelineRulerPointer, selectedTrack, setTrackTrim, setTrackTrimRange, snapStepSeconds, updateTimelineRulerGuide]);
+  }, [commitDeferredHistory, duration, handleSeek, resolveTimelineRulerPointer, selectedTrack, setTrackTrim, setTrackTrimRange, snapStepSeconds, updateTimelineRulerGuide]);
 
   const commitCurrentTimeInput = useCallback((value: string) => {
     const parsedTime = parseStemTimecode(value);
@@ -7473,7 +7503,7 @@ function trackListStyle(trackDensity: TrackDensity, isPanning = false, canScroll
     order: 3,
     display: 'flex',
     flexDirection: 'column',
-    gap: trackDensity === 'compact' ? 3 : 5,
+    gap: trackDensity === 'compact' ? 2 : 3,
     marginTop: 0,
     padding: '0 6px 8px',
     border: '1px solid rgba(48, 52, 76, 0.84)',
@@ -7483,7 +7513,7 @@ function trackListStyle(trackDensity: TrackDensity, isPanning = false, canScroll
       linear-gradient(180deg, rgba(255,255,255,0.035) 1px, transparent 1px),
       linear-gradient(180deg, rgba(9, 13, 22, 0.96), rgba(4, 8, 15, 0.96))
     `,
-    backgroundSize: trackDensity === 'compact' ? '76px 100%, 100% 54px, auto' : '76px 100%, 100% 66px, auto',
+    backgroundSize: trackDensity === 'compact' ? '76px 100%, 100% 58px, auto' : '76px 100%, 100% 76px, auto',
     minWidth: 0,
     maxWidth: '100%',
     boxSizing: 'border-box',
@@ -7860,10 +7890,10 @@ const timelineRulerToolButtonStyle: CSSProperties = {
 
 const timelineRulerMarksStyle: CSSProperties = {
   position: 'relative',
-  height: 24,
+  height: 26,
   borderRadius: 5,
   border: '1px solid rgba(48, 52, 76, 0.72)',
-  background: 'rgba(10, 13, 24, 0.74)',
+  background: 'linear-gradient(180deg, rgba(13, 17, 29, 0.86), rgba(7, 10, 18, 0.88))',
   overflow: 'visible',
   cursor: 'pointer',
   userSelect: 'none',
@@ -7880,14 +7910,14 @@ function timelineSelectedRangeStyle(start: number, end: number, duration: number
   return {
     position: 'absolute',
     left: `${startRatio * 100}%`,
-    top: 3,
+    top: 5,
     width: `${Math.max(0.25, (endRatio - startRatio) * 100)}%`,
-    height: 18,
+    height: 16,
     zIndex: 1,
-    borderRadius: 4,
-    border: '1px solid rgba(206, 255, 53, 0.48)',
-    background: 'linear-gradient(90deg, rgba(206, 255, 53, 0.14), rgba(82, 214, 198, 0.12))',
-    boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.045), 0 0 14px rgba(156,108,255,0.18)',
+    borderRadius: 3,
+    border: '1px solid rgba(206, 255, 53, 0.36)',
+    background: 'linear-gradient(90deg, rgba(206, 255, 53, 0.1), rgba(82, 214, 198, 0.09))',
+    boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.035)',
     pointerEvents: 'none',
     userSelect: 'none',
     WebkitUserSelect: 'none',
@@ -7901,18 +7931,19 @@ function timelineSelectedRangeEdgeStyle(time: number, duration: number, edge: 's
   return {
     position: 'absolute',
     left: `${safeRatio * 100}%`,
-    top: -2,
-    bottom: -2,
+    top: 2,
+    bottom: 2,
     zIndex: 8,
-    width: 7,
+    width: 5,
+    transform: 'translateX(-50%)',
     borderRadius: 999,
-    border: '1px solid rgba(255,255,255,0.86)',
+    border: '1px solid rgba(255,255,255,0.68)',
     background: edge === 'start'
-      ? 'linear-gradient(180deg, #f7ffd0, #ceff35)'
-      : 'linear-gradient(180deg, #ecfeff, #22d3ee)',
+      ? 'linear-gradient(180deg, #f7ffd0, #b9ff2f)'
+      : 'linear-gradient(180deg, #ecfeff, #20c7dc)',
     boxShadow: edge === 'start'
-      ? '0 0 0 4px rgba(206, 255, 53, 0.16), 0 0 14px rgba(206, 255, 53, 0.38)'
-      : '0 0 0 4px rgba(34, 211, 238, 0.16), 0 0 14px rgba(103, 232, 249, 0.5)',
+      ? '0 0 0 2px rgba(6, 10, 18, 0.78), 0 0 10px rgba(206, 255, 53, 0.26)'
+      : '0 0 0 2px rgba(6, 10, 18, 0.78), 0 0 10px rgba(103, 232, 249, 0.32)',
     pointerEvents: 'none',
   };
 }
@@ -7972,7 +8003,7 @@ function timelineRulerMarkStyle(ratio: number): CSSProperties {
     transform: ratio >= 0.96 ? 'translateX(-100%)' : 'none',
     color: '#cfd3e6',
     fontSize: 10,
-    lineHeight: '22px',
+    lineHeight: '24px',
     fontVariantNumeric: 'tabular-nums',
     whiteSpace: 'nowrap',
   };
@@ -8001,15 +8032,16 @@ function stemTrackStyle(
   const compact = trackDensity === 'compact';
   const rowHeight = resolveDawTrackHeight({ advanced, density: trackDensity, selected: selectedTrack });
   const collapsedHeight = compact ? 48 : 56;
+  const openHeight = compact ? 72 : 86;
 
   return {
     display: 'grid',
     gridTemplateColumns: gridColumns,
     alignItems: 'center',
-    gap: compact ? Math.max(6, TIMELINE_GRID_GAP - 2) : TIMELINE_GRID_GAP,
+    gap: compact ? 4 : 5,
     minWidth,
     boxSizing: 'border-box',
-    minHeight: collapsed ? collapsedHeight : Math.max(rowHeight, compact ? 78 : 98),
+    minHeight: collapsed ? collapsedHeight : Math.max(rowHeight, openHeight),
     borderRadius: 8,
     border: selectedTrack
       ? '1px solid rgba(206, 255, 53, 0.46)'
@@ -8021,14 +8053,14 @@ function stemTrackStyle(
       linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0))
     `,
     boxShadow: selectedTrack
-      ? 'inset 3px 0 0 var(--hc-lime), 0 12px 28px rgba(0, 0, 0, 0.18)'
+      ? 'inset 0 0 0 1px rgba(206, 255, 53, 0.28)'
       : solo
         ? 'inset 3px 0 0 rgba(206, 255, 53, 0.58)'
         : 'none',
     opacity: audible ? 1 : 0.46,
     padding: selectedTrack
-      ? collapsed ? '5px 8px' : compact ? '7px 8px' : '9px 10px'
-      : collapsed ? '4px 8px' : compact ? '4px 8px' : '6px 10px',
+      ? collapsed ? '4px 8px' : compact ? '4px 8px' : '5px 8px'
+      : collapsed ? '4px 8px' : compact ? '4px 8px' : '5px 8px',
     cursor: 'pointer',
     transition: 'min-height 180ms ease, opacity 140ms ease, border-color 140ms ease, background 140ms ease, box-shadow 140ms ease, padding 180ms ease',
   };
@@ -8808,6 +8840,7 @@ function WaveformTrackCanvas({
       trimStart,
       trimEnd,
       currentTime,
+      hitSize: selected ? 48 : 40,
     });
 
     onSelect();
@@ -8868,7 +8901,7 @@ function WaveformTrackCanvas({
       }
     }
     event.currentTarget.setPointerCapture(event.pointerId);
-  }, [clips, currentTime, duration, editable, interactionTimeFromPointer, onSelect, trimEnd, trimStart, updatePointerGuide]);
+  }, [clips, currentTime, duration, editable, interactionTimeFromPointer, onSelect, selected, trimEnd, trimStart, updatePointerGuide]);
 
   const handlePointerMove = useCallback((event: PointerEvent<HTMLCanvasElement>) => {
     if (trimDragRef.current) {
@@ -9020,13 +9053,13 @@ const waveformCanvasWrapStyle: CSSProperties = {
 };
 
 function waveformCanvasStyle(selected: boolean, muted: boolean, editable: boolean, compact: boolean, collapsed: boolean, recording = false): CSSProperties {
+  const waveformHeight = compact ? 64 : 76;
+
   return {
     width: '100%',
     height: collapsed
       ? compact ? 34 : 40
-      : selected
-      ? compact ? 66 : 78
-      : compact ? 58 : 68,
+      : waveformHeight,
     borderRadius: 4,
     border: recording ? '1px solid rgba(251, 113, 133, 0.92)' : selected ? '1px solid rgba(206, 255, 53, 0.46)' : '1px solid rgba(55, 61, 83, 0.82)',
     background: recording ? 'linear-gradient(180deg, #241317, #090b12)' : 'linear-gradient(180deg, #111827, #080c15)',
@@ -9041,7 +9074,7 @@ function waveformCanvasStyle(selected: boolean, muted: boolean, editable: boolea
     userSelect: 'none',
     WebkitUserSelect: 'none',
     WebkitTouchCallout: 'none',
-    transition: 'height 180ms ease, border-color 140ms ease, box-shadow 140ms ease, opacity 140ms ease',
+    transition: 'border-color 140ms ease, box-shadow 140ms ease, opacity 140ms ease',
   };
 }
 
@@ -9053,7 +9086,7 @@ function waveformTrimHandleStyle(time: number, duration: number, selected: boole
     top: selected ? 2 : 6,
     bottom: selected ? 2 : 6,
     left: `${safeRatio * 100}%`,
-    transform: edge === 'start' ? 'translateX(-50%)' : 'translateX(-50%)',
+    transform: edge === 'start' ? 'translateX(0)' : 'translateX(-100%)',
     zIndex: selected ? 7 : 3,
     width: selected ? 5 : 3,
     borderRadius: 999,
