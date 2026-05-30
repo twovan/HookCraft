@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ChangeEvent, CSSProperties, PointerEvent, WheelEvent } from 'react';
+import type { ChangeEvent, CSSProperties, PointerEvent } from 'react';
 import {
   defaultStemMasterState,
   normalizeStemMasterState,
@@ -1127,6 +1127,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   const [recordingInputLevel, setRecordingInputLevel] = useState(0.78);
   const [monitoringEnabled, setMonitoringEnabled] = useState(false);
   const [reorderingTrackType, setReorderingTrackType] = useState<string | null>(null);
+  const timelineZoomRef = useRef(timelineZoom);
 
   const masterStem = stems[0] || null;
   const hasSoloTrack = useMemo(
@@ -1163,6 +1164,10 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       URL.revokeObjectURL(latestExportDownload.url);
     }
   }, [latestExportDownload?.url]);
+
+  useEffect(() => {
+    timelineZoomRef.current = timelineZoom;
+  }, [timelineZoom]);
 
   useEffect(() => () => {
     customObjectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
@@ -1499,22 +1504,31 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     centerTimelineOnPlaybackPosition(currentTime, nextLaneWidth);
   }, [centerTimelineOnPlaybackPosition, currentTime, showAdvancedControls, timelineViewportWidth]);
 
-  const handleTimelineWheel = useCallback((event: WheelEvent<HTMLDivElement>) => {
+  useEffect(() => {
     const viewport = timelineViewportRef.current;
     if (!viewport) return;
 
-    if (event.ctrlKey || event.metaKey) {
-      event.preventDefault();
-      const zoomStep = event.deltaY < 0 ? 0.15 : -0.15;
-      applyTimelineZoom(timelineZoom + zoomStep);
-      return;
-    }
+    const handleNativeTimelineWheel = (event: globalThis.WheelEvent) => {
+      if (event.ctrlKey || event.metaKey) {
+        event.preventDefault();
+        event.stopPropagation();
+        const zoomStep = event.deltaY < 0 ? 0.15 : -0.15;
+        applyTimelineZoom(timelineZoomRef.current + zoomStep);
+        return;
+      }
 
-    if (event.shiftKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
-      event.preventDefault();
-      viewport.scrollLeft += event.deltaX + event.deltaY;
-    }
-  }, [applyTimelineZoom, timelineZoom]);
+      if (event.shiftKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
+        event.preventDefault();
+        event.stopPropagation();
+        viewport.scrollLeft += event.deltaX + event.deltaY;
+      }
+    };
+
+    viewport.addEventListener('wheel', handleNativeTimelineWheel, { passive: false });
+    return () => {
+      viewport.removeEventListener('wheel', handleNativeTimelineWheel);
+    };
+  }, [applyTimelineZoom]);
 
   const shouldStartTimelinePan = useCallback((event: PointerEvent<HTMLDivElement>) => {
     const target = event.target;
@@ -5387,7 +5401,6 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         style={trackListStyle(trackDensity, isTimelinePanning, shouldAllowTimelineHorizontalScroll)}
         onContextMenu={(event) => event.preventDefault()}
         onDragStart={(event) => event.preventDefault()}
-        onWheel={handleTimelineWheel}
         onPointerDown={handleTimelinePanPointerDown}
         onPointerMove={handleTimelinePanPointerMove}
         onPointerUp={finishTimelinePan}
