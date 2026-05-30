@@ -5584,16 +5584,6 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
             <span><strong>编辑</strong> Ctrl+S / Ctrl+Z / Ctrl+Y / X / Shift+X</span>
           </div>
         )}
-        {timelineScrollState.canScroll && (
-          <div
-            style={timelineScrollProgressStyle(timelineMinWidth, showShortcutHelp)}
-            onPointerDown={handleTimelineNavigatorPointerDown}
-            onPointerMove={handleTimelineNavigatorPointerMove}
-            title="拖动快速移动时间线视野"
-          >
-            <div style={timelineScrollThumbStyle(timelineScrollState.progress, timelineScrollState.viewRatio)} />
-          </div>
-        )}
         <div style={timelineRulerStyle(timelineGridColumns, timelineMinWidth)} data-timeline-pan-zone="true">
           <div style={timelineRulerLabelStyle} data-timeline-pan-zone="true">
             <button
@@ -5903,6 +5893,16 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         {visibleStems.length === 0 && (
           <div style={emptyTrackNoticeStyle}>
             当前筛选下没有可显示的轨道，可以切回“全部”查看完整分轨列表。
+          </div>
+        )}
+        {timelineScrollState.canScroll && (
+          <div
+            style={timelineScrollProgressStyle}
+            onPointerDown={handleTimelineNavigatorPointerDown}
+            onPointerMove={handleTimelineNavigatorPointerMove}
+            title="拖动快速移动时间线视野"
+          >
+            <div style={timelineScrollThumbStyle(timelineScrollState.progress, timelineScrollState.viewRatio)} />
           </div>
         )}
       </div>
@@ -7846,21 +7846,26 @@ const timelineLocateButtonStyle: CSSProperties = {
   fontWeight: 900,
 };
 
-function timelineScrollProgressStyle(minWidth: number, shortcutHelpOpen: boolean): CSSProperties {
-  return {
-    position: 'sticky',
-    top: shortcutHelpOpen ? 104 : 49,
-    zIndex: 5,
-    minWidth,
-    boxSizing: 'border-box',
-    height: 7,
-    borderRadius: 999,
-    background: 'rgba(255, 255, 255, 0.055)',
-    overflow: 'hidden',
-    cursor: 'ew-resize',
-    userSelect: 'none',
-  };
-}
+const timelineScrollProgressStyle: CSSProperties = {
+  position: 'sticky',
+  left: 0,
+  bottom: 0,
+  zIndex: 8,
+  width: '100%',
+  minWidth: 0,
+  boxSizing: 'border-box',
+  height: 16,
+  marginTop: 2,
+  padding: '5px 8px',
+  borderRadius: '8px 8px 0 0',
+  borderTop: '1px solid rgba(206, 255, 53, 0.18)',
+  background: 'linear-gradient(180deg, rgba(6, 10, 18, 0.72), rgba(3, 6, 12, 0.98))',
+  boxShadow: '0 -8px 22px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255,255,255,0.035)',
+  overflow: 'hidden',
+  cursor: 'ew-resize',
+  userSelect: 'none',
+  backdropFilter: 'blur(10px)',
+};
 
 function timelineScrollThumbStyle(progress: number, viewRatio: number): CSSProperties {
   const widthPercent = Math.max(10, Math.min(92, viewRatio * 100));
@@ -7869,8 +7874,10 @@ function timelineScrollThumbStyle(progress: number, viewRatio: number): CSSPrope
   return {
     position: 'absolute',
     left: `${leftPercent}%`,
+    top: 5,
     width: `${widthPercent}%`,
-    height: '100%',
+    minWidth: 42,
+    height: 6,
     borderRadius: 999,
     background: 'linear-gradient(90deg, rgba(206, 255, 53, 0.86), rgba(82, 214, 198, 0.9))',
     boxShadow: '0 0 12px rgba(206, 255, 53, 0.34)',
