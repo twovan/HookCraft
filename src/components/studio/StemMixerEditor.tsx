@@ -5694,6 +5694,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
               }}
             >
               <div
+                className="stem-track-header"
                 style={stemNameStyle(isSelectedTrack, isAudible, reorderingTrackType === stem.type, isTrackCollapsed)}
                 data-timeline-pan-zone="true"
                 title="点击选择轨道"
@@ -5939,41 +5940,13 @@ function editorStyle(metrics: DawEditorLayoutMetrics): CSSProperties {
 
 const timelineScrollbarCss = `
   #stem-editor-timeline {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(206, 255, 53, 0.62) rgba(7, 10, 18, 0.98);
+    scrollbar-width: none;
   }
 
   #stem-editor-timeline::-webkit-scrollbar {
-    width: 12px;
-    height: 12px;
-  }
-
-  #stem-editor-timeline::-webkit-scrollbar-track {
-    border-radius: 999px;
-    background:
-      linear-gradient(180deg, rgba(14, 18, 30, 0.96), rgba(5, 8, 14, 0.98));
-    box-shadow:
-      inset 0 0 0 1px rgba(48, 52, 76, 0.76),
-      inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  }
-
-  #stem-editor-timeline::-webkit-scrollbar-thumb {
-    min-width: 72px;
-    border: 3px solid rgba(7, 10, 18, 0.98);
-    border-radius: 999px;
-    background:
-      linear-gradient(90deg, rgba(206, 255, 53, 0.88), rgba(82, 214, 198, 0.9));
-    box-shadow:
-      0 0 12px rgba(206, 255, 53, 0.22),
-      inset 0 0 0 1px rgba(255, 255, 255, 0.2);
-  }
-
-  #stem-editor-timeline::-webkit-scrollbar-thumb:hover {
-    background:
-      linear-gradient(90deg, rgba(226, 255, 94, 0.96), rgba(103, 232, 249, 0.96));
-    box-shadow:
-      0 0 16px rgba(206, 255, 53, 0.34),
-      inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+    width: 0;
+    height: 0;
+    display: none;
   }
 
   #stem-editor-timeline::-webkit-scrollbar-button {
@@ -5998,6 +5971,18 @@ const timelineScrollbarCss = `
 
   #stem-editor-timeline .stem-add-track-dropzone:active {
     transform: translateY(1px);
+  }
+
+  #stem-editor-timeline .stem-track-header::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -18px;
+    width: 18px;
+    background: linear-gradient(90deg, rgba(5, 8, 14, 0.99), rgba(13, 17, 22, 0.98));
+    box-shadow: -1px 0 0 rgba(48, 52, 76, 0.48);
+    pointer-events: none;
   }
 `;
 
@@ -8178,8 +8163,8 @@ const activeTrackReorderStyle: CSSProperties = {
 function stemNameStyle(selectedTrack: boolean, audible: boolean, reordering = false, collapsed = false): CSSProperties {
   return {
     position: 'sticky',
-    left: 8,
-    zIndex: 2,
+    left: 0,
+    zIndex: 9,
     display: 'grid',
     gridTemplateColumns: '18px 10px minmax(0, 1fr) 22px auto',
     gridTemplateRows: collapsed ? 'auto' : 'auto auto auto',
@@ -8196,7 +8181,7 @@ function stemNameStyle(selectedTrack: boolean, audible: boolean, reordering = fa
       ? 'linear-gradient(90deg, rgba(26, 20, 34, 0.98), rgba(15, 18, 24, 0.98))'
       : 'linear-gradient(90deg, rgba(18, 22, 28, 0.98), rgba(13, 17, 22, 0.96))',
     boxShadow: selectedTrack ? 'inset 3px 0 0 #a855f7' : 'none',
-    overflow: 'hidden',
+    overflow: 'visible',
     opacity: audible ? 1 : 0.8,
     cursor: reordering ? 'grabbing' : 'grab',
     touchAction: 'none',
