@@ -1026,6 +1026,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     selectedTrackType: filterDeletedStems(initialStems, initialDeletedTrackTypes)[0]?.type ?? null,
   });
   const timelineViewportRef = useRef<HTMLDivElement | null>(null);
+  const inspectorViewportRef = useRef<HTMLDivElement | null>(null);
   const timelinePanRef = useRef<TimelinePanState | null>(null);
   const timelineRulerTrimDragRef = useRef<TimelineRulerTrimDragState | null>(null);
   const ignoreNextTrackClickRef = useRef(false);
@@ -4370,6 +4371,12 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     setSideRailTab(tab);
   }, []);
 
+  useEffect(() => {
+    if (inspectorViewportRef.current) {
+      inspectorViewportRef.current.scrollTop = 0;
+    }
+  }, [inspectorCollapsed, inspectorTab]);
+
   const dawLayoutMetrics = useMemo(() => buildDawEditorLayoutMetrics({
     compactTransport,
     inspectorCollapsed,
@@ -4660,7 +4667,12 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
           </div>
         </div>
 
-        <div id="stem-editor-inspector" className="stem-editor-vertical-scroll" style={controlGridStyle(inspectorCollapsed)}>
+        <div
+          id="stem-editor-inspector"
+          ref={inspectorViewportRef}
+          className="stem-editor-inspector-dock stem-editor-vertical-scroll"
+          style={controlGridStyle(inspectorCollapsed, dawLayoutMetrics)}
+        >
           <div style={inspectorHeaderStyle(inspectorCollapsed)}>
             <div>
               <div style={inspectorEyebrowStyle}>Inspector</div>
@@ -6070,6 +6082,20 @@ const timelineScrollbarCss = `
     background: rgba(5, 9, 16, 0.98);
   }
 
+  @media (max-width: 920px) {
+    .stem-editor-inspector-dock {
+      position: static !important;
+      top: auto !important;
+      right: auto !important;
+      bottom: auto !important;
+      width: auto !important;
+      max-width: 100% !important;
+      max-height: none !important;
+      grid-column: 1 / -1 !important;
+      z-index: auto !important;
+    }
+  }
+
   #stem-editor-timeline .stem-add-track-dropzone:hover,
   #stem-editor-timeline .stem-add-track-dropzone:focus-visible {
     border-color: rgba(206, 255, 53, 0.52) !important;
@@ -6782,21 +6808,27 @@ const readinessMetricStyle: CSSProperties = {
   whiteSpace: 'nowrap',
 };
 
-function controlGridStyle(collapsed: boolean): CSSProperties {
+function controlGridStyle(collapsed: boolean, metrics: DawEditorLayoutMetrics): CSSProperties {
   return {
     order: 4,
     gridColumn: '2',
-    position: 'sticky',
-    top: 82,
+    position: 'fixed',
+    top: metrics.headerHeight + 10,
+    right: 12,
+    bottom: metrics.bottomTransportHeight + 16,
+    width: metrics.inspectorWidth,
+    zIndex: 42,
     display: 'grid',
     gridTemplateColumns: 'minmax(0, 1fr)',
+    alignContent: 'start',
     gap: 10,
     minWidth: 0,
-    alignSelf: 'start',
-    maxHeight: 'calc(100vh - 104px)',
+    maxWidth: `calc(100vw - ${metrics.sideRailWidth + 28}px)`,
+    boxSizing: 'border-box',
     overflowY: 'auto',
     overflowX: 'hidden',
-    paddingRight: collapsed ? 0 : 2,
+    paddingRight: collapsed ? 0 : 3,
+    paddingBottom: 8,
   };
 }
 
