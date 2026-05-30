@@ -146,6 +146,7 @@ type StemEditorHistorySnapshot = {
 };
 type StemHistoryMode = 'immediate' | 'deferred' | 'none';
 type StemInteractionPhase = 'preview' | 'commit';
+type RecordingInputChannel = 'channel-1' | 'channel-2' | 'stereo';
 type EditorPreferences = {
   exportMode?: ExportMode;
   exportReadiness?: ExportReadiness;
@@ -1007,8 +1008,11 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   const customObjectUrlsRef = useRef<Set<string>>(new Set());
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordingStreamRef = useRef<MediaStream | null>(null);
+  const recordingProcessedStreamRef = useRef<MediaStream | null>(null);
   const recordingChunksRef = useRef<Blob[]>([]);
   const recordingAudioContextRef = useRef<AudioContext | null>(null);
+  const recordingInputGainRef = useRef<GainNode | null>(null);
+  const recordingMonitorGainRef = useRef<GainNode | null>(null);
   const recordingWaveformFrameRef = useRef<number | null>(null);
   const importTargetTypeRef = useRef<string | null>(null);
   const trackReorderPressTimerRef = useRef<number | null>(null);
@@ -1101,6 +1105,14 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   const [isRecording, setIsRecording] = useState(false);
   const [recordingStatus, setRecordingStatus] = useState<string | null>(null);
   const [recordingWaveform, setRecordingWaveform] = useState<number[]>(() => Array.from({ length: 28 }, () => 0.08));
+  const [recordingTrackType, setRecordingTrackType] = useState<string | null>(null);
+  const [recordingTrackWaveform, setRecordingTrackWaveform] = useState<number[]>(() => Array.from({ length: 220 }, () => 0));
+  const [recordingLevel, setRecordingLevel] = useState(0);
+  const [audioInputDevices, setAudioInputDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedAudioInputDeviceId, setSelectedAudioInputDeviceId] = useState('');
+  const [recordingInputChannel, setRecordingInputChannel] = useState<RecordingInputChannel>('channel-1');
+  const [recordingInputLevel, setRecordingInputLevel] = useState(0.78);
+  const [monitoringEnabled, setMonitoringEnabled] = useState(false);
   const [reorderingTrackType, setReorderingTrackType] = useState<string | null>(null);
 
   const masterStem = stems[0] || null;
@@ -1143,18 +1155,42 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     customObjectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     customObjectUrlsRef.current.clear();
     recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+    recordingProcessedStreamRef.current?.getTracks().forEach((track) => track.stop());
     if (recordingWaveformFrameRef.current !== null) {
       window.cancelAnimationFrame(recordingWaveformFrameRef.current);
       recordingWaveformFrameRef.current = null;
     }
     const recordingContext = recordingAudioContextRef.current;
     recordingAudioContextRef.current = null;
+    recordingInputGainRef.current = null;
+    recordingMonitorGainRef.current = null;
     void recordingContext?.close();
     if (trackReorderPressTimerRef.current !== null) {
       window.clearTimeout(trackReorderPressTimerRef.current);
       trackReorderPressTimerRef.current = null;
     }
   }, []);
+
+  const refreshAudioInputDevices = useCallback(async () => {
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.enumerateDevices) return;
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const inputs = devices.filter((device) => device.kind === 'audioinput');
+      setAudioInputDevices(inputs);
+      setSelectedAudioInputDeviceId((current) => current || inputs[0]?.deviceId || '');
+    } catch {
+      setAudioInputDevices([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshAudioInputDevices();
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices) return;
+    navigator.mediaDevices.addEventListener?.('devicechange', refreshAudioInputDevices);
+    return () => {
+      navigator.mediaDevices.removeEventListener?.('devicechange', refreshAudioInputDevices);
+    };
+  }, [refreshAudioInputDevices]);
   const timelineLaneWidth = useMemo(
     () => Math.round(resolveTimelineBaseLaneWidth(showAdvancedControls, timelineViewportWidth) * timelineZoom),
     [showAdvancedControls, timelineViewportWidth, timelineZoom],
@@ -1794,6 +1830,9 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     };
     setRecordingStatus(null);
     setRecordingWaveform(Array.from({ length: 28 }, () => 0.08));
+    setRecordingTrackType(null);
+    setRecordingTrackWaveform(Array.from({ length: 220 }, () => 0));
+    setRecordingLevel(0);
     importTargetTypeRef.current = null;
     if (recordingWaveformFrameRef.current !== null) {
       window.cancelAnimationFrame(recordingWaveformFrameRef.current);
@@ -2409,6 +2448,9 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       setBufferVersion((version) => version + 1);
       setRecordingStatus(null);
       setRecordingWaveform(Array.from({ length: 28 }, () => 0.08));
+      setRecordingTrackType(null);
+      setRecordingTrackWaveform(Array.from({ length: 220 }, () => 0));
+      setRecordingLevel(0);
       setIsAddTrackPanelOpen(true);
       setSaveStatus(`已为“${displayLabel}”载入音频，可参与预听、混音和导出。`);
     } catch {
@@ -2441,34 +2483,78 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     }
     const context = recordingAudioContextRef.current;
     recordingAudioContextRef.current = null;
+    recordingInputGainRef.current = null;
+    recordingMonitorGainRef.current = null;
+    recordingProcessedStreamRef.current?.getTracks().forEach((track) => track.stop());
+    recordingProcessedStreamRef.current = null;
     void context?.close();
+    setRecordingLevel(0);
   }, []);
+
+  useEffect(() => {
+    if (recordingInputGainRef.current) {
+      recordingInputGainRef.current.gain.value = recordingInputLevel;
+    }
+    if (recordingMonitorGainRef.current) {
+      recordingMonitorGainRef.current.gain.value = monitoringEnabled ? 1 : 0;
+    }
+  }, [monitoringEnabled, recordingInputLevel]);
 
   const startRecordingMeter = useCallback((stream: MediaStream) => {
     stopRecordingMeter();
     const context = new AudioContext();
     const source = context.createMediaStreamSource(stream);
+    const inputGain = context.createGain();
+    const monitorGain = context.createGain();
     const analyser = context.createAnalyser();
+    const recordingDestination = context.createMediaStreamDestination();
     analyser.fftSize = 256;
-    source.connect(analyser);
+    inputGain.gain.value = recordingInputLevel;
+    monitorGain.gain.value = monitoringEnabled ? 1 : 0;
+
+    if (recordingInputChannel === 'stereo') {
+      source.connect(inputGain);
+    } else {
+      const splitter = context.createChannelSplitter(2);
+      source.connect(splitter);
+      try {
+        splitter.connect(inputGain, recordingInputChannel === 'channel-2' ? 1 : 0);
+      } catch {
+        splitter.connect(inputGain, 0);
+      }
+    }
+
+    inputGain.connect(analyser);
+    inputGain.connect(recordingDestination);
+    inputGain.connect(monitorGain);
+    monitorGain.connect(context.destination);
     recordingAudioContextRef.current = context;
+    recordingInputGainRef.current = inputGain;
+    recordingMonitorGainRef.current = monitorGain;
+    recordingProcessedStreamRef.current = recordingDestination.stream;
 
     const samples = new Uint8Array(analyser.fftSize);
     const tick = () => {
       analyser.getByteTimeDomainData(samples);
       let sum = 0;
+      let peak = 0;
       for (let index = 0; index < samples.length; index += 1) {
         const centered = (samples[index] - 128) / 128;
         sum += centered * centered;
+        peak = Math.max(peak, Math.abs(centered));
       }
       const rms = Math.sqrt(sum / samples.length);
       const level = Math.max(0.08, Math.min(1, rms * 5.2));
+      const trackPeak = Math.max(0.01, Math.min(1, peak * 1.4));
       setRecordingWaveform((current) => [...current.slice(-27), level]);
+      setRecordingTrackWaveform((current) => [...current.slice(1), trackPeak]);
+      setRecordingLevel(Math.min(1, Math.max(level, trackPeak * 0.72)));
       recordingWaveformFrameRef.current = window.requestAnimationFrame(tick);
     };
 
     tick();
-  }, [stopRecordingMeter]);
+    return recordingDestination.stream;
+  }, [monitoringEnabled, recordingInputChannel, recordingInputLevel, stopRecordingMeter]);
 
   const openAddTrackPanel = useCallback((mode: 'import' | 'record' = 'import') => {
     setAddTrackMode(mode);
@@ -2488,15 +2574,27 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     try {
       const targetType = resolveAudioInputTargetType();
       setSelectedTrackType(targetType);
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      setRecordingTrackType(targetType);
+      setRecordingTrackWaveform(Array.from({ length: 220 }, () => 0));
+      setRecordingLevel(0);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          deviceId: selectedAudioInputDeviceId ? { exact: selectedAudioInputDeviceId } : undefined,
+          channelCount: recordingInputChannel === 'channel-1' ? { ideal: 1 } : { ideal: 2 },
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+        },
+      });
+      void refreshAudioInputDevices();
+      const processedStream = startRecordingMeter(stream);
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus'
         : '';
-      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      const recorder = new MediaRecorder(processedStream, mimeType ? { mimeType } : undefined);
       recordingChunksRef.current = [];
       recordingStreamRef.current = stream;
       mediaRecorderRef.current = recorder;
-      startRecordingMeter(stream);
 
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -2507,13 +2605,18 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         const chunks = recordingChunksRef.current;
         const type = recorder.mimeType || 'audio/webm';
         stream.getTracks().forEach((track) => track.stop());
+        processedStream.getTracks().forEach((track) => track.stop());
         recordingStreamRef.current = null;
+        recordingProcessedStreamRef.current = null;
         mediaRecorderRef.current = null;
         stopRecordingMeter();
         setIsRecording(false);
 
         if (chunks.length === 0) {
           setRecordingStatus(null);
+          setRecordingTrackType(null);
+          setRecordingTrackWaveform(Array.from({ length: 220 }, () => 0));
+          setRecordingLevel(0);
           setPlaybackError('录音没有捕获到音频，请检查麦克风权限后重试。');
           return;
         }
@@ -2532,9 +2635,12 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       stopRecordingMeter();
       setIsRecording(false);
       setRecordingStatus(null);
+      setRecordingTrackType(null);
+      setRecordingTrackWaveform(Array.from({ length: 220 }, () => 0));
+      setRecordingLevel(0);
       setPlaybackError('无法打开麦克风，请检查浏览器录音权限。');
     }
-  }, [addCustomStemFromBlob, customStems.length, resolveAudioInputTargetType, startRecordingMeter, stopRecordingMeter]);
+  }, [addCustomStemFromBlob, customStems.length, recordingInputChannel, refreshAudioInputDevices, resolveAudioInputTargetType, selectedAudioInputDeviceId, startRecordingMeter, stopRecordingMeter]);
 
   const stopRecordingTrack = useCallback(() => {
     const recorder = mediaRecorderRef.current;
@@ -2546,8 +2652,11 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
 
     recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
     recordingStreamRef.current = null;
+    recordingProcessedStreamRef.current?.getTracks().forEach((track) => track.stop());
+    recordingProcessedStreamRef.current = null;
     stopRecordingMeter();
     setIsRecording(false);
+    setRecordingTrackType(null);
   }, [stopRecordingMeter]);
 
   const deleteSelectedTrack = useCallback(() => {
@@ -4501,23 +4610,89 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
               </div>
             )}
             {isAddTrackPanelOpen && addTrackMode === 'record' && (
-              <div style={recordPanelStyle}>
-                <div>
-                  <span style={addTrackHintStyle}>{recordingStatus || '使用麦克风录制当前空轨。'}</span>
-                  <div style={recordingWaveformStyle(isRecording)} aria-hidden="true">
-                    {recordingWaveform.map((level, index) => (
-                      <span key={index} style={recordingWaveformBarStyle(level, isRecording)} />
+              <>
+                <div style={recordingInputPanelStyle}>
+                  <div style={recordingInputLabelStyle}>Input</div>
+                  <select
+                    aria-label="录音输入设备"
+                    value={selectedAudioInputDeviceId}
+                    disabled={isRecording}
+                    onChange={(event) => setSelectedAudioInputDeviceId(event.target.value)}
+                    style={recordingSelectStyle}
+                  >
+                    {audioInputDevices.length === 0 && <option value="">默认麦克风</option>}
+                    {audioInputDevices.map((device, index) => (
+                      <option key={device.deviceId || index} value={device.deviceId}>
+                        {device.label || `麦克风 ${index + 1}`}
+                      </option>
                     ))}
+                  </select>
+                  <select
+                    aria-label="录音输入通道"
+                    value={recordingInputChannel}
+                    disabled={isRecording}
+                    onChange={(event) => setRecordingInputChannel(event.target.value as RecordingInputChannel)}
+                    style={recordingSelectStyle}
+                  >
+                    <option value="channel-1">Channel 1</option>
+                    <option value="channel-2">Channel 2</option>
+                    <option value="stereo">Stereo</option>
+                  </select>
+                  <div style={recordingInputFooterStyle}>
+                    <label style={recordingInputLevelStyle}>
+                      <span>Input Level</span>
+                      <input
+                        aria-label="录音输入电平"
+                        type="range"
+                        min={0}
+                        max={1.4}
+                        step={0.01}
+                        value={recordingInputLevel}
+                        onChange={(event) => setRecordingInputLevel(Number(event.target.value))}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      aria-pressed={monitoringEnabled}
+                      title={monitoringEnabled ? '关闭监听' : '开启监听'}
+                      style={monitoringButtonStyle(monitoringEnabled)}
+                      onClick={() => setMonitoringEnabled((value) => !value)}
+                    >
+                      <span aria-hidden="true">M</span>
+                      Monitoring
+                    </button>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  style={isRecording ? addTrackDangerButtonStyle : addTrackPrimaryButtonStyle}
-                  onClick={isRecording ? stopRecordingTrack : () => void startRecordingTrack()}
-                >
-                  {isRecording ? '停止录音' : '开始录音'}
-                </button>
-              </div>
+                <div style={recordPanelStyle}>
+                  <div>
+                    <span style={addTrackHintStyle}>{recordingStatus || '使用麦克风录制当前空轨。'}</span>
+                    <div style={recordingWaveformStyle(isRecording)} aria-hidden="true">
+                      {recordingWaveform.map((level, index) => (
+                        <span key={index} style={recordingWaveformBarStyle(level, isRecording)} />
+                      ))}
+                    </div>
+                  </div>
+                  <div style={recordingMeterStyle(isRecording)} aria-label={`录音电平 ${Math.round(recordingLevel * 100)}%`}>
+                    <div style={recordingMeterScaleStyle}>
+                      <span>0</span>
+                      <span>-6</span>
+                      <span>-20</span>
+                      <span>-60</span>
+                    </div>
+                    <div style={recordingMeterTrackStyle}>
+                      <span style={recordingMeterFillStyle(recordingLevel, isRecording)} />
+                      <span style={recordingMeterPeakStyle(recordingLevel)} />
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    style={isRecording ? addTrackDangerButtonStyle : addTrackPrimaryButtonStyle}
+                    onClick={isRecording ? stopRecordingTrack : () => void startRecordingTrack()}
+                  >
+                    {isRecording ? '停止录音' : '开始录音'}
+                  </button>
+                </div>
+              </>
             )}
           </div>
           <div style={selectedTrackPanelStyle}>
@@ -5399,6 +5574,10 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
           const displayName = getStemDisplayName(stem);
           const isSelectedTrack = selectedTrack?.type === stem.type;
           const audioBuffer = audioBuffersRef.current[stem.type] || null;
+          const isRecordingTarget = isRecording && recordingTrackType === stem.type;
+          const waveformForTrack = isRecordingTarget
+            ? { duration: Math.max(duration, 1), peaks: recordingTrackWaveform }
+            : stem.waveform || null;
           const audioStatus = resolveStemTrackAudioStatus({
             knownEmpty: stemHasKnownEmptyWaveform(stem),
             loaded: Boolean(audioBuffer),
@@ -5453,7 +5632,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
 
               <WaveformTrackCanvas
                 buffer={audioBuffer}
-                waveform={stem.waveform || null}
+                waveform={waveformForTrack}
                 color={stemColorForType(stem.type)}
                 currentTime={currentTime}
                 duration={duration}
@@ -5469,6 +5648,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                 bufferVersion={bufferVersion}
                 liveSeekOnDrag={!isPlaying}
                 compact={trackDensity === 'compact'}
+                recording={isRecordingTarget}
                 onSelect={() => setSelectedTrackType(stem.type)}
                 onSeek={(time, shouldSnap) => handleSeek(snapStemEditorTime(time, duration, shouldSnap, snapStepSeconds))}
                 onTrimChange={(edge, time, shouldSnap, phase) => {
@@ -6512,9 +6692,68 @@ const addTrackHintStyle: CSSProperties = {
   lineHeight: 1.45,
 };
 
-const recordPanelStyle: CSSProperties = {
+const recordingInputPanelStyle: CSSProperties = {
+  display: 'grid',
+  gap: 8,
+  marginTop: 10,
+  padding: 10,
+  borderRadius: 8,
+  border: '1px solid rgba(48, 52, 76, 0.76)',
+  background: 'linear-gradient(180deg, rgba(9, 14, 22, 0.98), rgba(5, 8, 14, 0.94))',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
+};
+
+const recordingInputLabelStyle: CSSProperties = {
+  color: '#f8fbff',
+  fontSize: 12,
+  fontWeight: 950,
+};
+
+const recordingSelectStyle: CSSProperties = {
+  width: '100%',
+  minHeight: 34,
+  borderRadius: 7,
+  border: '1px solid rgba(48, 52, 76, 0.74)',
+  background: '#1b2027',
+  color: '#f8fbff',
+  padding: '0 10px',
+  fontSize: 12,
+  fontWeight: 850,
+  outline: 'none',
+};
+
+const recordingInputFooterStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'minmax(0, 1fr) auto',
+  alignItems: 'end',
+  gap: 10,
+};
+
+const recordingInputLevelStyle: CSSProperties = {
+  display: 'grid',
+  gap: 6,
+  minWidth: 0,
+  color: '#f8fbff',
+  fontSize: 12,
+  fontWeight: 900,
+};
+
+function monitoringButtonStyle(active: boolean): CSSProperties {
+  return {
+    ...editorButtonChromeStyle({ tone: active ? 'primary' : 'neutral', compact: true, round: true, active }),
+    minHeight: 34,
+    padding: '0 13px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 7,
+    fontSize: 12,
+    fontWeight: 950,
+  };
+}
+
+const recordPanelStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr) auto auto',
   gap: 8,
   alignItems: 'center',
   marginTop: 8,
@@ -6548,6 +6787,71 @@ function recordingWaveformBarStyle(level: number, active: boolean): CSSPropertie
       : 'rgba(148, 163, 184, 0.32)',
     boxShadow: active ? '0 0 10px rgba(82, 214, 198, 0.28)' : 'none',
     transition: 'height 70ms linear, background 140ms ease',
+  };
+}
+
+function recordingMeterStyle(active: boolean): CSSProperties {
+  return {
+    display: 'grid',
+    gridTemplateColumns: '18px 14px',
+    alignItems: 'stretch',
+    gap: 4,
+    height: 70,
+    padding: '5px 4px',
+    borderRadius: 8,
+    border: active ? '1px solid rgba(52, 211, 153, 0.42)' : '1px solid rgba(48, 52, 76, 0.82)',
+    background: active
+      ? 'linear-gradient(180deg, rgba(5, 46, 22, 0.55), rgba(7, 10, 18, 0.92))'
+      : 'rgba(8, 11, 19, 0.72)',
+    boxShadow: active ? '0 0 18px rgba(52, 211, 153, 0.12)' : 'none',
+  };
+}
+
+const recordingMeterScaleStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  justifyContent: 'space-between',
+  alignItems: 'flex-end',
+  color: '#77ff9d',
+  fontSize: 8,
+  fontWeight: 900,
+  fontVariantNumeric: 'tabular-nums',
+  lineHeight: 1,
+};
+
+const recordingMeterTrackStyle: CSSProperties = {
+  position: 'relative',
+  overflow: 'hidden',
+  borderRadius: 999,
+  border: '1px solid rgba(74, 222, 128, 0.32)',
+  background: 'linear-gradient(180deg, rgba(127, 29, 29, 0.82) 0%, rgba(113, 63, 18, 0.82) 22%, rgba(20, 83, 45, 0.9) 54%, rgba(5, 46, 22, 0.92) 100%)',
+  boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.32)',
+};
+
+function recordingMeterFillStyle(level: number, active: boolean): CSSProperties {
+  const height = Math.max(2, Math.min(100, level * 100));
+  return {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: `${active ? height : 2}%`,
+    background: 'linear-gradient(180deg, rgba(248, 113, 113, 0.95), rgba(250, 204, 21, 0.92) 32%, rgba(74, 222, 128, 0.95) 72%)',
+    boxShadow: active ? '0 0 12px rgba(74, 222, 128, 0.45)' : 'none',
+    transition: 'height 70ms linear',
+  };
+}
+
+function recordingMeterPeakStyle(level: number): CSSProperties {
+  const bottom = Math.max(2, Math.min(96, level * 100));
+  return {
+    position: 'absolute',
+    left: -2,
+    right: -2,
+    bottom: `${bottom}%`,
+    height: 2,
+    background: '#ecfeff',
+    boxShadow: '0 0 8px rgba(236, 254, 255, 0.78)',
   };
 }
 
@@ -7906,6 +8210,7 @@ function WaveformTrackCanvas({
   bufferVersion,
   liveSeekOnDrag,
   compact,
+  recording,
   onSelect,
   onSeek,
   onTrimChange,
@@ -7929,6 +8234,7 @@ function WaveformTrackCanvas({
   bufferVersion: number;
   liveSeekOnDrag: boolean;
   compact: boolean;
+  recording: boolean;
   onSelect: () => void;
   onSeek: (time: number, shouldSnap: boolean) => void;
   onTrimChange: (edge: 'start' | 'end', time: number, shouldSnap: boolean, phase: StemInteractionPhase) => void;
@@ -8058,8 +8364,8 @@ function WaveformTrackCanvas({
       context.fillRect(0, 0, width, height);
 
       const clipGradient = context.createLinearGradient(0, 0, 0, height);
-      clipGradient.addColorStop(0, selected ? 'rgba(206, 255, 53, 0.12)' : 'rgba(255,255,255,0.055)');
-      clipGradient.addColorStop(0.5, selected ? 'rgba(56, 189, 248, 0.08)' : 'rgba(255,255,255,0.025)');
+      clipGradient.addColorStop(0, recording ? 'rgba(248, 113, 113, 0.23)' : selected ? 'rgba(206, 255, 53, 0.12)' : 'rgba(255,255,255,0.055)');
+      clipGradient.addColorStop(0.5, recording ? 'rgba(251, 191, 36, 0.1)' : selected ? 'rgba(56, 189, 248, 0.08)' : 'rgba(255,255,255,0.025)');
       clipGradient.addColorStop(1, 'rgba(0,0,0,0)');
       context.fillStyle = clipGradient;
       context.fillRect(0, 0, width, height);
@@ -8095,10 +8401,10 @@ function WaveformTrackCanvas({
       context.stroke();
 
       if (displayPeaks.length && duration > 0) {
-        context.strokeStyle = muted ? 'rgba(148, 163, 184, 0.4)' : color;
-        context.lineWidth = selected ? Math.max(1.4, 1.4 * ratio) : Math.max(1, ratio);
-        context.shadowColor = muted ? 'transparent' : color;
-        context.shadowBlur = selected ? 6 * ratio : 2 * ratio;
+        context.strokeStyle = recording ? '#f97316' : muted ? 'rgba(148, 163, 184, 0.4)' : color;
+        context.lineWidth = recording ? Math.max(1.5, 1.5 * ratio) : selected ? Math.max(1.4, 1.4 * ratio) : Math.max(1, ratio);
+        context.shadowColor = recording ? 'rgba(249, 115, 22, 0.78)' : muted ? 'transparent' : color;
+        context.shadowBlur = recording ? 9 * ratio : selected ? 6 * ratio : 2 * ratio;
         context.beginPath();
         const step = displayPeaks.length > 1 ? width / (displayPeaks.length - 1) : width;
         displayPeaks.forEach((peak, index) => {
@@ -8184,6 +8490,16 @@ function WaveformTrackCanvas({
           context.fillText(`静音 ${mutedRects.length}`, 8 * ratio, height - 8 * ratio);
         }
       }
+      if (recording) {
+        context.fillStyle = 'rgba(255,255,255,0.92)';
+        context.font = `${Math.max(9, 10 * ratio)}px sans-serif`;
+        context.textAlign = 'left';
+        context.fillText('REC', 8 * ratio, 13 * ratio);
+        context.fillStyle = '#fb7185';
+        context.beginPath();
+        context.arc(32 * ratio, 9 * ratio, 3.5 * ratio, 0, Math.PI * 2);
+        context.fill();
+      }
 
       const playheadX = (Math.min(duration, Math.max(0, currentTime)) / duration) * width;
       context.strokeStyle = 'rgba(255,255,255,0.58)';
@@ -8207,7 +8523,7 @@ function WaveformTrackCanvas({
     const observer = new ResizeObserver(draw);
     observer.observe(canvas);
     return () => observer.disconnect();
-  }, [clips, color, currentTime, displayPeaks, duration, muted, mutedRanges, selected, snapEnabled, snapStepSeconds, trimEnd, trimStart]);
+  }, [clips, color, currentTime, displayPeaks, duration, muted, mutedRanges, recording, selected, snapEnabled, snapStepSeconds, trimEnd, trimStart]);
 
   const handlePointerDown = useCallback((event: PointerEvent<HTMLCanvasElement>) => {
     if (duration <= 0) return;
@@ -8400,7 +8716,7 @@ function WaveformTrackCanvas({
             setPointerGuide(null);
           }
         }}
-        style={waveformCanvasStyle(selected, muted, editable, compact)}
+        style={waveformCanvasStyle(selected, muted, editable, compact, recording)}
       />
       {duration > 0 && (
         <>
@@ -8433,17 +8749,19 @@ const waveformCanvasWrapStyle: CSSProperties = {
   WebkitTouchCallout: 'none',
 };
 
-function waveformCanvasStyle(selected: boolean, muted: boolean, editable: boolean, compact: boolean): CSSProperties {
+function waveformCanvasStyle(selected: boolean, muted: boolean, editable: boolean, compact: boolean, recording = false): CSSProperties {
   return {
     width: '100%',
     height: selected
       ? compact ? 56 : 66
       : compact ? 36 : 46,
     borderRadius: 4,
-    border: selected ? '1px solid rgba(216, 201, 255, 0.92)' : '1px solid rgba(55, 61, 83, 0.82)',
-    background: 'linear-gradient(180deg, #111827, #080c15)',
+    border: recording ? '1px solid rgba(251, 113, 133, 0.92)' : selected ? '1px solid rgba(216, 201, 255, 0.92)' : '1px solid rgba(55, 61, 83, 0.82)',
+    background: recording ? 'linear-gradient(180deg, #241317, #090b12)' : 'linear-gradient(180deg, #111827, #080c15)',
     boxShadow: selected
-      ? 'inset 0 0 0 1px rgba(206, 255, 53, 0.18), 0 0 0 1px rgba(82, 214, 198, 0.18)'
+      ? recording
+        ? 'inset 0 0 0 1px rgba(251, 113, 133, 0.22), 0 0 22px rgba(248, 113, 113, 0.16)'
+        : 'inset 0 0 0 1px rgba(206, 255, 53, 0.18), 0 0 0 1px rgba(82, 214, 198, 0.18)'
       : 'inset 0 1px 0 rgba(255,255,255,0.035)',
     cursor: editable ? 'ew-resize' : 'default',
     opacity: muted ? 0.72 : 1,
