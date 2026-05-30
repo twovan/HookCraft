@@ -2726,7 +2726,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     }
 
     const label = getStemDisplayName(selectedTrack).zh;
-    if (typeof window !== 'undefined' && !window.confirm(`确定删除“${label}”吗？删除后可通过“上一步”恢复。`)) {
+    if (typeof window !== 'undefined' && !window.confirm(`确定删除整条轨道“${label}”吗？删除后可通过“上一步”恢复。`)) {
       return;
     }
 
@@ -3013,9 +3013,14 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       return;
     }
 
+    const label = getStemDisplayName(selectedTrack).zh;
+    if (typeof window !== 'undefined' && !window.confirm(`确定删除“${label}”在 ${formatStemTimecode(currentTime)} 的片段吗？删除后可通过“上一步”恢复。`)) {
+      return;
+    }
+
     setTrackClips(selectedTrack.type, removeStemClipAtTime(clipState.clips, currentTime));
     setPlaybackError(null);
-    setSaveStatus(`已删除“${getStemDisplayName(selectedTrack).zh}”在 ${formatStemTimecode(currentTime)} 的片段。`);
+    setSaveStatus(`已删除“${label}”在 ${formatStemTimecode(currentTime)} 的片段。`);
   }, [currentTime, duration, selectedTrack, selectedTrackState, setTrackClips]);
 
   const moveTrackClip = useCallback((type: string, clipId: string, nextStart: number, shouldSnap = snapToGrid, historyMode: StemHistoryMode = 'immediate') => {
