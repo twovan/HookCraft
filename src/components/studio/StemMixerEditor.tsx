@@ -73,6 +73,7 @@ import {
   moveStemClip,
   normalizeStemClipState,
   removeStemClipAtTime,
+  resolveStemClipDragTarget,
   splitStemClipAtTime,
   type StemClip,
 } from '@/lib/stems/stemClips';
@@ -3025,18 +3026,29 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   }, [currentTime, duration, selectedTrack, selectedTrackState, setTrackClips]);
 
   const moveTrackClip = useCallback((type: string, clipId: string, nextStart: number, shouldSnap = snapToGrid, historyMode: StemHistoryMode = 'immediate') => {
+    const stateBeforeMove = tracks[type] || defaultTrackState();
+    const clipStateBeforeMove = resolveTrackClipState(stateBeforeMove, duration);
+    const movingClip = clipStateBeforeMove.clips.find((clip) => clip.id === clipId);
+    const snappedStart = snapStemEditorTime(nextStart, duration, shouldSnap, snapStepSeconds);
+    const nextDuration = movingClip
+      ? Math.max(duration, snappedStart + getStemClipDuration(movingClip))
+      : duration;
+    if (nextDuration > duration) {
+      setDuration(Number(nextDuration.toFixed(3)));
+    }
+
     commitTrackChange((current) => {
       const state = current[type] || defaultTrackState();
-      const clipState = resolveTrackClipState(state, duration);
+      const clipState = resolveTrackClipState(state, nextDuration);
       const movedClips = moveStemClip(
         clipState.clips,
         clipId,
-        snapStemEditorTime(nextStart, duration, shouldSnap, snapStepSeconds),
-        duration,
+        snappedStart,
+        nextDuration,
       );
       const nextClipState = normalizeStemClipState({
         clips: movedClips,
-        duration,
+        duration: nextDuration,
         trimStart: state.trimStart,
         trimEnd: state.trimEnd,
       });
@@ -3054,7 +3066,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         },
       };
     }, historyMode);
-  }, [commitTrackChange, duration, snapStepSeconds, snapToGrid]);
+  }, [commitTrackChange, duration, snapStepSeconds, snapToGrid, tracks]);
 
   const resolveTimelineRulerPointer = useCallback((event: PointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -8837,7 +8849,7 @@ function WaveformTrackCanvas({
   const pendingSeekRef = useRef<{ x: number; time: number; moved: boolean; mode: 'click' | 'playhead' } | null>(null);
   const trimDragRef = useRef<{ edge: 'start' | 'end'; moved: boolean } | null>(null);
   const trimRangeDragRef = useRef<{ anchorTime: number; trimStart: number; trimEnd: number; moved: boolean } | null>(null);
-  const clipDragRef = useRef<{ clipId: string; anchorTime: number; clipStart: number; moved: boolean } | null>(null);
+  const clipDragRef = useRef<{ clipId: string; anchorTime: number; clipStart: number; pointerX: number; moved: boolean } | null>(null);
   const pendingTrimRef = useRef<{ time: number; shouldSnap: boolean } | null>(null);
   const pendingSeekTimeRef = useRef<{ time: number; shouldSnap: boolean } | null>(null);
   const trimFrameRef = useRef<number | null>(null);
@@ -9203,12 +9215,13 @@ function WaveformTrackCanvas({
       updatePointerGuide(event, intent.edge === 'start' ? '入点' : '出点', true);
     } else {
       const { time } = interactionTimeFromPointer(event);
-      const targetClip = clips.length > 1 ? findStemClipAtTime(clips, time) : null;
+      const targetClip = resolveStemClipDragTarget(clips, time);
       if (targetClip) {
         clipDragRef.current = {
           clipId: targetClip.id,
           anchorTime: time,
           clipStart: targetClip.start,
+          pointerX: event.clientX,
           moved: false,
         };
         trimDragRef.current = null;
@@ -9270,6 +9283,10 @@ function WaveformTrackCanvas({
     }
 
     if (clipDragRef.current) {
+      if (!clipDragRef.current.moved && Math.abs(event.clientX - clipDragRef.current.pointerX) < 4) {
+        updatePointerGuide(event, '移动片段', true);
+        return;
+      }
       clipDragRef.current.moved = true;
       const { time, shouldSnap } = interactionTimeFromPointer(event);
       onClipMove(clipDragRef.current.clipId, clipDragRef.current.clipStart + time - clipDragRef.current.anchorTime, shouldSnap, 'preview');
@@ -9330,7 +9347,11 @@ function WaveformTrackCanvas({
 
     if (clipDragRef.current) {
       const { time, shouldSnap } = interactionTimeFromPointer(event);
-      onClipMove(clipDragRef.current.clipId, clipDragRef.current.clipStart + time - clipDragRef.current.anchorTime, shouldSnap, 'commit');
+      if (clipDragRef.current.moved) {
+        onClipMove(clipDragRef.current.clipId, clipDragRef.current.clipStart + time - clipDragRef.current.anchorTime, shouldSnap, 'commit');
+      } else {
+        onSeek(time, shouldSnap);
+      }
       clipDragRef.current = null;
       pendingSeekRef.current = null;
       updatePointerGuide(event, '移动片段', false);
@@ -9415,7 +9436,7 @@ function waveformCanvasStyle(selected: boolean, muted: boolean, editable: boolea
         ? 'inset 0 0 0 1px rgba(251, 113, 133, 0.22), 0 0 22px rgba(248, 113, 113, 0.16)'
         : 'inset 0 0 0 1px rgba(206, 255, 53, 0.18), 0 0 0 1px rgba(82, 214, 198, 0.18)'
       : 'inset 0 1px 0 rgba(255,255,255,0.035)',
-    cursor: editable ? 'ew-resize' : 'default',
+    cursor: editable ? 'grab' : 'default',
     opacity: muted ? 0.72 : 1,
     touchAction: 'none',
     userSelect: 'none',

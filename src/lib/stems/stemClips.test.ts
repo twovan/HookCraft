@@ -5,6 +5,7 @@ import {
   normalizeStemClipState,
   normalizeStemClips,
   removeStemClipAtTime,
+  resolveStemClipDragTarget,
   splitStemClipAtTime,
 } from './stemClips';
 
@@ -42,6 +43,23 @@ describe('stem clips', () => {
       sourceStart: 35,
       sourceEnd: 70,
     });
+  });
+
+  it('allows dragging a single full-length clip later in the timeline', () => {
+    const clips = normalizeStemClips(null, 120, 0, 120);
+    const moved = moveStemClip(clips, clips[0].id, 30, 150);
+
+    expect(moved[0]).toMatchObject({
+      start: 30,
+      sourceStart: 0,
+      sourceEnd: 120,
+    });
+  });
+
+  it('selects a single clip as a drag target', () => {
+    const clips = normalizeStemClips(null, 120, 0, 120);
+
+    expect(resolveStemClipDragTarget(clips, 42)?.id).toBe(clips[0].id);
   });
 
   it('finds a clip by timeline position', () => {

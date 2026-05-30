@@ -139,3 +139,7 @@ export function moveStemClip(clips: StemClip[], clipId: string, nextStart: numbe
 export function findStemClipAtTime(clips: StemClip[], time: number) {
   return clips.find((clip) => time >= clip.start && time <= clip.start + getStemClipDuration(clip)) || null;
 }
+
+export function resolveStemClipDragTarget(clips: StemClip[], time: number) {
+  return findStemClipAtTime(clips, time);
+}
