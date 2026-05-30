@@ -8889,29 +8889,13 @@ function WaveformTrackCanvas({
         context.fill();
       }
 
-      const playheadX = (Math.min(duration, Math.max(0, currentTime)) / duration) * width;
-      context.strokeStyle = 'rgba(255,255,255,0.58)';
-      context.lineWidth = Math.max(1, ratio);
-      context.beginPath();
-      context.moveTo(playheadX, 0);
-      context.lineTo(playheadX, height);
-      context.stroke();
-      if (selected) {
-        context.fillStyle = 'rgba(255,255,255,0.96)';
-        context.beginPath();
-        context.arc(playheadX, 8 * ratio, 4.5 * ratio, 0, Math.PI * 2);
-        context.fill();
-        context.strokeStyle = 'rgba(206, 255, 53, 0.9)';
-        context.lineWidth = Math.max(1, ratio);
-        context.stroke();
-      }
     };
 
     draw();
     const observer = new ResizeObserver(draw);
     observer.observe(canvas);
     return () => observer.disconnect();
-  }, [clips, color, currentTime, displayPeaks, duration, muted, mutedRanges, recording, selected, snapEnabled, snapStepSeconds, trackLabel, trimEnd, trimStart]);
+  }, [clips, color, displayPeaks, duration, muted, mutedRanges, recording, selected, snapEnabled, snapStepSeconds, trackLabel, trimEnd, trimStart]);
 
   const handlePointerDown = useCallback((event: PointerEvent<HTMLCanvasElement>) => {
     if (duration <= 0) return;
