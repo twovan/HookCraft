@@ -4934,6 +4934,17 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
             </div>
           );
         })}
+        <div style={timelineAddTrackRowStyle(timelineMinWidth)} data-timeline-pan-zone="true">
+          <button
+            type="button"
+            aria-label="添加轨道"
+            title="添加轨道"
+            style={trackAddIconButtonStyle}
+            onClick={() => openAddTrackPanel('import')}
+          >
+            +
+          </button>
+        </div>
         {visibleStems.length === 0 && (
           <div style={emptyTrackNoticeStyle}>
             当前筛选下没有可显示的轨道，可以切回“全部”查看完整分轨列表。
@@ -6397,6 +6408,32 @@ const emptyTrackNoticeStyle: CSSProperties = {
   padding: '18px 14px',
   fontSize: 12,
   textAlign: 'center',
+};
+
+function timelineAddTrackRowStyle(minWidth: number): CSSProperties {
+  return {
+    minWidth,
+    minHeight: 56,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    border: '1px dashed rgba(206, 255, 53, 0.3)',
+    background: 'linear-gradient(90deg, rgba(206, 255, 53, 0.07), rgba(12, 16, 27, 0.74))',
+  };
+}
+
+const trackAddIconButtonStyle: CSSProperties = {
+  ...editorButtonChromeStyle({ tone: 'primary', compact: true, round: true }),
+  width: 34,
+  height: 34,
+  minWidth: 34,
+  minHeight: 34,
+  borderRadius: 999,
+  padding: 0,
+  fontSize: 24,
+  fontWeight: 900,
+  lineHeight: 1,
 };
 
 function timelineToolbarStyle(minWidth: number): CSSProperties {
