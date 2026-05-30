@@ -644,7 +644,7 @@ export default function AdvancedArrangementTab({
               fontSize: 15,
               fontWeight: 700,
               cursor: canGenerate ? 'pointer' : 'not-allowed',
-              fontFamily: "'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif",
+              fontFamily: 'var(--hc-font)',
               boxShadow: canGenerate ? '0 4px 20px rgba(206, 255, 53, 0.22)' : 'none',
               transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
               display: 'flex',

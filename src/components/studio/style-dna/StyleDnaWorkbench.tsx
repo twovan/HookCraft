@@ -469,7 +469,7 @@ export default function StyleDnaWorkbench({ variant = 'studio' }: { variant?: 's
             var(--hc-bg);
           color: var(--hc-text);
           padding: 28px;
-          font-family: var(--hc-font, Inter, sans-serif);
+          font-family: var(--hc-font);
         }
         .style-dna-header {
           display: flex;

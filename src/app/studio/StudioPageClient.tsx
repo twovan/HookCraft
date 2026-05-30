@@ -513,7 +513,7 @@ export default function StudioPageClient({
                 style={{
                   background: 'none', border: 'none', padding: 0,
                   color: 'var(--hc-text-muted)', fontSize: 12, cursor: 'pointer',
-                  textDecoration: 'underline', fontFamily: "'Inter', sans-serif",
+                  textDecoration: 'underline', fontFamily: 'var(--hc-font)',
                   transition: 'color 0.2s',
                 }}
                 onMouseEnter={e => e.currentTarget.style.color = '#ceff35'}
@@ -705,7 +705,7 @@ export default function StudioPageClient({
               <div>
                 <h3 style={{
                   fontSize: 18, fontWeight: 600, color: '#e8e8f0', marginBottom: 20,
-                  fontFamily: "'Inter', sans-serif", textAlign: 'center',
+                  fontFamily: 'var(--hc-font)', textAlign: 'center',
                 }}>生成完成 · {versions.filter(v => v.status === 'completed').length} 个版本</h3>
 
                 {versions.filter(v => v.status === 'completed').length === 0 && versions.some(v => v.status === 'safety_blocked') && (
@@ -751,7 +751,7 @@ export default function StudioPageClient({
                       padding: '14px 32px', borderRadius: 24,
                       border: '1px solid rgba(206, 255, 53, 0.34)', background: 'transparent', color: '#ceff35',
                       fontSize: 15, fontWeight: 600, cursor: 'pointer',
-                      fontFamily: "'Inter', sans-serif",
+                      fontFamily: 'var(--hc-font)',
                     }}
                   >
                     继续创作
