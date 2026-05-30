@@ -8763,29 +8763,33 @@ function WaveformTrackCanvas({
 
       const handleColor = selected ? '#e7f8ff' : colorWithAlpha(baseColor, 0.52);
       const handleWidth = selected ? 4 * ratio : 3 * ratio;
+      const startHandleX = Math.max(0, Math.min(width - handleWidth, startX));
+      const endHandleX = Math.max(0, Math.min(width - handleWidth, endX - handleWidth));
+      const startLineX = startHandleX;
+      const endLineX = endHandleX + handleWidth;
       context.strokeStyle = handleColor;
       context.lineWidth = Math.max(1, ratio);
       context.beginPath();
-      context.moveTo(startX, 0);
-      context.lineTo(startX, height);
-      context.moveTo(endX, 0);
-      context.lineTo(endX, height);
+      context.moveTo(startLineX, 0);
+      context.lineTo(startLineX, height);
+      context.moveTo(endLineX, 0);
+      context.lineTo(endLineX, height);
       context.stroke();
 
       context.fillStyle = handleColor;
-      context.fillRect(startX - handleWidth / 2, 0, handleWidth, height);
-      context.fillRect(endX - handleWidth / 2, 0, handleWidth, height);
+      context.fillRect(startHandleX, 0, handleWidth, height);
+      context.fillRect(endHandleX, 0, handleWidth, height);
       if (selected) {
         context.fillStyle = 'rgba(206, 255, 53, 0.88)';
-        context.fillRect(startX - 0.5 * ratio, 8 * ratio, ratio, height - 16 * ratio);
+        context.fillRect(startHandleX + handleWidth - ratio, 8 * ratio, ratio, height - 16 * ratio);
         context.fillStyle = 'rgba(34, 211, 238, 0.9)';
-        context.fillRect(endX - 0.5 * ratio, 8 * ratio, ratio, height - 16 * ratio);
+        context.fillRect(endHandleX, 8 * ratio, ratio, height - 16 * ratio);
 
         context.fillStyle = 'rgba(255,255,255,0.78)';
         context.font = `${Math.max(9, 10 * ratio)}px sans-serif`;
         context.textAlign = 'center';
-        context.fillText('入', Math.max(10 * ratio, Math.min(width - 10 * ratio, startX)), 12 * ratio);
-        context.fillText('出', Math.max(10 * ratio, Math.min(width - 10 * ratio, endX)), height - 6 * ratio);
+        context.fillText('入', Math.max(12 * ratio, Math.min(width - 12 * ratio, startHandleX + handleWidth)), 12 * ratio);
+        context.fillText('出', Math.max(12 * ratio, Math.min(width - 12 * ratio, endHandleX)), height - 6 * ratio);
         if (mutedRects.length > 0) {
           context.fillStyle = 'rgba(255,255,255,0.88)';
           context.textAlign = 'left';
@@ -9091,13 +9095,9 @@ function waveformTrimHandleStyle(time: number, duration: number, selected: boole
     width: selected ? 5 : 3,
     borderRadius: 999,
     border: selected ? '1px solid rgba(255,255,255,0.72)' : '1px solid rgba(206, 255, 53, 0.36)',
-    background: selected
-      ? edge === 'start'
-        ? 'linear-gradient(180deg, #f7ffd0, #b9ff2f)'
-        : 'linear-gradient(180deg, #ecfeff, #20c7dc)'
-      : 'rgba(206, 255, 53, 0.42)',
+    background: selected ? 'linear-gradient(180deg, #f7ffd0, #b9ff2f)' : 'rgba(206, 255, 53, 0.42)',
     boxShadow: selected
-      ? '0 0 0 2px rgba(6, 10, 18, 0.78), 0 0 12px rgba(82, 214, 198, 0.24)'
+      ? '0 0 0 2px rgba(6, 10, 18, 0.78), 0 0 12px rgba(206, 255, 53, 0.26)'
       : '0 0 8px rgba(206, 255, 53, 0.12)',
     pointerEvents: 'none',
   };
