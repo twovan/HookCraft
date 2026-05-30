@@ -8405,11 +8405,17 @@ const trackHeaderSwitchesStyle: CSSProperties = {
 function trackCollapseButtonStyle(active: boolean): CSSProperties {
   return {
     ...editorButtonChromeStyle({ tone: active ? 'info' : 'neutral', compact: true, round: true, active }),
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     width: 24,
+    height: 24,
     minWidth: 24,
     minHeight: 24,
     padding: 0,
     color: active ? '#081018' : '#f8fafc',
+    lineHeight: 0,
+    verticalAlign: 'middle',
   };
 }
 
