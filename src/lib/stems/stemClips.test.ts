@@ -6,6 +6,7 @@ import {
   normalizeStemClips,
   removeStemClipAtTime,
   resolveStemClipDragTarget,
+  sliceStemClipPeaks,
   splitStemClipAtTime,
 } from './stemClips';
 
@@ -43,6 +44,17 @@ describe('stem clips', () => {
       sourceStart: 35,
       sourceEnd: 70,
     });
+  });
+
+  it('slices waveform peaks by a clip source range', () => {
+    const peaks = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8];
+
+    expect(sliceStemClipPeaks({
+      id: 'clip-a',
+      start: 40,
+      sourceStart: 20,
+      sourceEnd: 60,
+    }, 80, peaks)).toEqual([0.3, 0.4, 0.5, 0.6]);
   });
 
   it('allows dragging a single full-length clip later in the timeline', () => {

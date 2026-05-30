@@ -74,6 +74,7 @@ import {
   normalizeStemClipState,
   removeStemClipAtTime,
   resolveStemClipDragTarget,
+  sliceStemClipPeaks,
   splitStemClipAtTime,
   type StemClip,
 } from '@/lib/stems/stemClips';
@@ -5763,13 +5764,13 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                 setSelectedTrackType(stem.type);
               }}
               style={{
-                ...stemTrackStyle(isAudible, state.solo, showAdvancedControls, isSelectedTrack, timelineGridColumns, timelineMinWidth, trackDensity, isTrackCollapsed),
+                ...stemTrackStyle(isAudible, state.solo, showAdvancedControls, isSelectedTrack, stemColorForType(stem.type), timelineGridColumns, timelineMinWidth, trackDensity, isTrackCollapsed),
                 ...(reorderingTrackType === stem.type ? activeTrackReorderStyle : {}),
               }}
             >
               <div
                 className="stem-track-header"
-                style={stemNameStyle(isSelectedTrack, isAudible, reorderingTrackType === stem.type, isTrackCollapsed)}
+                style={stemNameStyle(isSelectedTrack, isAudible, stemColorForType(stem.type), reorderingTrackType === stem.type, isTrackCollapsed)}
                 data-timeline-pan-zone="true"
                 title="点击选择轨道"
               >
@@ -5876,12 +5877,17 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                     <label style={trackHeaderVolumeStyle}>
                       <span>Vol</span>
                       <input
+                        className="stem-track-volume-range"
                         aria-label={`${stem.label} 音量`}
                         type="range"
                         min={0}
                         max={1}
                         step={0.01}
                         value={state.volume}
+                        style={{
+                          '--stem-track-color': stemColorForType(stem.type),
+                          '--stem-track-fill': `${state.volume * 100}%`,
+                        } as CSSProperties}
                         onFocus={beginContinuousControlEdit}
                         onPointerDown={beginContinuousControlEdit}
                         onPointerUp={finishContinuousControlEdit}
@@ -5900,6 +5906,10 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                         max={1}
                         step={0.01}
                         value={state.pan}
+                        style={{
+                          '--stem-track-color': stemColorForType(stem.type),
+                          '--stem-track-fill': `${((state.pan + 1) / 2) * 100}%`,
+                        } as CSSProperties}
                         onFocus={beginContinuousControlEdit}
                         onPointerDown={beginContinuousControlEdit}
                         onPointerUp={finishContinuousControlEdit}
@@ -6122,54 +6132,60 @@ const timelineScrollbarCss = `
     transform: translateY(1px);
   }
 
+  #stem-editor-timeline .stem-track-volume-range,
   #stem-editor-timeline .stem-track-pan-range {
-    height: 14px;
+    height: 12px;
     cursor: pointer;
-    accent-color: #1493ff;
+    accent-color: var(--stem-track-color, #1493ff);
     -webkit-appearance: none;
     appearance: none;
     background: transparent;
   }
 
+  #stem-editor-timeline .stem-track-volume-range::-webkit-slider-runnable-track,
   #stem-editor-timeline .stem-track-pan-range::-webkit-slider-runnable-track {
-    height: 4px;
+    height: 3px;
     border-radius: 999px;
-    background: linear-gradient(90deg, #148bff 0%, #148bff 50%, rgba(255, 255, 255, 0.9) 50%, rgba(255, 255, 255, 0.9) 100%);
+    background: linear-gradient(90deg, var(--stem-track-color, #148bff) 0%, var(--stem-track-color, #148bff) var(--stem-track-fill, 50%), rgba(255, 255, 255, 0.84) var(--stem-track-fill, 50%), rgba(255, 255, 255, 0.84) 100%);
     box-shadow: inset 0 0 0 1px rgba(6, 12, 24, 0.22);
   }
 
+  #stem-editor-timeline .stem-track-volume-range::-webkit-slider-thumb,
   #stem-editor-timeline .stem-track-pan-range::-webkit-slider-thumb {
-    width: 14px;
-    height: 14px;
-    margin-top: -5px;
+    width: 11px;
+    height: 11px;
+    margin-top: -4px;
     border: 0;
     border-radius: 999px;
-    background: #0f8cff;
-    box-shadow: 0 0 0 1px rgba(2, 8, 20, 0.5), 0 4px 10px rgba(15, 140, 255, 0.28);
+    background: var(--stem-track-color, #0f8cff);
+    box-shadow: 0 0 0 1px rgba(2, 8, 20, 0.55), 0 3px 8px color-mix(in srgb, var(--stem-track-color, #0f8cff) 36%, transparent);
     -webkit-appearance: none;
     appearance: none;
   }
 
+  #stem-editor-timeline .stem-track-volume-range::-moz-range-track,
   #stem-editor-timeline .stem-track-pan-range::-moz-range-track {
-    height: 4px;
+    height: 3px;
     border: 0;
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 0.84);
   }
 
+  #stem-editor-timeline .stem-track-volume-range::-moz-range-progress,
   #stem-editor-timeline .stem-track-pan-range::-moz-range-progress {
-    height: 4px;
+    height: 3px;
     border-radius: 999px;
-    background: #148bff;
+    background: var(--stem-track-color, #148bff);
   }
 
+  #stem-editor-timeline .stem-track-volume-range::-moz-range-thumb,
   #stem-editor-timeline .stem-track-pan-range::-moz-range-thumb {
-    width: 14px;
-    height: 14px;
+    width: 11px;
+    height: 11px;
     border: 0;
     border-radius: 999px;
-    background: #0f8cff;
-    box-shadow: 0 0 0 1px rgba(2, 8, 20, 0.5), 0 4px 10px rgba(15, 140, 255, 0.28);
+    background: var(--stem-track-color, #0f8cff);
+    box-shadow: 0 0 0 1px rgba(2, 8, 20, 0.55), 0 3px 8px rgba(15, 140, 255, 0.2);
   }
 
   #stem-editor-timeline .stem-track-header::before {
@@ -8336,16 +8352,14 @@ function stemTrackStyle(
   solo: boolean,
   advanced: boolean,
   selectedTrack: boolean,
+  trackColor: string,
   gridColumns: string,
   minWidth: number,
   trackDensity: TrackDensity,
   collapsed: boolean,
 ): CSSProperties {
-  const accent = selectedTrack
-    ? 'rgba(206, 255, 53, 0.12)'
-    : solo
-      ? 'rgba(206, 255, 53, 0.1)'
-      : 'rgba(16, 19, 33, 0.96)';
+  const selectionWash = colorWithAlpha(trackColor, 0.16);
+  const selectionEdge = colorWithAlpha(trackColor, 0.72);
   const compact = trackDensity === 'compact';
   const rowHeight = resolveDawTrackHeight({ advanced, density: trackDensity, selected: selectedTrack });
   const collapsedHeight = compact ? 48 : 56;
@@ -8361,16 +8375,16 @@ function stemTrackStyle(
     minHeight: collapsed ? collapsedHeight : Math.max(rowHeight, openHeight),
     borderRadius: 8,
     border: selectedTrack
-      ? '1px solid rgba(206, 255, 53, 0.46)'
+      ? `1px solid ${colorWithAlpha(trackColor, 0.58)}`
       : solo
         ? '1px solid rgba(206, 255, 53, 0.42)'
-        : '1px solid rgba(38, 42, 64, 0.68)',
+        : '1px solid rgba(25, 30, 46, 0.92)',
     background: `
-      linear-gradient(90deg, ${accent}, rgba(16, 19, 33, 0.92) 18%, rgba(8, 12, 21, 0.9)),
-      linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0))
+      linear-gradient(90deg, ${selectedTrack ? selectionWash : 'rgba(4, 7, 12, 0.98)'}, rgba(7, 10, 17, 0.96) 26%, rgba(3, 6, 11, 0.98)),
+      linear-gradient(180deg, rgba(255,255,255,0.026), rgba(255,255,255,0))
     `,
     boxShadow: selectedTrack
-      ? 'inset 0 0 0 1px rgba(206, 255, 53, 0.28)'
+      ? `inset 0 0 0 1px ${colorWithAlpha(trackColor, 0.24)}, inset 3px 0 0 ${selectionEdge}`
       : solo
         ? 'inset 3px 0 0 rgba(206, 255, 53, 0.58)'
         : 'none',
@@ -8390,7 +8404,7 @@ const activeTrackReorderStyle: CSSProperties = {
   opacity: 1,
 };
 
-function stemNameStyle(selectedTrack: boolean, audible: boolean, reordering = false, collapsed = false): CSSProperties {
+function stemNameStyle(selectedTrack: boolean, audible: boolean, trackColor: string, reordering = false, collapsed = false): CSSProperties {
   return {
     position: 'sticky',
     left: 0,
@@ -8406,11 +8420,11 @@ function stemNameStyle(selectedTrack: boolean, audible: boolean, reordering = fa
     padding: collapsed ? '5px 9px' : '7px 9px',
     borderRadius: 0,
     border: 'none',
-    borderRight: selectedTrack ? '1px solid rgba(192, 132, 252, 0.42)' : '1px solid rgba(255, 255, 255, 0.06)',
+    borderRight: selectedTrack ? `1px solid ${colorWithAlpha(trackColor, 0.42)}` : '1px solid rgba(255, 255, 255, 0.055)',
     background: selectedTrack
-      ? 'linear-gradient(90deg, rgba(26, 20, 34, 0.98), rgba(15, 18, 24, 0.98))'
-      : 'linear-gradient(90deg, rgba(18, 22, 28, 0.98), rgba(13, 17, 22, 0.96))',
-    boxShadow: selectedTrack ? 'inset 3px 0 0 #a855f7' : 'none',
+      ? `linear-gradient(90deg, ${colorWithAlpha(trackColor, 0.18)}, rgba(12, 15, 21, 0.98))`
+      : 'linear-gradient(90deg, rgba(10, 14, 19, 0.99), rgba(8, 11, 16, 0.98))',
+    boxShadow: selectedTrack ? `inset 3px 0 0 ${trackColor}` : 'none',
     overflow: 'visible',
     opacity: audible ? 1 : 0.8,
     cursor: reordering ? 'grabbing' : 'grab',
@@ -8964,8 +8978,11 @@ function WaveformTrackCanvas({
       if (!context) return;
 
       const baseColor = recording ? '#f97316' : color;
-      const backgroundColor = recording ? '#1f1116' : colorWithAlpha(baseColor, 0.22);
-      const laneGlowColor = colorWithAlpha(baseColor, selected ? 0.34 : 0.22);
+      const backgroundColor = recording
+        ? 'rgba(31, 17, 22, 0.96)'
+        : selected
+          ? colorWithAlpha(baseColor, 0.12)
+          : 'rgba(5, 8, 14, 0.98)';
       const waveformColor = recording
         ? '#f97316'
         : muted
@@ -8975,29 +8992,10 @@ function WaveformTrackCanvas({
       context.fillStyle = backgroundColor;
       context.fillRect(0, 0, width, height);
 
-      const clipGradient = context.createLinearGradient(0, 0, 0, height);
-      clipGradient.addColorStop(0, colorWithAlpha(baseColor, recording ? 0.28 : selected ? 0.26 : 0.18));
-      clipGradient.addColorStop(0.5, colorWithAlpha(baseColor, recording ? 0.13 : 0.1));
-      clipGradient.addColorStop(1, 'rgba(0,0,0,0)');
-      context.fillStyle = clipGradient;
-      context.fillRect(0, 0, width, height);
-
-      const takeBarHeight = selected ? 18 * ratio : 15 * ratio;
-      const takeGradient = context.createLinearGradient(0, 0, width, 0);
-      takeGradient.addColorStop(0, colorWithAlpha(baseColor, recording ? 0.92 : 0.88));
-      takeGradient.addColorStop(0.72, colorWithAlpha(baseColor, recording ? 0.76 : 0.68));
-      takeGradient.addColorStop(1, colorWithAlpha(baseColor, recording ? 0.5 : 0.42));
-      context.fillStyle = takeGradient;
-      context.fillRect(0, 0, width, takeBarHeight);
-      context.fillStyle = '#fff7ff';
-      context.font = `${Math.max(8, 9 * ratio)}px sans-serif`;
-      context.textAlign = 'left';
-      context.fillText(`♛ Takes   ${trackLabel}`, 7 * ratio, Math.max(10 * ratio, takeBarHeight - 5 * ratio));
-
       const gridStep = snapEnabled && duration > 0
         ? Math.max((normalizeTimelineSnapStep(snapStepSeconds) / duration) * width, 18 * ratio)
         : Math.max(24 * ratio, width / 10);
-      const gridOpacity = snapEnabled ? 0.075 : 0.045;
+      const gridOpacity = selected ? 0.09 : snapEnabled ? 0.064 : 0.04;
       context.strokeStyle = `rgba(255,255,255,${gridOpacity})`;
       context.lineWidth = Math.max(1, ratio);
       context.beginPath();
@@ -9024,71 +9022,6 @@ function WaveformTrackCanvas({
       context.lineTo(width, centerY);
       context.stroke();
 
-      if (displayPeaks.length && duration > 0) {
-        const step = displayPeaks.length > 1 ? width / (displayPeaks.length - 1) : width;
-        const usableHeight = Math.max(1, height - takeBarHeight - 2 * ratio);
-        const waveformCenterY = takeBarHeight + usableHeight / 2;
-        const waveformScale = usableHeight * (recording ? 0.5 : 0.49);
-        const visualPeakMax = Math.max(0.08, ...displayPeaks);
-        const smoothedPeaks = displayPeaks.map((peak, index) => {
-          const previous = displayPeaks[Math.max(0, index - 1)] ?? peak;
-          const next = displayPeaks[Math.min(displayPeaks.length - 1, index + 1)] ?? peak;
-          const normalizedPeak = Math.min(1, (previous * 0.18 + peak * 0.64 + next * 0.18) / visualPeakMax);
-          const boostedPeak = Math.pow(normalizedPeak, 0.68) * 1.08;
-          return Math.max(0.045, Math.min(1, boostedPeak));
-        });
-
-        const waveformFill = context.createLinearGradient(0, takeBarHeight, 0, height);
-        waveformFill.addColorStop(0, muted ? colorWithAlpha(baseColor, 0.46) : colorWithAlpha(waveformColor, recording ? 0.94 : 0.96));
-        waveformFill.addColorStop(0.5, muted ? colorWithAlpha(baseColor, 0.36) : colorWithAlpha(waveformColor, recording ? 0.9 : 0.88));
-        waveformFill.addColorStop(1, muted ? colorWithAlpha(baseColor, 0.28) : colorWithAlpha(waveformColor, recording ? 0.72 : 0.7));
-
-        context.save();
-        context.shadowColor = recording ? 'rgba(249, 115, 22, 0.68)' : muted ? 'transparent' : colorWithAlpha(baseColor, selected ? 0.48 : 0.3);
-        context.shadowBlur = recording ? 8 * ratio : selected ? 5 * ratio : 2 * ratio;
-        context.fillStyle = waveformFill;
-        context.beginPath();
-        smoothedPeaks.forEach((peak, index) => {
-          const x = index * step;
-          const y = Math.min(waveformScale, peak * waveformScale);
-          const topY = waveformCenterY - y;
-          if (index === 0) {
-            context.moveTo(x, topY);
-          } else {
-            context.lineTo(x, topY);
-          }
-        });
-        for (let index = smoothedPeaks.length - 1; index >= 0; index -= 1) {
-          const x = index * step;
-          const y = Math.min(waveformScale, smoothedPeaks[index] * waveformScale);
-          context.lineTo(x, waveformCenterY + y);
-        }
-        context.closePath();
-        context.fill();
-        context.restore();
-
-        context.strokeStyle = muted ? colorWithAlpha(baseColor, 0.4) : colorWithAlpha(waveformColor, selected ? 0.92 : 0.74);
-        context.lineWidth = Math.max(1, selected ? 1.35 * ratio : ratio);
-        context.beginPath();
-        smoothedPeaks.forEach((peak, index) => {
-          const x = index * step;
-          const y = Math.min(waveformScale, peak * waveformScale);
-          const topY = waveformCenterY - y;
-          if (index === 0) context.moveTo(x, topY);
-          else context.lineTo(x, topY);
-        });
-        context.stroke();
-        context.beginPath();
-        smoothedPeaks.forEach((peak, index) => {
-          const x = index * step;
-          const y = Math.min(waveformScale, peak * waveformScale);
-          const bottomY = waveformCenterY + y;
-          if (index === 0) context.moveTo(x, bottomY);
-          else context.lineTo(x, bottomY);
-        });
-        context.stroke();
-      }
-
       if (!displayPeaks.length) {
         context.fillStyle = 'rgba(206, 255, 53, 0.12)';
         context.fillRect(0, 0, width, height);
@@ -9105,22 +9038,101 @@ function WaveformTrackCanvas({
       context.fillRect(0, 0, startX, height);
       context.fillRect(endX, 0, Math.max(0, width - endX), height);
 
-      context.fillStyle = selected ? colorWithAlpha(baseColor, 0.14) : 'rgba(255,255,255,0.055)';
+      context.fillStyle = selected ? colorWithAlpha(baseColor, 0.08) : 'rgba(255,255,255,0.012)';
       context.fillRect(startX, 0, Math.max(0, endX - startX), height);
 
-      clips.forEach((clip) => {
+      const sourceDuration = Math.max(waveform?.duration || 0, buffer?.duration || 0, duration);
+      const takeBarHeight = selected ? 15 * ratio : 13 * ratio;
+      const renderClipWaveform = (clip: StemClip) => {
         const clipStartX = (Math.max(0, Math.min(duration, clip.start)) / duration) * width;
         const clipEndX = (Math.max(0, Math.min(duration, clip.start + getStemClipDuration(clip))) / duration) * width;
-        if (clipEndX <= clipStartX) return;
-        context.fillStyle = selected ? colorWithAlpha(baseColor, 0.18) : colorWithAlpha(baseColor, 0.08);
-        context.fillRect(clipStartX, 0, clipEndX - clipStartX, height);
-        context.strokeStyle = selected ? colorWithAlpha(baseColor, 0.72) : colorWithAlpha(baseColor, 0.28);
+        const clipWidth = Math.max(0, clipEndX - clipStartX);
+        if (clipWidth <= 1) return;
+
+        const clipPeaks = sliceStemClipPeaks(clip, sourceDuration, displayPeaks);
+        const clipGradient = context.createLinearGradient(clipStartX, 0, clipEndX, 0);
+        clipGradient.addColorStop(0, colorWithAlpha(baseColor, recording ? 0.42 : selected ? 0.36 : 0.24));
+        clipGradient.addColorStop(0.55, colorWithAlpha(baseColor, recording ? 0.34 : selected ? 0.28 : 0.18));
+        clipGradient.addColorStop(1, colorWithAlpha(baseColor, recording ? 0.24 : selected ? 0.22 : 0.13));
+        context.fillStyle = clipGradient;
+        context.fillRect(clipStartX, 0, clipWidth, height);
+
+        const takeGradient = context.createLinearGradient(clipStartX, 0, clipEndX, 0);
+        takeGradient.addColorStop(0, colorWithAlpha(baseColor, recording ? 0.94 : 0.9));
+        takeGradient.addColorStop(1, colorWithAlpha(baseColor, recording ? 0.68 : 0.58));
+        context.fillStyle = takeGradient;
+        context.fillRect(clipStartX, 0, clipWidth, takeBarHeight);
+
+        context.save();
+        context.beginPath();
+        context.rect(clipStartX, 0, clipWidth, height);
+        context.clip();
+
+        const clipGridStep = Math.max(12 * ratio, gridStep);
+        context.strokeStyle = 'rgba(255,255,255,0.08)';
         context.lineWidth = Math.max(1, ratio);
-        context.strokeRect(clipStartX + 0.5 * ratio, 0.5 * ratio, Math.max(0, clipEndX - clipStartX - ratio), Math.max(0, height - ratio));
-        if (selected) {
-          context.fillStyle = colorWithAlpha(baseColor, 0.92);
-          context.fillRect(clipStartX, 0, Math.max(2 * ratio, 3), height);
+        context.beginPath();
+        for (let x = clipStartX + clipGridStep; x < clipEndX; x += clipGridStep) {
+          context.moveTo(x, takeBarHeight);
+          context.lineTo(x, height);
         }
+        context.stroke();
+
+        context.fillStyle = '#fff7ff';
+        context.font = `${Math.max(8, 9 * ratio)}px sans-serif`;
+        context.textAlign = 'left';
+        context.fillText(`♛ Takes   ${trackLabel}`, clipStartX + 7 * ratio, Math.max(10 * ratio, takeBarHeight - 4 * ratio));
+
+        if (clipPeaks.length) {
+          const step = clipPeaks.length > 1 ? clipWidth / (clipPeaks.length - 1) : clipWidth;
+          const usableHeight = Math.max(1, height - takeBarHeight - 3 * ratio);
+          const waveformCenterY = takeBarHeight + usableHeight / 2;
+          const waveformScale = usableHeight * (recording ? 0.5 : 0.46);
+          const visualPeakMax = Math.max(0.08, ...clipPeaks);
+          const smoothedPeaks = clipPeaks.map((peak, index) => {
+            const previous = clipPeaks[Math.max(0, index - 1)] ?? peak;
+            const next = clipPeaks[Math.min(clipPeaks.length - 1, index + 1)] ?? peak;
+            const normalizedPeak = Math.min(1, (previous * 0.16 + peak * 0.68 + next * 0.16) / visualPeakMax);
+            const boostedPeak = Math.pow(normalizedPeak, 0.66) * 1.08;
+            return Math.max(0.035, Math.min(1, boostedPeak));
+          });
+
+          const waveformFill = context.createLinearGradient(0, takeBarHeight, 0, height);
+          waveformFill.addColorStop(0, muted ? colorWithAlpha(baseColor, 0.44) : colorWithAlpha(waveformColor, recording ? 0.94 : 0.96));
+          waveformFill.addColorStop(0.5, muted ? colorWithAlpha(baseColor, 0.34) : colorWithAlpha(waveformColor, recording ? 0.9 : 0.88));
+          waveformFill.addColorStop(1, muted ? colorWithAlpha(baseColor, 0.26) : colorWithAlpha(waveformColor, recording ? 0.72 : 0.68));
+
+          context.save();
+          context.shadowColor = recording ? 'rgba(249, 115, 22, 0.62)' : muted ? 'transparent' : colorWithAlpha(baseColor, selected ? 0.38 : 0.22);
+          context.shadowBlur = recording ? 7 * ratio : selected ? 4 * ratio : 1.5 * ratio;
+          context.fillStyle = waveformFill;
+          context.beginPath();
+          smoothedPeaks.forEach((peak, index) => {
+            const x = clipStartX + index * step;
+            const y = Math.min(waveformScale, peak * waveformScale);
+            const topY = waveformCenterY - y;
+            if (index === 0) context.moveTo(x, topY);
+            else context.lineTo(x, topY);
+          });
+          for (let index = smoothedPeaks.length - 1; index >= 0; index -= 1) {
+            const x = clipStartX + index * step;
+            const y = Math.min(waveformScale, smoothedPeaks[index] * waveformScale);
+            context.lineTo(x, waveformCenterY + y);
+          }
+          context.closePath();
+          context.fill();
+          context.restore();
+        }
+
+        context.restore();
+
+        context.strokeStyle = selected ? colorWithAlpha(baseColor, 0.92) : colorWithAlpha(baseColor, 0.46);
+        context.lineWidth = Math.max(1, selected ? 1.2 * ratio : ratio);
+        context.strokeRect(clipStartX + 0.5 * ratio, 0.5 * ratio, Math.max(0, clipWidth - ratio), Math.max(0, height - ratio));
+      };
+
+      clips.forEach((clip) => {
+        renderClipWaveform(clip);
       });
 
       const mutedRects = mapStemMutedRangesToPixels({ mutedRanges, duration, width });

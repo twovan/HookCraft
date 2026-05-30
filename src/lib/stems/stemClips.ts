@@ -143,3 +143,16 @@ export function findStemClipAtTime(clips: StemClip[], time: number) {
 export function resolveStemClipDragTarget(clips: StemClip[], time: number) {
   return findStemClipAtTime(clips, time);
 }
+
+export function sliceStemClipPeaks(clip: StemClip, sourceDuration: number, peaks: number[]) {
+  if (!peaks.length || sourceDuration <= 0) return [];
+  const lastIndex = peaks.length - 1;
+  const startRatio = clampNumber(clip.sourceStart / sourceDuration, 0, 1);
+  const endRatio = clampNumber(clip.sourceEnd / sourceDuration, startRatio, 1);
+  const startIndex = Math.floor(startRatio * peaks.length);
+  const endIndex = Math.ceil(endRatio * peaks.length);
+  return peaks.slice(
+    clampNumber(startIndex, 0, lastIndex),
+    clampNumber(Math.max(startIndex + 1, endIndex), 1, peaks.length),
+  );
+}
