@@ -5896,14 +5896,16 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
             当前筛选下没有可显示的轨道，可以切回“全部”查看完整分轨列表。
           </div>
         )}
-        <div
-          style={timelineScrollProgressStyle(dawLayoutMetrics)}
-          onPointerDown={handleTimelineNavigatorPointerDown}
-          onPointerMove={handleTimelineNavigatorPointerMove}
-          title="拖动快速移动时间线视野"
-        >
-          <div style={timelineScrollThumbStyle(timelineScrollState.progress, timelineScrollState.viewRatio)} />
-        </div>
+        {timelineScrollState.canScroll && (
+          <div
+            style={timelineScrollProgressStyle(dawLayoutMetrics)}
+            onPointerDown={handleTimelineNavigatorPointerDown}
+            onPointerMove={handleTimelineNavigatorPointerMove}
+            title="拖动快速移动时间线视野"
+          >
+            <div style={timelineScrollThumbStyle(timelineScrollState.progress, timelineScrollState.viewRatio)} />
+          </div>
+        )}
       </div>
     </section>
   );
@@ -7834,7 +7836,7 @@ function timelineScrollProgressStyle(metrics: DawEditorLayoutMetrics): CSSProper
     position: 'fixed',
     left: metrics.sideRailWidth + 16,
     right: metrics.inspectorWidth + 24,
-    bottom: metrics.bottomTransportHeight + 8,
+    bottom: metrics.bottomTransportHeight + 2,
     zIndex: 39,
     minWidth: 0,
     boxSizing: 'border-box',
