@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   findStemClipAtTime,
+  cloneStemClipForPaste,
   moveStemClip,
   normalizeStemClipState,
   normalizeStemClips,
@@ -44,6 +45,22 @@ describe('stem clips', () => {
       sourceStart: 35,
       sourceEnd: 70,
     });
+  });
+
+  it('clones a clip to a new timeline start while preserving source audio', () => {
+    const clone = cloneStemClipForPaste({
+      id: 'clip-a',
+      start: 12,
+      sourceStart: 4,
+      sourceEnd: 18,
+    }, 42);
+
+    expect(clone).toMatchObject({
+      start: 42,
+      sourceStart: 4,
+      sourceEnd: 18,
+    });
+    expect(clone.id).not.toBe('clip-a');
   });
 
   it('slices waveform peaks by a clip source range', () => {

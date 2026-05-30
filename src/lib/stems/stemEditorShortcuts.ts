@@ -5,8 +5,13 @@ export type StemEditorShortcutAction =
   | 'save'
   | 'undo'
   | 'redo'
+  | 'copy-selected-clip'
+  | 'cut-selected-clip'
+  | 'paste-clip'
   | 'toggle-selected-mute'
   | 'toggle-selected-solo'
+  | 'rename-selected-track'
+  | 'edit-selected-track-color'
   | 'reset-selected-track'
   | 'delete-selected-track'
   | 'reset-selected-trim-range'
@@ -89,6 +94,7 @@ export function resolveStemEditorShortcut(event: KeyboardShortcutEvent): StemEdi
     if (key === 'p') return 'preview-selected-range';
     if (key === 'r') return 'reset-selected-track';
     if (event.key === 'Delete') return 'delete-selected-track';
+    if (event.key === 'F2') return 'rename-selected-track';
     if (event.key === 'ArrowLeft') return 'seek-backward';
     if (event.key === 'ArrowRight') return 'seek-forward';
     if (event.key === 'ArrowUp') return 'select-previous-track';
@@ -101,6 +107,7 @@ export function resolveStemEditorShortcut(event: KeyboardShortcutEvent): StemEdi
   }
 
   if (!hasCommandModifier && event.shiftKey) {
+    if (key === 'c') return 'edit-selected-track-color';
     if (key === 'f') return 'focus-selected-range';
     if (key === 'g') return 'cycle-snap-step';
     if (key === 'r') return 'reset-selected-trim-range';
@@ -114,6 +121,9 @@ export function resolveStemEditorShortcut(event: KeyboardShortcutEvent): StemEdi
   if (!hasCommandModifier) return null;
 
   if (key === 's' && !event.shiftKey) return 'save';
+  if (key === 'c' && !event.shiftKey) return 'copy-selected-clip';
+  if (key === 'x' && !event.shiftKey) return 'cut-selected-clip';
+  if (key === 'v' && !event.shiftKey) return 'paste-clip';
   if ((key === '+' || key === '=') && !event.shiftKey) return 'zoom-in';
   if ((key === '+' || key === '=') && event.shiftKey) return 'zoom-in';
   if ((key === '-' || key === '_') && !event.shiftKey) return 'zoom-out';

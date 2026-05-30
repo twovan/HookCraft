@@ -136,6 +136,14 @@ export function moveStemClip(clips: StemClip[], clipId: string, nextStart: numbe
   }).sort((left, right) => left.start - right.start || left.sourceStart - right.sourceStart);
 }
 
+export function cloneStemClipForPaste(clip: StemClip, nextStart: number): StemClip {
+  return {
+    ...clip,
+    id: `${clip.id}-copy-${Date.now().toString(36)}`,
+    start: roundTime(Math.max(0, Number.isFinite(nextStart) ? nextStart : 0)),
+  };
+}
+
 export function findStemClipAtTime(clips: StemClip[], time: number) {
   return clips.find((clip) => time >= clip.start && time <= clip.start + getStemClipDuration(clip)) || null;
 }

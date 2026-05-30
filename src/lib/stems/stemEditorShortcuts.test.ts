@@ -18,6 +18,9 @@ describe('resolveStemEditorShortcut', () => {
     expect(resolveStemEditorShortcut(keyEvent({ key: 'Escape' }))).toBe('stop-playback');
     expect(resolveStemEditorShortcut(keyEvent({ key: '?' }))).toBe('toggle-shortcut-help');
     expect(resolveStemEditorShortcut(keyEvent({ key: 's', ctrlKey: true }))).toBe('save');
+    expect(resolveStemEditorShortcut(keyEvent({ key: 'c', ctrlKey: true }))).toBe('copy-selected-clip');
+    expect(resolveStemEditorShortcut(keyEvent({ key: 'x', ctrlKey: true }))).toBe('cut-selected-clip');
+    expect(resolveStemEditorShortcut(keyEvent({ key: 'v', ctrlKey: true }))).toBe('paste-clip');
     expect(resolveStemEditorShortcut(keyEvent({ key: 'z', ctrlKey: true }))).toBe('undo');
     expect(resolveStemEditorShortcut(keyEvent({ key: 'z', metaKey: true }))).toBe('undo');
     expect(resolveStemEditorShortcut(keyEvent({ key: 'y', ctrlKey: true }))).toBe('redo');
@@ -41,6 +44,8 @@ describe('resolveStemEditorShortcut', () => {
     expect(resolveStemEditorShortcut(keyEvent({ key: 'f', shiftKey: true }))).toBe('focus-selected-range');
     expect(resolveStemEditorShortcut(keyEvent({ key: 'r' }))).toBe('reset-selected-track');
     expect(resolveStemEditorShortcut(keyEvent({ key: 'Delete' }))).toBe('delete-selected-track');
+    expect(resolveStemEditorShortcut(keyEvent({ key: 'F2' }))).toBe('rename-selected-track');
+    expect(resolveStemEditorShortcut(keyEvent({ key: 'c', shiftKey: true }))).toBe('edit-selected-track-color');
     expect(resolveStemEditorShortcut(keyEvent({ key: 'r', shiftKey: true }))).toBe('reset-selected-trim-range');
     expect(resolveStemEditorShortcut(keyEvent({ key: 'ArrowLeft' }))).toBe('seek-backward');
     expect(resolveStemEditorShortcut(keyEvent({ key: 'ArrowRight' }))).toBe('seek-forward');
@@ -64,7 +69,7 @@ describe('resolveStemEditorShortcut', () => {
     expect(resolveStemEditorShortcut(keyEvent({ key: 'm', target: input as unknown as EventTarget }))).toBeNull();
     expect(resolveStemEditorShortcut(keyEvent({ key: 'Delete', target: input as unknown as EventTarget }))).toBeNull();
     expect(resolveStemEditorShortcut(keyEvent({ key: 's', altKey: true }))).toBeNull();
-    expect(resolveStemEditorShortcut(keyEvent({ key: 'x', ctrlKey: true }))).toBeNull();
+    expect(resolveStemEditorShortcut(keyEvent({ key: 'q', ctrlKey: true }))).toBeNull();
   });
 
   it('keeps undo available when focus is on non-text controls', () => {

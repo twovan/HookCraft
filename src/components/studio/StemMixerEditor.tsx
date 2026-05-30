@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ChangeEvent, CSSProperties, PointerEvent } from 'react';
+import type { ChangeEvent, CSSProperties, MouseEvent, PointerEvent } from 'react';
 import {
   defaultStemMasterState,
   normalizeStemMasterState,
@@ -68,6 +68,7 @@ import {
   type StemMutedRange,
 } from '@/lib/stems/stemMuteRanges';
 import {
+  cloneStemClipForPaste,
   findStemClipAtTime,
   getStemClipDuration,
   moveStemClip,
@@ -111,6 +112,7 @@ export interface StemEditState {
   tracks: Record<string, StemTrackState>;
   master?: StemMasterState;
   trackLabels?: Record<string, string>;
+  trackColors?: Record<string, string>;
   trackOrder?: string[];
   deletedTrackTypes?: string[];
   savedAt?: string;
@@ -147,6 +149,7 @@ type StemEditorHistorySnapshot = {
   tracks: Record<string, StemTrackState>;
   master: StemMasterState;
   trackLabels: Record<string, string>;
+  trackColors: Record<string, string>;
   trackOrder: string[];
   deletedTrackTypes: string[];
   customStems: EditableStem[];
@@ -156,6 +159,19 @@ type StemEditorHistorySnapshot = {
 type StemHistoryMode = 'immediate' | 'deferred' | 'none';
 type StemInteractionPhase = 'preview' | 'commit';
 type RecordingInputChannel = 'channel-1' | 'channel-2' | 'stereo';
+type StemClipClipboard = {
+  clip: StemClip;
+  sourceTrackType: string;
+};
+type TrackContextMenuState = {
+  x: number;
+  y: number;
+  trackType: string;
+  time: number;
+  clipId: string | null;
+  colorOpen: boolean;
+  colorDraft: string;
+};
 type EditorPreferences = {
   exportMode?: ExportMode;
   exportReadiness?: ExportReadiness;
@@ -173,6 +189,20 @@ type EditorPreferences = {
 const SELECTED_TRIM_NUDGE_SECONDS = 0.1;
 const STATUS_TOAST_VISIBLE_MS = 3600;
 const STATUS_TOAST_FADE_MS = 360;
+const TRACK_COLOR_PALETTE = [
+  '#4d8cff',
+  '#38bdf8',
+  '#2dd4bf',
+  '#34d399',
+  '#84cc16',
+  '#facc15',
+  '#fb923c',
+  '#f97316',
+  '#ef4444',
+  '#f472b6',
+  '#c084fc',
+  '#a78bfa',
+];
 const TIMELINE_SNAP_STEPS_SECONDS = [0.1, 0.25, 0.5, 1] as const;
 const DEFAULT_TIMELINE_SNAP_STEP_SECONDS = 0.25;
 const MIN_TIMELINE_ZOOM = 1;
@@ -421,6 +451,7 @@ function cloneEditorHistorySnapshot(snapshot: StemEditorHistorySnapshot): StemEd
     tracks: JSON.parse(JSON.stringify(snapshot.tracks)) as Record<string, StemTrackState>,
     master: JSON.parse(JSON.stringify(snapshot.master)) as StemMasterState,
     trackLabels: { ...snapshot.trackLabels },
+    trackColors: { ...snapshot.trackColors },
     trackOrder: [...snapshot.trackOrder],
     deletedTrackTypes: [...snapshot.deletedTrackTypes],
     customStems: snapshot.customStems.map((stem) => ({
@@ -1019,6 +1050,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     tracks: createTrackState(initialStems, initialEditState),
     master: normalizeStemMasterState(initialEditState?.master),
     trackLabels: normalizeTrackLabels(initialEditState?.trackLabels),
+    trackColors: normalizeTrackColors(initialEditState?.trackColors),
     trackOrder: normalizeTrackOrderForStems(initialEditState?.trackOrder, initialStems),
     deletedTrackTypes: initialDeletedTrackTypes,
     customStems: [],
@@ -1052,6 +1084,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   } | null>(null);
   const [customStems, setCustomStems] = useState<EditableStem[]>([]);
   const [trackLabels, setTrackLabels] = useState<Record<string, string>>(() => normalizeTrackLabels(initialEditState?.trackLabels));
+  const [trackColors, setTrackColors] = useState<Record<string, string>>(() => normalizeTrackColors(initialEditState?.trackColors));
   const [trackOrder, setTrackOrder] = useState<string[]>(() => normalizeTrackOrderForStems(initialEditState?.trackOrder, initialStems));
   const [deletedTrackTypes, setDeletedTrackTypes] = useState<string[]>(() => initialDeletedTrackTypes);
   const sourceStems = useMemo(() => {
@@ -1062,6 +1095,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     const label = trackLabels[stem.type];
     return label ? { ...stem, displayLabel: label } : stem;
   }), [sourceStems, trackLabels]);
+  const getTrackColor = useCallback((type: string) => trackColors[type] || stemColorForType(type), [trackColors]);
   const [tracks, setTracks] = useState<Record<string, StemTrackState>>(() => createTrackState(initialStems, initialEditState));
   const [masterState, setMasterState] = useState<StemMasterState>(() => normalizeStemMasterState(initialEditState?.master));
   const [isPlaying, setIsPlaying] = useState(false);
@@ -1110,6 +1144,8 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
   const [trackDensity, setTrackDensity] = useState<TrackDensity>('comfortable');
   const [showShortcutHelp, setShowShortcutHelp] = useState(false);
+  const [clipClipboard, setClipClipboard] = useState<StemClipClipboard | null>(null);
+  const [trackContextMenu, setTrackContextMenu] = useState<TrackContextMenuState | null>(null);
   const [isTimelinePanning, setIsTimelinePanning] = useState(false);
   const [timelineScrollState, setTimelineScrollState] = useState<TimelineScrollState>({
     canScroll: false,
@@ -1171,13 +1207,14 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       tracks,
       master: masterState,
       trackLabels,
+      trackColors,
       trackOrder,
       deletedTrackTypes,
       customStems,
       skippedEmptyCount,
       selectedTrackType,
     };
-  }, [customStems, deletedTrackTypes, masterState, selectedTrackType, skippedEmptyCount, trackLabels, trackOrder, tracks]);
+  }, [customStems, deletedTrackTypes, masterState, selectedTrackType, skippedEmptyCount, trackColors, trackLabels, trackOrder, tracks]);
 
   useEffect(() => () => {
     if (latestExportDownload?.url) {
@@ -1726,6 +1763,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     setTracks(next.tracks);
     setMasterState(next.master);
     setTrackLabels(next.trackLabels);
+    setTrackColors(next.trackColors);
     setTrackOrder(next.trackOrder);
     setDeletedTrackTypes(next.deletedTrackTypes);
     setCustomStems(next.customStems);
@@ -1863,6 +1901,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     setTracks(createTrackState(initialStems, initialEditState));
     setMasterState(normalizeStemMasterState(initialEditState?.master));
     setTrackLabels(normalizeTrackLabels(initialEditState?.trackLabels));
+    setTrackColors(normalizeTrackColors(initialEditState?.trackColors));
     setTrackOrder(normalizeTrackOrderForStems(initialEditState?.trackOrder, initialStems));
     const nextDeletedTrackTypes = normalizeDeletedStemTypes(initialEditState?.deletedTrackTypes, initialStems);
     setDeletedTrackTypes(nextDeletedTrackTypes);
@@ -1873,6 +1912,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       tracks: createTrackState(initialStems, initialEditState),
       master: normalizeStemMasterState(initialEditState?.master),
       trackLabels: normalizeTrackLabels(initialEditState?.trackLabels),
+      trackColors: normalizeTrackColors(initialEditState?.trackColors),
       trackOrder: normalizeTrackOrderForStems(initialEditState?.trackOrder, initialStems),
       deletedTrackTypes: nextDeletedTrackTypes,
       customStems: [],
@@ -2388,6 +2428,26 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     setSaveStatus(label ? `轨道已重命名为“${label}”。` : '轨道名称已恢复默认。');
   }, [beginDeferredHistory, pushHistorySnapshot, stems]);
 
+  const setTrackColor = useCallback((type: string, value: string) => {
+    const color = sanitizeTrackColor(value);
+    if (!color) return;
+
+    setTrackColors((current) => {
+      const fallbackColor = stemColorForType(type);
+      const next = { ...current };
+      if (color === fallbackColor.toLowerCase()) {
+        delete next[type];
+      } else {
+        next[type] = color;
+      }
+      if (JSON.stringify(current) !== JSON.stringify(next)) {
+        pushHistorySnapshot({ ...editorHistoryRef.current, trackColors: current });
+      }
+      return next;
+    });
+    setSaveStatus(`轨道颜色已更新为 ${color}。`);
+  }, [pushHistorySnapshot]);
+
   const createEmptyCustomTrack = useCallback(() => {
     const type = `custom_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
     const displayLabel = `空轨道 ${customStems.length + 1}`;
@@ -2708,8 +2768,11 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     setRecordingTrackType(null);
   }, [stopRecordingMeter]);
 
-  const deleteSelectedTrack = useCallback(() => {
-    if (!selectedTrack) {
+  const deleteSelectedTrack = useCallback((targetType?: string) => {
+    const trackToDelete = targetType
+      ? stems.find((stem) => stem.type === targetType) || null
+      : selectedTrack;
+    if (!trackToDelete) {
       setPlaybackError('请先选中一条轨道，再执行删除。');
       return;
     }
@@ -2718,7 +2781,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       return;
     }
 
-    const label = getStemDisplayName(selectedTrack).zh;
+    const label = getStemDisplayName(trackToDelete).zh;
     if (typeof window !== 'undefined' && !window.confirm(`确定删除整条轨道“${label}”吗？删除后可通过“上一步”恢复。`)) {
       return;
     }
@@ -2726,7 +2789,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     rememberEditorHistory();
     pauseAll();
 
-    const deletedType = selectedTrack.type;
+    const deletedType = trackToDelete.type;
     const nextStems = stems.filter((stem) => stem.type !== deletedType);
     const deletedIndex = stems.findIndex((stem) => stem.type === deletedType);
     const nextSelectedTrack = nextStems[Math.min(Math.max(deletedIndex, 0), Math.max(nextStems.length - 1, 0))] || null;
@@ -2735,6 +2798,11 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     setDeletedTrackTypes((current) => addDeletedStemType(current, deletedType, initialStems));
     setTrackOrder((current) => current.filter((type) => type !== deletedType));
     setTrackLabels((current) => {
+      const next = { ...current };
+      delete next[deletedType];
+      return next;
+    });
+    setTrackColors((current) => {
       const next = { ...current };
       delete next[deletedType];
       return next;
@@ -2754,7 +2822,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       next.delete(deletedType);
       return next;
     });
-    if (stemHasKnownEmptyWaveform(selectedTrack)) {
+    if (stemHasKnownEmptyWaveform(trackToDelete)) {
       setSkippedEmptyCount((count) => Math.max(0, count - 1));
     }
     setSelectedTrackType(nextSelectedTrack?.type ?? null);
@@ -3290,6 +3358,158 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     }, historyMode);
   }, [commitTrackChange, duration]);
 
+  const copyTrackClipAtTime = useCallback((type: string, time: number) => {
+    const state = tracks[type] || defaultTrackState();
+    const clipState = resolveTrackClipState(state, duration);
+    const clip = findStemClipAtTime(clipState.clips, time);
+    if (!clip) {
+      setPlaybackError('当前位置没有可复制的片段。');
+      return false;
+    }
+
+    setClipClipboard({ clip: { ...clip }, sourceTrackType: type });
+    setPlaybackError(null);
+    setSaveStatus('片段已复制，可在目标时间点粘贴。');
+    return true;
+  }, [duration, tracks]);
+
+  const cutTrackClipAtTime = useCallback((type: string, time: number) => {
+    if (!copyTrackClipAtTime(type, time)) return;
+    const state = tracks[type] || defaultTrackState();
+    const clipState = resolveTrackClipState(state, duration);
+    setTrackClips(type, removeStemClipAtTime(clipState.clips, time));
+    setSaveStatus('片段已剪切，可在目标时间点粘贴。');
+  }, [copyTrackClipAtTime, duration, setTrackClips, tracks]);
+
+  const pasteClipToTrack = useCallback((type: string, time: number) => {
+    if (!clipClipboard) {
+      setPlaybackError('剪贴板里还没有片段。');
+      return;
+    }
+
+    const pasteStart = snapStemEditorTime(time, Math.max(duration, time), snapToGrid, snapStepSeconds);
+    const clonedClip = cloneStemClipForPaste(clipClipboard.clip, pasteStart);
+    const nextDuration = Math.max(duration, clonedClip.start + getStemClipDuration(clonedClip));
+    if (nextDuration > duration) {
+      setDuration(Number(nextDuration.toFixed(3)));
+    }
+
+    commitTrackChange((current) => {
+      const state = current[type] || defaultTrackState();
+      const clipState = resolveTrackClipState(state, nextDuration);
+      const nextClipState = normalizeStemClipState({
+        clips: [...clipState.clips, clonedClip],
+        duration: nextDuration,
+        trimStart: state.trimStart,
+        trimEnd: state.trimEnd,
+      });
+      const clipDuration = Math.max(0, (nextClipState.trimEnd ?? 0) - nextClipState.trimStart);
+
+      return {
+        ...current,
+        [type]: {
+          ...state,
+          trimStart: nextClipState.trimStart,
+          trimEnd: nextClipState.trimEnd,
+          fadeIn: Math.min(state.fadeIn, clipDuration),
+          fadeOut: Math.min(state.fadeOut, clipDuration),
+          clips: nextClipState.clips,
+        },
+      };
+    });
+    setPlaybackError(null);
+    setSaveStatus('片段已粘贴到当前轨道。');
+  }, [clipClipboard, commitTrackChange, duration, snapStepSeconds, snapToGrid]);
+
+  const openTrackContextMenu = useCallback((event: MouseEvent<Element>, type: string, time: number) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const state = tracks[type] || defaultTrackState();
+    const clipState = resolveTrackClipState(state, duration);
+    const safeTime = Math.max(0, Math.min(Math.max(duration, time), Number.isFinite(time) ? time : currentTime));
+    const targetClip = findStemClipAtTime(clipState.clips, safeTime);
+    const menuWidth = 256;
+    const menuHeight = 420;
+    const x = typeof window === 'undefined'
+      ? event.clientX
+      : Math.min(event.clientX, Math.max(12, window.innerWidth - menuWidth - 12));
+    const y = typeof window === 'undefined'
+      ? event.clientY
+      : Math.min(event.clientY, Math.max(12, window.innerHeight - menuHeight - 12));
+
+    setSelectedTrackType(type);
+    handleSeek(safeTime);
+    setTrackContextMenu({
+      x,
+      y,
+      trackType: type,
+      time: safeTime,
+      clipId: targetClip?.id ?? null,
+      colorOpen: false,
+      colorDraft: getTrackColor(type),
+    });
+  }, [currentTime, duration, getTrackColor, handleSeek, tracks]);
+
+  const closeTrackContextMenu = useCallback(() => {
+    setTrackContextMenu(null);
+  }, []);
+
+  const renameTrackFromMenu = useCallback((type: string) => {
+    const stem = stems.find((candidate) => candidate.type === type);
+    const currentLabel = stem ? getStemDisplayName(stem).zh : type;
+    const nextLabel = typeof window === 'undefined'
+      ? null
+      : window.prompt('重命名轨道', currentLabel);
+    if (nextLabel === null) return;
+    renameTrack(type, nextLabel);
+  }, [renameTrack, stems]);
+
+  const performTrackContextMenuAction = useCallback((action: 'copy' | 'cut' | 'paste' | 'rename' | 'delete' | 'color') => {
+    if (!trackContextMenu) return;
+    const { trackType, time } = trackContextMenu;
+
+    if (action === 'copy') {
+      copyTrackClipAtTime(trackType, time);
+      closeTrackContextMenu();
+      return;
+    }
+    if (action === 'cut') {
+      cutTrackClipAtTime(trackType, time);
+      closeTrackContextMenu();
+      return;
+    }
+    if (action === 'paste') {
+      pasteClipToTrack(trackType, time);
+      closeTrackContextMenu();
+      return;
+    }
+    if (action === 'rename') {
+      renameTrackFromMenu(trackType);
+      closeTrackContextMenu();
+      return;
+    }
+    if (action === 'delete') {
+      deleteSelectedTrack(trackType);
+      closeTrackContextMenu();
+      return;
+    }
+    setTrackContextMenu((current) => current ? { ...current, colorOpen: !current.colorOpen } : current);
+  }, [closeTrackContextMenu, copyTrackClipAtTime, cutTrackClipAtTime, deleteSelectedTrack, pasteClipToTrack, renameTrackFromMenu, trackContextMenu]);
+
+  useEffect(() => {
+    if (!trackContextMenu) return;
+    const close = () => closeTrackContextMenu();
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeTrackContextMenu();
+    };
+    window.addEventListener('pointerdown', close);
+    window.addEventListener('keydown', closeOnEscape);
+    return () => {
+      window.removeEventListener('pointerdown', close);
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [closeTrackContextMenu, trackContextMenu]);
+
   const commitSelectedTrimInput = useCallback((edge: 'start' | 'end', value: string) => {
     if (!selectedTrack) return;
 
@@ -3596,6 +3816,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
             tracks,
             master: masterState,
             trackLabels,
+            trackColors,
             trackOrder: stems.map((stem) => stem.type),
             deletedTrackTypes,
           },
@@ -3630,7 +3851,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         setIsSaving(false);
       }
     }
-  }, [deletedTrackTypes, jobId, masterState, stems, trackLabels, tracks]);
+  }, [deletedTrackTypes, jobId, masterState, stems, trackColors, trackLabels, tracks]);
 
   const saveEditState = useCallback(async () => {
     await persistEditState('manual');
@@ -3841,6 +4062,34 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         return;
       }
       if (!selectedTrack) return;
+      if (action === 'copy-selected-clip') {
+        copyTrackClipAtTime(selectedTrack.type, currentTime);
+        return;
+      }
+      if (action === 'cut-selected-clip') {
+        cutTrackClipAtTime(selectedTrack.type, currentTime);
+        return;
+      }
+      if (action === 'paste-clip') {
+        pasteClipToTrack(selectedTrack.type, currentTime);
+        return;
+      }
+      if (action === 'rename-selected-track') {
+        renameTrackFromMenu(selectedTrack.type);
+        return;
+      }
+      if (action === 'edit-selected-track-color') {
+        setTrackContextMenu({
+          x: typeof window === 'undefined' ? 24 : Math.max(16, window.innerWidth - 300),
+          y: 98,
+          trackType: selectedTrack.type,
+          time: currentTime,
+          clipId: null,
+          colorOpen: true,
+          colorDraft: getTrackColor(selectedTrack.type),
+        });
+        return;
+      }
       if (action === 'focus-selected-range') {
         focusSelectedTrackRange();
         return;
@@ -3904,11 +4153,16 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     handleTogglePlayback,
     handleSeek,
     currentTime,
+    copyTrackClipAtTime,
+    cutTrackClipAtTime,
     deleteSelectedTrack,
     duration,
     focusSelectedTrackRange,
+    getTrackColor,
     nudgePlaybackHead,
+    pasteClipToTrack,
     redoTrackChange,
+    renameTrackFromMenu,
     resetTrackEdit,
     resetSelectedTrackTrimRange,
     nudgeSelectedTrackTrim,
@@ -3932,9 +4186,10 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     tracks,
     master: masterState,
     trackLabels,
+    trackColors,
     trackOrder: stems.map((stem) => stem.type),
     deletedTrackTypes,
-  }), [deletedTrackTypes, masterState, stems, trackLabels, tracks]);
+  }), [deletedTrackTypes, masterState, stems, trackColors, trackLabels, tracks]);
 
   useEffect(() => {
     if (!jobId) return;
@@ -4849,7 +5104,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                       <button
                         type="button"
                         style={deleteTrackButtonStyle}
-                        onClick={deleteSelectedTrack}
+                        onClick={() => deleteSelectedTrack()}
                       >
                         删除轨道
                       </button>
@@ -5094,7 +5349,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                   <button type="button" style={presetButtonStyle} onClick={() => resetTrackEdit(selectedTrack.type)}>
                     重置当前轨裁剪
                   </button>
-                  <span style={selectedTrackShortcutStyle}>快捷键：↑/↓ 选轨，M 静音，S 独奏，[ / ] 设置入出点，Shift+[ / Shift+] 微调，X 静音选区，Shift+X 恢复，Shift+R 全长</span>
+                  <span style={selectedTrackShortcutStyle}>快捷键：↑/↓ 选轨，M 静音，S 独奏，Ctrl+C/X/V 复制剪切粘贴，F2 重命名，Shift+C 改色，Del 删除</span>
                 </div>
                 {selectedTrackMutedRanges.length > 0 && (
                   <div style={mutedRangeListStyle} aria-label={`${getStemDisplayName(selectedTrack).zh} 静音片段`}>
@@ -5385,6 +5640,82 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
           {playbackError}
         </div>
       )}
+      {trackContextMenu && (
+        <div
+          id="stem-editor-track-menu"
+          role="menu"
+          aria-label="轨道快捷菜单"
+          style={trackContextMenuStyle(trackContextMenu.x, trackContextMenu.y)}
+          onPointerDown={(event) => event.stopPropagation()}
+          onContextMenu={(event) => event.preventDefault()}
+        >
+          <button type="button" role="menuitem" disabled={!clipClipboard} style={trackContextMenuItemStyle(!clipClipboard)} onClick={() => performTrackContextMenuAction('paste')}>
+            <span>粘贴</span>
+            <kbd>Ctrl V</kbd>
+          </button>
+          <button type="button" role="menuitem" disabled={!trackContextMenu.clipId} style={trackContextMenuItemStyle(!trackContextMenu.clipId)} onClick={() => performTrackContextMenuAction('copy')}>
+            <span>复制</span>
+            <kbd>Ctrl C</kbd>
+          </button>
+          <button type="button" role="menuitem" disabled={!trackContextMenu.clipId} style={trackContextMenuItemStyle(!trackContextMenu.clipId)} onClick={() => performTrackContextMenuAction('cut')}>
+            <span>剪切</span>
+            <kbd>Ctrl X</kbd>
+          </button>
+          <div style={trackContextMenuDividerStyle} />
+          <button type="button" role="menuitem" style={trackContextMenuItemStyle(false)} onClick={() => performTrackContextMenuAction('rename')}>
+            <span>重命名轨道</span>
+            <kbd>F2</kbd>
+          </button>
+          <button type="button" role="menuitem" style={trackContextMenuItemStyle(false)} onClick={() => performTrackContextMenuAction('delete')}>
+            <span>删除轨道</span>
+            <kbd>Del</kbd>
+          </button>
+          <button type="button" role="menuitem" style={trackContextMenuItemStyle(false)} onClick={() => performTrackContextMenuAction('color')}>
+            <span>编辑轨道颜色</span>
+            <kbd>Shift C</kbd>
+          </button>
+          {trackContextMenu.colorOpen && (
+            <div style={trackColorEditorStyle}>
+              <div style={trackColorPaletteStyle}>
+                {TRACK_COLOR_PALETTE.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    aria-label={`选择颜色 ${color}`}
+                    style={trackColorSwatchStyle(color, trackContextMenu.colorDraft === color)}
+                    onClick={() => {
+                      setTrackContextMenu((current) => current ? { ...current, colorDraft: color } : current);
+                      setTrackColor(trackContextMenu.trackType, color);
+                    }}
+                  />
+                ))}
+              </div>
+              <label style={trackColorInputRowStyle}>
+                <input
+                  type="color"
+                  value={trackContextMenu.colorDraft}
+                  onChange={(event) => {
+                    const color = event.target.value;
+                    setTrackContextMenu((current) => current ? { ...current, colorDraft: color } : current);
+                    setTrackColor(trackContextMenu.trackType, color);
+                  }}
+                  style={trackColorInputStyle}
+                />
+                <input
+                  type="text"
+                  value={trackContextMenu.colorDraft}
+                  onChange={(event) => {
+                    const color = event.target.value;
+                    setTrackContextMenu((current) => current ? { ...current, colorDraft: color } : current);
+                    if (sanitizeTrackColor(color)) setTrackColor(trackContextMenu.trackType, color);
+                  }}
+                  style={trackColorHexInputStyle}
+                />
+              </label>
+            </div>
+          )}
+        </div>
+      )}
 
       <div
         id="stem-editor-timeline"
@@ -5393,7 +5724,10 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         aria-label="多轨时间线"
         title="Ctrl+鼠标滚轮缩放波形，Shift+滚轮横向移动"
         style={trackListStyle(trackDensity, isTimelinePanning, shouldAllowTimelineHorizontalScroll)}
-        onContextMenu={(event) => event.preventDefault()}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          closeTrackContextMenu();
+        }}
         onDragStart={(event) => event.preventDefault()}
         onPointerDown={handleTimelinePanPointerDown}
         onPointerMove={handleTimelinePanPointerMove}
@@ -5571,11 +5905,11 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         {showShortcutHelp && (
           <div style={timelineShortcutHelpStyle(timelineMinWidth)}>
             <span><strong>播放</strong> 空格 / Esc / P / L</span>
-            <span><strong>选轨</strong> ↑ ↓ / M / S / R / Del</span>
+            <span><strong>选轨</strong> ↑ ↓ / M / S / R / F2 / Del</span>
             <span><strong>裁剪</strong> [ ] / Shift+[ ] / Shift+R</span>
             <span><strong>时间线</strong> ← → / Shift+← → / G / Shift+G / B / D / Alt</span>
             <span><strong>视野</strong> Ctrl+± / Ctrl+0 / Ctrl+滚轮 / Shift+F</span>
-            <span><strong>编辑</strong> Ctrl+S / Ctrl+Z / Ctrl+Y / X / Shift+X</span>
+            <span><strong>编辑</strong> Ctrl+S / Ctrl+Z / Ctrl+Y / Ctrl+C/X/V / Shift+C / X / Shift+X</span>
           </div>
         )}
         <div style={timelineRulerStyle(timelineGridColumns, timelineMinWidth)} data-timeline-pan-zone="true">
@@ -5658,6 +5992,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
           const isAudible = !state.muted && (!hasSoloTrack || state.solo);
           const displayName = getStemDisplayName(stem);
           const isSelectedTrack = selectedTrack?.type === stem.type;
+          const trackColor = getTrackColor(stem.type);
           const isTrackCollapsed = state.collapsed === true;
           const audioBuffer = audioBuffersRef.current[stem.type] || null;
           const isRecordingTarget = isRecording && recordingTrackType === stem.type;
@@ -5682,14 +6017,15 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                 if (ignoreNextTrackClickRef.current) return;
                 setSelectedTrackType(stem.type);
               }}
+              onContextMenu={(event) => openTrackContextMenu(event, stem.type, currentTime)}
               style={{
-                ...stemTrackStyle(isAudible, state.solo, showAdvancedControls, isSelectedTrack, stemColorForType(stem.type), timelineGridColumns, timelineMinWidth, trackDensity, isTrackCollapsed),
+                ...stemTrackStyle(isAudible, state.solo, showAdvancedControls, isSelectedTrack, trackColor, timelineGridColumns, timelineMinWidth, trackDensity, isTrackCollapsed),
                 ...(reorderingTrackType === stem.type ? activeTrackReorderStyle : {}),
               }}
             >
               <div
                 className="stem-track-header"
-                style={stemNameStyle(isSelectedTrack, isAudible, stemColorForType(stem.type), reorderingTrackType === stem.type, isTrackCollapsed)}
+                style={stemNameStyle(isSelectedTrack, isAudible, trackColor, reorderingTrackType === stem.type, isTrackCollapsed)}
                 data-timeline-pan-zone="true"
                 title="点击选择轨道"
               >
@@ -5699,7 +6035,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                   style={stemAudioCornerBadgeStyle(audioStatus)}
                 />
                 <span style={stemIndexStyle(isSelectedTrack)}>{String(index + 1).padStart(2, '0')}</span>
-                <span style={stemColorStyle(stem.type)} />
+                <span style={stemColorStyle(trackColor)} />
                 <div style={stemIdentityStyle}>
                   <div style={stemTitleRowStyle}>
                     <span style={stemLabelStyle}>{displayName.zh}</span>
@@ -5803,7 +6139,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                         step={0.01}
                         value={state.volume}
                         style={{
-                          '--stem-track-color': stemColorForType(stem.type),
+                          '--stem-track-color': trackColor,
                           '--stem-track-fill': `${state.volume * 100}%`,
                         } as CSSProperties}
                         onFocus={beginContinuousControlEdit}
@@ -5825,7 +6161,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                         step={0.01}
                         value={state.pan}
                         style={{
-                          '--stem-track-color': stemColorForType(stem.type),
+                          '--stem-track-color': trackColor,
                           '--stem-track-fill': `${((state.pan + 1) / 2) * 100}%`,
                         } as CSSProperties}
                         onFocus={beginContinuousControlEdit}
@@ -5844,7 +6180,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
               <WaveformTrackCanvas
                 buffer={audioBuffer}
                 waveform={waveformForTrack}
-                color={stemColorForType(stem.type)}
+                color={trackColor}
                 currentTime={currentTime}
                 duration={duration}
                 trimStart={state.trimStart}
@@ -5863,6 +6199,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                 recording={isRecordingTarget}
                 trackLabel={displayName.zh}
                 onSelect={() => setSelectedTrackType(stem.type)}
+                onTrackContextMenu={(event, time) => openTrackContextMenu(event, stem.type, time)}
                 onSeek={(time, shouldSnap) => handleSeek(snapStemEditorTime(time, duration, shouldSnap, snapStepSeconds))}
                 onTrimChange={(edge, time, shouldSnap, phase) => {
                   setTrackTrim(stem.type, edge, time, shouldSnap, 'deferred');
@@ -6116,6 +6453,13 @@ const timelineScrollbarCss = `
     background: linear-gradient(90deg, rgba(5, 8, 14, 0.99), rgba(13, 17, 22, 0.98));
     box-shadow: -1px 0 0 rgba(48, 52, 76, 0.48);
     pointer-events: none;
+  }
+
+  #stem-editor-track-menu kbd {
+    color: #d7dbea;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 850;
   }
 `;
 
@@ -7335,6 +7679,24 @@ function normalizeTrackLabels(value: unknown) {
   ) as Record<string, string>;
 }
 
+function sanitizeTrackColor(value: string) {
+  const color = String(value || '').trim();
+  return /^#[0-9a-f]{6}$/i.test(color) ? color.toLowerCase() : '';
+}
+
+function normalizeTrackColors(value: unknown) {
+  const colors = value && typeof value === 'object'
+    ? value as Record<string, unknown>
+    : null;
+  if (!colors) return {};
+
+  return Object.fromEntries(
+    Object.entries(colors)
+      .map(([type, color]) => [type.trim().slice(0, 80), sanitizeTrackColor(String(color || ''))])
+      .filter(([type, color]) => type.length > 0 && color.length > 0),
+  ) as Record<string, string>;
+}
+
 function normalizeTrackOrderForStems(value: unknown, stems: EditableStem[]) {
   const stemTypes = stems.map((stem) => stem.type);
   const stemTypeSet = new Set(stemTypes);
@@ -7689,6 +8051,105 @@ const editorStatusToastTextStyle: CSSProperties = {
   overflow: 'hidden',
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
+};
+
+function trackContextMenuStyle(x: number, y: number): CSSProperties {
+  return {
+    position: 'fixed',
+    left: x,
+    top: y,
+    zIndex: 80,
+    width: 256,
+    boxSizing: 'border-box',
+    padding: 8,
+    borderRadius: 10,
+    border: '1px solid rgba(73, 79, 107, 0.86)',
+    background: 'linear-gradient(180deg, rgba(18, 21, 29, 0.98), rgba(10, 13, 18, 0.98))',
+    boxShadow: '0 26px 60px rgba(0, 0, 0, 0.52), inset 0 1px 0 rgba(255,255,255,0.055)',
+    backdropFilter: 'blur(18px)',
+    color: '#f8fafc',
+  };
+}
+
+function trackContextMenuItemStyle(disabled: boolean): CSSProperties {
+  return {
+    width: '100%',
+    minHeight: 36,
+    display: 'grid',
+    gridTemplateColumns: 'minmax(0, 1fr) auto',
+    alignItems: 'center',
+    gap: 12,
+    border: 0,
+    borderRadius: 7,
+    background: 'transparent',
+    color: disabled ? '#61687a' : '#f4f7ff',
+    padding: '0 10px',
+    fontSize: 13,
+    fontWeight: 900,
+    textAlign: 'left',
+    cursor: disabled ? 'not-allowed' : 'pointer',
+  };
+}
+
+const trackContextMenuDividerStyle: CSSProperties = {
+  height: 1,
+  margin: '6px -8px',
+  background: 'rgba(73, 79, 107, 0.62)',
+};
+
+const trackColorEditorStyle: CSSProperties = {
+  marginTop: 7,
+  padding: 9,
+  borderRadius: 8,
+  border: '1px solid rgba(73, 79, 107, 0.58)',
+  background: 'rgba(4, 7, 13, 0.58)',
+};
+
+const trackColorPaletteStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(6, 1fr)',
+  gap: 6,
+};
+
+function trackColorSwatchStyle(color: string, active: boolean): CSSProperties {
+  return {
+    width: '100%',
+    aspectRatio: '1',
+    borderRadius: 7,
+    border: active ? '2px solid #ffffff' : '1px solid rgba(255,255,255,0.18)',
+    background: color,
+    boxShadow: active ? `0 0 0 2px ${colorWithAlpha(color, 0.34)}` : 'none',
+    cursor: 'pointer',
+  };
+}
+
+const trackColorInputRowStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '38px minmax(0, 1fr)',
+  alignItems: 'center',
+  gap: 8,
+  marginTop: 9,
+};
+
+const trackColorInputStyle: CSSProperties = {
+  width: 38,
+  height: 30,
+  padding: 0,
+  border: '1px solid rgba(255,255,255,0.18)',
+  borderRadius: 7,
+  background: 'transparent',
+};
+
+const trackColorHexInputStyle: CSSProperties = {
+  minWidth: 0,
+  height: 30,
+  borderRadius: 7,
+  border: '1px solid rgba(73, 79, 107, 0.78)',
+  background: 'rgba(6, 9, 15, 0.88)',
+  color: '#edf2ff',
+  padding: '0 9px',
+  fontSize: 12,
+  fontWeight: 850,
 };
 
 function trackListStyle(trackDensity: TrackDensity, isPanning = false, canScrollHorizontally = true): CSSProperties {
@@ -8712,6 +9173,7 @@ function WaveformTrackCanvas({
   recording,
   trackLabel,
   onSelect,
+  onTrackContextMenu,
   onSeek,
   onTrimChange,
   onTrimRangeMove,
@@ -8738,6 +9200,7 @@ function WaveformTrackCanvas({
   recording: boolean;
   trackLabel: string;
   onSelect: () => void;
+  onTrackContextMenu: (event: MouseEvent<HTMLCanvasElement>, time: number) => void;
   onSeek: (time: number, shouldSnap: boolean) => void;
   onTrimChange: (edge: 'start' | 'end', time: number, shouldSnap: boolean, phase: StemInteractionPhase) => void;
   onTrimRangeMove: (nextStart: number, shouldSnap: boolean, phase: StemInteractionPhase) => void;
@@ -8765,7 +9228,7 @@ function WaveformTrackCanvas({
     return buildWaveformPeaksFromSamples(buffer.getChannelData(0), 720);
   }, [buffer, bufferVersion, waveform?.peaks]);
 
-  const timeFromPointer = useCallback((event: PointerEvent<HTMLCanvasElement>) => {
+  const timeFromPointer = useCallback((event: PointerEvent<HTMLCanvasElement> | MouseEvent<HTMLCanvasElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     const ratio = rect.width > 0
       ? Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width))
@@ -9272,7 +9735,7 @@ function WaveformTrackCanvas({
         ref={canvasRef}
         draggable={false}
         aria-label="Stem waveform. Select the track, drag the playhead, or drag trim handles to edit this track."
-        onContextMenu={(event) => event.preventDefault()}
+        onContextMenu={(event) => onTrackContextMenu(event, timeFromPointer(event))}
         onDragStart={(event) => event.preventDefault()}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -9411,13 +9874,13 @@ function stemColorForType(type: string) {
   return colorMap[type] || '#94a3b8';
 }
 
-function stemColorStyle(type: string): CSSProperties {
+function stemColorStyle(color: string): CSSProperties {
   return {
     width: 8,
     height: 32,
     flexShrink: 0,
     borderRadius: 999,
-    background: stemColorForType(type),
+    background: color,
   };
 }
 
