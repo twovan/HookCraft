@@ -35,6 +35,7 @@ export default function AccountPage() {
 
   const membership = useMembershipStore((s) => s.membership);
   const fetchMembership = useMembershipStore((s) => s.fetchMembership);
+  const membershipLoading = useMembershipStore((s) => s.isLoading);
   const membershipError = useMembershipStore((s) => s.error);
   const credits = useCreditStore((s) => s.credits);
   const previewCount = useCreditStore((s) => s.previewCount);
@@ -72,7 +73,7 @@ export default function AccountPage() {
       const res = await fetchWithAuth('/api/credits/history');
       if (res.ok) {
         const data = await res.json();
-        setCreditHistory(data);
+        setCreditHistory(Array.isArray(data) ? data : data.history ?? []);
       }
     } catch {
       // History is non-critical for account management.
@@ -184,9 +185,37 @@ export default function AccountPage() {
     }
   };
 
+  const monthlyTrendData = useMemo(() => {
+    const rows = [...creditHistory];
+    if (isPaid && credits) {
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      const existingIndex = rows.findIndex((row) => row.month === currentMonth);
+      const currentRow: CreditHistory = {
+        month: currentMonth,
+        used: credits.monthlyUsed,
+        total: credits.monthlyTotal,
+        monthlyUsed: credits.monthlyUsed,
+        purchasedUsed: 0,
+      };
+
+      if (existingIndex >= 0) {
+        rows[existingIndex] = {
+          ...rows[existingIndex],
+          used: Math.max(rows[existingIndex].used, currentRow.used),
+          total: Math.max(rows[existingIndex].total, currentRow.total),
+          monthlyUsed: Math.max(rows[existingIndex].monthlyUsed ?? 0, currentRow.monthlyUsed),
+        };
+      } else if (credits.monthlyUsed > 0 || credits.monthlyTotal > 0) {
+        rows.push(currentRow);
+      }
+    }
+
+    return rows.sort((a, b) => a.month.localeCompare(b.month)).slice(-6);
+  }, [creditHistory, credits, isPaid]);
+
   const maxUsage = useMemo(
-    () => (creditHistory.length > 0 ? Math.max(...creditHistory.map((h) => h.total), 1) : 1),
-    [creditHistory]
+    () => (monthlyTrendData.length > 0 ? Math.max(...monthlyTrendData.map((h) => h.total), 1) : 1),
+    [monthlyTrendData]
   );
 
   const handleRetryAccountData = () => {
@@ -207,6 +236,19 @@ export default function AccountPage() {
         <div className="account-state">
           <span>账户</span>
           <p>正在确认账户状态...</p>
+          <div className="account-state-loader" />
+        </div>
+        <AccountStyles />
+      </main>
+    );
+  }
+
+  if (!membership && (membershipLoading || !membershipError)) {
+    return (
+      <main className="account-page account-centered">
+        <div className="account-state">
+          <span>账户同步</span>
+          <p>正在同步会员与额度数据...</p>
           <div className="account-state-loader" />
         </div>
         <AccountStyles />
@@ -238,6 +280,12 @@ export default function AccountPage() {
   const monthlyPercent = isPaid && credits?.monthlyTotal
     ? Math.min(100, (credits.monthlyUsed / credits.monthlyTotal) * 100)
     : 0;
+  const monthlyRemaining = credits?.monthlyRemaining ?? 0;
+  const purchasedBalance = credits?.purchasedBalance ?? 0;
+  const totalAvailable = credits?.totalAvailable ?? 0;
+  const availablePool = Math.max(totalAvailable, 1);
+  const monthlySharePercent = credits ? Math.min(100, (monthlyRemaining / availablePool) * 100) : 0;
+  const purchasedSharePercent = credits ? Math.min(100, (purchasedBalance / availablePool) * 100) : 0;
   const previewPercent = !isPaid && previewCount?.total
     ? Math.min(100, (previewCount.used / previewCount.total) * 100)
     : 0;
@@ -279,18 +327,52 @@ export default function AccountPage() {
 
             {isPaid && credits ? (
               <>
-                <div className="metric-line">
-                  <strong>{credits.monthlyUsed}</strong>
-                  <span>/ {credits.monthlyTotal} 点额度已消耗</span>
+                <div className="credit-hero">
+                  <div>
+                    <span className="credit-label">总可用</span>
+                    <strong>{totalAvailable}</strong>
+                    <small>点额度</small>
+                  </div>
+                  <button type="button" onClick={() => router.push('/pricing#credits-pack')}>
+                    购买额度
+                  </button>
                 </div>
-                <div className="progress-track" aria-label="本月额度使用进度">
-                  <div style={{ width: `${monthlyPercent}%` }} />
+
+                <div className="credit-wallet" aria-label="额度钱包构成">
+                  <div className="wallet-card monthly">
+                    <span>月度剩余</span>
+                    <strong>{monthlyRemaining}</strong>
+                    <small>
+                      {monthlyRemaining > 0
+                        ? `本月配额 ${credits.monthlyTotal} · 已用 ${credits.monthlyUsed}`
+                        : '月度额度已用尽，正在使用购买额度'}
+                    </small>
+                  </div>
+                  <div className="wallet-card purchased">
+                    <span>购买额度</span>
+                    <strong>{purchasedBalance}</strong>
+                    <small>{purchasedBalance > 0 ? '后续生成会从这里扣除，不会因月度额度用尽而中断' : '购买后会显示在这里，并参与生成扣减'}</small>
+                  </div>
                 </div>
-                <div className="usage-meta">
-                  <span>月度剩余 {credits.monthlyRemaining} 点额度</span>
-                  {credits.purchasedBalance > 0 && <span>购买余额 {credits.purchasedBalance}</span>}
+
+                <div className="wallet-stack" aria-label="可用额度构成">
+                  <i style={{ width: `${monthlySharePercent}%` }} />
+                  <b style={{ width: `${purchasedSharePercent}%` }} />
                 </div>
-                <p>总可用 {credits.totalAvailable} 点额度</p>
+                <div className="wallet-legend">
+                  <span><i />月度剩余 {monthlyRemaining}</span>
+                  <span><b />购买余额 {purchasedBalance}</span>
+                </div>
+
+                <div className="monthly-usage">
+                  <div>
+                    <span>本月消耗</span>
+                    <b>{credits.monthlyUsed} / {credits.monthlyTotal}</b>
+                  </div>
+                  <div className="progress-track" aria-label="本月额度使用进度">
+                    <div style={{ width: `${monthlyPercent}%` }} />
+                  </div>
+                </div>
               </>
             ) : !isPaid && previewCount ? (
               <>
@@ -331,9 +413,9 @@ export default function AccountPage() {
               </div>
             </div>
 
-            {trendView === 'month' && creditHistory.length > 0 ? (
+            {trendView === 'month' && monthlyTrendData.length > 0 ? (
               <div className="bar-chart" role="img" aria-label="月度额度使用趋势柱状图">
-                {creditHistory.slice(-6).map((month) => {
+                {monthlyTrendData.map((month) => {
                   const monthlyHeight = maxUsage > 0 ? ((month.monthlyUsed ?? 0) / maxUsage) * 100 : 0;
                   const purchasedHeight = maxUsage > 0 ? ((month.purchasedUsed ?? 0) / maxUsage) * 100 : 0;
                   const totalHeight = monthlyHeight + purchasedHeight;
@@ -377,7 +459,7 @@ export default function AccountPage() {
           onUpgrade={handleUpgrade}
           onDowngrade={handleDowngrade}
           onCancel={handleCancel}
-          onBuyCredits={() => window.open('/pricing#credits-pack', '_blank')}
+          onBuyCredits={() => router.push('/pricing#credits-pack')}
         />
       </div>
       <AccountStyles />
@@ -499,6 +581,12 @@ function AccountStyles() {
         min-width: 0;
       }
 
+      .usage-card {
+        background:
+          linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.018)),
+          rgba(18,20,27,.92);
+      }
+
       .card-heading {
         margin-bottom: 18px;
       }
@@ -514,6 +602,184 @@ function AccountStyles() {
         margin: 6px 0 0;
         color: var(--hc-text);
         font-size: 18px;
+      }
+
+      .credit-hero {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 14px;
+        padding: 18px 20px;
+        border: 1px solid rgba(206,255,53,.24);
+        border-radius: 12px;
+        background:
+          linear-gradient(135deg, rgba(206,255,53,.14), rgba(82,214,198,.08) 52%, rgba(255,255,255,.035)),
+          rgba(8,9,12,.5);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
+      }
+
+      .credit-hero > div {
+        min-width: 0;
+      }
+
+      .credit-label {
+        display: block;
+        color: var(--hc-muted);
+        font-size: 12px;
+        font-weight: 900;
+        margin-bottom: 7px;
+      }
+
+      .credit-hero strong {
+        color: var(--hc-lime);
+        font-size: clamp(50px, 7vw, 74px);
+        line-height: .9;
+        letter-spacing: 0;
+      }
+
+      .credit-hero small {
+        margin-left: 8px;
+        color: var(--hc-text);
+        font-size: 13px;
+        font-weight: 900;
+      }
+
+      .credit-hero button {
+        min-height: 42px;
+        border: 1px solid rgba(206,255,53,.42);
+        border-radius: 999px;
+        background: linear-gradient(135deg, var(--hc-lime), #73e8c6);
+        color: #08090c;
+        padding: 0 18px;
+        font-size: 13px;
+        font-weight: 950;
+        cursor: pointer;
+        white-space: nowrap;
+        box-shadow: 0 12px 28px rgba(206,255,53,.16);
+      }
+
+      .credit-wallet {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin-bottom: 16px;
+      }
+
+      .wallet-card {
+        min-width: 0;
+        min-height: 122px;
+        padding: 15px;
+        border: 1px solid rgba(255,255,255,.1);
+        border-radius: 10px;
+        background: rgba(8,9,12,.36);
+      }
+
+      .wallet-card.purchased {
+        border-color: rgba(245,197,66,.44);
+        background:
+          linear-gradient(160deg, rgba(245,197,66,.18), rgba(255,90,61,.07)),
+          rgba(8,9,12,.34);
+      }
+
+      .wallet-card span,
+      .monthly-usage span {
+        display: block;
+        color: var(--hc-muted);
+        font-size: 12px;
+        font-weight: 900;
+        margin-bottom: 7px;
+      }
+
+      .wallet-card strong {
+        display: block;
+        color: var(--hc-text);
+        font-size: 34px;
+        line-height: 1;
+      }
+
+      .wallet-card.purchased strong {
+        color: var(--hc-amber);
+      }
+
+      .wallet-card small {
+        display: block;
+        margin-top: 9px;
+        color: var(--hc-muted);
+        font-size: 12px;
+        line-height: 1.55;
+      }
+
+      .wallet-stack {
+        display: flex;
+        height: 9px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(255,255,255,.08);
+      }
+
+      .wallet-stack i,
+      .wallet-stack b {
+        min-width: 0;
+        transition: width .25s ease;
+      }
+
+      .wallet-stack i {
+        background: linear-gradient(90deg, var(--hc-lime), var(--hc-cyan));
+      }
+
+      .wallet-stack b {
+        background: linear-gradient(90deg, var(--hc-amber), var(--hc-coral));
+      }
+
+      .wallet-legend {
+        display: flex;
+        justify-content: flex-start;
+        gap: 18px;
+        margin: 10px 0 18px;
+        color: var(--hc-muted);
+        font-size: 12px;
+        flex-wrap: wrap;
+      }
+
+      .wallet-legend span {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+      }
+
+      .wallet-legend i,
+      .wallet-legend b {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+      }
+
+      .wallet-legend i {
+        background: var(--hc-cyan);
+      }
+
+      .wallet-legend b {
+        background: var(--hc-amber);
+      }
+
+      .monthly-usage {
+        padding: 14px;
+        border: 1px solid rgba(255,255,255,.09);
+        border-radius: 10px;
+        background: rgba(8,9,12,.28);
+      }
+
+      .monthly-usage > div:first-child {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 8px;
+      }
+
+      .monthly-usage b {
+        color: var(--hc-text);
+        font-size: 12px;
       }
 
       .metric-line {
@@ -730,6 +996,19 @@ function AccountStyles() {
         }
 
         .account-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .credit-hero {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .credit-hero button {
+          width: 100%;
+        }
+
+        .credit-wallet {
           grid-template-columns: 1fr;
         }
 

@@ -189,7 +189,7 @@ export default function PricingContent({ tiers, initialCreditsPacks }: PricingCo
         </div>
       </section>
 
-      <style>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         .pricing-content {
           max-width: 1180px;
           margin: 0 auto;
@@ -270,12 +270,13 @@ export default function PricingContent({ tiers, initialCreditsPacks }: PricingCo
           grid-template-columns: repeat(3, minmax(0, 1fr));
           gap: 22px;
           align-items: stretch;
+          padding-top: 18px;
           margin-bottom: 76px;
         }
 
         .tier-card {
           backdrop-filter: blur(18px);
-          overflow: hidden;
+          overflow: visible;
         }
 
         .tier-card::before {
@@ -285,6 +286,8 @@ export default function PricingContent({ tiers, initialCreditsPacks }: PricingCo
           height: 3px;
           background: linear-gradient(90deg, var(--hc-cyan), var(--hc-lime), var(--hc-coral));
           opacity: .58;
+          border-radius: var(--hc-radius-lg) var(--hc-radius-lg) 0 0;
+          pointer-events: none;
         }
 
         .tier-card:hover {
@@ -426,7 +429,7 @@ export default function PricingContent({ tiers, initialCreditsPacks }: PricingCo
             grid-template-columns: 1fr;
           }
         }
-      `}</style>
+      ` }} />
     </div>
   );
 }

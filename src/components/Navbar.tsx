@@ -94,7 +94,7 @@ export default function Navbar() {
 
   return (
     <>
-    <style>{`
+    <style dangerouslySetInnerHTML={{ __html: `
       .hc-nav a,
       .hc-nav button {
         letter-spacing: 0;
@@ -133,7 +133,7 @@ export default function Navbar() {
         .hc-nav::after { left: 14px; right: 14px; }
         .hc-nav-logo img { width: 112px !important; }
       }
-    `}</style>
+    ` }} />
     <nav style={{
       position: 'sticky', top: 0, height: 70, zIndex: 1000,
       background: 'linear-gradient(180deg, rgba(8, 9, 12, 0.95), rgba(8, 9, 12, 0.88))', backdropFilter: 'blur(20px)',

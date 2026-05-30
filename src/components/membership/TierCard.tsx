@@ -177,9 +177,10 @@ const cardStyle: React.CSSProperties = {
 
 const recommendStyle: React.CSSProperties = {
   position: 'absolute',
-  top: -14,
+  top: -18,
   left: '50%',
   transform: 'translateX(-50%)',
+  zIndex: 2,
   borderRadius: 999,
   padding: '7px 16px',
   background: 'linear-gradient(135deg, var(--hc-lime), var(--hc-cyan))',
@@ -193,6 +194,7 @@ const currentStyle: React.CSSProperties = {
   position: 'absolute',
   top: 16,
   right: 16,
+  zIndex: 2,
   borderRadius: 999,
   padding: '5px 10px',
   border: '1px solid rgba(206,255,53,.32)',

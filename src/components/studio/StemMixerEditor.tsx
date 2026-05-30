@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, PointerEvent, WheelEvent } from 'react';
+import type { ChangeEvent, CSSProperties, PointerEvent, WheelEvent } from 'react';
 import {
   defaultStemMasterState,
   normalizeStemMasterState,
@@ -77,6 +77,7 @@ export interface EditableStem {
   label: string;
   url: string;
   waveform?: StemWaveform | null;
+  displayLabel?: string;
 }
 
 export interface StemWaveform {
@@ -100,6 +101,7 @@ interface StemTrackState {
 export interface StemEditState {
   tracks: Record<string, StemTrackState>;
   master?: StemMasterState;
+  trackLabels?: Record<string, string>;
   savedAt?: string;
 }
 
@@ -407,6 +409,14 @@ function normalizeStemType(type: string) {
 }
 
 function getStemDisplayName(stem: EditableStem) {
+  const customLabel = stem.displayLabel?.trim();
+  if (customLabel) {
+    return {
+      zh: customLabel,
+      en: stem.type.replaceAll('_', ' '),
+    };
+  }
+
   const normalized = normalizeStemType(stem.type);
   const nameMap: Record<string, { zh: string; en: string }> = {
     vocals: { zh: '人声', en: 'Vocals' },
@@ -919,7 +929,7 @@ function createMasterOutputChain(context: BaseAudioContext, masterState: StemMas
   };
 }
 
-export default function StemMixerEditor({ stems, versionLabel, jobId, initialEditState }: StemMixerEditorProps) {
+export default function StemMixerEditor({ stems: initialStems, versionLabel, jobId, initialEditState }: StemMixerEditorProps) {
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioBuffersRef = useRef<Record<string, AudioBuffer>>({});
   const gainNodesRef = useRef<Record<string, GainNode>>({});
@@ -936,7 +946,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
   const frameRef = useRef<number | null>(null);
   const skipNextTimeInputCommitRef = useRef(false);
   const skipNextTrimInputCommitRef = useRef(false);
-  const loadingCountRef = useRef(stems.length);
+  const loadingCountRef = useRef(initialStems.length);
   const failedLoadCountRef = useRef(0);
   const autoSaveTimerRef = useRef<number | null>(null);
   const skipNextAutoSaveRef = useRef(true);
@@ -947,16 +957,28 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
   const timelineRulerTrimDragRef = useRef<TimelineRulerTrimDragState | null>(null);
   const ignoreNextTrackClickRef = useRef(false);
   const trackRowRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const [tracks, setTracks] = useState<Record<string, StemTrackState>>(() => createTrackState(stems, initialEditState));
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const customObjectUrlsRef = useRef<Set<string>>(new Set());
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordingStreamRef = useRef<MediaStream | null>(null);
+  const recordingChunksRef = useRef<Blob[]>([]);
+  const [customStems, setCustomStems] = useState<EditableStem[]>([]);
+  const [trackLabels, setTrackLabels] = useState<Record<string, string>>(() => normalizeTrackLabels(initialEditState?.trackLabels));
+  const sourceStems = useMemo(() => [...initialStems, ...customStems], [customStems, initialStems]);
+  const stems = useMemo(() => sourceStems.map((stem) => {
+    const label = trackLabels[stem.type];
+    return label ? { ...stem, displayLabel: label } : stem;
+  }), [sourceStems, trackLabels]);
+  const [tracks, setTracks] = useState<Record<string, StemTrackState>>(() => createTrackState(initialStems, initialEditState));
   const [masterState, setMasterState] = useState<StemMasterState>(() => normalizeStemMasterState(initialEditState?.master));
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(() => getInitialWaveformDuration(stems));
-  const [loadingCount, setLoadingCount] = useState(stems.length);
+  const [duration, setDuration] = useState(() => getInitialWaveformDuration(initialStems));
+  const [loadingCount, setLoadingCount] = useState(initialStems.length);
   const [failedLoadCount, setFailedLoadCount] = useState(0);
   const [cachedLoadCount, setCachedLoadCount] = useState(0);
   const [skippedEmptyCount, setSkippedEmptyCount] = useState(0);
-  const [loadingStemTypes, setLoadingStemTypes] = useState<Set<string>>(() => new Set(stems.map((stem) => stem.type)));
+  const [loadingStemTypes, setLoadingStemTypes] = useState<Set<string>>(() => new Set(initialStems.map((stem) => stem.type)));
   const [failedStemTypes, setFailedStemTypes] = useState<Set<string>>(() => new Set());
   const [bufferVersion, setBufferVersion] = useState(0);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
@@ -1007,13 +1029,17 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     snapBypassed: boolean;
   } | null>(null);
   const [historyVersion, setHistoryVersion] = useState(0);
-  const [selectedTrackType, setSelectedTrackType] = useState<string | null>(() => stems[0]?.type ?? null);
+  const [selectedTrackType, setSelectedTrackType] = useState<string | null>(() => initialStems[0]?.type ?? null);
   const [currentTimeInputDraft, setCurrentTimeInputDraft] = useState<string | null>(null);
   const [selectedTrimInputDraft, setSelectedTrimInputDraft] = useState<{
     edge: 'start' | 'end';
     type: string;
     value: string;
   } | null>(null);
+  const [isAddTrackPanelOpen, setIsAddTrackPanelOpen] = useState(false);
+  const [addTrackMode, setAddTrackMode] = useState<'import' | 'record'>('import');
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingStatus, setRecordingStatus] = useState<string | null>(null);
 
   const masterStem = stems[0] || null;
   const hasSoloTrack = useMemo(
@@ -1038,6 +1064,12 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
       URL.revokeObjectURL(latestExportDownload.url);
     }
   }, [latestExportDownload?.url]);
+
+  useEffect(() => () => {
+    customObjectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    customObjectUrlsRef.current.clear();
+    recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+  }, []);
   const timelineLaneWidth = useMemo(
     () => Math.round(resolveTimelineBaseLaneWidth(showAdvancedControls, timelineViewportWidth) * timelineZoom),
     [showAdvancedControls, timelineViewportWidth, timelineZoom],
@@ -1603,13 +1635,17 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
   }, []);
 
   useEffect(() => {
-    setTracks(createTrackState(stems, initialEditState));
+    setTracks(createTrackState(initialStems, initialEditState));
     setMasterState(normalizeStemMasterState(initialEditState?.master));
+    setTrackLabels(normalizeTrackLabels(initialEditState?.trackLabels));
+    customObjectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    customObjectUrlsRef.current.clear();
+    setCustomStems([]);
     setIsPlaying(false);
     setCurrentTime(0);
-    setDuration(getInitialWaveformDuration(stems));
-    const stemsToLoad = stems.filter((stem) => !stemHasKnownEmptyWaveform(stem));
-    const knownEmptyCount = stems.length - stemsToLoad.length;
+    setDuration(getInitialWaveformDuration(initialStems));
+    const stemsToLoad = initialStems.filter((stem) => !stemHasKnownEmptyWaveform(stem));
+    const knownEmptyCount = initialStems.length - stemsToLoad.length;
     setLoadingCount(stemsToLoad.length);
     setFailedLoadCount(0);
     loadingCountRef.current = stemsToLoad.length;
@@ -1625,7 +1661,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     setHasPendingEditChanges(false);
     setExportingStemType(null);
     setExportStatusInput({ phase: 'idle' });
-    setSelectedTrackType(stems[0]?.type ?? null);
+    setSelectedTrackType(initialStems[0]?.type ?? null);
     skipNextAutoSaveRef.current = true;
     undoStackRef.current = [];
     redoStackRef.current = [];
@@ -1714,7 +1750,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
     return () => {
       abortController.abort();
     };
-  }, [getAudioContext, initialEditState, jobId, stems, stopFrame, stopSources]);
+  }, [getAudioContext, initialEditState, initialStems, jobId, stopFrame, stopSources]);
 
   useEffect(() => () => {
     if (autoSaveTimerRef.current !== null) {
@@ -2064,6 +2100,149 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
       setIsAudioRetrying(false);
     }
   }, [failedStemTypes, getAudioContext, isAudioRetrying, jobId, loadingStemTypes, pauseAll]);
+
+  const renameTrack = useCallback((type: string, value: string) => {
+    const label = sanitizeTrackLabel(value);
+    const fallback = stems.find((stem) => stem.type === type);
+    setTrackLabels((current) => {
+      const next = { ...current };
+      if (!label || label === getStemDisplayName({ ...(fallback || { type, label: type, url: '' }), displayLabel: undefined }).zh) {
+        delete next[type];
+      } else {
+        next[type] = label;
+      }
+      return next;
+    });
+    setSaveStatus(label ? `轨道已重命名为“${label}”。` : '轨道名称已恢复默认。');
+  }, [stems]);
+
+  const addCustomStemFromBlob = useCallback(async (blob: Blob, label: string) => {
+    if (!blob.size) {
+      setPlaybackError('没有收到可用音频，请重新选择文件或重新录音。');
+      return;
+    }
+
+    try {
+      pauseAll();
+      setPlaybackError(null);
+      setRecordingStatus('正在解析音频...');
+
+      const context = getAudioContext();
+      const arrayBuffer = await blob.arrayBuffer();
+      const audioBuffer = await context.decodeAudioData(arrayBuffer);
+      const type = `custom_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+      const displayLabel = sanitizeTrackLabel(label) || `新增轨道 ${customStems.length + 1}`;
+      const url = URL.createObjectURL(blob);
+      const stem: EditableStem = {
+        type,
+        label: displayLabel,
+        displayLabel,
+        url,
+        waveform: calculateWaveform(audioBuffer),
+      };
+
+      customObjectUrlsRef.current.add(url);
+      audioBuffersRef.current[type] = audioBuffer;
+      setCustomStems((current) => [...current, stem]);
+      setTracks((current) => ({
+        ...current,
+        [type]: defaultTrackState(),
+      }));
+      setSelectedTrackType(type);
+      setTrackViewMode('all');
+      setInspectorTab('track');
+      setSideRailTab('track');
+      setInspectorCollapsed(false);
+      setDuration((current) => Math.max(current, audioBuffer.duration || 0));
+      setBufferVersion((version) => version + 1);
+      setRecordingStatus(null);
+      setIsAddTrackPanelOpen(false);
+      setSaveStatus(`已添加“${displayLabel}”，可参与预听、混音和导出。`);
+    } catch {
+      setRecordingStatus(null);
+      setPlaybackError('音频解析失败，请换一个常见格式文件，或重新录音。');
+    }
+  }, [customStems.length, getAudioContext, pauseAll]);
+
+  const importTrackFile = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    const label = file.name.replace(/\.[^/.]+$/, '');
+    void addCustomStemFromBlob(file, label);
+  }, [addCustomStemFromBlob]);
+
+  const openAddTrackPanel = useCallback((mode: 'import' | 'record' = 'import') => {
+    setAddTrackMode(mode);
+    setIsAddTrackPanelOpen(true);
+    setInspectorTab('track');
+    setSideRailTab('track');
+    setInspectorCollapsed(false);
+    setRecordingStatus(null);
+  }, []);
+
+  const startRecordingTrack = useCallback(async () => {
+    if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia || !('MediaRecorder' in window)) {
+      setPlaybackError('当前浏览器不支持现场录音，请改用导入音频。');
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : '';
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      recordingChunksRef.current = [];
+      recordingStreamRef.current = stream;
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          recordingChunksRef.current.push(event.data);
+        }
+      };
+      recorder.onstop = () => {
+        const chunks = recordingChunksRef.current;
+        const type = recorder.mimeType || 'audio/webm';
+        stream.getTracks().forEach((track) => track.stop());
+        recordingStreamRef.current = null;
+        mediaRecorderRef.current = null;
+        setIsRecording(false);
+
+        if (chunks.length === 0) {
+          setRecordingStatus(null);
+          setPlaybackError('录音没有捕获到音频，请检查麦克风权限后重试。');
+          return;
+        }
+
+        const blob = new Blob(chunks, { type });
+        void addCustomStemFromBlob(blob, `现场录音 ${customStems.length + 1}`);
+      };
+
+      recorder.start();
+      setIsRecording(true);
+      setRecordingStatus('正在录音...');
+      setPlaybackError(null);
+    } catch {
+      setIsRecording(false);
+      setRecordingStatus(null);
+      setPlaybackError('无法打开麦克风，请检查浏览器录音权限。');
+    }
+  }, [addCustomStemFromBlob, customStems.length]);
+
+  const stopRecordingTrack = useCallback(() => {
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== 'inactive') {
+      setRecordingStatus('正在生成录音轨道...');
+      recorder.stop();
+      return;
+    }
+
+    recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+    recordingStreamRef.current = null;
+    setIsRecording(false);
+  }, []);
 
   const handleSeek = useCallback((nextTime: number) => {
     const safeTime = Math.max(0, Math.min(duration || nextTime, nextTime));
@@ -2697,7 +2876,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
       const response = await fetch('/api/stems/edit-state', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobId, editState: { tracks, master: masterState } }),
+        body: JSON.stringify({ jobId, editState: { tracks, master: masterState, trackLabels } }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -2728,7 +2907,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
         setIsSaving(false);
       }
     }
-  }, [jobId, masterState, tracks]);
+  }, [jobId, masterState, trackLabels, tracks]);
 
   const saveEditState = useCallback(async () => {
     await persistEditState('manual');
@@ -3046,7 +3225,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
         autoSaveTimerRef.current = null;
       }
     };
-  }, [jobId, masterState, persistEditState, tracks]);
+  }, [jobId, masterState, persistEditState, trackLabels, tracks]);
 
   const waitForStemLoadingToSettle = useCallback(async () => {
     const startedAt = Date.now();
@@ -3459,6 +3638,13 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
 
   return (
     <section style={editorStyle(dawLayoutMetrics)}>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="audio/*"
+        onChange={importTrackFile}
+        style={hiddenFileInputStyle}
+      />
       <div style={editorSideRailStyle} role="tablist" aria-label="编辑器工具栏">
         <button
           type="button"
@@ -3508,6 +3694,14 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
           </div>
         </div>
         <div style={editorActionStyle}>
+          <button
+            type="button"
+            onClick={() => openAddTrackPanel('import')}
+            title="添加一条可混音的新轨道"
+            style={primarySmallButtonStyle}
+          >
+            添加轨道
+          </button>
           <button
             type="button"
             onClick={() => void returnToStudioAfterSave()}
@@ -3746,6 +3940,51 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
             </button>
           </div>}
           {!inspectorCollapsed && inspectorTab === 'track' && (
+          <>
+          <div style={addTrackPanelStyle(isAddTrackPanelOpen)}>
+            <div style={panelHeadingStyle}>
+              <span style={presetLabelStyle}>添加轨道</span>
+              <span style={panelHeadingMetaStyle}>Import / Record</span>
+            </div>
+            <div style={addTrackModeGridStyle}>
+              <button
+                type="button"
+                aria-pressed={addTrackMode === 'import'}
+                style={exportModeButtonStyle(addTrackMode === 'import')}
+                onClick={() => {
+                  openAddTrackPanel('import');
+                  fileInputRef.current?.click();
+                }}
+              >
+                导入音频
+              </button>
+              <button
+                type="button"
+                aria-pressed={addTrackMode === 'record'}
+                style={exportModeButtonStyle(addTrackMode === 'record')}
+                onClick={() => openAddTrackPanel('record')}
+              >
+                现场录音
+              </button>
+            </div>
+            {isAddTrackPanelOpen && addTrackMode === 'import' && (
+              <div style={addTrackHintStyle}>
+                选择 WAV、MP3、M4A 或 WebM 音频后会生成新轨道，可直接预听、混音和导出。
+              </div>
+            )}
+            {isAddTrackPanelOpen && addTrackMode === 'record' && (
+              <div style={recordPanelStyle}>
+                <span style={addTrackHintStyle}>{recordingStatus || '使用麦克风录制一条新轨道。'}</span>
+                <button
+                  type="button"
+                  style={isRecording ? addTrackDangerButtonStyle : addTrackPrimaryButtonStyle}
+                  onClick={isRecording ? stopRecordingTrack : () => void startRecordingTrack()}
+                >
+                  {isRecording ? '停止录音' : '开始录音'}
+                </button>
+              </div>
+            )}
+          </div>
           <div style={selectedTrackPanelStyle}>
             {selectedTrack && selectedTrackState ? (
               <>
@@ -3753,7 +3992,14 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
                   <div style={selectedTrackTitleGroupStyle}>
                     <span style={stemColorStyle(selectedTrack.type)} />
                     <div>
-                      <div style={selectedTrackNameStyle}>{getStemDisplayName(selectedTrack).zh}</div>
+                      <input
+                        aria-label="轨道名称"
+                        type="text"
+                        value={getStemDisplayName(selectedTrack).zh}
+                        maxLength={40}
+                        onChange={(event) => renameTrack(selectedTrack.type, event.target.value)}
+                        style={selectedTrackNameInputStyle}
+                      />
                       <div style={selectedTrackSubStyle}>{getStemDisplayName(selectedTrack).en}</div>
                     </div>
                     {selectedTrackAudioStatus && (
@@ -4046,6 +4292,7 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
               <div style={emptyTrackNoticeStyle}>当前筛选下没有选中的轨道。</div>
             )}
           </div>
+          </>
           )}
 
           {!inspectorCollapsed && inspectorTab === 'mix' && (
@@ -4355,6 +4602,13 @@ export default function StemMixerEditor({ stems, versionLabel, jobId, initialEdi
             </button>
           </div>
           <div style={timelineToolbarStatsStyle}>
+            <button
+              type="button"
+              style={timelineAddTrackButtonStyle}
+              onClick={() => openAddTrackPanel('import')}
+            >
+              添加轨道
+            </button>
             <span style={timelineToolbarPillStyle}>显示 {visibleStems.length}/{stems.length}</span>
             <span style={timelineToolbarPillStyle}>时长 {formatStemTimecode(duration)}</span>
             <span style={timelineToolbarPillStyle}>{selectedTrack ? `选中 ${getStemDisplayName(selectedTrack).zh}` : '未选轨道'}</span>
@@ -4988,6 +5242,14 @@ const primarySmallButtonStyle: CSSProperties = {
   fontWeight: 900,
 };
 
+const hiddenFileInputStyle: CSSProperties = {
+  position: 'absolute',
+  width: 1,
+  height: 1,
+  opacity: 0,
+  pointerEvents: 'none',
+};
+
 const editorEyebrowRowStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
@@ -5468,10 +5730,21 @@ const selectedTrackTitleGroupStyle: CSSProperties = {
   minWidth: 0,
 };
 
-const selectedTrackNameStyle: CSSProperties = {
+const selectedTrackNameInputStyle: CSSProperties = {
+  width: '100%',
+  minWidth: 120,
+  maxWidth: 220,
+  minHeight: 28,
+  borderRadius: 7,
+  border: '1px solid rgba(206, 255, 53, 0.26)',
+  background: 'rgba(7, 10, 18, 0.82)',
   color: '#f5f3ff',
+  padding: '4px 8px',
   fontSize: 14,
   fontWeight: 900,
+  outline: 'none',
+  userSelect: 'text',
+  WebkitUserSelect: 'text',
 };
 
 const selectedTrackSubStyle: CSSProperties = {
@@ -5592,6 +5865,55 @@ const controlPanelStyle: CSSProperties = {
   padding: '10px 12px',
 };
 
+function addTrackPanelStyle(open: boolean): CSSProperties {
+  return {
+    ...controlPanelStyle,
+    borderColor: open ? 'rgba(206, 255, 53, 0.42)' : 'rgba(48, 52, 76, 0.82)',
+    background: open
+      ? 'linear-gradient(180deg, rgba(35, 45, 25, 0.58), rgba(10, 14, 24, 0.94))'
+      : controlPanelStyle.background,
+  };
+}
+
+const addTrackModeGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  gap: 8,
+  marginTop: 8,
+};
+
+const addTrackHintStyle: CSSProperties = {
+  marginTop: 8,
+  color: '#aeb2c9',
+  fontSize: 11,
+  lineHeight: 1.45,
+};
+
+const recordPanelStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr) auto',
+  gap: 8,
+  alignItems: 'center',
+};
+
+const addTrackPrimaryButtonStyle: CSSProperties = {
+  ...editorButtonChromeStyle({ tone: 'primary', compact: true }),
+  minHeight: 30,
+  borderRadius: 7,
+  padding: '5px 10px',
+  fontSize: 12,
+  fontWeight: 900,
+};
+
+const addTrackDangerButtonStyle: CSSProperties = {
+  ...editorButtonChromeStyle({ tone: 'danger', compact: true, active: true }),
+  minHeight: 30,
+  borderRadius: 7,
+  padding: '5px 10px',
+  fontSize: 12,
+  fontWeight: 900,
+};
+
 const buttonWrapStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
@@ -5710,6 +6032,23 @@ function exportPrimaryActionStyle(disabled: boolean): CSSProperties {
     fontWeight: 900,
     lineHeight: 1.15,
   };
+}
+
+function sanitizeTrackLabel(value: string) {
+  return value.replace(/\s+/g, ' ').trim().slice(0, 40);
+}
+
+function normalizeTrackLabels(value: unknown) {
+  const labels = value && typeof value === 'object'
+    ? value as Record<string, unknown>
+    : null;
+  if (!labels) return {};
+
+  return Object.fromEntries(
+    Object.entries(labels)
+      .map(([type, label]) => [type.trim().slice(0, 80), sanitizeTrackLabel(String(label || ''))])
+      .filter(([type, label]) => type.length > 0 && label.length > 0),
+  ) as Record<string, string>;
 }
 
 const exportActionReasonStyle: CSSProperties = {
@@ -6153,6 +6492,16 @@ const timelineToolbarPillStyle: CSSProperties = {
   padding: '3px 8px',
   fontSize: 11,
   fontWeight: 800,
+  whiteSpace: 'nowrap',
+};
+
+const timelineAddTrackButtonStyle: CSSProperties = {
+  ...editorButtonChromeStyle({ tone: 'primary', compact: true }),
+  minHeight: 24,
+  borderRadius: 999,
+  padding: '3px 9px',
+  fontSize: 11,
+  fontWeight: 900,
   whiteSpace: 'nowrap',
 };
 

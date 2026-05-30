@@ -91,7 +91,7 @@ export default function HomePage() {
 
   return (
     <main className="hc-shell home-page">
-      <style>{homeStyles}</style>
+      <style dangerouslySetInnerHTML={{ __html: homeStyles }} />
 
       <section className="home-hero">
         <div className="hc-container home-hero-grid">

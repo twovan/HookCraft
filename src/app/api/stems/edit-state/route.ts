@@ -53,6 +53,22 @@ function normalizeTrackState(value: unknown): TrackStatePayload | null {
   };
 }
 
+function normalizeTrackLabels(value: unknown) {
+  const labels = value && typeof value === 'object'
+    ? value as Record<string, unknown>
+    : null;
+  if (!labels) return {};
+
+  return Object.fromEntries(
+    Object.entries(labels)
+      .map(([type, label]) => [
+        type.trim().slice(0, 80),
+        String(label || '').replace(/\s+/g, ' ').trim().slice(0, 40),
+      ])
+      .filter(([type, label]) => type.length > 0 && label.length > 0),
+  );
+}
+
 function normalizeEditState(value: unknown) {
   const editState = value && typeof value === 'object'
     ? value as Record<string, unknown>
@@ -73,9 +89,12 @@ function normalizeEditState(value: unknown) {
     return null;
   }
 
+  const trackLabels = normalizeTrackLabels(editState?.trackLabels);
+
   return {
     tracks: normalizedTracks,
     master: normalizeStemMasterState(editState?.master as any),
+    ...(Object.keys(trackLabels).length > 0 ? { trackLabels } : {}),
     savedAt: new Date().toISOString(),
   };
 }
