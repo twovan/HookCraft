@@ -122,7 +122,6 @@ type ExportReadiness = 'ready-only' | 'wait-all';
 type TrackViewMode = 'all' | 'active' | 'audible';
 type TrackDensity = 'comfortable' | 'compact';
 type InspectorTab = 'track' | 'mix' | 'export';
-type SideRailTab = InspectorTab;
 type TimelineScrollState = {
   canScroll: boolean;
   progress: number;
@@ -162,7 +161,6 @@ type EditorPreferences = {
   exportReadiness?: ExportReadiness;
   trackViewMode?: TrackViewMode;
   inspectorTab?: InspectorTab;
-  sideRailTab?: SideRailTab;
   timelineZoom?: number;
   followPlayhead?: boolean;
   snapToGrid?: boolean;
@@ -1102,7 +1100,6 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   const showAdvancedControls = false;
   const [trackViewMode, setTrackViewMode] = useState<TrackViewMode>('all');
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>('track');
-  const [sideRailTab, setSideRailTab] = useState<SideRailTab>('track');
   const [loopSelectionPreview, setLoopSelectionPreview] = useState(false);
   const [timelineZoom, setTimelineZoom] = useState(1);
   const [timelineViewportWidth, setTimelineViewportWidth] = useState(0);
@@ -1358,9 +1355,6 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     if (preferences.inspectorTab === 'track' || preferences.inspectorTab === 'mix' || preferences.inspectorTab === 'export') {
       setInspectorTab(preferences.inspectorTab);
     }
-    if (preferences.sideRailTab === 'track' || preferences.sideRailTab === 'mix' || preferences.sideRailTab === 'export') {
-      setSideRailTab(preferences.sideRailTab);
-    }
     if (typeof preferences.timelineZoom === 'number' && Number.isFinite(preferences.timelineZoom)) {
       setTimelineZoom(clampTimelineZoom(preferences.timelineZoom));
     }
@@ -1392,7 +1386,6 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       exportReadiness,
       trackViewMode,
       inspectorTab,
-      sideRailTab,
       timelineZoom,
       followPlayhead,
       snapToGrid,
@@ -1401,7 +1394,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       inspectorCollapsed,
       trackDensity,
     }));
-  }, [compactTransport, editorPreferencesLoaded, exportMode, exportReadiness, followPlayhead, inspectorCollapsed, inspectorTab, sideRailTab, snapStepSeconds, snapToGrid, timelineZoom, trackDensity, trackViewMode]);
+  }, [compactTransport, editorPreferencesLoaded, exportMode, exportReadiness, followPlayhead, inspectorCollapsed, inspectorTab, snapStepSeconds, snapToGrid, timelineZoom, trackDensity, trackViewMode]);
 
   useEffect(() => {
     setSaveStatusDismissing(false);
@@ -2422,7 +2415,6 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     setSelectedTrackType(type);
     setTrackViewMode('all');
     setInspectorTab('track');
-    setSideRailTab('track');
     setInspectorCollapsed(false);
     setAddTrackMode('import');
     setIsAddTrackPanelOpen(true);
@@ -2501,7 +2493,6 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       setSelectedTrackType(type);
       setTrackViewMode('all');
       setInspectorTab('track');
-      setSideRailTab('track');
       setInspectorCollapsed(false);
       setDuration((current) => Math.max(current, audioBuffer.duration || 0));
       setBufferVersion((version) => version + 1);
@@ -2619,7 +2610,6 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     setAddTrackMode(mode);
     setIsAddTrackPanelOpen(true);
     setInspectorTab('track');
-    setSideRailTab('track');
     setInspectorCollapsed(false);
     setRecordingStatus(null);
   }, []);
@@ -4003,7 +3993,6 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
 
   const exportMix = useCallback(async () => {
     setInspectorTab('export');
-    setSideRailTab('export');
     setInspectorCollapsed(false);
     setIsExporting(true);
     setPlaybackError(null);
@@ -4134,7 +4123,6 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
 
   const exportSingleStem = useCallback(async (stem: EditableStem) => {
     setInspectorTab('export');
-    setSideRailTab('export');
     setInspectorCollapsed(false);
     setExportingStemType(stem.type);
     setPlaybackError(null);
@@ -4231,7 +4219,6 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
 
   const exportAllReadyStems = useCallback(async () => {
     setInspectorTab('export');
-    setSideRailTab('export');
     setInspectorCollapsed(false);
     setIsExporting(true);
     setExportingStemType(null);
@@ -4348,40 +4335,8 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     }
   }, [duration, exportReadiness, savePendingEditsBeforeExport, stems, tracks, waitForStemLoadingToSettle]);
 
-  const focusTimelineSurface = useCallback(() => {
-    const viewport = timelineViewportRef.current;
-    if (!viewport) return;
-
-    viewport.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
-    viewport.focus({ preventScroll: true });
-  }, []);
-
-  const activateSideRailTab = useCallback((tab: SideRailTab) => {
-    setSideRailTab(tab);
-
-    if (tab === 'track') {
-      setInspectorCollapsed(false);
-      setInspectorTab('track');
-      window.requestAnimationFrame(focusTimelineSurface);
-      setSaveStatus('已切换到轨道时间线。');
-      return;
-    }
-
-    if (tab === 'mix') {
-      setInspectorCollapsed(false);
-      setInspectorTab('mix');
-      setSaveStatus('已打开混音控制。');
-      return;
-    }
-
-    setInspectorCollapsed(false);
-    setInspectorTab('export');
-    setSaveStatus('已打开导出中心。');
-  }, [focusTimelineSurface]);
-
   const selectInspectorTab = useCallback((tab: InspectorTab) => {
     setInspectorTab(tab);
-    setSideRailTab(tab);
   }, []);
 
   useEffect(() => {
@@ -4405,41 +4360,6 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         onChange={importTrackFile}
         style={hiddenFileInputStyle}
       />
-      <div style={editorSideRailStyle} role="tablist" aria-label="编辑器工具栏">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={sideRailTab === 'track'}
-          aria-controls="stem-editor-timeline"
-          title="轨道：查看多轨时间线"
-          style={sideRailButtonStyle(sideRailTab === 'track')}
-          onClick={() => activateSideRailTab('track')}
-        >
-          轨道
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={sideRailTab === 'mix'}
-          aria-controls="stem-editor-inspector"
-          title="混音：打开右侧混音控制"
-          style={sideRailButtonStyle(sideRailTab === 'mix')}
-          onClick={() => activateSideRailTab('mix')}
-        >
-          混音
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={sideRailTab === 'export'}
-          aria-controls="stem-editor-inspector"
-          title="导出：打开右侧导出中心"
-          style={sideRailButtonStyle(sideRailTab === 'export')}
-          onClick={() => activateSideRailTab('export')}
-        >
-          导出
-        </button>
-      </div>
       <div style={editorHeaderStyle}>
         <div style={editorHeaderPrimaryStyle}>
           <Link href="/" aria-label="返回 HookCraft 首页" style={editorBrandStyle}>
@@ -4495,7 +4415,6 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
           <button
             type="button"
             onClick={() => {
-              setSideRailTab('export');
               setInspectorTab('export');
               setInspectorCollapsed(false);
               setSaveStatus('已打开导出中心。');
@@ -5446,7 +5365,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         </div>
       )}
       {(saveStatus || autoSaveStatus) && (
-        <div style={editorStatusToastDockStyle} aria-live="polite">
+        <div style={editorStatusToastDockStyle(dawLayoutMetrics)} aria-live="polite">
           {saveStatus && (
             <div style={editorStatusToastStyle('save', saveStatusDismissing)}>
               <span style={editorStatusToastIconStyle('save')}>✓</span>
@@ -5846,7 +5765,6 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                       style={trackFxButtonStyle}
                       onClick={() => {
                         setInspectorTab('mix');
-                        setSideRailTab('mix');
                         setInspectorCollapsed(false);
                         setSaveStatus(`已打开“${displayName.zh}”的混音控制。`);
                       }}
@@ -6319,42 +6237,6 @@ const editorHeaderStyle: CSSProperties = {
   background: 'linear-gradient(180deg, rgba(13, 19, 29, 0.98), rgba(7, 11, 19, 0.96))',
   boxShadow: '0 10px 26px rgba(0, 0, 0, 0.26)',
 };
-
-const editorSideRailStyle: CSSProperties = {
-  position: 'fixed',
-  left: 0,
-  top: 72,
-  bottom: 0,
-  zIndex: 18,
-  width: 48,
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'stretch',
-  gap: 8,
-  padding: '10px 6px',
-  boxSizing: 'border-box',
-  borderRight: '1px solid rgba(48, 52, 76, 0.64)',
-  background: 'linear-gradient(180deg, rgba(12, 17, 27, 0.98), rgba(5, 9, 15, 0.98))',
-};
-
-function sideRailButtonStyle(active: boolean, armed = false): CSSProperties {
-  return {
-    ...editorButtonChromeStyle({ tone: active ? 'purple' : armed ? 'info' : 'neutral', active, disabled: false }),
-    minHeight: 54,
-    borderRadius: 9,
-    color: active ? '#f2ebff' : armed ? '#bfdbfe' : '#7e849b',
-    fontSize: 11,
-    fontWeight: 900,
-    writingMode: 'vertical-rl',
-    letterSpacing: 0,
-    boxShadow: active
-      ? 'inset 2px 0 0 rgba(206, 255, 53, 0.92), inset 0 1px 0 rgba(255,255,255,0.16), inset 0 -2px 0 rgba(0,0,0,0.34)'
-      : armed
-        ? 'inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -2px 0 rgba(0,0,0,0.3)'
-        : 'inset 0 1px 0 rgba(255,255,255,0.06), inset 0 -2px 0 rgba(0,0,0,0.24)',
-    transition: 'background 0.16s ease, border-color 0.16s ease, color 0.16s ease',
-  };
-}
 
 const editorHeaderPrimaryStyle: CSSProperties = {
   display: 'flex',
@@ -7748,16 +7630,18 @@ const loadingNoticeStyle: CSSProperties = {
   fontSize: 12,
 };
 
-const editorStatusToastDockStyle: CSSProperties = {
-  position: 'fixed',
-  top: 84,
-  right: 18,
-  zIndex: 19,
-  display: 'grid',
-  gap: 6,
-  width: 'min(390px, calc(100vw - 86px))',
-  pointerEvents: 'none',
-};
+function editorStatusToastDockStyle(metrics: DawEditorLayoutMetrics): CSSProperties {
+  return {
+    position: 'fixed',
+    top: metrics.headerHeight + 10,
+    right: metrics.inspectorWidth + 28,
+    zIndex: 45,
+    display: 'grid',
+    gap: 6,
+    width: `min(390px, calc(100vw - ${metrics.inspectorWidth + 64}px))`,
+    pointerEvents: 'none',
+  };
+}
 
 function editorStatusToastStyle(tone: 'save' | 'auto', dismissing = false): CSSProperties {
   const saveTone = tone === 'save';

@@ -48,7 +48,19 @@ function isTextEntryTarget(target: EventTarget | null) {
   if (element.isContentEditable) return true;
 
   const tagName = element.tagName?.toLowerCase();
-  return tagName === 'input' || tagName === 'textarea' || tagName === 'select';
+  if (tagName === 'textarea' || tagName === 'select') return true;
+  if (tagName !== 'input') return false;
+
+  const inputType = ((element as HTMLInputElement).type || 'text').toLowerCase();
+  return ![
+    'button',
+    'checkbox',
+    'file',
+    'radio',
+    'range',
+    'reset',
+    'submit',
+  ].includes(inputType);
 }
 
 export function resolveStemEditorShortcut(event: KeyboardShortcutEvent): StemEditorShortcutAction | null {

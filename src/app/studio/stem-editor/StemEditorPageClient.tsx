@@ -328,7 +328,7 @@ export default function StemEditorPageClient() {
           </div>
         </header>
       )}
-      {!hasLoadedStems && (
+      {false && !hasLoadedStems && (
         <aside style={sideRailStyle} aria-label="编辑器模块">
           <span style={sideRailButtonStyle(true)}>轨道</span>
           <span style={sideRailButtonStyle(false)}>混音</span>
@@ -627,15 +627,15 @@ const sideRailStyle: CSSProperties = {
   top: 72,
   bottom: 0,
   zIndex: 18,
-  width: 48,
-  display: 'flex',
+  width: 0,
+  display: 'none',
   flexDirection: 'column',
   alignItems: 'stretch',
   gap: 8,
-  padding: '10px 6px',
+  padding: 0,
   boxSizing: 'border-box',
-  borderRight: '1px solid rgba(255, 255, 255, 0.1)',
-  background: 'linear-gradient(180deg, rgba(17, 18, 23, 0.96), rgba(5, 6, 8, 0.98))',
+  borderRight: 'none',
+  background: 'transparent',
 };
 
 function sideRailButtonStyle(active: boolean): CSSProperties {
@@ -662,7 +662,7 @@ function stageStyle(loaded: boolean): CSSProperties {
     margin: 0,
     minHeight: loaded ? '100vh' : 'calc(100vh - 72px)',
     paddingTop: loaded ? 0 : 90,
-    paddingLeft: loaded ? 0 : 66,
+    paddingLeft: loaded ? 0 : 18,
     paddingRight: loaded ? 0 : 18,
     paddingBottom: loaded ? 0 : 84,
     borderRadius: 0,

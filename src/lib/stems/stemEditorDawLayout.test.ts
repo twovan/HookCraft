@@ -12,7 +12,7 @@ describe('stem editor DAW layout metrics', () => {
       viewportHeight: 900,
     });
 
-    expect(metrics.sideRailWidth).toBe(48);
+    expect(metrics.sideRailWidth).toBe(0);
     expect(metrics.headerHeight).toBe(72);
     expect(metrics.inspectorWidth).toBe(300);
     expect(metrics.bottomTransportHeight).toBe(86);

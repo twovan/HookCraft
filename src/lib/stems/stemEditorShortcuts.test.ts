@@ -18,6 +18,7 @@ describe('resolveStemEditorShortcut', () => {
     expect(resolveStemEditorShortcut(keyEvent({ key: 'Escape' }))).toBe('stop-playback');
     expect(resolveStemEditorShortcut(keyEvent({ key: '?' }))).toBe('toggle-shortcut-help');
     expect(resolveStemEditorShortcut(keyEvent({ key: 's', ctrlKey: true }))).toBe('save');
+    expect(resolveStemEditorShortcut(keyEvent({ key: 'z', ctrlKey: true }))).toBe('undo');
     expect(resolveStemEditorShortcut(keyEvent({ key: 'z', metaKey: true }))).toBe('undo');
     expect(resolveStemEditorShortcut(keyEvent({ key: 'y', ctrlKey: true }))).toBe('redo');
     expect(resolveStemEditorShortcut(keyEvent({ key: 'z', ctrlKey: true, shiftKey: true }))).toBe('redo');
@@ -64,5 +65,13 @@ describe('resolveStemEditorShortcut', () => {
     expect(resolveStemEditorShortcut(keyEvent({ key: 'Delete', target: input as unknown as EventTarget }))).toBeNull();
     expect(resolveStemEditorShortcut(keyEvent({ key: 's', altKey: true }))).toBeNull();
     expect(resolveStemEditorShortcut(keyEvent({ key: 'x', ctrlKey: true }))).toBeNull();
+  });
+
+  it('keeps undo available when focus is on non-text controls', () => {
+    const rangeInput = { tagName: 'INPUT', type: 'range', isContentEditable: false };
+    const checkboxInput = { tagName: 'INPUT', type: 'checkbox', isContentEditable: false };
+
+    expect(resolveStemEditorShortcut(keyEvent({ key: 'z', ctrlKey: true, target: rangeInput as unknown as EventTarget }))).toBe('undo');
+    expect(resolveStemEditorShortcut(keyEvent({ key: 'z', ctrlKey: true, target: checkboxInput as unknown as EventTarget }))).toBe('undo');
   });
 });

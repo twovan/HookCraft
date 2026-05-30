@@ -20,7 +20,7 @@ export function buildDawEditorLayoutMetrics(input: DawEditorLayoutInput): DawEdi
     : 720;
 
   return {
-    sideRailWidth: 48,
+    sideRailWidth: 0,
     headerHeight: 72,
     inspectorWidth: input.inspectorCollapsed ? 58 : 300,
     bottomTransportHeight: input.compactTransport ? 86 : 146,
