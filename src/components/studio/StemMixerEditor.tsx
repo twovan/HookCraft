@@ -78,6 +78,7 @@ export interface EditableStem {
   url: string;
   waveform?: StemWaveform | null;
   displayLabel?: string;
+  isPlaceholder?: boolean;
 }
 
 export interface StemWaveform {
@@ -963,6 +964,9 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordingStreamRef = useRef<MediaStream | null>(null);
   const recordingChunksRef = useRef<Blob[]>([]);
+  const recordingAudioContextRef = useRef<AudioContext | null>(null);
+  const recordingWaveformFrameRef = useRef<number | null>(null);
+  const importTargetTypeRef = useRef<string | null>(null);
   const trackReorderPressTimerRef = useRef<number | null>(null);
   const trackReorderDragTypeRef = useRef<string | null>(null);
   const trackReorderPressRef = useRef<{
@@ -1050,6 +1054,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   const [addTrackMode, setAddTrackMode] = useState<'import' | 'record'>('import');
   const [isRecording, setIsRecording] = useState(false);
   const [recordingStatus, setRecordingStatus] = useState<string | null>(null);
+  const [recordingWaveform, setRecordingWaveform] = useState<number[]>(() => Array.from({ length: 28 }, () => 0.08));
   const [reorderingTrackType, setReorderingTrackType] = useState<string | null>(null);
 
   const masterStem = stems[0] || null;
@@ -1080,6 +1085,13 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     customObjectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     customObjectUrlsRef.current.clear();
     recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+    if (recordingWaveformFrameRef.current !== null) {
+      window.cancelAnimationFrame(recordingWaveformFrameRef.current);
+      recordingWaveformFrameRef.current = null;
+    }
+    const recordingContext = recordingAudioContextRef.current;
+    recordingAudioContextRef.current = null;
+    void recordingContext?.close();
     if (trackReorderPressTimerRef.current !== null) {
       window.clearTimeout(trackReorderPressTimerRef.current);
       trackReorderPressTimerRef.current = null;
@@ -1516,6 +1528,10 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   const selectedTrackBuffer = selectedTrack
     ? (audioBuffersRef.current[selectedTrack.type] || null)
     : null;
+  const selectedTrackIsCustom = selectedTrack
+    ? customStems.some((stem) => stem.type === selectedTrack.type)
+    : false;
+  const selectedTrackNeedsAudio = Boolean(selectedTrack && (selectedTrack.isPlaceholder || !selectedTrackBuffer));
   const playbackNudgeStepSeconds = normalizeTimelineSnapStep(snapToGrid ? snapStepSeconds : DEFAULT_TIMELINE_SNAP_STEP_SECONDS);
   const selectedTrackAudioStatus = selectedTrack
     ? resolveStemTrackAudioStatus({
@@ -1657,6 +1673,16 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     customObjectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     customObjectUrlsRef.current.clear();
     setCustomStems([]);
+    setRecordingStatus(null);
+    setRecordingWaveform(Array.from({ length: 28 }, () => 0.08));
+    importTargetTypeRef.current = null;
+    if (recordingWaveformFrameRef.current !== null) {
+      window.cancelAnimationFrame(recordingWaveformFrameRef.current);
+      recordingWaveformFrameRef.current = null;
+    }
+    const recordingContext = recordingAudioContextRef.current;
+    recordingAudioContextRef.current = null;
+    void recordingContext?.close();
     setReorderingTrackType(null);
     trackReorderDragTypeRef.current = null;
     trackReorderPressRef.current = null;
@@ -2135,7 +2161,49 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     setSaveStatus(label ? `轨道已重命名为“${label}”。` : '轨道名称已恢复默认。');
   }, [stems]);
 
-  const addCustomStemFromBlob = useCallback(async (blob: Blob, label: string) => {
+  const createEmptyCustomTrack = useCallback(() => {
+    const type = `custom_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+    const displayLabel = `空轨道 ${customStems.length + 1}`;
+    const placeholderDuration = Math.max(1, Number(duration.toFixed(3)) || 1);
+    const stem: EditableStem = {
+      type,
+      label: displayLabel,
+      displayLabel,
+      url: '',
+      isPlaceholder: true,
+      waveform: {
+        duration: placeholderDuration,
+        peaks: Array.from({ length: 96 }, () => 0),
+      },
+    };
+
+    setCustomStems((current) => [...current, stem]);
+    setTrackOrder((current) => [...current.filter((item) => item !== type), type]);
+    setTracks((current) => ({
+      ...current,
+      [type]: defaultTrackState(),
+    }));
+    setSkippedEmptyCount((count) => count + 1);
+    setSelectedTrackType(type);
+    setTrackViewMode('all');
+    setInspectorTab('track');
+    setSideRailTab('track');
+    setInspectorCollapsed(false);
+    setAddTrackMode('import');
+    setIsAddTrackPanelOpen(true);
+    setRecordingStatus(null);
+    setSaveStatus(`已添加“${displayLabel}”，可在右侧导入音频或现场录音。`);
+    return type;
+  }, [customStems.length, duration]);
+
+  const resolveAudioInputTargetType = useCallback(() => {
+    if (selectedTrack && customStems.some((stem) => stem.type === selectedTrack.type)) {
+      return selectedTrack.type;
+    }
+    return createEmptyCustomTrack();
+  }, [createEmptyCustomTrack, customStems, selectedTrack]);
+
+  const addCustomStemFromBlob = useCallback(async (blob: Blob, label: string, targetType?: string | null) => {
     if (!blob.size) {
       setPlaybackError('没有收到可用音频，请重新选择文件或重新录音。');
       return;
@@ -2149,25 +2217,51 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       const context = getAudioContext();
       const arrayBuffer = await blob.arrayBuffer();
       const audioBuffer = await context.decodeAudioData(arrayBuffer);
-      const type = `custom_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
-      const displayLabel = sanitizeTrackLabel(label) || `新增轨道 ${customStems.length + 1}`;
+      const existingStem = targetType
+        ? customStems.find((stem) => stem.type === targetType)
+        : null;
+      const type = existingStem?.type || `custom_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+      const shouldUseIncomingLabel = !existingStem
+        || existingStem.isPlaceholder
+        || getStemDisplayName(existingStem).zh.startsWith('空轨道');
+      const displayLabel = shouldUseIncomingLabel
+        ? (sanitizeTrackLabel(label) || `新增轨道 ${customStems.length + 1}`)
+        : getStemDisplayName(existingStem).zh;
       const url = URL.createObjectURL(blob);
       const stem: EditableStem = {
         type,
         label: displayLabel,
         displayLabel,
         url,
+        isPlaceholder: false,
         waveform: calculateWaveform(audioBuffer),
       };
 
+      if (existingStem?.url && customObjectUrlsRef.current.has(existingStem.url)) {
+        URL.revokeObjectURL(existingStem.url);
+        customObjectUrlsRef.current.delete(existingStem.url);
+      }
       customObjectUrlsRef.current.add(url);
       audioBuffersRef.current[type] = audioBuffer;
-      setCustomStems((current) => [...current, stem]);
-      setTrackOrder((current) => [...current.filter((item) => item !== type), type]);
+      setCustomStems((current) => {
+        const existingIndex = current.findIndex((item) => item.type === type);
+        if (existingIndex < 0) return [...current, stem];
+        const next = [...current];
+        next[existingIndex] = stem;
+        return next;
+      });
+      setTrackOrder((current) => (
+        existingStem
+          ? current.includes(type) ? current : [...current, type]
+          : [...current.filter((item) => item !== type), type]
+      ));
       setTracks((current) => ({
         ...current,
-        [type]: defaultTrackState(),
+        [type]: current[type] || defaultTrackState(),
       }));
+      if (existingStem && stemHasKnownEmptyWaveform(existingStem)) {
+        setSkippedEmptyCount((count) => Math.max(0, count - 1));
+      }
       setSelectedTrackType(type);
       setTrackViewMode('all');
       setInspectorTab('track');
@@ -2176,21 +2270,67 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       setDuration((current) => Math.max(current, audioBuffer.duration || 0));
       setBufferVersion((version) => version + 1);
       setRecordingStatus(null);
-      setIsAddTrackPanelOpen(false);
-      setSaveStatus(`已添加“${displayLabel}”，可参与预听、混音和导出。`);
+      setRecordingWaveform(Array.from({ length: 28 }, () => 0.08));
+      setIsAddTrackPanelOpen(true);
+      setSaveStatus(`已为“${displayLabel}”载入音频，可参与预听、混音和导出。`);
     } catch {
       setRecordingStatus(null);
       setPlaybackError('音频解析失败，请换一个常见格式文件，或重新录音。');
     }
-  }, [customStems.length, getAudioContext, pauseAll]);
+  }, [customStems, getAudioContext, pauseAll]);
 
   const importTrackFile = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
     const label = file.name.replace(/\.[^/.]+$/, '');
-    void addCustomStemFromBlob(file, label);
-  }, [addCustomStemFromBlob]);
+    const targetType = importTargetTypeRef.current || resolveAudioInputTargetType();
+    importTargetTypeRef.current = null;
+    void addCustomStemFromBlob(file, label, targetType);
+  }, [addCustomStemFromBlob, resolveAudioInputTargetType]);
+
+  const importAudioToSelectedTrack = useCallback(() => {
+    importTargetTypeRef.current = resolveAudioInputTargetType();
+    setAddTrackMode('import');
+    setIsAddTrackPanelOpen(true);
+    fileInputRef.current?.click();
+  }, [resolveAudioInputTargetType]);
+
+  const stopRecordingMeter = useCallback(() => {
+    if (recordingWaveformFrameRef.current !== null) {
+      window.cancelAnimationFrame(recordingWaveformFrameRef.current);
+      recordingWaveformFrameRef.current = null;
+    }
+    const context = recordingAudioContextRef.current;
+    recordingAudioContextRef.current = null;
+    void context?.close();
+  }, []);
+
+  const startRecordingMeter = useCallback((stream: MediaStream) => {
+    stopRecordingMeter();
+    const context = new AudioContext();
+    const source = context.createMediaStreamSource(stream);
+    const analyser = context.createAnalyser();
+    analyser.fftSize = 256;
+    source.connect(analyser);
+    recordingAudioContextRef.current = context;
+
+    const samples = new Uint8Array(analyser.fftSize);
+    const tick = () => {
+      analyser.getByteTimeDomainData(samples);
+      let sum = 0;
+      for (let index = 0; index < samples.length; index += 1) {
+        const centered = (samples[index] - 128) / 128;
+        sum += centered * centered;
+      }
+      const rms = Math.sqrt(sum / samples.length);
+      const level = Math.max(0.08, Math.min(1, rms * 5.2));
+      setRecordingWaveform((current) => [...current.slice(-27), level]);
+      recordingWaveformFrameRef.current = window.requestAnimationFrame(tick);
+    };
+
+    tick();
+  }, [stopRecordingMeter]);
 
   const openAddTrackPanel = useCallback((mode: 'import' | 'record' = 'import') => {
     setAddTrackMode(mode);
@@ -2208,6 +2348,8 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     }
 
     try {
+      const targetType = resolveAudioInputTargetType();
+      setSelectedTrackType(targetType);
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus'
@@ -2216,6 +2358,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       recordingChunksRef.current = [];
       recordingStreamRef.current = stream;
       mediaRecorderRef.current = recorder;
+      startRecordingMeter(stream);
 
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -2228,6 +2371,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         stream.getTracks().forEach((track) => track.stop());
         recordingStreamRef.current = null;
         mediaRecorderRef.current = null;
+        stopRecordingMeter();
         setIsRecording(false);
 
         if (chunks.length === 0) {
@@ -2237,19 +2381,22 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         }
 
         const blob = new Blob(chunks, { type });
-        void addCustomStemFromBlob(blob, `现场录音 ${customStems.length + 1}`);
+        void addCustomStemFromBlob(blob, `现场录音 ${customStems.length + 1}`, targetType);
       };
 
       recorder.start();
       setIsRecording(true);
+      setAddTrackMode('record');
+      setIsAddTrackPanelOpen(true);
       setRecordingStatus('正在录音...');
       setPlaybackError(null);
     } catch {
+      stopRecordingMeter();
       setIsRecording(false);
       setRecordingStatus(null);
       setPlaybackError('无法打开麦克风，请检查浏览器录音权限。');
     }
-  }, [addCustomStemFromBlob, customStems.length]);
+  }, [addCustomStemFromBlob, customStems.length, resolveAudioInputTargetType, startRecordingMeter, stopRecordingMeter]);
 
   const stopRecordingTrack = useCallback(() => {
     const recorder = mediaRecorderRef.current;
@@ -2261,8 +2408,9 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
 
     recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
     recordingStreamRef.current = null;
+    stopRecordingMeter();
     setIsRecording(false);
-  }, []);
+  }, [stopRecordingMeter]);
 
   const clearTrackReorderPress = useCallback(() => {
     if (trackReorderPressTimerRef.current !== null) {
@@ -3819,7 +3967,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         <div style={editorActionStyle}>
           <button
             type="button"
-            onClick={() => openAddTrackPanel('import')}
+            onClick={createEmptyCustomTrack}
             title="添加一条可混音的新轨道"
             style={primarySmallButtonStyle}
           >
@@ -4066,18 +4214,24 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
           <>
           <div style={addTrackPanelStyle(isAddTrackPanelOpen)}>
             <div style={panelHeadingStyle}>
-              <span style={presetLabelStyle}>添加轨道</span>
+              <span style={presetLabelStyle}>轨道素材</span>
               <span style={panelHeadingMetaStyle}>Import / Record</span>
+            </div>
+            <div style={addTrackHintStyle}>
+              {selectedTrack
+                ? selectedTrackIsCustom
+                  ? selectedTrackNeedsAudio
+                    ? `当前选中“${getStemDisplayName(selectedTrack).zh}”，导入或录音后会填入这条空轨。`
+                    : `当前选中“${getStemDisplayName(selectedTrack).zh}”，可以重新导入或重新录音替换素材。`
+                  : '当前是系统分轨。需要新增素材时，先点击时间线下方 + 创建一条空轨。'
+                : '先点击时间线下方 + 创建一条空轨。'}
             </div>
             <div style={addTrackModeGridStyle}>
               <button
                 type="button"
                 aria-pressed={addTrackMode === 'import'}
                 style={exportModeButtonStyle(addTrackMode === 'import')}
-                onClick={() => {
-                  openAddTrackPanel('import');
-                  fileInputRef.current?.click();
-                }}
+                onClick={importAudioToSelectedTrack}
               >
                 导入音频
               </button>
@@ -4092,12 +4246,19 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
             </div>
             {isAddTrackPanelOpen && addTrackMode === 'import' && (
               <div style={addTrackHintStyle}>
-                选择 WAV、MP3、M4A 或 WebM 音频后会生成新轨道，可直接预听、混音和导出。
+                选择 WAV、MP3、M4A 或 WebM 音频后，会填入当前空轨并生成波形。
               </div>
             )}
             {isAddTrackPanelOpen && addTrackMode === 'record' && (
               <div style={recordPanelStyle}>
-                <span style={addTrackHintStyle}>{recordingStatus || '使用麦克风录制一条新轨道。'}</span>
+                <div>
+                  <span style={addTrackHintStyle}>{recordingStatus || '使用麦克风录制当前空轨。'}</span>
+                  <div style={recordingWaveformStyle(isRecording)} aria-hidden="true">
+                    {recordingWaveform.map((level, index) => (
+                      <span key={index} style={recordingWaveformBarStyle(level, isRecording)} />
+                    ))}
+                  </div>
+                </div>
                 <button
                   type="button"
                   style={isRecording ? addTrackDangerButtonStyle : addTrackPrimaryButtonStyle}
@@ -4728,7 +4889,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
             <button
               type="button"
               style={timelineAddTrackButtonStyle}
-              onClick={() => openAddTrackPanel('import')}
+              onClick={createEmptyCustomTrack}
             >
               添加轨道
             </button>
@@ -5075,7 +5236,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
             aria-label="添加轨道"
             title="添加轨道"
             style={trackAddIconButtonStyle}
-            onClick={() => openAddTrackPanel('import')}
+            onClick={createEmptyCustomTrack}
           >
             +
           </button>
@@ -6040,7 +6201,39 @@ const recordPanelStyle: CSSProperties = {
   gridTemplateColumns: 'minmax(0, 1fr) auto',
   gap: 8,
   alignItems: 'center',
+  marginTop: 8,
 };
+
+function recordingWaveformStyle(active: boolean): CSSProperties {
+  return {
+    height: 42,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 3,
+    marginTop: 8,
+    padding: '6px 8px',
+    borderRadius: 8,
+    border: active ? '1px solid rgba(82, 214, 198, 0.42)' : '1px solid rgba(48, 52, 76, 0.82)',
+    background: active
+      ? 'linear-gradient(90deg, rgba(82, 214, 198, 0.13), rgba(206, 255, 53, 0.08))'
+      : 'rgba(8, 11, 19, 0.72)',
+    overflow: 'hidden',
+  };
+}
+
+function recordingWaveformBarStyle(level: number, active: boolean): CSSProperties {
+  const height = Math.max(5, Math.min(30, level * 32));
+  return {
+    width: 4,
+    height,
+    borderRadius: 999,
+    background: active
+      ? 'linear-gradient(180deg, #ceff35, #52d6c6)'
+      : 'rgba(148, 163, 184, 0.32)',
+    boxShadow: active ? '0 0 10px rgba(82, 214, 198, 0.28)' : 'none',
+    transition: 'height 70ms linear, background 140ms ease',
+  };
+}
 
 const addTrackPrimaryButtonStyle: CSSProperties = {
   ...editorButtonChromeStyle({ tone: 'primary', compact: true }),
