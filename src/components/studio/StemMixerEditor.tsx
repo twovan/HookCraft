@@ -135,6 +135,15 @@ type TimelineRulerTrimDragState = {
   trimEnd: number;
   moved: boolean;
 };
+type StemEditorHistorySnapshot = {
+  tracks: Record<string, StemTrackState>;
+  master: StemMasterState;
+  trackLabels: Record<string, string>;
+  trackOrder: string[];
+  customStems: EditableStem[];
+  skippedEmptyCount: number;
+  selectedTrackType: string | null;
+};
 type EditorPreferences = {
   exportMode?: ExportMode;
   exportReadiness?: ExportReadiness;
@@ -391,6 +400,23 @@ function resolveTrackClipState(state: StemTrackState, duration: number) {
 
 function areTrackStatesEqual(left: Record<string, StemTrackState>, right: Record<string, StemTrackState>) {
   return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function cloneEditorHistorySnapshot(snapshot: StemEditorHistorySnapshot): StemEditorHistorySnapshot {
+  return {
+    tracks: JSON.parse(JSON.stringify(snapshot.tracks)) as Record<string, StemTrackState>,
+    master: JSON.parse(JSON.stringify(snapshot.master)) as StemMasterState,
+    trackLabels: { ...snapshot.trackLabels },
+    trackOrder: [...snapshot.trackOrder],
+    customStems: snapshot.customStems.map((stem) => ({
+      ...stem,
+      waveform: stem.waveform
+        ? { ...stem.waveform, peaks: [...stem.waveform.peaks] }
+        : stem.waveform,
+    })),
+    skippedEmptyCount: snapshot.skippedEmptyCount,
+    selectedTrackType: snapshot.selectedTrackType,
+  };
 }
 
 function formatTime(seconds: number) {
@@ -952,8 +978,17 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   const failedLoadCountRef = useRef(0);
   const autoSaveTimerRef = useRef<number | null>(null);
   const skipNextAutoSaveRef = useRef(true);
-  const undoStackRef = useRef<Record<string, StemTrackState>[]>([]);
-  const redoStackRef = useRef<Record<string, StemTrackState>[]>([]);
+  const undoStackRef = useRef<StemEditorHistorySnapshot[]>([]);
+  const redoStackRef = useRef<StemEditorHistorySnapshot[]>([]);
+  const editorHistoryRef = useRef<StemEditorHistorySnapshot>({
+    tracks: createTrackState(initialStems, initialEditState),
+    master: normalizeStemMasterState(initialEditState?.master),
+    trackLabels: normalizeTrackLabels(initialEditState?.trackLabels),
+    trackOrder: normalizeTrackOrderForStems(initialEditState?.trackOrder, initialStems),
+    customStems: [],
+    skippedEmptyCount: 0,
+    selectedTrackType: initialStems[0]?.type ?? null,
+  });
   const timelineViewportRef = useRef<HTMLDivElement | null>(null);
   const timelinePanRef = useRef<TimelinePanState | null>(null);
   const timelineRulerTrimDragRef = useRef<TimelineRulerTrimDragState | null>(null);
@@ -1074,6 +1109,18 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     () => exportRecords.map((record) => ({ ...record, view: formatStemExportRecord(record) })),
     [exportRecords],
   );
+
+  useEffect(() => {
+    editorHistoryRef.current = {
+      tracks,
+      master: masterState,
+      trackLabels,
+      trackOrder,
+      customStems,
+      skippedEmptyCount,
+      selectedTrackType,
+    };
+  }, [customStems, masterState, selectedTrackType, skippedEmptyCount, trackLabels, trackOrder, tracks]);
 
   useEffect(() => () => {
     if (latestExportDownload?.url) {
@@ -1550,40 +1597,56 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     jobId,
   });
 
+  const pushHistorySnapshot = useCallback((snapshot: StemEditorHistorySnapshot) => {
+    undoStackRef.current = [...undoStackRef.current.slice(-59), cloneEditorHistorySnapshot(snapshot)];
+    redoStackRef.current = [];
+    setHistoryVersion((version) => version + 1);
+  }, []);
+
+  const rememberEditorHistory = useCallback(() => {
+    pushHistorySnapshot(editorHistoryRef.current);
+  }, [pushHistorySnapshot]);
+
+  const restoreEditorHistorySnapshot = useCallback((snapshot: StemEditorHistorySnapshot) => {
+    const next = cloneEditorHistorySnapshot(snapshot);
+    setTracks(next.tracks);
+    setMasterState(next.master);
+    setTrackLabels(next.trackLabels);
+    setTrackOrder(next.trackOrder);
+    setCustomStems(next.customStems);
+    setSkippedEmptyCount(next.skippedEmptyCount);
+    setSelectedTrackType(next.selectedTrackType);
+    editorHistoryRef.current = next;
+  }, []);
+
   const commitTrackChange = useCallback((
     updater: Record<string, StemTrackState> | ((current: Record<string, StemTrackState>) => Record<string, StemTrackState>),
   ) => {
     setTracks((current) => {
       const next = typeof updater === 'function' ? updater(current) : updater;
       if (areTrackStatesEqual(current, next)) return current;
-      undoStackRef.current = [...undoStackRef.current.slice(-59), current];
-      redoStackRef.current = [];
+      pushHistorySnapshot({ ...editorHistoryRef.current, tracks: current });
       return next;
     });
-    setHistoryVersion((version) => version + 1);
-  }, []);
+  }, [pushHistorySnapshot]);
 
   const undoTrackChange = useCallback(() => {
     const previous = undoStackRef.current.pop();
     if (!previous) return;
-    setTracks((current) => {
-      redoStackRef.current = [...redoStackRef.current.slice(-59), current];
-      return previous;
-    });
+    redoStackRef.current = [...redoStackRef.current.slice(-59), cloneEditorHistorySnapshot(editorHistoryRef.current)];
+    restoreEditorHistorySnapshot(previous);
     setHistoryVersion((version) => version + 1);
-    setSaveStatus('已撤销上一步编辑，自动保存后下次进入会恢复。');
-  }, []);
+    setSaveStatus('已回到上一步，自动保存后下次进入会恢复。');
+  }, [restoreEditorHistorySnapshot]);
 
   const redoTrackChange = useCallback(() => {
     const next = redoStackRef.current.pop();
     if (!next) return;
-    setTracks((current) => {
-      undoStackRef.current = [...undoStackRef.current.slice(-59), current];
-      return next;
-    });
+    undoStackRef.current = [...undoStackRef.current.slice(-59), cloneEditorHistorySnapshot(editorHistoryRef.current)];
+    restoreEditorHistorySnapshot(next);
     setHistoryVersion((version) => version + 1);
-    setSaveStatus('已重做上一步编辑，自动保存后下次进入会恢复。');
-  }, []);
+    setSaveStatus('已前进到下一步，自动保存后下次进入会恢复。');
+  }, [restoreEditorHistorySnapshot]);
 
   const stopFrame = useCallback(() => {
     if (frameRef.current !== null) {
@@ -1673,6 +1736,15 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     customObjectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     customObjectUrlsRef.current.clear();
     setCustomStems([]);
+    editorHistoryRef.current = {
+      tracks: createTrackState(initialStems, initialEditState),
+      master: normalizeStemMasterState(initialEditState?.master),
+      trackLabels: normalizeTrackLabels(initialEditState?.trackLabels),
+      trackOrder: normalizeTrackOrderForStems(initialEditState?.trackOrder, initialStems),
+      customStems: [],
+      skippedEmptyCount: 0,
+      selectedTrackType: initialStems[0]?.type ?? null,
+    };
     setRecordingStatus(null);
     setRecordingWaveform(Array.from({ length: 28 }, () => 0.08));
     importTargetTypeRef.current = null;
@@ -1699,6 +1771,10 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     setFailedStemTypes(new Set());
     setCachedLoadCount(0);
     setSkippedEmptyCount(knownEmptyCount);
+    editorHistoryRef.current = {
+      ...editorHistoryRef.current,
+      skippedEmptyCount: knownEmptyCount,
+    };
     setBufferVersion(0);
     setPlaybackError(null);
     setSaveStatus(initialEditState?.savedAt ? '已读取上次保存的编辑状态。' : null);
@@ -2156,10 +2232,13 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       } else {
         next[type] = label;
       }
+      if (JSON.stringify(current) !== JSON.stringify(next)) {
+        pushHistorySnapshot({ ...editorHistoryRef.current, trackLabels: current });
+      }
       return next;
     });
     setSaveStatus(label ? `轨道已重命名为“${label}”。` : '轨道名称已恢复默认。');
-  }, [stems]);
+  }, [pushHistorySnapshot, stems]);
 
   const createEmptyCustomTrack = useCallback(() => {
     const type = `custom_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
@@ -2177,6 +2256,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       },
     };
 
+    rememberEditorHistory();
     setCustomStems((current) => [...current, stem]);
     setTrackOrder((current) => [...current.filter((item) => item !== type), type]);
     setTracks((current) => ({
@@ -2194,7 +2274,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     setRecordingStatus(null);
     setSaveStatus(`已添加“${displayLabel}”，可在右侧导入音频或现场录音。`);
     return type;
-  }, [customStems.length, duration]);
+  }, [customStems.length, duration, rememberEditorHistory]);
 
   const resolveAudioInputTargetType = useCallback(() => {
     if (selectedTrack && customStems.some((stem) => stem.type === selectedTrack.type)) {
@@ -2237,6 +2317,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         waveform: calculateWaveform(audioBuffer),
       };
 
+      rememberEditorHistory();
       if (existingStem?.url && customObjectUrlsRef.current.has(existingStem.url)) {
         URL.revokeObjectURL(existingStem.url);
         customObjectUrlsRef.current.delete(existingStem.url);
@@ -2277,7 +2358,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       setRecordingStatus(null);
       setPlaybackError('音频解析失败，请换一个常见格式文件，或重新录音。');
     }
-  }, [customStems, getAudioContext, pauseAll]);
+  }, [customStems, getAudioContext, pauseAll, rememberEditorHistory]);
 
   const importTrackFile = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -2412,6 +2493,59 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     setIsRecording(false);
   }, [stopRecordingMeter]);
 
+  const deleteSelectedTrack = useCallback(() => {
+    if (!selectedTrack || !selectedTrackIsCustom) {
+      setPlaybackError('只能删除手动添加的轨道。');
+      return;
+    }
+    if (isRecording) {
+      setPlaybackError('请先停止当前录音，再删除轨道。');
+      return;
+    }
+
+    const label = getStemDisplayName(selectedTrack).zh;
+    if (typeof window !== 'undefined' && !window.confirm(`确定删除“${label}”吗？删除后可通过“上一步”恢复。`)) {
+      return;
+    }
+
+    rememberEditorHistory();
+    pauseAll();
+
+    const deletedType = selectedTrack.type;
+    const nextStems = stems.filter((stem) => stem.type !== deletedType);
+    const deletedIndex = stems.findIndex((stem) => stem.type === deletedType);
+    const nextSelectedTrack = nextStems[Math.min(Math.max(deletedIndex, 0), Math.max(nextStems.length - 1, 0))] || null;
+
+    setCustomStems((current) => current.filter((stem) => stem.type !== deletedType));
+    setTrackOrder((current) => current.filter((type) => type !== deletedType));
+    setTrackLabels((current) => {
+      const next = { ...current };
+      delete next[deletedType];
+      return next;
+    });
+    setTracks((current) => {
+      const next = { ...current };
+      delete next[deletedType];
+      return next;
+    });
+    setLoadingStemTypes((current) => {
+      const next = new Set(current);
+      next.delete(deletedType);
+      return next;
+    });
+    setFailedStemTypes((current) => {
+      const next = new Set(current);
+      next.delete(deletedType);
+      return next;
+    });
+    if (stemHasKnownEmptyWaveform(selectedTrack)) {
+      setSkippedEmptyCount((count) => Math.max(0, count - 1));
+    }
+    setSelectedTrackType(nextSelectedTrack?.type ?? null);
+    setRecordingStatus(null);
+    setSaveStatus(`已删除“${label}”，可用上一步恢复。`);
+  }, [isRecording, pauseAll, rememberEditorHistory, selectedTrack, selectedTrackIsCustom, stems]);
+
   const clearTrackReorderPress = useCallback(() => {
     if (trackReorderPressTimerRef.current !== null) {
       window.clearTimeout(trackReorderPressTimerRef.current);
@@ -2429,9 +2563,10 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       if (fromIndex < 0 || toIndex < 0) return normalized;
       const next = [...normalized];
       [next[fromIndex], next[toIndex]] = [next[toIndex], next[fromIndex]];
+      pushHistorySnapshot({ ...editorHistoryRef.current, trackOrder: current });
       return next;
     });
-  }, [stems]);
+  }, [pushHistorySnapshot, stems]);
 
   const beginTrackReorder = useCallback((type: string) => {
     trackReorderDragTypeRef.current = type;
@@ -3060,19 +3195,21 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   }, [clearLoopPreviewTimer]);
 
   const setMasterVolume = useCallback((volume: number) => {
+    rememberEditorHistory();
     setMasterState((current) => normalizeStemMasterState({
       ...current,
       volume,
     }));
-  }, []);
+  }, [rememberEditorHistory]);
 
   const toggleMasterLimiter = useCallback(() => {
+    rememberEditorHistory();
     setMasterState((current) => normalizeStemMasterState({
       ...current,
       limiter: !current.limiter,
     }));
     setSaveStatus('母带防爆音设置已更新，自动保存后下次进入会恢复。');
-  }, []);
+  }, [rememberEditorHistory]);
 
   const applyMixPreset = useCallback((preset: MixPreset) => {
     commitTrackChange((current) => Object.fromEntries(stems.map((stem) => {
@@ -3967,6 +4104,24 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         <div style={editorActionStyle}>
           <button
             type="button"
+            onClick={undoTrackChange}
+            disabled={!canUndo}
+            title="回到上一步编辑"
+            style={historyButtonStyle(canUndo)}
+          >
+            上一步
+          </button>
+          <button
+            type="button"
+            onClick={redoTrackChange}
+            disabled={!canRedo}
+            title="前进到下一步编辑"
+            style={historyButtonStyle(canRedo)}
+          >
+            下一步
+          </button>
+          <button
+            type="button"
             onClick={createEmptyCustomTrack}
             title="添加一条可混音的新轨道"
             style={primarySmallButtonStyle}
@@ -4103,10 +4258,10 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
           {!compactTransport && (
           <div style={transportOptionBarStyle}>
             <button type="button" onClick={undoTrackChange} disabled={!canUndo} style={transportOptionButtonStyle(false, !canUndo)}>
-              撤销
+              上一步
             </button>
             <button type="button" onClick={redoTrackChange} disabled={!canRedo} style={transportOptionButtonStyle(false, !canRedo)}>
-              重做
+              下一步
             </button>
             <button
               type="button"
@@ -4341,6 +4496,15 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                     >
                       {exportingStemType === selectedTrack.type ? '导出中' : '导出单轨'}
                     </button>
+                    {selectedTrackIsCustom && (
+                      <button
+                        type="button"
+                        style={deleteTrackButtonStyle}
+                        onClick={deleteSelectedTrack}
+                      >
+                        删除轨道
+                      </button>
+                    )}
                   </div>
                 </div>
                 <div style={selectedTrackStatsStyle}>
@@ -6297,6 +6461,16 @@ const panelHeadingMetaStyle: CSSProperties = {
 
 const presetButtonStyle: CSSProperties = {
   ...editorButtonChromeStyle({ tone: 'purple', compact: true }),
+  minHeight: 30,
+  borderRadius: 7,
+  padding: '5px 10px',
+  fontSize: 12,
+  fontWeight: 900,
+  minWidth: 0,
+};
+
+const deleteTrackButtonStyle: CSSProperties = {
+  ...editorButtonChromeStyle({ tone: 'danger', compact: true }),
   minHeight: 30,
   borderRadius: 7,
   padding: '5px 10px',
