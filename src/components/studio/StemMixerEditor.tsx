@@ -3845,6 +3845,10 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         resetSelectedTrackTrimRange();
         return;
       }
+      if (action === 'delete-selected-track') {
+        deleteSelectedTrack();
+        return;
+      }
       resetTrackEdit(selectedTrack.type);
       setSaveStatus(`已重置“${getStemDisplayName(selectedTrack).zh}”的裁剪和淡入淡出。`);
     };
@@ -3856,6 +3860,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     handleTogglePlayback,
     handleSeek,
     currentTime,
+    deleteSelectedTrack,
     duration,
     focusSelectedTrackRange,
     nudgePlaybackHead,
@@ -5577,7 +5582,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         {showShortcutHelp && (
           <div style={timelineShortcutHelpStyle(timelineMinWidth)}>
             <span><strong>播放</strong> 空格 / Esc / P / L</span>
-            <span><strong>选轨</strong> ↑ ↓ / M / S / R</span>
+            <span><strong>选轨</strong> ↑ ↓ / M / S / R / Del</span>
             <span><strong>裁剪</strong> [ ] / Shift+[ ] / Shift+R</span>
             <span><strong>时间线</strong> ← → / Shift+← → / G / Shift+G / B / D / Alt</span>
             <span><strong>视野</strong> Ctrl+± / Ctrl+0 / Ctrl+滚轮 / Shift+F</span>
@@ -5819,6 +5824,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                     <label style={trackHeaderPanStyle}>
                       <span>L</span>
                       <input
+                        className="stem-track-pan-range"
                         aria-label={`${stem.label} 声像`}
                         type="range"
                         min={-1}
@@ -5971,6 +5977,56 @@ const timelineScrollbarCss = `
 
   #stem-editor-timeline .stem-add-track-dropzone:active {
     transform: translateY(1px);
+  }
+
+  #stem-editor-timeline .stem-track-pan-range {
+    height: 14px;
+    cursor: pointer;
+    accent-color: #1493ff;
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+  }
+
+  #stem-editor-timeline .stem-track-pan-range::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #148bff 0%, #148bff 50%, rgba(255, 255, 255, 0.9) 50%, rgba(255, 255, 255, 0.9) 100%);
+    box-shadow: inset 0 0 0 1px rgba(6, 12, 24, 0.22);
+  }
+
+  #stem-editor-timeline .stem-track-pan-range::-webkit-slider-thumb {
+    width: 14px;
+    height: 14px;
+    margin-top: -5px;
+    border: 0;
+    border-radius: 999px;
+    background: #0f8cff;
+    box-shadow: 0 0 0 1px rgba(2, 8, 20, 0.5), 0 4px 10px rgba(15, 140, 255, 0.28);
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  #stem-editor-timeline .stem-track-pan-range::-moz-range-track {
+    height: 4px;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.9);
+  }
+
+  #stem-editor-timeline .stem-track-pan-range::-moz-range-progress {
+    height: 4px;
+    border-radius: 999px;
+    background: #148bff;
+  }
+
+  #stem-editor-timeline .stem-track-pan-range::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border: 0;
+    border-radius: 999px;
+    background: #0f8cff;
+    box-shadow: 0 0 0 1px rgba(2, 8, 20, 0.5), 0 4px 10px rgba(15, 140, 255, 0.28);
   }
 
   #stem-editor-timeline .stem-track-header::before {
