@@ -1505,7 +1505,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
 
     if (event.ctrlKey || event.metaKey) {
       event.preventDefault();
-      const zoomStep = event.deltaY < 0 ? 0.25 : -0.25;
+      const zoomStep = event.deltaY < 0 ? 0.15 : -0.15;
       applyTimelineZoom(timelineZoom + zoomStep);
       return;
     }
@@ -4317,6 +4317,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
 
   return (
     <section style={editorStyle(dawLayoutMetrics)}>
+      <style dangerouslySetInnerHTML={{ __html: timelineScrollbarCss }} />
       <input
         ref={fileInputRef}
         type="file"
@@ -5382,6 +5383,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         ref={timelineViewportRef}
         tabIndex={-1}
         aria-label="多轨时间线"
+        title="Ctrl+鼠标滚轮缩放波形，Shift+滚轮横向移动"
         style={trackListStyle(trackDensity, isTimelinePanning, shouldAllowTimelineHorizontalScroll)}
         onContextMenu={(event) => event.preventDefault()}
         onDragStart={(event) => event.preventDefault()}
@@ -5565,7 +5567,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
             <span><strong>选轨</strong> ↑ ↓ / M / S / R</span>
             <span><strong>裁剪</strong> [ ] / Shift+[ ] / Shift+R</span>
             <span><strong>时间线</strong> ← → / Shift+← → / G / Shift+G / B / D / Alt</span>
-            <span><strong>视野</strong> Ctrl+± / Ctrl+0 / Shift+F</span>
+            <span><strong>视野</strong> Ctrl+± / Ctrl+0 / Ctrl+滚轮 / Shift+F</span>
             <span><strong>编辑</strong> Ctrl+S / Ctrl+Z / Ctrl+Y / X / Shift+X</span>
           </div>
         )}
@@ -5872,15 +5874,17 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
             </div>
           );
         })}
-        <div style={timelineAddTrackRowStyle(timelineMinWidth)} data-timeline-pan-zone="true">
+        <div style={timelineAddTrackRowStyle}>
           <button
             type="button"
+            className="stem-add-track-dropzone"
             aria-label="添加轨道"
-            title="添加轨道"
-            style={trackAddIconButtonStyle}
+            title="点击添加一条空轨道"
+            style={trackAddDropzoneButtonStyle}
             onClick={createEmptyCustomTrack}
           >
-            +
+            <span style={trackAddDropzoneIconStyle}>+♫</span>
+            <span style={trackAddDropzoneTextStyle}>点击添加空轨道</span>
           </button>
         </div>
         {visibleStems.length === 0 && (
@@ -5919,6 +5923,70 @@ function editorStyle(metrics: DawEditorLayoutMetrics): CSSProperties {
     WebkitTouchCallout: 'none',
   };
 }
+
+const timelineScrollbarCss = `
+  #stem-editor-timeline {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(206, 255, 53, 0.62) rgba(7, 10, 18, 0.98);
+  }
+
+  #stem-editor-timeline::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+
+  #stem-editor-timeline::-webkit-scrollbar-track {
+    border-radius: 999px;
+    background:
+      linear-gradient(180deg, rgba(14, 18, 30, 0.96), rgba(5, 8, 14, 0.98));
+    box-shadow:
+      inset 0 0 0 1px rgba(48, 52, 76, 0.76),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+
+  #stem-editor-timeline::-webkit-scrollbar-thumb {
+    min-width: 72px;
+    border: 3px solid rgba(7, 10, 18, 0.98);
+    border-radius: 999px;
+    background:
+      linear-gradient(90deg, rgba(206, 255, 53, 0.88), rgba(82, 214, 198, 0.9));
+    box-shadow:
+      0 0 12px rgba(206, 255, 53, 0.22),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+  }
+
+  #stem-editor-timeline::-webkit-scrollbar-thumb:hover {
+    background:
+      linear-gradient(90deg, rgba(226, 255, 94, 0.96), rgba(103, 232, 249, 0.96));
+    box-shadow:
+      0 0 16px rgba(206, 255, 53, 0.34),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+  }
+
+  #stem-editor-timeline::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  #stem-editor-timeline::-webkit-scrollbar-corner {
+    background: rgba(7, 10, 18, 0.98);
+  }
+
+  #stem-editor-timeline .stem-add-track-dropzone:hover,
+  #stem-editor-timeline .stem-add-track-dropzone:focus-visible {
+    border-color: rgba(206, 255, 53, 0.52) !important;
+    background:
+      radial-gradient(circle at 50% 0%, rgba(206, 255, 53, 0.11), transparent 44%),
+      linear-gradient(180deg, rgba(3, 7, 12, 0.48), rgba(2, 6, 12, 0.72)) !important;
+    color: #ffffff !important;
+    outline: none;
+  }
+
+  #stem-editor-timeline .stem-add-track-dropzone:active {
+    transform: translateY(1px);
+  }
+`;
 
 type EditorButtonTone = 'neutral' | 'primary' | 'info' | 'success' | 'warning' | 'danger' | 'purple';
 
@@ -7538,30 +7606,44 @@ const emptyTrackNoticeStyle: CSSProperties = {
   textAlign: 'center',
 };
 
-function timelineAddTrackRowStyle(minWidth: number): CSSProperties {
-  return {
-    minWidth,
-    minHeight: 56,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 8,
-    border: '1px dashed rgba(206, 255, 53, 0.3)',
-    background: 'linear-gradient(90deg, rgba(206, 255, 53, 0.07), rgba(12, 16, 27, 0.74))',
-  };
-}
+const timelineAddTrackRowStyle: CSSProperties = {
+  position: 'sticky',
+  left: 0,
+  zIndex: 3,
+  width: '100%',
+  minWidth: 0,
+  boxSizing: 'border-box',
+  padding: '9px 8px 10px',
+  background: 'linear-gradient(180deg, rgba(5, 8, 14, 0.28), rgba(5, 8, 14, 0.82))',
+};
 
-const trackAddIconButtonStyle: CSSProperties = {
-  ...editorButtonChromeStyle({ tone: 'primary', compact: true, round: true }),
-  width: 34,
-  height: 34,
-  minWidth: 34,
-  minHeight: 34,
-  borderRadius: 999,
-  padding: 0,
-  fontSize: 24,
-  fontWeight: 900,
+const trackAddDropzoneButtonStyle: CSSProperties = {
+  width: '100%',
+  minHeight: 74,
+  display: 'grid',
+  placeItems: 'center',
+  gap: 2,
+  borderRadius: 8,
+  border: '2px dashed rgba(148, 163, 184, 0.26)',
+  background: 'linear-gradient(180deg, rgba(0, 0, 0, 0.34), rgba(2, 6, 12, 0.58))',
+  color: '#f8fbff',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.035), 0 12px 28px rgba(0,0,0,0.24)',
+  cursor: 'pointer',
+  transition: 'border-color 140ms ease, background 140ms ease, transform 140ms ease, color 140ms ease',
+};
+
+const trackAddDropzoneIconStyle: CSSProperties = {
+  color: '#f8fbff',
+  fontSize: 23,
   lineHeight: 1,
+  fontWeight: 950,
+};
+
+const trackAddDropzoneTextStyle: CSSProperties = {
+  color: '#f8fbff',
+  fontSize: 14,
+  fontWeight: 900,
+  lineHeight: 1.2,
 };
 
 function timelineToolbarStyle(minWidth: number): CSSProperties {
