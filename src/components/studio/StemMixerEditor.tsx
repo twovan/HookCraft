@@ -417,20 +417,41 @@ function defaultTrackState(): StemTrackState {
 }
 
 function normalizeTrackState(value: Partial<StemTrackState> | undefined | null, duration?: number): StemTrackState {
+  const safeDuration = Number.isFinite(duration) && duration && duration > 0 ? duration : 0;
+  const rawTrimStart = typeof value?.trimStart === 'number' && Number.isFinite(value.trimStart)
+    ? value.trimStart
+    : 0;
+  const rawTrimEnd = typeof value?.trimEnd === 'number' && Number.isFinite(value.trimEnd)
+    ? value.trimEnd
+    : null;
+  const hasValidDuration = safeDuration > 0;
+  const savedRangeIsOutsideDuration = hasValidDuration && (
+    rawTrimStart >= safeDuration ||
+    (rawTrimEnd !== null && rawTrimEnd <= 0) ||
+    (rawTrimEnd !== null && rawTrimEnd <= rawTrimStart)
+  );
+  const normalizedTrimStart = hasValidDuration
+    ? Math.max(0, Math.min(safeDuration, savedRangeIsOutsideDuration ? 0 : rawTrimStart))
+    : Math.max(0, rawTrimStart);
+  const normalizedTrimEnd = rawTrimEnd === null
+    ? null
+    : hasValidDuration
+      ? Math.max(normalizedTrimStart, Math.min(safeDuration, savedRangeIsOutsideDuration ? safeDuration : rawTrimEnd))
+      : Math.max(0, rawTrimEnd);
   const normalized: StemTrackState = {
     volume: typeof value?.volume === 'number' ? Math.max(0, Math.min(1, value.volume)) : 1,
     pan: typeof value?.pan === 'number' ? Math.max(-1, Math.min(1, value.pan)) : 0,
     muted: value?.muted === true,
     solo: value?.solo === true,
     collapsed: value?.collapsed === true,
-    trimStart: typeof value?.trimStart === 'number' ? Math.max(0, value.trimStart) : 0,
-    trimEnd: typeof value?.trimEnd === 'number' ? Math.max(0, value.trimEnd) : null,
+    trimStart: normalizedTrimStart,
+    trimEnd: normalizedTrimEnd,
     fadeIn: typeof value?.fadeIn === 'number' ? Math.max(0, value.fadeIn) : 0,
     fadeOut: typeof value?.fadeOut === 'number' ? Math.max(0, value.fadeOut) : 0,
-    mutedRanges: normalizeStemMutedRanges(value?.mutedRanges, typeof value?.trimEnd === 'number' ? value.trimEnd : Number.MAX_SAFE_INTEGER),
+    mutedRanges: normalizeStemMutedRanges(value?.mutedRanges, (normalizedTrimEnd ?? safeDuration) || Number.MAX_SAFE_INTEGER),
   };
 
-  if (!Number.isFinite(duration) || !duration || duration <= 0) {
+  if (!hasValidDuration) {
     return Array.isArray(value?.clips) && value.clips.length > 0
       ? { ...normalized, clips: value.clips }
       : normalized;
@@ -438,7 +459,7 @@ function normalizeTrackState(value: Partial<StemTrackState> | undefined | null, 
 
   const clipState = normalizeStemClipState({
     clips: value?.clips,
-    duration,
+    duration: safeDuration,
     trimStart: normalized.trimStart,
     trimEnd: normalized.trimEnd,
   });
@@ -450,7 +471,11 @@ function normalizeTrackState(value: Partial<StemTrackState> | undefined | null, 
         trimEnd: clipState.trimEnd,
         clips: clipState.clips,
       }
-    : normalized;
+    : {
+        ...normalized,
+        trimStart: 0,
+        trimEnd: safeDuration,
+      };
 }
 
 function createTrackState(stems: EditableStem[], editState?: StemEditState | null) {
@@ -6551,6 +6576,7 @@ const timelineScrollbarCss = `
 
   html:has(.stem-mixer-editor),
   body:has(.stem-mixer-editor),
+  .stem-timeline-track-body,
   .stem-editor-vertical-scroll {
     scrollbar-width: thin;
     scrollbar-color: rgba(87, 219, 199, 0.88) rgba(5, 9, 16, 0.92);
@@ -6558,6 +6584,7 @@ const timelineScrollbarCss = `
 
   html:has(.stem-mixer-editor)::-webkit-scrollbar,
   body:has(.stem-mixer-editor)::-webkit-scrollbar,
+  .stem-timeline-track-body::-webkit-scrollbar,
   .stem-editor-vertical-scroll::-webkit-scrollbar {
     width: 12px;
     height: 12px;
@@ -6565,6 +6592,7 @@ const timelineScrollbarCss = `
 
   html:has(.stem-mixer-editor)::-webkit-scrollbar-track,
   body:has(.stem-mixer-editor)::-webkit-scrollbar-track,
+  .stem-timeline-track-body::-webkit-scrollbar-track,
   .stem-editor-vertical-scroll::-webkit-scrollbar-track {
     border-radius: 999px;
     background:
@@ -6577,6 +6605,7 @@ const timelineScrollbarCss = `
 
   html:has(.stem-mixer-editor)::-webkit-scrollbar-thumb,
   body:has(.stem-mixer-editor)::-webkit-scrollbar-thumb,
+  .stem-timeline-track-body::-webkit-scrollbar-thumb,
   .stem-editor-vertical-scroll::-webkit-scrollbar-thumb {
     min-height: 52px;
     border: 3px solid rgba(5, 9, 16, 0.96);
@@ -6590,6 +6619,7 @@ const timelineScrollbarCss = `
 
   html:has(.stem-mixer-editor)::-webkit-scrollbar-thumb:hover,
   body:has(.stem-mixer-editor)::-webkit-scrollbar-thumb:hover,
+  .stem-timeline-track-body::-webkit-scrollbar-thumb:hover,
   .stem-editor-vertical-scroll::-webkit-scrollbar-thumb:hover {
     background:
       linear-gradient(180deg, #ddff57 0%, #8ef59c 46%, #62efe0 100%);
@@ -6597,6 +6627,7 @@ const timelineScrollbarCss = `
 
   html:has(.stem-mixer-editor)::-webkit-scrollbar-button,
   body:has(.stem-mixer-editor)::-webkit-scrollbar-button,
+  .stem-timeline-track-body::-webkit-scrollbar-button,
   .stem-editor-vertical-scroll::-webkit-scrollbar-button {
     display: none;
     width: 0;
@@ -6605,6 +6636,7 @@ const timelineScrollbarCss = `
 
   html:has(.stem-mixer-editor)::-webkit-scrollbar-corner,
   body:has(.stem-mixer-editor)::-webkit-scrollbar-corner,
+  .stem-timeline-track-body::-webkit-scrollbar-corner,
   .stem-editor-vertical-scroll::-webkit-scrollbar-corner {
     background: rgba(5, 9, 16, 0.98);
   }
