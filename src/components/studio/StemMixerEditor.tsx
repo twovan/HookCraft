@@ -6689,6 +6689,10 @@ const timelineScrollbarCss = `
     }
   }
 
+  .stem-timeline-toolbar-strip::-webkit-scrollbar {
+    display: none;
+  }
+
   #stem-editor-timeline .stem-add-track-dropzone:hover,
   #stem-editor-timeline .stem-add-track-dropzone:focus-visible {
     border-color: rgba(190, 232, 95, 0.5) !important;
@@ -8734,12 +8738,14 @@ function timelineToolbarStyle(metrics: DawEditorLayoutMetrics, viewportWidth: nu
     zIndex: 58,
     alignSelf: 'flex-start',
     display: 'grid',
-    gridTemplateColumns: 'minmax(130px, auto) auto minmax(0, 1fr)',
+    gridTemplateColumns: 'minmax(130px, auto) auto',
     alignItems: 'center',
-    gap: 12,
+    justifyContent: 'start',
+    columnGap: 12,
+    rowGap: 6,
     boxSizing: 'border-box',
-    minHeight: 44,
-    padding: '7px 10px',
+    minHeight: 78,
+    padding: '7px 10px 8px',
     width: visibleWidth ?? '100%',
     minWidth: 0,
     maxWidth: visibleWidth ?? '100%',
@@ -8768,6 +8774,7 @@ const timelineToolbarTitleStyle: CSSProperties = {
 };
 
 const timelineToolbarStatsStyle: CSSProperties = {
+  gridColumn: '1 / -1',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'flex-start',
@@ -8903,7 +8910,7 @@ function timelineShortcutHelpStyle(metrics: DawEditorLayoutMetrics, viewportWidt
 
   return {
     position: 'sticky',
-    top: metrics.headerHeight + 46,
+    top: metrics.headerHeight + 80,
     left: 0,
     zIndex: 57,
     alignSelf: 'flex-start',
@@ -8979,7 +8986,7 @@ function timelineScrollThumbStyle(progress: number, viewRatio: number): CSSPrope
 function timelineRulerStyle(gridColumns: string, minWidth: number, metrics: DawEditorLayoutMetrics): CSSProperties {
   return {
     position: 'sticky',
-    top: metrics.headerHeight + 44,
+    top: metrics.headerHeight + 78,
     zIndex: 56,
     display: 'grid',
     gridTemplateColumns: gridColumns,
@@ -9006,7 +9013,7 @@ function timelineGlobalPlayheadStyle(currentTime: number, duration: number, lane
 
   return {
     position: 'absolute',
-    top: 76,
+    top: 110,
     bottom: 10,
     left: playheadLeft,
     width: 2,
@@ -9025,7 +9032,7 @@ function timelineGlobalPlayheadBadgeStyle(currentTime: number, duration: number,
 
   return {
     position: 'absolute',
-    top: 55,
+    top: 89,
     left: playheadLeft,
     transform: 'translateX(-50%)',
     zIndex: 7,
