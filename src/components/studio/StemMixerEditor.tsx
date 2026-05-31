@@ -6715,7 +6715,7 @@ const timelineScrollbarCss = `
     }
 
     .stem-timeline-ruler {
-      top: 82px !important;
+      top: 0 !important;
     }
 
     .stem-timeline-playhead {
