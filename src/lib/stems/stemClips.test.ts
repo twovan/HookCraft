@@ -53,14 +53,37 @@ describe('stem clips', () => {
       start: 12,
       sourceStart: 4,
       sourceEnd: 18,
+      sourceTrackType: 'vocals',
     }, 42);
 
     expect(clone).toMatchObject({
       start: 42,
       sourceStart: 4,
       sourceEnd: 18,
+      sourceTrackType: 'vocals',
     });
     expect(clone.id).not.toBe('clip-a');
+  });
+
+  it('keeps the source track on normalized copied clips', () => {
+    expect(normalizeStemClipState({
+      clips: [{
+        id: 'copied',
+        start: 36,
+        sourceStart: 4,
+        sourceEnd: 14,
+        sourceTrackType: 'drums',
+      }],
+      duration: 80,
+      trimStart: 0,
+      trimEnd: 80,
+    }).clips[0]).toMatchObject({
+      id: 'copied',
+      start: 36,
+      sourceStart: 4,
+      sourceEnd: 14,
+      sourceTrackType: 'drums',
+    });
   });
 
   it('slices waveform peaks by a clip source range', () => {

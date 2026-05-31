@@ -10,7 +10,6 @@ export type StemEditorShortcutAction =
   | 'paste-clip'
   | 'toggle-selected-mute'
   | 'toggle-selected-solo'
-  | 'rename-selected-track'
   | 'edit-selected-track-color'
   | 'reset-selected-track'
   | 'delete-selected-track'
@@ -94,7 +93,6 @@ export function resolveStemEditorShortcut(event: KeyboardShortcutEvent): StemEdi
     if (key === 'p') return 'preview-selected-range';
     if (key === 'r') return 'reset-selected-track';
     if (event.key === 'Delete') return 'delete-selected-track';
-    if (event.key === 'F2') return 'rename-selected-track';
     if (event.key === 'ArrowLeft') return 'seek-backward';
     if (event.key === 'ArrowRight') return 'seek-forward';
     if (event.key === 'ArrowUp') return 'select-previous-track';

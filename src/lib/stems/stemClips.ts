@@ -3,6 +3,7 @@ export interface StemClip {
   start: number;
   sourceStart: number;
   sourceEnd: number;
+  sourceTrackType?: string;
 }
 
 export interface StemClipSegment {
@@ -26,6 +27,10 @@ function clampNumber(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
+function normalizeSourceTrackType(value: unknown) {
+  return typeof value === 'string' ? value.trim().slice(0, 96) : '';
+}
+
 export function getStemClipDuration(clip: StemClip) {
   return Math.max(0, clip.sourceEnd - clip.sourceStart);
 }
@@ -42,12 +47,14 @@ export function normalizeStemClips(
       const sourceStart = clampNumber(clip.sourceStart, 0, safeDuration);
       const sourceEnd = clampNumber(Math.max(sourceStart, clip.sourceEnd), 0, safeDuration);
       const clipDuration = sourceEnd - sourceStart;
+      const sourceTrackType = normalizeSourceTrackType(clip.sourceTrackType);
       if (clipDuration <= 0.001) return null;
       return {
         id: clip.id || `clip-${index + 1}`,
         start: roundTime(clampNumber(clip.start, 0, Math.max(0, safeDuration - clipDuration))),
         sourceStart: roundTime(sourceStart),
         sourceEnd: roundTime(sourceEnd),
+        ...(sourceTrackType ? { sourceTrackType } : {}),
       };
     })
     .filter((clip): clip is StemClip => Boolean(clip));
@@ -137,10 +144,12 @@ export function moveStemClip(clips: StemClip[], clipId: string, nextStart: numbe
 }
 
 export function cloneStemClipForPaste(clip: StemClip, nextStart: number): StemClip {
+  const sourceTrackType = normalizeSourceTrackType(clip.sourceTrackType);
   return {
     ...clip,
     id: `${clip.id}-copy-${Date.now().toString(36)}`,
     start: roundTime(Math.max(0, Number.isFinite(nextStart) ? nextStart : 0)),
+    ...(sourceTrackType ? { sourceTrackType } : {}),
   };
 }
 

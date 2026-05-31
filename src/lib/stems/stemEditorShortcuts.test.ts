@@ -44,7 +44,7 @@ describe('resolveStemEditorShortcut', () => {
     expect(resolveStemEditorShortcut(keyEvent({ key: 'f', shiftKey: true }))).toBe('focus-selected-range');
     expect(resolveStemEditorShortcut(keyEvent({ key: 'r' }))).toBe('reset-selected-track');
     expect(resolveStemEditorShortcut(keyEvent({ key: 'Delete' }))).toBe('delete-selected-track');
-    expect(resolveStemEditorShortcut(keyEvent({ key: 'F2' }))).toBe('rename-selected-track');
+    expect(resolveStemEditorShortcut(keyEvent({ key: 'F2' }))).toBeNull();
     expect(resolveStemEditorShortcut(keyEvent({ key: 'c', shiftKey: true }))).toBe('edit-selected-track-color');
     expect(resolveStemEditorShortcut(keyEvent({ key: 'r', shiftKey: true }))).toBe('reset-selected-trim-range');
     expect(resolveStemEditorShortcut(keyEvent({ key: 'ArrowLeft' }))).toBe('seek-backward');
@@ -66,6 +66,8 @@ describe('resolveStemEditorShortcut', () => {
   it('ignores text-entry fields and unrelated modified shortcuts', () => {
     const input = { tagName: 'INPUT', isContentEditable: false };
     expect(resolveStemEditorShortcut(keyEvent({ key: ' ', target: input as unknown as EventTarget }))).toBeNull();
+    expect(resolveStemEditorShortcut(keyEvent({ key: 'c', ctrlKey: true, target: input as unknown as EventTarget }))).toBeNull();
+    expect(resolveStemEditorShortcut(keyEvent({ key: 'v', ctrlKey: true, target: input as unknown as EventTarget }))).toBeNull();
     expect(resolveStemEditorShortcut(keyEvent({ key: 'm', target: input as unknown as EventTarget }))).toBeNull();
     expect(resolveStemEditorShortcut(keyEvent({ key: 'Delete', target: input as unknown as EventTarget }))).toBeNull();
     expect(resolveStemEditorShortcut(keyEvent({ key: 's', altKey: true }))).toBeNull();

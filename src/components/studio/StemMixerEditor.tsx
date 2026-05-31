@@ -163,6 +163,13 @@ type StemClipClipboard = {
   clip: StemClip;
   sourceTrackType: string;
 };
+type TrackClipAudioSegment = {
+  sourceTrackType: string;
+  sourceStart: number;
+  sourceEnd: number;
+  timelineStart: number;
+  timelineEnd: number;
+};
 type TrackContextMenuState = {
   x: number;
   y: number;
@@ -918,12 +925,20 @@ function scheduleTrackGain({
 function buildTrackClipAudioSegments(
   state: StemTrackState,
   timelineDuration: number,
-  audioDuration: number,
+  audioDurationByTrack: number | Record<string, number>,
   cursor = 0,
-) {
-  const clipState = resolveTrackClipState(state, Math.max(timelineDuration, audioDuration));
+  fallbackSourceTrackType = '',
+): TrackClipAudioSegment[] {
+  const fallbackAudioDuration = typeof audioDurationByTrack === 'number'
+    ? audioDurationByTrack
+    : audioDurationByTrack[fallbackSourceTrackType] || timelineDuration;
+  const clipState = resolveTrackClipState(state, Math.max(timelineDuration, fallbackAudioDuration));
 
   return clipState.clips.flatMap((clip) => {
+    const sourceTrackType = clip.sourceTrackType || fallbackSourceTrackType;
+    const audioDuration = typeof audioDurationByTrack === 'number'
+      ? audioDurationByTrack
+      : audioDurationByTrack[sourceTrackType] || fallbackAudioDuration;
     const timelineStart = clip.start;
     const timelineEnd = clip.start + getStemClipDuration(clip);
     if (timelineEnd <= cursor) return [];
@@ -938,6 +953,7 @@ function buildTrackClipAudioSegments(
       end: sourceEnd,
       mutedRanges: state.mutedRanges,
     }).map((segment) => ({
+      sourceTrackType,
       sourceStart: segment.start,
       sourceEnd: segment.end,
       timelineStart: clip.start + (segment.start - clip.sourceStart),
@@ -2105,9 +2121,15 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     if (!masterStem) return;
 
     const previewStemType = previewStemTypeRef.current;
-    const playableStems = stems.filter((stem) => (
-      audioBuffersRef.current[stem.type] && (!previewStemType || stem.type === previewStemType)
-    ));
+    const audioDurations = Object.fromEntries(
+      Object.entries(audioBuffersRef.current).map(([type, buffer]) => [type, buffer.duration]),
+    );
+    const playableStems = stems.filter((stem) => {
+      if (previewStemType && stem.type !== previewStemType) return false;
+      const state = tracks[stem.type] || defaultTrackState();
+      const clipState = resolveTrackClipState(state, Math.max(duration, audioDurations[stem.type] || 0));
+      return clipState.clips.some((clip) => Boolean(audioBuffersRef.current[clip.sourceTrackType || stem.type]));
+    });
     if (playableStems.length === 0) {
       setPlaybackError('分轨正在缓存中，第一条轨道完成后即可开始预听。');
       return;
@@ -2130,15 +2152,13 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       playableStems.forEach((stem) => {
         const gain = context.createGain();
         const state = tracks[stem.type] || defaultTrackState();
-        const audioBuffer = audioBuffersRef.current[stem.type];
-        if (!audioBuffer) return;
         const isAudible = previewStemType ? state.volume > 0 : !state.muted && (!hasSoloTrack || state.solo);
         const trimStart = Math.max(0, Math.min(duration, state.trimStart));
         const trimEnd = Math.max(trimStart, Math.min(duration, state.trimEnd ?? duration));
         const cursor = playbackOffsetRef.current;
         const bufferOffset = Math.max(trimStart, cursor);
         const gainScheduleStartAt = startAt + Math.max(0, trimStart - cursor);
-        const segments = buildTrackClipAudioSegments(state, duration, audioBuffer.duration, cursor);
+        const segments = buildTrackClipAudioSegments(state, duration, audioDurations, cursor, stem.type);
 
         if (isAudible) {
           scheduleTrackGain({
@@ -2159,7 +2179,9 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         if (panner) {
           panNodesRef.current[stem.type] = panner;
         }
-        sourceNodesRef.current[stem.type] = segments.map((segment) => {
+        sourceNodesRef.current[stem.type] = segments.flatMap((segment) => {
+          const audioBuffer = audioBuffersRef.current[segment.sourceTrackType];
+          if (!audioBuffer) return [];
           const source = context.createBufferSource();
           source.buffer = audioBuffer;
           source.connect(gain);
@@ -2168,7 +2190,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
             segment.sourceStart,
             Math.max(0, segment.sourceEnd - segment.sourceStart),
           );
-          return source;
+          return [source];
         });
       });
 
@@ -3367,7 +3389,8 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       return false;
     }
 
-    setClipClipboard({ clip: { ...clip }, sourceTrackType: type });
+    const sourceTrackType = clip.sourceTrackType || type;
+    setClipClipboard({ clip: { ...clip, sourceTrackType }, sourceTrackType });
     setPlaybackError(null);
     setSaveStatus('片段已复制，可在目标时间点粘贴。');
     return true;
@@ -4074,10 +4097,6 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         pasteClipToTrack(selectedTrack.type, currentTime);
         return;
       }
-      if (action === 'rename-selected-track') {
-        renameTrackFromMenu(selectedTrack.type);
-        return;
-      }
       if (action === 'edit-selected-track-color') {
         setTrackContextMenu({
           x: typeof window === 'undefined' ? 24 : Math.max(16, window.innerWidth - 300),
@@ -4162,7 +4181,6 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     nudgePlaybackHead,
     pasteClipToTrack,
     redoTrackChange,
-    renameTrackFromMenu,
     resetTrackEdit,
     resetSelectedTrackTrimRange,
     nudgeSelectedTrackTrim,
@@ -5349,7 +5367,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                   <button type="button" style={presetButtonStyle} onClick={() => resetTrackEdit(selectedTrack.type)}>
                     重置当前轨裁剪
                   </button>
-                  <span style={selectedTrackShortcutStyle}>快捷键：↑/↓ 选轨，M 静音，S 独奏，Ctrl+C/X/V 复制剪切粘贴，F2 重命名，Shift+C 改色，Del 删除</span>
+                  <span style={selectedTrackShortcutStyle}>快捷键：↑/↓ 选轨，M 静音，S 独奏，Ctrl+C/X/V 复制剪切粘贴，Shift+C 改色，Del 删除</span>
                 </div>
                 {selectedTrackMutedRanges.length > 0 && (
                   <div style={mutedRangeListStyle} aria-label={`${getStemDisplayName(selectedTrack).zh} 静音片段`}>
@@ -5664,7 +5682,6 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
           <div style={trackContextMenuDividerStyle} />
           <button type="button" role="menuitem" style={trackContextMenuItemStyle(false)} onClick={() => performTrackContextMenuAction('rename')}>
             <span>重命名轨道</span>
-            <kbd>F2</kbd>
           </button>
           <button type="button" role="menuitem" style={trackContextMenuItemStyle(false)} onClick={() => performTrackContextMenuAction('delete')}>
             <span>删除轨道</span>
@@ -5905,7 +5922,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         {showShortcutHelp && (
           <div style={timelineShortcutHelpStyle(timelineMinWidth)}>
             <span><strong>播放</strong> 空格 / Esc / P / L</span>
-            <span><strong>选轨</strong> ↑ ↓ / M / S / R / F2 / Del</span>
+            <span><strong>选轨</strong> ↑ ↓ / M / S / R / Del</span>
             <span><strong>裁剪</strong> [ ] / Shift+[ ] / Shift+R</span>
             <span><strong>时间线</strong> ← → / Shift+← → / G / Shift+G / B / D / Alt</span>
             <span><strong>视野</strong> Ctrl+± / Ctrl+0 / Ctrl+滚轮 / Shift+F</span>
@@ -5994,11 +6011,17 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
           const isSelectedTrack = selectedTrack?.type === stem.type;
           const trackColor = getTrackColor(stem.type);
           const isTrackCollapsed = state.collapsed === true;
-          const audioBuffer = audioBuffersRef.current[stem.type] || null;
+          const firstCopiedSourceType = trackClipState.clips.find((clip) => clip.sourceTrackType)?.sourceTrackType;
+          const sourceStemForWaveform = firstCopiedSourceType
+            ? stems.find((sourceStem) => sourceStem.type === firstCopiedSourceType)
+            : null;
+          const audioBuffer = audioBuffersRef.current[stem.type]
+            || (firstCopiedSourceType ? audioBuffersRef.current[firstCopiedSourceType] : null)
+            || null;
           const isRecordingTarget = isRecording && recordingTrackType === stem.type;
           const waveformForTrack = isRecordingTarget
             ? { duration: Math.max(duration, 1), peaks: recordingTrackWaveform }
-            : stem.waveform || null;
+            : stem.waveform || sourceStemForWaveform?.waveform || null;
           const audioStatus = resolveStemTrackAudioStatus({
             knownEmpty: stemHasKnownEmptyWaveform(stem),
             loaded: Boolean(audioBuffer),
@@ -9385,8 +9408,10 @@ function WaveformTrackCanvas({
       context.fillRect(0, 0, startX, height);
       context.fillRect(endX, 0, Math.max(0, width - endX), height);
 
-      context.fillStyle = selected ? colorWithAlpha(baseColor, 0.08) : 'rgba(255,255,255,0.012)';
-      context.fillRect(startX, 0, Math.max(0, endX - startX), height);
+      if (clips.length <= 1) {
+        context.fillStyle = selected ? colorWithAlpha(baseColor, 0.08) : 'rgba(255,255,255,0.012)';
+        context.fillRect(startX, 0, Math.max(0, endX - startX), height);
+      }
 
       const sourceDuration = Math.max(waveform?.duration || 0, buffer?.duration || 0, duration);
       const takeBarHeight = selected ? 15 * ratio : 13 * ratio;
