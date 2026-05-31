@@ -5989,7 +5989,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         >
           {formatStemTimecode(currentTime)}
         </div>
-        <div style={timelineToolbarStyle(dawLayoutMetrics)} data-timeline-pan-zone="true" title="拖动空白处移动时间线视野">
+        <div style={timelineToolbarStyle(dawLayoutMetrics, timelineViewportWidth)} data-timeline-pan-zone="true" title="拖动空白处移动时间线视野">
           <div>
             <div style={timelineToolbarEyebrowStyle}>时间线</div>
             <div style={timelineToolbarTitleStyle}>多轨时间线</div>
@@ -6148,7 +6148,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
           </div>
         </div>
         {showShortcutHelp && (
-          <div style={timelineShortcutHelpStyle(dawLayoutMetrics)}>
+          <div style={timelineShortcutHelpStyle(dawLayoutMetrics, timelineViewportWidth)}>
             <span><strong>播放</strong> 空格 / Esc / P / L</span>
             <span><strong>选轨</strong> ↑ ↓ / M / S / R / Del</span>
             <span><strong>裁剪</strong> [ ] / Shift+[ ] / Shift+R</span>
@@ -8654,12 +8654,15 @@ const trackAddDropzoneTextStyle: CSSProperties = {
   lineHeight: 1.2,
 };
 
-function timelineToolbarStyle(_metrics: DawEditorLayoutMetrics): CSSProperties {
+function timelineToolbarStyle(metrics: DawEditorLayoutMetrics, viewportWidth: number): CSSProperties {
+  const visibleWidth = viewportWidth > 0 ? Math.max(320, viewportWidth - 14) : undefined;
+
   return {
     position: 'sticky',
-    top: 0,
+    top: metrics.headerHeight,
     left: 0,
     zIndex: 22,
+    alignSelf: 'flex-start',
     display: 'grid',
     gridTemplateColumns: 'minmax(130px, auto) auto minmax(0, 1fr)',
     alignItems: 'center',
@@ -8667,9 +8670,9 @@ function timelineToolbarStyle(_metrics: DawEditorLayoutMetrics): CSSProperties {
     boxSizing: 'border-box',
     minHeight: 44,
     padding: '7px 10px',
-    width: '100%',
+    width: visibleWidth ?? '100%',
     minWidth: 0,
-    maxWidth: '100%',
+    maxWidth: visibleWidth ?? '100%',
     borderRadius: 0,
     border: 'none',
     borderBottom: '1px solid rgba(48, 52, 76, 0.82)',
@@ -8816,18 +8819,21 @@ function timelineHelpButtonStyle(active: boolean): CSSProperties {
   };
 }
 
-function timelineShortcutHelpStyle(_metrics: DawEditorLayoutMetrics): CSSProperties {
+function timelineShortcutHelpStyle(metrics: DawEditorLayoutMetrics, viewportWidth: number): CSSProperties {
+  const visibleWidth = viewportWidth > 0 ? Math.max(320, viewportWidth - 14) : undefined;
+
   return {
     position: 'sticky',
-    top: 46,
+    top: metrics.headerHeight + 46,
     left: 0,
     zIndex: 21,
+    alignSelf: 'flex-start',
     display: 'grid',
     gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
     gap: 6,
-    width: '100%',
+    width: visibleWidth ?? '100%',
     minWidth: 0,
-    maxWidth: '100%',
+    maxWidth: visibleWidth ?? '100%',
     boxSizing: 'border-box',
     padding: '7px 10px',
     borderRadius: 7,
@@ -8891,10 +8897,10 @@ function timelineScrollThumbStyle(progress: number, viewRatio: number): CSSPrope
   };
 }
 
-function timelineRulerStyle(gridColumns: string, minWidth: number, _metrics: DawEditorLayoutMetrics): CSSProperties {
+function timelineRulerStyle(gridColumns: string, minWidth: number, metrics: DawEditorLayoutMetrics): CSSProperties {
   return {
     position: 'sticky',
-    top: 44,
+    top: metrics.headerHeight + 44,
     zIndex: 20,
     display: 'grid',
     gridTemplateColumns: gridColumns,
