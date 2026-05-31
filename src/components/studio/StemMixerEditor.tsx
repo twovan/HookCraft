@@ -6654,6 +6654,7 @@ const timelineScrollbarCss = `
     }
 
     .stem-timeline-toolbar-strip {
+      grid-column: 1 / -1 !important;
       justify-content: flex-start !important;
       overflow-x: auto !important;
       flex-wrap: nowrap !important;
@@ -8738,14 +8739,14 @@ function timelineToolbarStyle(metrics: DawEditorLayoutMetrics, viewportWidth: nu
     zIndex: 58,
     alignSelf: 'flex-start',
     display: 'grid',
-    gridTemplateColumns: 'minmax(130px, auto) auto',
+    gridTemplateColumns: 'minmax(130px, auto) auto minmax(0, 1fr)',
     alignItems: 'center',
     justifyContent: 'start',
     columnGap: 12,
-    rowGap: 6,
+    rowGap: 0,
     boxSizing: 'border-box',
-    minHeight: 78,
-    padding: '7px 10px 8px',
+    minHeight: 40,
+    padding: '5px 10px',
     width: visibleWidth ?? '100%',
     minWidth: 0,
     maxWidth: visibleWidth ?? '100%',
@@ -8774,7 +8775,6 @@ const timelineToolbarTitleStyle: CSSProperties = {
 };
 
 const timelineToolbarStatsStyle: CSSProperties = {
-  gridColumn: '1 / -1',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'flex-start',
@@ -8910,7 +8910,7 @@ function timelineShortcutHelpStyle(metrics: DawEditorLayoutMetrics, viewportWidt
 
   return {
     position: 'sticky',
-    top: metrics.headerHeight + 80,
+    top: metrics.headerHeight + 42,
     left: 0,
     zIndex: 57,
     alignSelf: 'flex-start',
@@ -8986,7 +8986,7 @@ function timelineScrollThumbStyle(progress: number, viewRatio: number): CSSPrope
 function timelineRulerStyle(gridColumns: string, minWidth: number, metrics: DawEditorLayoutMetrics): CSSProperties {
   return {
     position: 'sticky',
-    top: metrics.headerHeight + 78,
+    top: metrics.headerHeight + 40,
     zIndex: 56,
     display: 'grid',
     gridTemplateColumns: gridColumns,
@@ -9013,7 +9013,7 @@ function timelineGlobalPlayheadStyle(currentTime: number, duration: number, lane
 
   return {
     position: 'absolute',
-    top: 110,
+    top: 72,
     bottom: 10,
     left: playheadLeft,
     width: 2,
@@ -9032,7 +9032,7 @@ function timelineGlobalPlayheadBadgeStyle(currentTime: number, duration: number,
 
   return {
     position: 'absolute',
-    top: 89,
+    top: 51,
     left: playheadLeft,
     transform: 'translateX(-50%)',
     zIndex: 7,
