@@ -158,10 +158,17 @@ type StemEditorHistorySnapshot = {
 type StemHistoryMode = 'immediate' | 'deferred' | 'none';
 type StemInteractionPhase = 'preview' | 'commit';
 type RecordingInputChannel = 'channel-1' | 'channel-2' | 'stereo';
+type RecordingSelectMenu = 'device' | 'channel' | null;
 type StemClipClipboard = {
   clip: StemClip;
   sourceTrackType: string;
 };
+
+const RECORDING_CHANNEL_OPTIONS: Array<{ value: RecordingInputChannel; label: string }> = [
+  { value: 'channel-1', label: '通道 1' },
+  { value: 'channel-2', label: '通道 2' },
+  { value: 'stereo', label: '立体声' },
+];
 type TrackClipAudioSegment = {
   sourceTrackType: string;
   sourceStart: number;
@@ -1217,6 +1224,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   const [recordingInputLevel, setRecordingInputLevel] = useState(0.78);
   const [monitoringEnabled, setMonitoringEnabled] = useState(false);
   const [isMonitoringPreview, setIsMonitoringPreview] = useState(false);
+  const [recordingSelectMenu, setRecordingSelectMenu] = useState<RecordingSelectMenu>(null);
   const [reorderingTrackType, setReorderingTrackType] = useState<string | null>(null);
   const timelineZoomRef = useRef(timelineZoom);
 
@@ -1237,6 +1245,22 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     () => exportRecords.map((record) => ({ ...record, view: formatStemExportRecord(record) })),
     [exportRecords],
   );
+  const recordingDeviceOptions = useMemo(() => (
+    audioInputDevices.length === 0
+      ? [{ value: '', label: '默认麦克风' }]
+      : audioInputDevices.map((device, index) => ({
+        value: device.deviceId,
+        label: device.label || `麦克风 ${index + 1}`,
+      }))
+  ), [audioInputDevices]);
+  const selectedRecordingDeviceLabel = useMemo(() => (
+    recordingDeviceOptions.find((option) => option.value === selectedAudioInputDeviceId)?.label
+      || recordingDeviceOptions[0]?.label
+      || '默认麦克风'
+  ), [recordingDeviceOptions, selectedAudioInputDeviceId]);
+  const selectedRecordingChannelLabel = useMemo(() => (
+    RECORDING_CHANNEL_OPTIONS.find((option) => option.value === recordingInputChannel)?.label || '通道 1'
+  ), [recordingInputChannel]);
 
   useEffect(() => {
     editorHistoryRef.current = {
@@ -1261,6 +1285,17 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   useEffect(() => {
     timelineZoomRef.current = timelineZoom;
   }, [timelineZoom]);
+
+  useEffect(() => {
+    if (!recordingSelectMenu) return undefined;
+    const closeRecordingSelect = (event: globalThis.PointerEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('[data-recording-select="true"]')) return;
+      setRecordingSelectMenu(null);
+    };
+    window.addEventListener('pointerdown', closeRecordingSelect);
+    return () => window.removeEventListener('pointerdown', closeRecordingSelect);
+  }, [recordingSelectMenu]);
 
   useEffect(() => () => {
     customObjectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
@@ -4964,7 +4999,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
           <div style={addTrackPanelStyle(isAddTrackPanelOpen)}>
             <div style={panelHeadingStyle}>
               <span style={presetLabelStyle}>轨道素材</span>
-              <span style={panelHeadingMetaStyle}>Import / Record</span>
+              <span style={panelHeadingMetaStyle}>导入 / 录音</span>
             </div>
             <div style={addTrackHintStyle}>
               {selectedTrack
@@ -5001,35 +5036,74 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
             {isAddTrackPanelOpen && addTrackMode === 'record' && (
               <>
                 <div style={recordingInputPanelStyle}>
-                  <div style={recordingInputLabelStyle}>Input</div>
-                  <select
-                    aria-label="录音输入设备"
-                    value={selectedAudioInputDeviceId}
-                    disabled={isRecording || isMonitoringPreview}
-                    onChange={(event) => setSelectedAudioInputDeviceId(event.target.value)}
-                    style={recordingSelectStyle}
-                  >
-                    {audioInputDevices.length === 0 && <option value="">默认麦克风</option>}
-                    {audioInputDevices.map((device, index) => (
-                      <option key={device.deviceId || index} value={device.deviceId}>
-                        {device.label || `麦克风 ${index + 1}`}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    aria-label="录音输入通道"
-                    value={recordingInputChannel}
-                    disabled={isRecording || isMonitoringPreview}
-                    onChange={(event) => setRecordingInputChannel(event.target.value as RecordingInputChannel)}
-                    style={recordingSelectStyle}
-                  >
-                    <option value="channel-1">Channel 1</option>
-                    <option value="channel-2">Channel 2</option>
-                    <option value="stereo">Stereo</option>
-                  </select>
+                  <div style={recordingInputLabelStyle}>输入</div>
+                  <div style={recordingSelectGroupStyle} data-recording-select="true">
+                    <button
+                      type="button"
+                      aria-haspopup="listbox"
+                      aria-expanded={recordingSelectMenu === 'device'}
+                      disabled={isRecording || isMonitoringPreview}
+                      onClick={() => setRecordingSelectMenu((current) => (current === 'device' ? null : 'device'))}
+                      style={recordingSelectButtonStyle(isRecording || isMonitoringPreview)}
+                    >
+                      <span style={recordingSelectTextStyle}>{selectedRecordingDeviceLabel}</span>
+                      <span aria-hidden="true" style={recordingSelectChevronStyle}>⌄</span>
+                    </button>
+                    {recordingSelectMenu === 'device' && (
+                      <div role="listbox" aria-label="录音输入设备" style={recordingSelectMenuStyle}>
+                        {recordingDeviceOptions.map((option) => (
+                          <button
+                            key={option.value || 'default-device'}
+                            type="button"
+                            role="option"
+                            aria-selected={option.value === selectedAudioInputDeviceId}
+                            style={recordingSelectOptionButtonStyle(option.value === selectedAudioInputDeviceId)}
+                            onClick={() => {
+                              setSelectedAudioInputDeviceId(option.value);
+                              setRecordingSelectMenu(null);
+                            }}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div style={recordingSelectGroupStyle} data-recording-select="true">
+                    <button
+                      type="button"
+                      aria-haspopup="listbox"
+                      aria-expanded={recordingSelectMenu === 'channel'}
+                      disabled={isRecording || isMonitoringPreview}
+                      onClick={() => setRecordingSelectMenu((current) => (current === 'channel' ? null : 'channel'))}
+                      style={recordingSelectButtonStyle(isRecording || isMonitoringPreview)}
+                    >
+                      <span style={recordingSelectTextStyle}>{selectedRecordingChannelLabel}</span>
+                      <span aria-hidden="true" style={recordingSelectChevronStyle}>⌄</span>
+                    </button>
+                    {recordingSelectMenu === 'channel' && (
+                      <div role="listbox" aria-label="录音输入通道" style={recordingSelectMenuStyle}>
+                        {RECORDING_CHANNEL_OPTIONS.map((option) => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            role="option"
+                            aria-selected={option.value === recordingInputChannel}
+                            style={recordingSelectOptionButtonStyle(option.value === recordingInputChannel)}
+                            onClick={() => {
+                              setRecordingInputChannel(option.value);
+                              setRecordingSelectMenu(null);
+                            }}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <div style={recordingInputFooterStyle}>
                     <label style={recordingInputLevelStyle}>
-                      <span>Input Level</span>
+                      <span>输入电平</span>
                       <input
                         aria-label="录音输入电平"
                         type="range"
@@ -5048,8 +5122,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                       style={monitoringButtonStyle(monitoringEnabled)}
                       onClick={() => void toggleInputMonitoring()}
                     >
-                      <span aria-hidden="true">M</span>
-                      Monitoring
+                      {monitoringEnabled ? '监听中' : '监听'}
                     </button>
                   </div>
                 </div>
@@ -5864,9 +5937,9 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         >
           {formatStemTimecode(currentTime)}
         </div>
-        <div style={timelineToolbarStyle(timelineMinWidth)} data-timeline-pan-zone="true" title="拖动空白处移动时间线视野">
+        <div style={timelineToolbarStyle(timelineMinWidth, dawLayoutMetrics)} data-timeline-pan-zone="true" title="拖动空白处移动时间线视野">
           <div>
-            <div style={timelineToolbarEyebrowStyle}>Timeline</div>
+            <div style={timelineToolbarEyebrowStyle}>时间线</div>
             <div style={timelineToolbarTitleStyle}>多轨时间线</div>
           </div>
           <div style={timelineZoomControlsStyle}>
@@ -6023,7 +6096,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
           </div>
         </div>
         {showShortcutHelp && (
-          <div style={timelineShortcutHelpStyle(timelineMinWidth)}>
+          <div style={timelineShortcutHelpStyle(timelineMinWidth, dawLayoutMetrics)}>
             <span><strong>播放</strong> 空格 / Esc / P / L</span>
             <span><strong>选轨</strong> ↑ ↓ / M / S / R / Del</span>
             <span><strong>裁剪</strong> [ ] / Shift+[ ] / Shift+R</span>
@@ -6032,28 +6105,14 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
             <span><strong>编辑</strong> Ctrl+S / Ctrl+Z / Ctrl+Y / Ctrl+C/X/V / Shift+C / X / Shift+X</span>
           </div>
         )}
-        <div style={timelineRulerStyle(timelineGridColumns, timelineMinWidth)} data-timeline-pan-zone="true">
+        <div style={timelineRulerStyle(timelineGridColumns, timelineMinWidth, dawLayoutMetrics)} data-timeline-pan-zone="true">
           <div style={timelineRulerLabelStyle} data-timeline-pan-zone="true">
             <button
               type="button"
               style={timelineRulerAddTrackButtonStyle}
               onClick={createEmptyCustomTrack}
             >
-              + Add Track
-            </button>
-            <button
-              type="button"
-              title="显示轨道连接"
-              style={timelineRulerToolButtonStyle}
-            >
-              ↔
-            </button>
-            <button
-              type="button"
-              title="轨道设置"
-              style={timelineRulerToolButtonStyle}
-            >
-              ⚙
+              + 添加轨道
             </button>
           </div>
           <div
@@ -7495,23 +7554,93 @@ const recordingInputLabelStyle: CSSProperties = {
   fontWeight: 950,
 };
 
-const recordingSelectStyle: CSSProperties = {
+const recordingSelectGroupStyle: CSSProperties = {
+  position: 'relative',
   width: '100%',
-  minHeight: 36,
-  borderRadius: 7,
-  border: '1px solid rgba(64, 74, 104, 0.82)',
-  background: 'linear-gradient(180deg, #202631, #151a23)',
-  color: '#f8fbff',
-  padding: '0 11px',
-  fontSize: 12,
-  fontWeight: 850,
-  outline: 'none',
+  minWidth: 0,
 };
+
+function recordingSelectButtonStyle(disabled: boolean): CSSProperties {
+  return {
+    width: '100%',
+    minWidth: 0,
+    minHeight: 36,
+    borderRadius: 7,
+    border: '1px solid rgba(75, 86, 118, 0.62)',
+    background: disabled
+      ? 'rgba(14, 18, 28, 0.72)'
+      : 'linear-gradient(180deg, rgba(23, 29, 42, 0.98), rgba(13, 18, 28, 0.98))',
+    color: disabled ? '#6d7486' : '#f6f8ff',
+    padding: '0 10px',
+    display: 'grid',
+    gridTemplateColumns: 'minmax(0, 1fr) 18px',
+    alignItems: 'center',
+    gap: 8,
+    fontSize: 12,
+    fontWeight: 850,
+    textAlign: 'left',
+    outline: 'none',
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    boxShadow: disabled ? 'none' : 'inset 0 1px 0 rgba(255,255,255,0.04)',
+  };
+}
+
+const recordingSelectTextStyle: CSSProperties = {
+  minWidth: 0,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+};
+
+const recordingSelectChevronStyle: CSSProperties = {
+  width: 18,
+  height: 18,
+  display: 'grid',
+  placeItems: 'center',
+  borderRadius: 999,
+  color: '#9de6da',
+  background: 'rgba(87, 219, 199, 0.08)',
+  fontSize: 13,
+  lineHeight: 1,
+};
+
+const recordingSelectMenuStyle: CSSProperties = {
+  position: 'absolute',
+  zIndex: 80,
+  top: 'calc(100% + 5px)',
+  left: 0,
+  right: 0,
+  display: 'grid',
+  gap: 2,
+  maxHeight: 174,
+  overflowY: 'auto',
+  padding: 4,
+  borderRadius: 8,
+  border: '1px solid rgba(80, 92, 126, 0.72)',
+  background: 'linear-gradient(180deg, rgba(16, 22, 34, 0.99), rgba(8, 12, 20, 0.99))',
+  boxShadow: '0 18px 40px rgba(0,0,0,0.42), inset 0 1px 0 rgba(255,255,255,0.045)',
+};
+
+function recordingSelectOptionButtonStyle(active: boolean): CSSProperties {
+  return {
+    minHeight: 30,
+    width: '100%',
+    border: '1px solid transparent',
+    borderRadius: 6,
+    background: active ? 'rgba(87, 219, 199, 0.16)' : 'transparent',
+    color: active ? '#d9fff8' : '#d7deee',
+    padding: '0 9px',
+    fontSize: 12,
+    fontWeight: active ? 950 : 820,
+    textAlign: 'left',
+    cursor: 'pointer',
+  };
+}
 
 const recordingInputFooterStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1fr)',
-  alignItems: 'stretch',
+  gridTemplateColumns: 'minmax(0, 1fr) 88px',
+  alignItems: 'end',
   gap: 8,
   paddingTop: 2,
 };
@@ -7528,21 +7657,21 @@ const recordingInputLevelStyle: CSSProperties = {
 const recordingInputRangeStyle: CSSProperties = {
   width: '100%',
   minWidth: 0,
-  height: 18,
-  accentColor: '#24b8ff',
+  height: 14,
+  accentColor: '#57dbc7',
   display: 'block',
 };
 
 function monitoringButtonStyle(active: boolean): CSSProperties {
   return {
-    ...editorButtonChromeStyle({ tone: active ? 'primary' : 'neutral', compact: true, round: true, active }),
+    ...editorButtonChromeStyle({ tone: active ? 'success' : 'neutral', compact: true, round: true, active }),
     width: '100%',
-    minHeight: 34,
-    padding: '0 12px',
+    minHeight: 30,
+    padding: '0 10px',
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 7,
+    gap: 0,
     fontSize: 11,
     fontWeight: 950,
     boxShadow: 'none',
@@ -8464,11 +8593,11 @@ const trackAddDropzoneTextStyle: CSSProperties = {
   lineHeight: 1.2,
 };
 
-function timelineToolbarStyle(minWidth: number): CSSProperties {
+function timelineToolbarStyle(minWidth: number, metrics: DawEditorLayoutMetrics): CSSProperties {
   return {
     position: 'sticky',
-    top: 0,
-    zIndex: 5,
+    top: metrics.headerHeight + 4,
+    zIndex: 22,
     display: 'grid',
     gridTemplateColumns: 'minmax(130px, auto) auto minmax(0, 1fr)',
     alignItems: 'center',
@@ -8482,6 +8611,7 @@ function timelineToolbarStyle(minWidth: number): CSSProperties {
     borderBottom: '1px solid rgba(48, 52, 76, 0.82)',
     background: 'linear-gradient(180deg, rgba(10, 14, 24, 0.98), rgba(7, 10, 18, 0.98))',
     boxShadow: '0 10px 22px rgba(0,0,0,0.18)',
+    backdropFilter: 'blur(14px)',
   };
 }
 
@@ -8622,11 +8752,11 @@ function timelineHelpButtonStyle(active: boolean): CSSProperties {
   };
 }
 
-function timelineShortcutHelpStyle(minWidth: number): CSSProperties {
+function timelineShortcutHelpStyle(minWidth: number, metrics: DawEditorLayoutMetrics): CSSProperties {
   return {
     position: 'sticky',
-    top: 49,
-    zIndex: 5,
+    top: metrics.headerHeight + 53,
+    zIndex: 21,
     display: 'grid',
     gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
     gap: 6,
@@ -8694,11 +8824,11 @@ function timelineScrollThumbStyle(progress: number, viewRatio: number): CSSPrope
   };
 }
 
-function timelineRulerStyle(gridColumns: string, minWidth: number): CSSProperties {
+function timelineRulerStyle(gridColumns: string, minWidth: number, metrics: DawEditorLayoutMetrics): CSSProperties {
   return {
     position: 'sticky',
-    top: 44,
-    zIndex: 4,
+    top: metrics.headerHeight + 48,
+    zIndex: 20,
     display: 'grid',
     gridTemplateColumns: gridColumns,
     gap: TIMELINE_GRID_GAP,
@@ -8783,17 +8913,6 @@ const timelineRulerAddTrackButtonStyle: CSSProperties = {
   color: '#e2e7f3',
   fontSize: 13,
   fontWeight: 950,
-};
-
-const timelineRulerToolButtonStyle: CSSProperties = {
-  ...editorButtonChromeStyle({ tone: 'neutral', compact: true, round: true }),
-  width: 32,
-  height: 32,
-  minHeight: 32,
-  padding: 0,
-  color: '#dbeafe',
-  fontSize: 14,
-  fontWeight: 900,
 };
 
 const timelineRulerMarksStyle: CSSProperties = {
