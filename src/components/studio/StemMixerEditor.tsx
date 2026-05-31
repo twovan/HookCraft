@@ -4782,8 +4782,8 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         onChange={importTrackFile}
         style={hiddenFileInputStyle}
       />
-      <div style={editorHeaderStyle}>
-        <div style={editorHeaderPrimaryStyle}>
+      <div className="stem-mixer-editor-header" style={editorHeaderStyle}>
+        <div className="stem-mixer-editor-header-primary" style={editorHeaderPrimaryStyle}>
           <Link href="/" aria-label="返回 HookCraft 首页" style={editorBrandStyle}>
             <Image src="/logo-nav.svg" alt="HookCraft" width={140} height={36} priority />
           </Link>
@@ -4795,7 +4795,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
             <span>{formatStemTimecode(currentTime)}</span>
           </div>
         </div>
-        <div style={editorActionStyle}>
+        <div className="stem-mixer-editor-actions" style={editorActionStyle}>
           <button
             type="button"
             onClick={undoTrackChange}
@@ -5980,16 +5980,18 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         onPointerCancel={finishTimelinePan}
       >
         <div
+          className="stem-timeline-playhead"
           aria-hidden="true"
           style={timelineGlobalPlayheadStyle(currentTime, duration, timelineLaneWidth, timelineLabelWidth)}
         />
         <div
+          className="stem-timeline-playhead-badge"
           aria-hidden="true"
           style={timelineGlobalPlayheadBadgeStyle(currentTime, duration, timelineLaneWidth, timelineLabelWidth)}
         >
           {formatStemTimecode(currentTime)}
         </div>
-        <div style={timelineToolbarStyle(dawLayoutMetrics, timelineViewportWidth)} data-timeline-pan-zone="true" title="拖动空白处移动时间线视野">
+        <div className="stem-timeline-toolbar" style={timelineToolbarStyle(dawLayoutMetrics, timelineViewportWidth)} data-timeline-pan-zone="true" title="拖动空白处移动时间线视野">
           <div>
             <div style={timelineToolbarEyebrowStyle}>时间线</div>
             <div style={timelineToolbarTitleStyle}>多轨时间线</div>
@@ -6016,7 +6018,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
               适合
             </button>
           </div>
-          <div style={timelineToolbarStatsStyle}>
+          <div className="stem-timeline-toolbar-strip" style={timelineToolbarStatsStyle}>
             <button
               type="button"
               style={timelineAddTrackButtonStyle}
@@ -6157,7 +6159,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
             <span><strong>编辑</strong> Ctrl+S / Ctrl+Z / Ctrl+Y / Ctrl+C/X/V / Shift+C / X / Shift+X</span>
           </div>
         )}
-        <div style={timelineRulerStyle(timelineGridColumns, timelineMinWidth, dawLayoutMetrics)} data-timeline-pan-zone="true">
+        <div className="stem-timeline-ruler" style={timelineRulerStyle(timelineGridColumns, timelineMinWidth, dawLayoutMetrics)} data-timeline-pan-zone="true">
           <div style={timelineRulerLabelStyle} data-timeline-pan-zone="true">
             <button
               type="button"
@@ -6606,6 +6608,74 @@ const timelineScrollbarCss = `
   }
 
   @media (max-width: 920px) {
+    .stem-mixer-editor {
+      grid-template-columns: 1fr !important;
+      padding: 118px 10px 112px !important;
+    }
+
+    .stem-mixer-editor-header {
+      grid-template-columns: 1fr !important;
+      align-items: start !important;
+      gap: 8px !important;
+      min-height: 110px !important;
+      padding: 10px 12px 9px !important;
+    }
+
+    .stem-mixer-editor-header-primary {
+      width: 100% !important;
+      gap: 10px !important;
+      flex-wrap: wrap !important;
+    }
+
+    .stem-mixer-editor-header-primary > a {
+      min-width: 148px !important;
+      padding-right: 10px !important;
+    }
+
+    .stem-mixer-editor-actions {
+      width: 100% !important;
+      justify-content: flex-start !important;
+      flex-wrap: nowrap !important;
+      overflow-x: auto !important;
+      padding-bottom: 2px !important;
+      scrollbar-width: none;
+    }
+
+    .stem-mixer-editor-actions::-webkit-scrollbar {
+      display: none;
+    }
+
+    .stem-timeline-toolbar {
+      top: 110px !important;
+      grid-template-columns: minmax(0, 1fr) !important;
+      gap: 6px !important;
+      min-height: 82px !important;
+      align-content: center !important;
+    }
+
+    .stem-timeline-toolbar-strip {
+      justify-content: flex-start !important;
+      overflow-x: auto !important;
+      flex-wrap: nowrap !important;
+      scrollbar-width: none;
+    }
+
+    .stem-timeline-toolbar-strip::-webkit-scrollbar {
+      display: none;
+    }
+
+    .stem-timeline-ruler {
+      top: 192px !important;
+    }
+
+    .stem-timeline-playhead {
+      top: 150px !important;
+    }
+
+    .stem-timeline-playhead-badge {
+      top: 130px !important;
+    }
+
     .stem-editor-inspector-dock {
       position: static !important;
       top: auto !important;
@@ -8700,9 +8770,15 @@ const timelineToolbarTitleStyle: CSSProperties = {
 const timelineToolbarStatsStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  justifyContent: 'flex-end',
+  justifyContent: 'flex-start',
   gap: 6,
-  flexWrap: 'wrap',
+  flexWrap: 'nowrap',
+  minWidth: 0,
+  maxWidth: '100%',
+  overflowX: 'auto',
+  overflowY: 'hidden',
+  scrollbarWidth: 'none',
+  paddingBottom: 1,
 };
 
 const timelineZoomControlsStyle: CSSProperties = {
@@ -8747,6 +8823,7 @@ const timelineZoomFitButtonStyle: CSSProperties = {
 };
 
 const timelineToolbarPillStyle: CSSProperties = {
+  flex: '0 0 auto',
   borderRadius: 999,
   border: '1px solid rgba(151, 165, 196, 0.22)',
   background: 'rgba(20, 25, 36, 0.66)',
@@ -8759,6 +8836,7 @@ const timelineToolbarPillStyle: CSSProperties = {
 
 const timelineAddTrackButtonStyle: CSSProperties = {
   ...editorButtonChromeStyle({ tone: 'primary', compact: true }),
+  flex: '0 0 auto',
   minHeight: 24,
   borderRadius: 999,
   padding: '3px 9px',
@@ -8768,6 +8846,7 @@ const timelineAddTrackButtonStyle: CSSProperties = {
 };
 
 const timelineSelectionActionsStyle: CSSProperties = {
+  flex: '0 0 auto',
   display: 'inline-flex',
   alignItems: 'center',
   gap: 4,
