@@ -1100,6 +1100,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   const customObjectUrlsRef = useRef<Set<string>>(new Set());
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordingStreamRef = useRef<MediaStream | null>(null);
+  const monitoringPreviewStreamRef = useRef<MediaStream | null>(null);
   const recordingProcessedStreamRef = useRef<MediaStream | null>(null);
   const recordingChunksRef = useRef<Blob[]>([]);
   const recordingAudioContextRef = useRef<AudioContext | null>(null);
@@ -1215,6 +1216,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   const [recordingInputChannel, setRecordingInputChannel] = useState<RecordingInputChannel>('channel-1');
   const [recordingInputLevel, setRecordingInputLevel] = useState(0.78);
   const [monitoringEnabled, setMonitoringEnabled] = useState(false);
+  const [isMonitoringPreview, setIsMonitoringPreview] = useState(false);
   const [reorderingTrackType, setReorderingTrackType] = useState<string | null>(null);
   const timelineZoomRef = useRef(timelineZoom);
 
@@ -1264,6 +1266,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     customObjectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     customObjectUrlsRef.current.clear();
     recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+    monitoringPreviewStreamRef.current?.getTracks().forEach((track) => track.stop());
     recordingProcessedStreamRef.current?.getTracks().forEach((track) => track.stop());
     if (recordingWaveformFrameRef.current !== null) {
       window.cancelAnimationFrame(recordingWaveformFrameRef.current);
@@ -2641,6 +2644,16 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     setRecordingLevel(0);
   }, []);
 
+  const stopMonitoringPreview = useCallback(() => {
+    monitoringPreviewStreamRef.current?.getTracks().forEach((track) => track.stop());
+    monitoringPreviewStreamRef.current = null;
+    setIsMonitoringPreview(false);
+    if (!isRecording) {
+      stopRecordingMeter();
+      setRecordingStatus((current) => current === '监听中...' ? null : current);
+    }
+  }, [isRecording, stopRecordingMeter]);
+
   useEffect(() => {
     if (recordingInputGainRef.current) {
       recordingInputGainRef.current.gain.value = recordingInputLevel;
@@ -2650,7 +2663,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     }
   }, [monitoringEnabled, recordingInputLevel]);
 
-  const startRecordingMeter = useCallback((stream: MediaStream) => {
+  const startRecordingMeter = useCallback((stream: MediaStream, forceMonitoring = monitoringEnabled) => {
     stopRecordingMeter();
     const context = new AudioContext();
     const source = context.createMediaStreamSource(stream);
@@ -2660,7 +2673,8 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     const recordingDestination = context.createMediaStreamDestination();
     analyser.fftSize = 256;
     inputGain.gain.value = recordingInputLevel;
-    monitorGain.gain.value = monitoringEnabled ? 1 : 0;
+    monitorGain.gain.value = forceMonitoring ? 1 : 0;
+    void context.resume().catch(() => undefined);
 
     if (recordingInputChannel === 'stereo') {
       source.connect(inputGain);
@@ -2706,6 +2720,70 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     return recordingDestination.stream;
   }, [monitoringEnabled, recordingInputChannel, recordingInputLevel, stopRecordingMeter]);
 
+  const toggleInputMonitoring = useCallback(async () => {
+    if (monitoringEnabled) {
+      setMonitoringEnabled(false);
+      if (recordingMonitorGainRef.current) {
+        recordingMonitorGainRef.current.gain.value = 0;
+      }
+      if (!isRecording) {
+        stopMonitoringPreview();
+      }
+      return;
+    }
+
+    setMonitoringEnabled(true);
+    if (recordingAudioContextRef.current && recordingMonitorGainRef.current) {
+      await recordingAudioContextRef.current.resume().catch(() => undefined);
+      recordingMonitorGainRef.current.gain.value = 1;
+      if (!isRecording) {
+        setIsMonitoringPreview(true);
+        setRecordingStatus('监听中...');
+      }
+      return;
+    }
+
+    if (isRecording) return;
+
+    if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      setMonitoringEnabled(false);
+      setPlaybackError('当前浏览器不支持麦克风监听。');
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          deviceId: selectedAudioInputDeviceId ? { exact: selectedAudioInputDeviceId } : undefined,
+          channelCount: recordingInputChannel === 'channel-1' ? { ideal: 1 } : { ideal: 2 },
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+        },
+      });
+      monitoringPreviewStreamRef.current = stream;
+      startRecordingMeter(stream, true);
+      setIsMonitoringPreview(true);
+      setRecordingStatus('监听中...');
+      setPlaybackError(null);
+      void refreshAudioInputDevices();
+    } catch {
+      setMonitoringEnabled(false);
+      setIsMonitoringPreview(false);
+      stopRecordingMeter();
+      setPlaybackError('无法打开麦克风监听，请检查浏览器权限和输入设备。');
+    }
+  }, [
+    isRecording,
+    monitoringEnabled,
+    recordingInputChannel,
+    refreshAudioInputDevices,
+    selectedAudioInputDeviceId,
+    startRecordingMeter,
+    stopMonitoringPreview,
+    stopRecordingMeter,
+  ]);
+
   const openAddTrackPanel = useCallback((mode: 'import' | 'record' = 'import') => {
     setAddTrackMode(mode);
     setIsAddTrackPanelOpen(true);
@@ -2721,6 +2799,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     }
 
     try {
+      stopMonitoringPreview();
       const targetType = resolveAudioInputTargetType();
       setSelectedTrackType(targetType);
       setRecordingTrackType(targetType);
@@ -2736,7 +2815,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         },
       });
       void refreshAudioInputDevices();
-      const processedStream = startRecordingMeter(stream);
+      const processedStream = startRecordingMeter(stream, monitoringEnabled);
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus'
         : '';
@@ -2760,6 +2839,8 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         mediaRecorderRef.current = null;
         stopRecordingMeter();
         setIsRecording(false);
+        setMonitoringEnabled(false);
+        setIsMonitoringPreview(false);
 
         if (chunks.length === 0) {
           setRecordingStatus(null);
@@ -2783,13 +2864,15 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     } catch {
       stopRecordingMeter();
       setIsRecording(false);
+      setMonitoringEnabled(false);
+      setIsMonitoringPreview(false);
       setRecordingStatus(null);
       setRecordingTrackType(null);
       setRecordingTrackWaveform(Array.from({ length: 220 }, () => 0));
       setRecordingLevel(0);
       setPlaybackError('无法打开麦克风，请检查浏览器录音权限。');
     }
-  }, [addCustomStemFromBlob, customStems.length, recordingInputChannel, refreshAudioInputDevices, resolveAudioInputTargetType, selectedAudioInputDeviceId, startRecordingMeter, stopRecordingMeter]);
+  }, [addCustomStemFromBlob, customStems.length, monitoringEnabled, recordingInputChannel, refreshAudioInputDevices, resolveAudioInputTargetType, selectedAudioInputDeviceId, startRecordingMeter, stopMonitoringPreview, stopRecordingMeter]);
 
   const stopRecordingTrack = useCallback(() => {
     const recorder = mediaRecorderRef.current;
@@ -2805,6 +2888,8 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     recordingProcessedStreamRef.current = null;
     stopRecordingMeter();
     setIsRecording(false);
+    setMonitoringEnabled(false);
+    setIsMonitoringPreview(false);
     setRecordingTrackType(null);
   }, [stopRecordingMeter]);
 
@@ -4937,7 +5022,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                   <select
                     aria-label="录音输入设备"
                     value={selectedAudioInputDeviceId}
-                    disabled={isRecording}
+                    disabled={isRecording || isMonitoringPreview}
                     onChange={(event) => setSelectedAudioInputDeviceId(event.target.value)}
                     style={recordingSelectStyle}
                   >
@@ -4951,7 +5036,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                   <select
                     aria-label="录音输入通道"
                     value={recordingInputChannel}
-                    disabled={isRecording}
+                    disabled={isRecording || isMonitoringPreview}
                     onChange={(event) => setRecordingInputChannel(event.target.value as RecordingInputChannel)}
                     style={recordingSelectStyle}
                   >
@@ -4970,6 +5055,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                         step={0.01}
                         value={recordingInputLevel}
                         onChange={(event) => setRecordingInputLevel(Number(event.target.value))}
+                        style={recordingInputRangeStyle}
                       />
                     </label>
                     <button
@@ -4977,7 +5063,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                       aria-pressed={monitoringEnabled}
                       title={monitoringEnabled ? '关闭监听' : '开启监听'}
                       style={monitoringButtonStyle(monitoringEnabled)}
-                      onClick={() => setMonitoringEnabled((value) => !value)}
+                      onClick={() => void toggleInputMonitoring()}
                     >
                       <span aria-hidden="true">M</span>
                       Monitoring
@@ -4986,12 +5072,12 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                 </div>
                 <div style={recordPanelStyle}>
                   <div style={recordingStatusBlockStyle}>
-                    <span style={recordingStatusTitleStyle}>{recordingStatus || '准备录音'}</span>
+                    <span style={recordingStatusTitleStyle}>{recordingStatus || (isMonitoringPreview ? '监听中...' : '准备录音')}</span>
                     <span style={recordingStatusHintStyle}>
-                      {isRecording ? '波形正在当前轨道实时生成。' : '点击开始后会录到当前空轨。'}
+                      {isRecording ? '波形正在当前轨道实时生成。' : isMonitoringPreview ? '已打开麦克风监听，开始录音会写入当前空轨。' : '点击开始后会录到当前空轨。'}
                     </span>
                   </div>
-                  <div style={recordingMeterStyle(isRecording)} aria-label={`录音电平 ${Math.round(recordingLevel * 100)}%`}>
+                  <div style={recordingMeterStyle(isRecording || isMonitoringPreview)} aria-label={`录音电平 ${Math.round(recordingLevel * 100)}%`}>
                     <div style={recordingMeterScaleStyle}>
                       <span>0</span>
                       <span>-6</span>
@@ -4999,7 +5085,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                       <span>-60</span>
                     </div>
                     <div style={recordingMeterTrackStyle}>
-                      <span style={recordingMeterFillStyle(recordingLevel, isRecording)} />
+                      <span style={recordingMeterFillStyle(recordingLevel, isRecording || isMonitoringPreview)} />
                       <span style={recordingMeterPeakStyle(recordingLevel)} />
                     </div>
                   </div>
@@ -7410,13 +7496,16 @@ const addTrackHintStyle: CSSProperties = {
 
 const recordingInputPanelStyle: CSSProperties = {
   display: 'grid',
-  gap: 8,
+  gap: 10,
   marginTop: 10,
-  padding: 10,
+  padding: 12,
   borderRadius: 8,
-  border: '1px solid rgba(48, 52, 76, 0.76)',
-  background: 'linear-gradient(180deg, rgba(9, 14, 22, 0.98), rgba(5, 8, 14, 0.94))',
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
+  border: '1px solid rgba(82, 214, 198, 0.2)',
+  background: `
+    linear-gradient(135deg, rgba(82, 214, 198, 0.08), transparent 34%),
+    linear-gradient(180deg, rgba(9, 14, 22, 0.98), rgba(5, 8, 14, 0.96))
+  `,
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.045), 0 12px 26px rgba(0,0,0,0.18)',
 };
 
 const recordingInputLabelStyle: CSSProperties = {
@@ -7427,12 +7516,12 @@ const recordingInputLabelStyle: CSSProperties = {
 
 const recordingSelectStyle: CSSProperties = {
   width: '100%',
-  minHeight: 34,
+  minHeight: 36,
   borderRadius: 7,
-  border: '1px solid rgba(48, 52, 76, 0.74)',
-  background: '#1b2027',
+  border: '1px solid rgba(64, 74, 104, 0.82)',
+  background: 'linear-gradient(180deg, #202631, #151a23)',
   color: '#f8fbff',
-  padding: '0 10px',
+  padding: '0 11px',
   fontSize: 12,
   fontWeight: 850,
   outline: 'none',
@@ -7440,9 +7529,10 @@ const recordingSelectStyle: CSSProperties = {
 
 const recordingInputFooterStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1fr) auto',
-  alignItems: 'end',
-  gap: 10,
+  gridTemplateColumns: 'minmax(0, 1fr)',
+  alignItems: 'stretch',
+  gap: 8,
+  paddingTop: 2,
 };
 
 const recordingInputLevelStyle: CSSProperties = {
@@ -7454,29 +7544,46 @@ const recordingInputLevelStyle: CSSProperties = {
   fontWeight: 900,
 };
 
+const recordingInputRangeStyle: CSSProperties = {
+  width: '100%',
+  minWidth: 0,
+  height: 18,
+  accentColor: '#24b8ff',
+  display: 'block',
+};
+
 function monitoringButtonStyle(active: boolean): CSSProperties {
   return {
     ...editorButtonChromeStyle({ tone: active ? 'primary' : 'neutral', compact: true, round: true, active }),
+    width: '100%',
     minHeight: 34,
-    padding: '0 13px',
+    padding: '0 12px',
     display: 'inline-flex',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 7,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 950,
+    boxShadow: active
+      ? '0 0 22px rgba(206, 255, 53, 0.22), inset 0 1px 0 rgba(255,255,255,0.22)'
+      : 'inset 0 1px 0 rgba(255,255,255,0.06)',
   };
 }
 
 const recordPanelStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1fr) auto',
-  gap: 10,
+  gridTemplateColumns: 'minmax(0, 1fr) 42px',
+  gap: 12,
   alignItems: 'stretch',
   marginTop: 10,
-  padding: 10,
+  padding: 12,
   borderRadius: 8,
-  border: '1px solid rgba(73, 79, 107, 0.58)',
-  background: 'rgba(4, 7, 13, 0.5)',
+  border: '1px solid rgba(73, 79, 107, 0.62)',
+  background: `
+    linear-gradient(180deg, rgba(14, 18, 29, 0.92), rgba(4, 7, 13, 0.68)),
+    radial-gradient(circle at 100% 0%, rgba(206, 255, 53, 0.08), transparent 32%)
+  `,
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
 };
 
 const recordingStatusBlockStyle: CSSProperties = {
@@ -7501,11 +7608,11 @@ const recordingStatusHintStyle: CSSProperties = {
 function recordingMeterStyle(active: boolean): CSSProperties {
   return {
     display: 'grid',
-    gridTemplateColumns: '18px 14px',
+    gridTemplateColumns: '17px 13px',
     alignItems: 'stretch',
     gap: 4,
     height: 70,
-    padding: '5px 4px',
+    padding: '5px 3px',
     borderRadius: 8,
     border: active ? '1px solid rgba(52, 211, 153, 0.42)' : '1px solid rgba(48, 52, 76, 0.82)',
     background: active

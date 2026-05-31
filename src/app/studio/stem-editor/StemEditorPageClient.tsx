@@ -662,27 +662,34 @@ function stageStyle(loaded: boolean): CSSProperties {
     margin: 0,
     minHeight: loaded ? '100vh' : 'calc(100vh - 72px)',
     paddingTop: loaded ? 0 : 90,
-    paddingLeft: loaded ? 0 : 18,
-    paddingRight: loaded ? 0 : 18,
-    paddingBottom: loaded ? 0 : 84,
+    paddingLeft: loaded ? 0 : 24,
+    paddingRight: loaded ? 0 : 24,
+    paddingBottom: loaded ? 0 : 40,
     borderRadius: 0,
     border: 'none',
     background: loaded
       ? '#050912'
-      : 'linear-gradient(180deg, rgba(10, 14, 28, 0.94), rgba(7, 10, 18, 0.98))',
+      : `
+        radial-gradient(circle at 50% 18%, rgba(206, 255, 53, 0.12), transparent 26%),
+        radial-gradient(circle at 24% 35%, rgba(82, 214, 198, 0.08), transparent 28%),
+        linear-gradient(180deg, rgba(10, 14, 28, 0.94), rgba(7, 10, 18, 0.98))
+      `,
     boxSizing: 'border-box',
     overflowX: 'hidden',
+    display: loaded ? 'block' : 'grid',
+    placeItems: loaded ? undefined : 'center',
   };
 }
 
 const fallbackWorkspaceStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1fr) 300px',
-  gap: 10,
+  gridTemplateColumns: 'minmax(0, 1fr)',
+  gap: 14,
   alignItems: 'start',
   width: '100%',
-  maxWidth: '100%',
+  maxWidth: 820,
   minWidth: 0,
+  margin: '0 auto',
 };
 
 const fallbackTimelineColumnStyle: CSSProperties = {
@@ -690,6 +697,7 @@ const fallbackTimelineColumnStyle: CSSProperties = {
 };
 
 const fallbackInspectorStyle: CSSProperties = {
+  display: 'none',
   minHeight: 520,
   borderRadius: 8,
   border: '1px solid rgba(255, 255, 255, 0.12)',
@@ -767,10 +775,10 @@ const statusHeaderStyle: CSSProperties = {
   gap: 16,
   flexWrap: 'wrap',
   minWidth: 0,
-  border: '1px solid rgba(255, 255, 255, 0.12)',
-  borderRadius: 8,
-  background: 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.018))',
-  padding: '12px 14px',
+  border: 'none',
+  borderRadius: 0,
+  background: 'transparent',
+  padding: 0,
 };
 
 const statusTitleRowStyle: CSSProperties = {
@@ -843,37 +851,40 @@ const errorStyle: CSSProperties = {
 };
 
 const loadingPanelStyle: CSSProperties = {
-  marginTop: 10,
-  minHeight: 248,
-  borderRadius: 8,
-  border: '1px solid rgba(255, 255, 255, 0.12)',
+  position: 'relative',
+  marginTop: 22,
+  minHeight: 270,
+  borderRadius: 0,
+  border: 'none',
   background: `
-    linear-gradient(90deg, rgba(32, 38, 55, 0.46) 1px, transparent 1px),
-    linear-gradient(180deg, rgba(32, 38, 55, 0.28) 1px, transparent 1px),
-    linear-gradient(180deg, rgba(10, 14, 24, 0.98), rgba(7, 10, 18, 0.98))
+    linear-gradient(90deg, rgba(206, 255, 53, 0.2) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(82, 214, 198, 0.12) 1px, transparent 1px),
+    radial-gradient(circle at 20% 50%, rgba(206, 255, 53, 0.12), transparent 30%),
+    radial-gradient(circle at 82% 35%, rgba(82, 214, 198, 0.1), transparent 30%)
   `,
-  backgroundSize: '74px 100%, 100% 52px, auto',
+  backgroundSize: '68px 100%, 100% 54px, auto, auto',
   display: 'grid',
-  gridTemplateColumns: '96px minmax(0, 1fr)',
+  gridTemplateColumns: '112px minmax(0, 1fr)',
   alignItems: 'center',
-  gap: 20,
-  padding: 22,
+  gap: 26,
+  padding: '28px 6px',
   overflow: 'hidden',
-  boxShadow: 'var(--hc-shadow-soft)',
+  boxShadow: 'none',
 };
 
 const waveLoaderStyle: CSSProperties = {
   position: 'relative',
-  width: 86,
-  height: 76,
-  borderRadius: 12,
-  border: '1px solid rgba(48, 52, 76, 0.9)',
-  background: 'rgba(11, 14, 28, 0.86)',
+  width: 104,
+  height: 92,
+  borderRadius: 18,
+  border: '1px solid rgba(206, 255, 53, 0.22)',
+  background: 'linear-gradient(180deg, rgba(17, 24, 39, 0.8), rgba(7, 10, 18, 0.72))',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
   gap: 4,
   overflow: 'hidden',
+  boxShadow: '0 18px 50px rgba(82, 214, 198, 0.14), inset 0 1px 0 rgba(255,255,255,0.08)',
 };
 
 function waveBarStyle(index: number): CSSProperties {
@@ -901,7 +912,7 @@ const loadingContentStyle: CSSProperties = {
 
 const loadingTitleStyle: CSSProperties = {
   color: '#f4f4fb',
-  fontSize: 18,
+  fontSize: 22,
   fontWeight: 900,
 };
 
@@ -950,13 +961,13 @@ const emptyStateStyle: CSSProperties = {
 };
 
 const fallbackTransportStyle: CSSProperties = {
+  display: 'none',
   position: 'fixed',
   left: 0,
   right: 0,
   bottom: 0,
   zIndex: 19,
   minHeight: 54,
-  display: 'grid',
   gridTemplateColumns: '36px 36px 46px 104px minmax(0, 1fr)',
   alignItems: 'center',
   gap: 9,
