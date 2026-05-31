@@ -6646,7 +6646,7 @@ const timelineScrollbarCss = `
     }
 
     .stem-timeline-toolbar {
-      top: 110px !important;
+      top: 0 !important;
       grid-template-columns: minmax(0, 1fr) !important;
       gap: 6px !important;
       min-height: 82px !important;
@@ -6666,7 +6666,7 @@ const timelineScrollbarCss = `
     }
 
     .stem-timeline-ruler {
-      top: 192px !important;
+      top: 82px !important;
     }
 
     .stem-timeline-playhead {
@@ -8734,7 +8734,7 @@ function timelineToolbarStyle(metrics: DawEditorLayoutMetrics, viewportWidth: nu
 
   return {
     position: 'sticky',
-    top: metrics.headerHeight,
+    top: 0,
     left: 0,
     zIndex: 58,
     alignSelf: 'flex-start',
@@ -8910,7 +8910,7 @@ function timelineShortcutHelpStyle(metrics: DawEditorLayoutMetrics, viewportWidt
 
   return {
     position: 'sticky',
-    top: metrics.headerHeight + 42,
+    top: 42,
     left: 0,
     zIndex: 57,
     alignSelf: 'flex-start',
@@ -8986,7 +8986,7 @@ function timelineScrollThumbStyle(progress: number, viewRatio: number): CSSPrope
 function timelineRulerStyle(gridColumns: string, minWidth: number, metrics: DawEditorLayoutMetrics): CSSProperties {
   return {
     position: 'sticky',
-    top: metrics.headerHeight + 40,
+    top: 40,
     zIndex: 56,
     display: 'grid',
     gridTemplateColumns: gridColumns,
