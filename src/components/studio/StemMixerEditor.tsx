@@ -20,7 +20,6 @@ import { resolveVisibleStemSelection } from '@/lib/stems/stemSelection';
 import { buildWaveformPeaksFromSamples } from '@/lib/stems/waveformPeaks';
 import { selectStemTypesForAudioLoad } from '@/lib/stems/stemAudioLoadPlan';
 import {
-  resolveTimelineTrimPointerIntent,
   resolveWaveformPointerIntent,
 } from '@/lib/stems/waveformPointerIntent';
 import {
@@ -179,6 +178,24 @@ type TrackContextMenuState = {
   colorOpen: boolean;
   colorDraft: string;
 };
+type StemEditorDialogState =
+  | {
+    kind: 'rename-track';
+    trackType: string;
+    label: string;
+    value: string;
+  }
+  | {
+    kind: 'delete-track';
+    trackType: string;
+    label: string;
+  }
+  | {
+    kind: 'delete-clip';
+    trackType: string;
+    label: string;
+    time: number;
+  };
 type EditorPreferences = {
   exportMode?: ExportMode;
   exportReadiness?: ExportReadiness;
@@ -1162,6 +1179,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   const [showShortcutHelp, setShowShortcutHelp] = useState(false);
   const [clipClipboard, setClipClipboard] = useState<StemClipClipboard | null>(null);
   const [trackContextMenu, setTrackContextMenu] = useState<TrackContextMenuState | null>(null);
+  const [editorDialog, setEditorDialog] = useState<StemEditorDialogState | null>(null);
   const [isTimelinePanning, setIsTimelinePanning] = useState(false);
   const [timelineScrollState, setTimelineScrollState] = useState<TimelineScrollState>({
     canScroll: false,
@@ -1188,7 +1206,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   const [addTrackMode, setAddTrackMode] = useState<'import' | 'record'>('import');
   const [isRecording, setIsRecording] = useState(false);
   const [recordingStatus, setRecordingStatus] = useState<string | null>(null);
-  const [recordingWaveform, setRecordingWaveform] = useState<number[]>(() => Array.from({ length: 28 }, () => 0.08));
+  const [, setRecordingWaveform] = useState<number[]>(() => Array.from({ length: 28 }, () => 0.08));
   const [recordingTrackType, setRecordingTrackType] = useState<string | null>(null);
   const [recordingTrackWaveform, setRecordingTrackWaveform] = useState<number[]>(() => Array.from({ length: 220 }, () => 0));
   const [recordingLevel, setRecordingLevel] = useState(0);
@@ -2790,24 +2808,8 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     setRecordingTrackType(null);
   }, [stopRecordingMeter]);
 
-  const deleteSelectedTrack = useCallback((targetType?: string) => {
-    const trackToDelete = targetType
-      ? stems.find((stem) => stem.type === targetType) || null
-      : selectedTrack;
-    if (!trackToDelete) {
-      setPlaybackError('请先选中一条轨道，再执行删除。');
-      return;
-    }
-    if (isRecording) {
-      setPlaybackError('请先停止当前录音，再删除轨道。');
-      return;
-    }
-
+  const performDeleteTrack = useCallback((trackToDelete: EditableStem) => {
     const label = getStemDisplayName(trackToDelete).zh;
-    if (typeof window !== 'undefined' && !window.confirm(`确定删除整条轨道“${label}”吗？删除后可通过“上一步”恢复。`)) {
-      return;
-    }
-
     rememberEditorHistory();
     pauseAll();
 
@@ -2850,7 +2852,27 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     setSelectedTrackType(nextSelectedTrack?.type ?? null);
     setRecordingStatus(null);
     setSaveStatus(`已删除“${label}”，可用上一步恢复。`);
-  }, [initialStems, isRecording, pauseAll, rememberEditorHistory, selectedTrack, stems]);
+  }, [initialStems, pauseAll, rememberEditorHistory, stems]);
+
+  const deleteSelectedTrack = useCallback((targetType?: string) => {
+    const trackToDelete = targetType
+      ? stems.find((stem) => stem.type === targetType) || null
+      : selectedTrack;
+    if (!trackToDelete) {
+      setPlaybackError('请先选中一条轨道，再执行删除。');
+      return;
+    }
+    if (isRecording) {
+      setPlaybackError('请先停止当前录音，再删除轨道。');
+      return;
+    }
+
+    setEditorDialog({
+      kind: 'delete-track',
+      trackType: trackToDelete.type,
+      label: getStemDisplayName(trackToDelete).zh,
+    });
+  }, [isRecording, selectedTrack, stems]);
 
   const clearTrackReorderPress = useCallback(() => {
     if (trackReorderPressTimerRef.current !== null) {
@@ -3097,14 +3119,13 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     }
 
     const label = getStemDisplayName(selectedTrack).zh;
-    if (typeof window !== 'undefined' && !window.confirm(`确定删除“${label}”在 ${formatStemTimecode(currentTime)} 的片段吗？删除后可通过“上一步”恢复。`)) {
-      return;
-    }
-
-    setTrackClips(selectedTrack.type, removeStemClipAtTime(clipState.clips, currentTime));
-    setPlaybackError(null);
-    setSaveStatus(`已删除“${label}”在 ${formatStemTimecode(currentTime)} 的片段。`);
-  }, [currentTime, duration, selectedTrack, selectedTrackState, setTrackClips]);
+    setEditorDialog({
+      kind: 'delete-clip',
+      trackType: selectedTrack.type,
+      label,
+      time: currentTime,
+    });
+  }, [currentTime, duration, selectedTrack, selectedTrackState]);
 
   const moveTrackClip = useCallback((type: string, clipId: string, nextStart: number, shouldSnap = snapToGrid, historyMode: StemHistoryMode = 'immediate') => {
     const stateBeforeMove = tracks[type] || defaultTrackState();
@@ -3171,75 +3192,16 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     });
   }, [duration, resolveTimelineRulerPointer, snapToGrid]);
 
-  const resolveTimelineRulerTrimIntent = useCallback((event: PointerEvent<HTMLDivElement>) => {
-    if (!selectedTrackTrimControls || duration <= 0) return null;
-
-    const rect = event.currentTarget.getBoundingClientRect();
-    return resolveTimelineTrimPointerIntent({
-      pointerX: event.clientX - rect.left,
-      width: rect.width,
-      duration,
-      trimStart: selectedTrackTrimControls.trimStart,
-      trimEnd: selectedTrackTrimControls.trimEnd,
-      hitSize: 40,
-    });
-  }, [duration, selectedTrackTrimControls]);
-
   const handleTimelineRulerPointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
     event.preventDefault();
-    const trimIntent = resolveTimelineRulerTrimIntent(event);
     const guide = resolveTimelineRulerPointer(event);
-    if (selectedTrack && selectedTrackTrimControls && trimIntent?.kind === 'trim') {
-      timelineRulerTrimDragRef.current = {
-        pointerId: event.pointerId,
-        kind: 'edge',
-        edge: trimIntent.edge,
-        anchorTime: trimIntent.time,
-        trimStart: selectedTrackTrimControls.trimStart,
-        trimEnd: selectedTrackTrimControls.trimEnd,
-        moved: false,
-      };
-      updateTimelineRulerGuide(event, true);
-      event.currentTarget.setPointerCapture(event.pointerId);
-      return;
-    }
-
-    if (selectedTrack && selectedTrackTrimControls && trimIntent?.kind === 'move-trim') {
-      timelineRulerTrimDragRef.current = {
-        pointerId: event.pointerId,
-        kind: 'range',
-        anchorTime: trimIntent.time,
-        trimStart: selectedTrackTrimControls.trimStart,
-        trimEnd: selectedTrackTrimControls.trimEnd,
-        moved: false,
-      };
-      handleSeek(guide.time);
-      updateTimelineRulerGuide(event, true);
-      event.currentTarget.setPointerCapture(event.pointerId);
-      return;
-    }
-
     timelineRulerTrimDragRef.current = null;
     handleSeek(guide.time);
-    updateTimelineRulerGuide(event, false);
+    updateTimelineRulerGuide(event, true);
     event.currentTarget.setPointerCapture(event.pointerId);
-  }, [handleSeek, resolveTimelineRulerPointer, resolveTimelineRulerTrimIntent, selectedTrack, selectedTrackTrimControls, updateTimelineRulerGuide]);
+  }, [handleSeek, resolveTimelineRulerPointer, updateTimelineRulerGuide]);
 
   const handleTimelineRulerPointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
-    const trimDrag = timelineRulerTrimDragRef.current;
-    if (trimDrag && trimDrag.pointerId === event.pointerId && selectedTrack) {
-      const guide = resolveTimelineRulerPointer(event);
-      trimDrag.moved = true;
-      if (trimDrag.kind === 'edge' && trimDrag.edge) {
-        setTrackTrim(selectedTrack.type, trimDrag.edge, guide.time, guide.shouldSnap, 'deferred');
-      } else {
-        setTrackTrimRange(selectedTrack.type, trimDrag.trimStart + guide.time - trimDrag.anchorTime, guide.shouldSnap, 'deferred');
-      }
-      updateTimelineRulerGuide(event, true);
-      event.preventDefault();
-      return;
-    }
-
     if (event.buttons === 1) {
       const guide = resolveTimelineRulerPointer(event);
       handleSeek(guide.time);
@@ -3249,43 +3211,17 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     }
 
     updateTimelineRulerGuide(event, false);
-  }, [handleSeek, resolveTimelineRulerPointer, selectedTrack, setTrackTrim, setTrackTrimRange, updateTimelineRulerGuide]);
+  }, [handleSeek, resolveTimelineRulerPointer, updateTimelineRulerGuide]);
 
   const handleTimelineRulerPointerUp = useCallback((event: PointerEvent<HTMLDivElement>) => {
-    const trimDrag = timelineRulerTrimDragRef.current;
-    if (trimDrag && trimDrag.pointerId === event.pointerId && selectedTrack) {
-      const guide = resolveTimelineRulerPointer(event);
-      if (!trimDrag.moved) {
-        if (trimDrag.kind === 'range') {
-          handleSeek(guide.time);
-        }
-        timelineRulerTrimDragRef.current = null;
-      } else if (trimDrag.kind === 'edge' && trimDrag.edge) {
-        setTrackTrim(selectedTrack.type, trimDrag.edge, guide.time, guide.shouldSnap, 'deferred');
-        commitDeferredHistory();
-        setSaveStatus(`已拖动“${getStemDisplayName(selectedTrack).zh}”${trimDrag.edge === 'start' ? '入点' : '出点'}到 ${formatTime(guide.time)}。`);
-      } else {
-        const nextStart = trimDrag.trimStart + guide.time - trimDrag.anchorTime;
-        const nextTrim = shiftStemTrimRange({
-          duration,
-          trimStart: trimDrag.trimStart,
-          trimEnd: trimDrag.trimEnd,
-          nextStart: snapStemEditorTime(nextStart, duration, guide.shouldSnap, snapStepSeconds),
-        });
-        setTrackTrimRange(selectedTrack.type, nextTrim.trimStart, false, 'deferred');
-        commitDeferredHistory();
-        setSaveStatus(`已移动“${getStemDisplayName(selectedTrack).zh}”选区到 ${formatTime(nextTrim.trimStart)} - ${formatTime(nextTrim.trimEnd)}。`);
-      }
-      timelineRulerTrimDragRef.current = null;
-    }
-
+    timelineRulerTrimDragRef.current = null;
     try {
       event.currentTarget.releasePointerCapture(event.pointerId);
     } catch {
       // Pointer capture may already be released by the browser.
     }
     updateTimelineRulerGuide(event, false);
-  }, [commitDeferredHistory, duration, handleSeek, resolveTimelineRulerPointer, selectedTrack, setTrackTrim, setTrackTrimRange, snapStepSeconds, updateTimelineRulerGuide]);
+  }, [updateTimelineRulerGuide]);
 
   const commitCurrentTimeInput = useCallback((value: string) => {
     const parsedTime = parseStemTimecode(value);
@@ -3480,12 +3416,13 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   const renameTrackFromMenu = useCallback((type: string) => {
     const stem = stems.find((candidate) => candidate.type === type);
     const currentLabel = stem ? getStemDisplayName(stem).zh : type;
-    const nextLabel = typeof window === 'undefined'
-      ? null
-      : window.prompt('重命名轨道', currentLabel);
-    if (nextLabel === null) return;
-    renameTrack(type, nextLabel);
-  }, [renameTrack, stems]);
+    setEditorDialog({
+      kind: 'rename-track',
+      trackType: type,
+      label: currentLabel,
+      value: currentLabel,
+    });
+  }, [stems]);
 
   const performTrackContextMenuAction = useCallback((action: 'copy' | 'cut' | 'paste' | 'rename' | 'delete' | 'color') => {
     if (!trackContextMenu) return;
@@ -3532,6 +3469,36 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       window.removeEventListener('keydown', closeOnEscape);
     };
   }, [closeTrackContextMenu, trackContextMenu]);
+
+  const closeEditorDialog = useCallback(() => {
+    setEditorDialog(null);
+  }, []);
+
+  const confirmEditorDialog = useCallback(() => {
+    if (!editorDialog) return;
+
+    if (editorDialog.kind === 'rename-track') {
+      renameTrack(editorDialog.trackType, editorDialog.value);
+      setEditorDialog(null);
+      return;
+    }
+
+    if (editorDialog.kind === 'delete-track') {
+      const trackToDelete = stems.find((stem) => stem.type === editorDialog.trackType);
+      if (trackToDelete) {
+        performDeleteTrack(trackToDelete);
+      }
+      setEditorDialog(null);
+      return;
+    }
+
+    const state = tracks[editorDialog.trackType] || defaultTrackState();
+    const clipState = resolveTrackClipState(state, duration);
+    setTrackClips(editorDialog.trackType, removeStemClipAtTime(clipState.clips, editorDialog.time));
+    setPlaybackError(null);
+    setSaveStatus(`已删除“${editorDialog.label}”在 ${formatStemTimecode(editorDialog.time)} 的片段。`);
+    setEditorDialog(null);
+  }, [duration, editorDialog, performDeleteTrack, renameTrack, setTrackClips, stems, tracks]);
 
   const commitSelectedTrimInput = useCallback((edge: 'start' | 'end', value: string) => {
     if (!selectedTrack) return;
@@ -3975,6 +3942,14 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (editorDialog) {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          closeEditorDialog();
+        }
+        return;
+      }
+
       const action = resolveStemEditorShortcut(event);
       if (!action) return;
 
@@ -4176,6 +4151,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     cutTrackClipAtTime,
     deleteSelectedTrack,
     duration,
+    editorDialog,
     focusSelectedTrackRange,
     getTrackColor,
     nudgePlaybackHead,
@@ -4190,6 +4166,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     saveEditState,
     selectAdjacentTrack,
     selectedTrack,
+    closeEditorDialog,
     setSelectedTrackTrimToCurrentTime,
     setTrackTrim,
     snapStepSeconds,
@@ -5008,13 +4985,11 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                   </div>
                 </div>
                 <div style={recordPanelStyle}>
-                  <div>
-                    <span style={addTrackHintStyle}>{recordingStatus || '使用麦克风录制当前空轨。'}</span>
-                    <div style={recordingWaveformStyle(isRecording)} aria-hidden="true">
-                      {recordingWaveform.map((level, index) => (
-                        <span key={index} style={recordingWaveformBarStyle(level, isRecording)} />
-                      ))}
-                    </div>
+                  <div style={recordingStatusBlockStyle}>
+                    <span style={recordingStatusTitleStyle}>{recordingStatus || '准备录音'}</span>
+                    <span style={recordingStatusHintStyle}>
+                      {isRecording ? '波形正在当前轨道实时生成。' : '点击开始后会录到当前空轨。'}
+                    </span>
                   </div>
                   <div style={recordingMeterStyle(isRecording)} aria-label={`录音电平 ${Math.round(recordingLevel * 100)}%`}>
                     <div style={recordingMeterScaleStyle}>
@@ -5030,7 +5005,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                   </div>
                   <button
                     type="button"
-                    style={isRecording ? addTrackDangerButtonStyle : addTrackPrimaryButtonStyle}
+                    style={recordingActionButtonStyle(isRecording)}
                     onClick={isRecording ? stopRecordingTrack : () => void startRecordingTrack()}
                   >
                     {isRecording ? '停止录音' : '开始录音'}
@@ -5656,6 +5631,65 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       {playbackError && (
         <div style={playbackErrorToastStyle(dawLayoutMetrics)} aria-live="assertive">
           {playbackError}
+        </div>
+      )}
+      {editorDialog && (
+        <div
+          role="presentation"
+          style={editorDialogOverlayStyle}
+          onPointerDown={closeEditorDialog}
+        >
+          <form
+            role="dialog"
+            aria-modal="true"
+            aria-label={editorDialog.kind === 'rename-track' ? '重命名轨道' : '确认删除'}
+            style={editorDialogPanelStyle(editorDialog.kind !== 'rename-track')}
+            onPointerDown={(event) => event.stopPropagation()}
+            onSubmit={(event) => {
+              event.preventDefault();
+              confirmEditorDialog();
+            }}
+          >
+            <div style={editorDialogEyebrowStyle}>HookCraft Studio</div>
+            <div style={editorDialogTitleStyle}>
+              {editorDialog.kind === 'rename-track' ? '重命名轨道' : editorDialog.kind === 'delete-track' ? '删除整条轨道' : '删除片段'}
+            </div>
+            <div style={editorDialogBodyStyle}>
+              {editorDialog.kind === 'rename-track'
+                ? `为“${editorDialog.label}”设置一个更清晰的轨道名称。`
+                : editorDialog.kind === 'delete-track'
+                  ? `确定删除整条轨道“${editorDialog.label}”吗？删除后可以通过“上一步”恢复。`
+                  : `确定删除“${editorDialog.label}”在 ${formatStemTimecode(editorDialog.time)} 的片段吗？删除后可以通过“上一步”恢复。`}
+            </div>
+            {editorDialog.kind === 'rename-track' && (
+              <input
+                autoFocus
+                aria-label="轨道新名称"
+                value={editorDialog.value}
+                maxLength={40}
+                onChange={(event) => setEditorDialog((current) => (
+                  current?.kind === 'rename-track'
+                    ? { ...current, value: event.target.value }
+                    : current
+                ))}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') {
+                    event.preventDefault();
+                    closeEditorDialog();
+                  }
+                }}
+                style={editorDialogInputStyle}
+              />
+            )}
+            <div style={editorDialogActionsStyle}>
+              <button type="button" style={editorDialogSecondaryButtonStyle} onClick={closeEditorDialog}>
+                取消
+              </button>
+              <button type="submit" style={editorDialogPrimaryButtonStyle(editorDialog.kind !== 'rename-track')}>
+                {editorDialog.kind === 'rename-track' ? '保存名称' : '确认删除'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
       {trackContextMenu && (
@@ -7435,42 +7469,34 @@ function monitoringButtonStyle(active: boolean): CSSProperties {
 
 const recordPanelStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1fr) auto auto',
-  gap: 8,
-  alignItems: 'center',
-  marginTop: 8,
+  gridTemplateColumns: 'minmax(0, 1fr) auto',
+  gap: 10,
+  alignItems: 'stretch',
+  marginTop: 10,
+  padding: 10,
+  borderRadius: 8,
+  border: '1px solid rgba(73, 79, 107, 0.58)',
+  background: 'rgba(4, 7, 13, 0.5)',
 };
 
-function recordingWaveformStyle(active: boolean): CSSProperties {
-  return {
-    height: 42,
-    display: 'flex',
-    alignItems: 'center',
-    gap: 3,
-    marginTop: 8,
-    padding: '6px 8px',
-    borderRadius: 8,
-    border: active ? '1px solid rgba(82, 214, 198, 0.42)' : '1px solid rgba(48, 52, 76, 0.82)',
-    background: active
-      ? 'linear-gradient(90deg, rgba(82, 214, 198, 0.13), rgba(206, 255, 53, 0.08))'
-      : 'rgba(8, 11, 19, 0.72)',
-    overflow: 'hidden',
-  };
-}
+const recordingStatusBlockStyle: CSSProperties = {
+  minWidth: 0,
+  display: 'grid',
+  alignContent: 'center',
+  gap: 5,
+};
 
-function recordingWaveformBarStyle(level: number, active: boolean): CSSProperties {
-  const height = Math.max(5, Math.min(30, level * 32));
-  return {
-    width: 4,
-    height,
-    borderRadius: 999,
-    background: active
-      ? 'linear-gradient(180deg, #ceff35, #52d6c6)'
-      : 'rgba(148, 163, 184, 0.32)',
-    boxShadow: active ? '0 0 10px rgba(82, 214, 198, 0.28)' : 'none',
-    transition: 'height 70ms linear, background 140ms ease',
-  };
-}
+const recordingStatusTitleStyle: CSSProperties = {
+  color: '#f8fbff',
+  fontSize: 12,
+  fontWeight: 950,
+};
+
+const recordingStatusHintStyle: CSSProperties = {
+  color: '#9298ad',
+  fontSize: 11,
+  lineHeight: 1.35,
+};
 
 function recordingMeterStyle(active: boolean): CSSProperties {
   return {
@@ -7554,6 +7580,15 @@ const addTrackDangerButtonStyle: CSSProperties = {
   fontSize: 12,
   fontWeight: 900,
 };
+
+function recordingActionButtonStyle(active: boolean): CSSProperties {
+  return {
+    ...(active ? addTrackDangerButtonStyle : addTrackPrimaryButtonStyle),
+    gridColumn: '1 / -1',
+    width: '100%',
+    minHeight: 34,
+  };
+}
 
 const buttonWrapStyle: CSSProperties = {
   display: 'flex',
@@ -8075,6 +8110,92 @@ const editorStatusToastTextStyle: CSSProperties = {
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
 };
+
+const editorDialogOverlayStyle: CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  zIndex: 120,
+  display: 'grid',
+  placeItems: 'center',
+  padding: 20,
+  background: 'radial-gradient(circle at 50% 36%, rgba(82, 214, 198, 0.1), transparent 32%), rgba(1, 4, 10, 0.68)',
+  backdropFilter: 'blur(7px)',
+};
+
+function editorDialogPanelStyle(danger: boolean): CSSProperties {
+  return {
+    width: 'min(460px, calc(100vw - 40px))',
+    display: 'grid',
+    gap: 12,
+    borderRadius: 12,
+    border: danger ? '1px solid rgba(248, 113, 113, 0.36)' : '1px solid rgba(82, 214, 198, 0.32)',
+    background: 'linear-gradient(180deg, rgba(20, 25, 36, 0.98), rgba(6, 9, 16, 0.98))',
+    boxShadow: danger
+      ? '0 30px 80px rgba(0, 0, 0, 0.58), 0 0 0 1px rgba(255,255,255,0.04), 0 0 48px rgba(248, 113, 113, 0.11)'
+      : '0 30px 80px rgba(0, 0, 0, 0.58), 0 0 0 1px rgba(255,255,255,0.04), 0 0 48px rgba(82, 214, 198, 0.12)',
+    padding: 22,
+    color: '#f8fbff',
+  };
+}
+
+const editorDialogEyebrowStyle: CSSProperties = {
+  color: '#ceff35',
+  fontSize: 11,
+  fontWeight: 950,
+  letterSpacing: 0,
+  textTransform: 'uppercase',
+};
+
+const editorDialogTitleStyle: CSSProperties = {
+  color: '#ffffff',
+  fontSize: 22,
+  fontWeight: 950,
+  lineHeight: 1.1,
+};
+
+const editorDialogBodyStyle: CSSProperties = {
+  color: '#b7bdd0',
+  fontSize: 13,
+  lineHeight: 1.55,
+};
+
+const editorDialogInputStyle: CSSProperties = {
+  width: '100%',
+  height: 42,
+  boxSizing: 'border-box',
+  borderRadius: 8,
+  border: '1px solid rgba(82, 214, 198, 0.46)',
+  background: 'rgba(4, 7, 13, 0.82)',
+  color: '#f8fbff',
+  outline: 'none',
+  padding: '0 12px',
+  fontSize: 14,
+  fontWeight: 850,
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04), 0 0 0 3px rgba(82, 214, 198, 0.08)',
+};
+
+const editorDialogActionsStyle: CSSProperties = {
+  display: 'flex',
+  justifyContent: 'flex-end',
+  gap: 10,
+  marginTop: 4,
+};
+
+const editorDialogSecondaryButtonStyle: CSSProperties = {
+  ...editorButtonChromeStyle({ tone: 'neutral', compact: true }),
+  minHeight: 36,
+  minWidth: 82,
+  borderRadius: 8,
+};
+
+function editorDialogPrimaryButtonStyle(danger: boolean): CSSProperties {
+  return {
+    ...editorButtonChromeStyle({ tone: danger ? 'danger' : 'primary', compact: true, active: true }),
+    minHeight: 36,
+    minWidth: 104,
+    borderRadius: 8,
+  };
+}
 
 function trackContextMenuStyle(x: number, y: number): CSSProperties {
   return {
@@ -9516,35 +9637,7 @@ function WaveformTrackCanvas({
         context.fillRect(rect.x + rect.width - Math.max(1, ratio), 0, Math.max(1, ratio), height);
       });
 
-      const handleColor = selected ? '#ceff35' : colorWithAlpha(baseColor, 0.52);
-      const handleWidth = selected ? 5 * ratio : 3 * ratio;
-      const startHandleX = Math.max(0, Math.min(width - handleWidth, startX));
-      const endHandleX = Math.max(0, Math.min(width - handleWidth, endX - handleWidth));
-      const startLineX = startHandleX;
-      const endLineX = endHandleX + handleWidth;
-      context.strokeStyle = handleColor;
-      context.lineWidth = Math.max(1, ratio);
-      context.beginPath();
-      context.moveTo(startLineX, 0);
-      context.lineTo(startLineX, height);
-      context.moveTo(endLineX, 0);
-      context.lineTo(endLineX, height);
-      context.stroke();
-
-      context.fillStyle = handleColor;
-      context.fillRect(startHandleX, 0, handleWidth, height);
-      context.fillRect(endHandleX, 0, handleWidth, height);
       if (selected) {
-        context.fillStyle = 'rgba(206, 255, 53, 0.88)';
-        context.fillRect(startHandleX + handleWidth - ratio, 8 * ratio, ratio, height - 16 * ratio);
-        context.fillStyle = 'rgba(206, 255, 53, 0.88)';
-        context.fillRect(endHandleX, 8 * ratio, ratio, height - 16 * ratio);
-
-        context.fillStyle = 'rgba(255,255,255,0.78)';
-        context.font = `${Math.max(9, 10 * ratio)}px sans-serif`;
-        context.textAlign = 'center';
-        context.fillText('入', Math.max(12 * ratio, Math.min(width - 12 * ratio, startHandleX + handleWidth)), 12 * ratio);
-        context.fillText('出', Math.max(12 * ratio, Math.min(width - 12 * ratio, endHandleX)), height - 6 * ratio);
         if (mutedRects.length > 0) {
           context.fillStyle = 'rgba(255,255,255,0.88)';
           context.textAlign = 'left';
@@ -9615,7 +9708,7 @@ function WaveformTrackCanvas({
         event.currentTarget.setPointerCapture(event.pointerId);
         return;
       }
-      if (intent.kind === 'move-trim') {
+      if (intent.kind === 'move-trim' && clips.length <= 1) {
         trimRangeDragRef.current = {
           anchorTime: intent.time,
           trimStart,
