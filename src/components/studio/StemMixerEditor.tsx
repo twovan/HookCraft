@@ -5968,7 +5968,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         tabIndex={-1}
         aria-label="多轨时间线"
         title="Ctrl+鼠标滚轮缩放波形，Shift+滚轮横向移动"
-        style={trackListStyle(trackDensity, isTimelinePanning, shouldAllowTimelineHorizontalScroll)}
+        style={trackListStyle(trackDensity, dawLayoutMetrics, isTimelinePanning, shouldAllowTimelineHorizontalScroll)}
         onContextMenu={(event) => {
           event.preventDefault();
           closeTrackContextMenu();
@@ -6218,7 +6218,8 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
             })}
           </div>
         </div>
-        {visibleStems.map((stem, index) => {
+        <div className="stem-timeline-track-body" style={timelineTrackBodyStyle(trackDensity)}>
+          {visibleStems.map((stem, index) => {
           const state = tracks[stem.type] || defaultTrackState();
           const trackClipState = resolveTrackClipState(state, duration);
           const trimEnd = state.trimEnd ?? duration;
@@ -6465,25 +6466,26 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
 
             </div>
           );
-        })}
-        <div style={timelineAddTrackRowStyle}>
-          <button
-            type="button"
-            className="stem-add-track-dropzone"
-            aria-label="添加轨道"
-            title="点击添加一条空轨道"
-            style={trackAddDropzoneButtonStyle}
-            onClick={createEmptyCustomTrack}
-          >
-            <span style={trackAddDropzoneIconStyle}>+♫</span>
-            <span style={trackAddDropzoneTextStyle}>点击添加空轨道</span>
-          </button>
-        </div>
-        {visibleStems.length === 0 && (
-          <div style={emptyTrackNoticeStyle}>
-            当前筛选下没有可显示的轨道，可以切回“全部”查看完整分轨列表。
+          })}
+          <div style={timelineAddTrackRowStyle}>
+            <button
+              type="button"
+              className="stem-add-track-dropzone"
+              aria-label="添加轨道"
+              title="点击添加一条空轨道"
+              style={trackAddDropzoneButtonStyle}
+              onClick={createEmptyCustomTrack}
+            >
+              <span style={trackAddDropzoneIconStyle}>+♫</span>
+              <span style={trackAddDropzoneTextStyle}>点击添加空轨道</span>
+            </button>
           </div>
-        )}
+          {visibleStems.length === 0 && (
+            <div style={emptyTrackNoticeStyle}>
+              当前筛选下没有可显示的轨道，可以切回“全部”查看完整分轨列表。
+            </div>
+          )}
+        </div>
         {timelineScrollState.canScroll && (
           <div
             style={timelineScrollProgressStyle(dawLayoutMetrics)}
@@ -6663,6 +6665,21 @@ const timelineScrollbarCss = `
 
     .stem-timeline-toolbar-strip::-webkit-scrollbar {
       display: none;
+    }
+
+    #stem-editor-timeline {
+      position: relative !important;
+      top: auto !important;
+      left: auto !important;
+      right: auto !important;
+      bottom: auto !important;
+      height: auto !important;
+      max-height: none !important;
+    }
+
+    .stem-timeline-track-body {
+      max-height: none !important;
+      overflow-y: visible !important;
     }
 
     .stem-timeline-ruler {
@@ -8647,14 +8664,24 @@ const trackColorHexInputStyle: CSSProperties = {
   fontWeight: 850,
 };
 
-function trackListStyle(trackDensity: TrackDensity, isPanning = false, canScrollHorizontally = true): CSSProperties {
+function trackListStyle(
+  trackDensity: TrackDensity,
+  metrics: DawEditorLayoutMetrics,
+  isPanning = false,
+  canScrollHorizontally = true,
+): CSSProperties {
   return {
-    position: 'relative',
+    position: 'fixed',
+    top: metrics.headerHeight + 8,
+    left: metrics.sideRailWidth + 8,
+    right: metrics.inspectorWidth + 24,
+    bottom: metrics.bottomTransportHeight + 10,
+    zIndex: 18,
     gridColumn: '1',
     order: 3,
     display: 'flex',
     flexDirection: 'column',
-    gap: trackDensity === 'compact' ? 2 : 3,
+    gap: 0,
     marginTop: 0,
     padding: '0 6px 8px',
     border: '1px solid rgba(48, 52, 76, 0.84)',
@@ -8667,8 +8694,11 @@ function trackListStyle(trackDensity: TrackDensity, isPanning = false, canScroll
     backgroundSize: trackDensity === 'compact' ? '76px 100%, 100% 58px, auto' : '76px 100%, 100% 76px, auto',
     minWidth: 0,
     maxWidth: '100%',
+    height: `calc(100vh - ${metrics.headerHeight + metrics.bottomTransportHeight + 18}px)`,
+    maxHeight: `calc(100vh - ${metrics.headerHeight + metrics.bottomTransportHeight + 18}px)`,
     boxSizing: 'border-box',
     overflowX: canScrollHorizontally ? 'auto' : 'hidden',
+    overflowY: 'hidden',
     outline: 'none',
     overscrollBehaviorX: 'contain',
     cursor: isPanning ? 'grabbing' : 'default',
@@ -8733,7 +8763,7 @@ function timelineToolbarStyle(metrics: DawEditorLayoutMetrics, viewportWidth: nu
   const visibleWidth = viewportWidth > 0 ? Math.max(320, viewportWidth - 14) : undefined;
 
   return {
-    position: 'sticky',
+    position: 'relative',
     top: 0,
     left: 0,
     zIndex: 58,
@@ -8756,6 +8786,24 @@ function timelineToolbarStyle(metrics: DawEditorLayoutMetrics, viewportWidth: nu
     background: 'linear-gradient(180deg, rgba(10, 14, 24, 0.98), rgba(7, 10, 18, 0.98))',
     boxShadow: '0 10px 22px rgba(0,0,0,0.18)',
     backdropFilter: 'blur(14px)',
+  };
+}
+
+function timelineTrackBodyStyle(trackDensity: TrackDensity): CSSProperties {
+  return {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: trackDensity === 'compact' ? 2 : 3,
+    minWidth: 'max-content',
+    minHeight: 0,
+    flex: '1 1 auto',
+    overflowY: 'auto',
+    overflowX: 'visible',
+    paddingTop: 3,
+    paddingBottom: 8,
+    scrollbarWidth: 'thin',
+    scrollbarColor: 'rgba(87, 219, 199, 0.88) rgba(5, 9, 16, 0.92)',
+    overscrollBehaviorY: 'contain',
   };
 }
 
@@ -8909,8 +8957,8 @@ function timelineShortcutHelpStyle(metrics: DawEditorLayoutMetrics, viewportWidt
   const visibleWidth = viewportWidth > 0 ? Math.max(320, viewportWidth - 14) : undefined;
 
   return {
-    position: 'sticky',
-    top: 42,
+    position: 'relative',
+    top: 0,
     left: 0,
     zIndex: 57,
     alignSelf: 'flex-start',
@@ -8985,8 +9033,8 @@ function timelineScrollThumbStyle(progress: number, viewRatio: number): CSSPrope
 
 function timelineRulerStyle(gridColumns: string, minWidth: number, metrics: DawEditorLayoutMetrics): CSSProperties {
   return {
-    position: 'sticky',
-    top: 40,
+    position: 'relative',
+    top: 0,
     zIndex: 56,
     display: 'grid',
     gridTemplateColumns: gridColumns,
