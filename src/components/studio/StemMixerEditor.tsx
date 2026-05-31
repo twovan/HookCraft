@@ -8654,10 +8654,10 @@ const trackAddDropzoneTextStyle: CSSProperties = {
   lineHeight: 1.2,
 };
 
-function timelineToolbarStyle(metrics: DawEditorLayoutMetrics): CSSProperties {
+function timelineToolbarStyle(_metrics: DawEditorLayoutMetrics): CSSProperties {
   return {
     position: 'sticky',
-    top: metrics.headerHeight + 4,
+    top: 0,
     left: 0,
     zIndex: 22,
     display: 'grid',
@@ -8816,10 +8816,10 @@ function timelineHelpButtonStyle(active: boolean): CSSProperties {
   };
 }
 
-function timelineShortcutHelpStyle(metrics: DawEditorLayoutMetrics): CSSProperties {
+function timelineShortcutHelpStyle(_metrics: DawEditorLayoutMetrics): CSSProperties {
   return {
     position: 'sticky',
-    top: metrics.headerHeight + 53,
+    top: 46,
     left: 0,
     zIndex: 21,
     display: 'grid',
@@ -8891,10 +8891,10 @@ function timelineScrollThumbStyle(progress: number, viewRatio: number): CSSPrope
   };
 }
 
-function timelineRulerStyle(gridColumns: string, minWidth: number, metrics: DawEditorLayoutMetrics): CSSProperties {
+function timelineRulerStyle(gridColumns: string, minWidth: number, _metrics: DawEditorLayoutMetrics): CSSProperties {
   return {
     position: 'sticky',
-    top: metrics.headerHeight + 48,
+    top: 44,
     zIndex: 20,
     display: 'grid',
     gridTemplateColumns: gridColumns,
