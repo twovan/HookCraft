@@ -4729,23 +4729,15 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
           </button>
           <button
             type="button"
-            onClick={createEmptyCustomTrack}
-            title="添加一条可混音的新轨道"
-            style={primarySmallButtonStyle}
-          >
-            添加轨道
-          </button>
-          <button
-            type="button"
             onClick={() => void returnToStudioAfterSave()}
             disabled={isSaving}
             title="自动保存当前项目后返回创作中心"
             style={ghostButtonStyle}
           >
-            返回创作中心
+            返回
           </button>
           <button type="button" onClick={saveEditState} disabled={isSaving} style={primarySmallButtonStyle}>
-            {isSaving ? '保存中' : '保存编辑'}
+            {isSaving ? '保存中' : '保存'}
           </button>
           <button
             type="button"
@@ -4756,10 +4748,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
             }}
             style={ghostButtonStyle}
           >
-            导出中心
-          </button>
-          <button type="button" onClick={() => void reloadAudioCache()} disabled={loadingCount > 0 || isAudioRetrying} style={ghostButtonStyle}>
-            {loadingCount > 0 || isAudioRetrying ? '检查中' : '检查音频'}
+            导出
           </button>
         </div>
       </div>
@@ -4863,12 +4852,6 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
           )}
           {!compactTransport && (
           <div style={transportOptionBarStyle}>
-            <button type="button" onClick={undoTrackChange} disabled={!canUndo} style={transportOptionButtonStyle(false, !canUndo)}>
-              上一步
-            </button>
-            <button type="button" onClick={redoTrackChange} disabled={!canRedo} style={transportOptionButtonStyle(false, !canRedo)}>
-              下一步
-            </button>
             <button
               type="button"
               aria-pressed={followPlayhead}
@@ -6518,16 +6501,14 @@ const timelineScrollbarCss = `
 
   #stem-editor-timeline .stem-add-track-dropzone:hover,
   #stem-editor-timeline .stem-add-track-dropzone:focus-visible {
-    border-color: rgba(206, 255, 53, 0.52) !important;
-    background:
-      radial-gradient(circle at 50% 0%, rgba(206, 255, 53, 0.11), transparent 44%),
-      linear-gradient(180deg, rgba(3, 7, 12, 0.48), rgba(2, 6, 12, 0.72)) !important;
-    color: #ffffff !important;
+    border-color: rgba(190, 232, 95, 0.5) !important;
+    background: rgba(18, 24, 34, 0.74) !important;
+    color: #f4f7ff !important;
     outline: none;
   }
 
   #stem-editor-timeline .stem-add-track-dropzone:active {
-    transform: translateY(1px);
+    transform: none;
   }
 
   #stem-editor-timeline .stem-track-volume-range,
@@ -6630,60 +6611,60 @@ function editorButtonChromeStyle({
     glow: string;
   }> = {
     neutral: {
-      border: 'rgba(70, 76, 106, 0.86)',
-      background: 'linear-gradient(180deg, #20253a 0%, #141827 54%, #0d111d 100%)',
-      activeBackground: 'linear-gradient(180deg, #313650 0%, #222842 54%, #151a2c 100%)',
-      color: '#d9dced',
-      activeColor: '#ffffff',
-      glow: 'rgba(148, 163, 184, 0.16)',
+      border: 'rgba(94, 102, 132, 0.36)',
+      background: 'rgba(21, 26, 38, 0.92)',
+      activeBackground: 'rgba(44, 52, 72, 0.92)',
+      color: '#c9cedd',
+      activeColor: '#f4f6fb',
+      glow: 'rgba(148, 163, 184, 0.08)',
     },
     primary: {
-      border: 'rgba(206, 255, 53, 0.74)',
-      background: 'linear-gradient(180deg, #dfff5b 0%, #ceff35 52%, #7f9f18 100%)',
-      activeBackground: 'linear-gradient(180deg, #f1ff99 0%, #ceff35 52%, #8fb51d 100%)',
-      color: '#08090c',
-      activeColor: '#08090c',
-      glow: 'rgba(206, 255, 53, 0.34)',
+      border: 'rgba(190, 232, 95, 0.56)',
+      background: 'rgba(190, 232, 95, 0.9)',
+      activeBackground: 'rgba(205, 244, 116, 0.96)',
+      color: '#0b1113',
+      activeColor: '#07100b',
+      glow: 'rgba(190, 232, 95, 0.12)',
     },
     purple: {
-      border: 'rgba(206, 255, 53, 0.48)',
-      background: 'linear-gradient(180deg, rgba(206, 255, 53, 0.2), rgba(42, 54, 22, 0.86))',
-      activeBackground: 'linear-gradient(180deg, rgba(206, 255, 53, 0.42), rgba(60, 78, 26, 0.9))',
-      color: '#eaff9e',
-      activeColor: '#f6ffd0',
-      glow: 'rgba(206, 255, 53, 0.24)',
+      border: 'rgba(151, 165, 196, 0.32)',
+      background: 'rgba(27, 33, 48, 0.9)',
+      activeBackground: 'rgba(74, 86, 116, 0.88)',
+      color: '#cfd7ec',
+      activeColor: '#f7f9ff',
+      glow: 'rgba(151, 165, 196, 0.1)',
     },
     info: {
-      border: 'rgba(96, 165, 250, 0.58)',
-      background: 'linear-gradient(180deg, rgba(37, 99, 235, 0.34), rgba(17, 42, 91, 0.82))',
-      activeBackground: 'linear-gradient(180deg, rgba(59, 130, 246, 0.52), rgba(29, 78, 216, 0.82))',
-      color: '#dbeafe',
+      border: 'rgba(122, 167, 255, 0.42)',
+      background: 'rgba(31, 49, 78, 0.78)',
+      activeBackground: 'rgba(64, 101, 158, 0.86)',
+      color: '#d8e5ff',
       activeColor: '#f8fbff',
-      glow: 'rgba(96, 165, 250, 0.28)',
+      glow: 'rgba(122, 167, 255, 0.1)',
     },
     success: {
-      border: 'rgba(52, 211, 153, 0.56)',
-      background: 'linear-gradient(180deg, rgba(16, 185, 129, 0.3), rgba(6, 78, 59, 0.78))',
-      activeBackground: 'linear-gradient(180deg, rgba(52, 211, 153, 0.5), rgba(5, 150, 105, 0.76))',
-      color: '#bbf7d0',
-      activeColor: '#ecfdf5',
-      glow: 'rgba(52, 211, 153, 0.25)',
+      border: 'rgba(79, 214, 177, 0.42)',
+      background: 'rgba(26, 69, 62, 0.76)',
+      activeBackground: 'rgba(52, 121, 104, 0.86)',
+      color: '#c8f7e8',
+      activeColor: '#f2fffa',
+      glow: 'rgba(79, 214, 177, 0.1)',
     },
     warning: {
-      border: 'rgba(251, 191, 36, 0.58)',
-      background: 'linear-gradient(180deg, rgba(251, 191, 36, 0.27), rgba(120, 53, 15, 0.8))',
-      activeBackground: 'linear-gradient(180deg, rgba(251, 191, 36, 0.48), rgba(180, 83, 9, 0.75))',
-      color: '#fde68a',
-      activeColor: '#fff7d6',
-      glow: 'rgba(251, 191, 36, 0.24)',
+      border: 'rgba(222, 178, 86, 0.44)',
+      background: 'rgba(74, 56, 30, 0.78)',
+      activeBackground: 'rgba(128, 91, 40, 0.86)',
+      color: '#f2dfb2',
+      activeColor: '#fff8e7',
+      glow: 'rgba(222, 178, 86, 0.1)',
     },
     danger: {
-      border: 'rgba(248, 113, 113, 0.58)',
-      background: 'linear-gradient(180deg, rgba(239, 68, 68, 0.3), rgba(127, 29, 29, 0.78))',
-      activeBackground: 'linear-gradient(180deg, rgba(248, 113, 113, 0.5), rgba(185, 28, 28, 0.76))',
-      color: '#fecaca',
-      activeColor: '#fff1f2',
-      glow: 'rgba(248, 113, 113, 0.24)',
+      border: 'rgba(255, 107, 122, 0.44)',
+      background: 'rgba(82, 36, 46, 0.78)',
+      activeBackground: 'rgba(143, 62, 74, 0.86)',
+      color: '#ffd0d6',
+      activeColor: '#fff5f6',
+      glow: 'rgba(255, 107, 122, 0.1)',
     },
   };
   const colors = palette[tone];
@@ -6692,14 +6673,16 @@ function editorButtonChromeStyle({
     minHeight: compact ? 24 : 32,
     borderRadius: round ? 999 : 8,
     border: `1px solid ${disabled ? 'rgba(48, 52, 76, 0.72)' : colors.border}`,
-    background: disabled ? 'linear-gradient(180deg, rgba(30, 34, 49, 0.62), rgba(13, 17, 29, 0.72))' : active ? colors.activeBackground : colors.background,
+    background: disabled ? 'rgba(20, 24, 34, 0.64)' : active ? colors.activeBackground : colors.background,
     color: disabled ? '#62687c' : active ? colors.activeColor : colors.color,
     boxShadow: disabled
-      ? 'inset 0 1px 0 rgba(255,255,255,0.03)'
-      : `inset 0 1px 0 rgba(255,255,255,0.16), inset 0 -2px 0 rgba(0,0,0,0.34), 0 1px 0 rgba(255,255,255,0.04), 0 0 16px ${active ? colors.glow : 'rgba(0,0,0,0)'}`,
-    textShadow: disabled ? 'none' : '0 1px 0 rgba(0,0,0,0.32)',
+      ? 'none'
+      : active
+        ? `0 0 0 1px ${colors.glow}`
+        : 'none',
+    textShadow: 'none',
     cursor: disabled ? 'not-allowed' : 'pointer',
-    transition: 'border-color 140ms ease, background 140ms ease, box-shadow 140ms ease, color 140ms ease, transform 140ms ease',
+    transition: 'border-color 140ms ease, background 140ms ease, color 140ms ease',
     whiteSpace: 'nowrap',
   };
 }
@@ -7001,17 +6984,17 @@ const playButtonStyle: CSSProperties = {
   ...editorButtonChromeStyle({ tone: 'primary', round: true, active: true }),
   minHeight: 38,
   minWidth: 46,
-  border: '1px solid rgba(206, 255, 53, 0.86)',
-  background: 'linear-gradient(180deg, #f7ffd0 0%, #ceff35 48%, #8fb51d 100%)',
-  color: '#08090c',
+  border: '1px solid rgba(190, 232, 95, 0.66)',
+  background: '#bee85f',
+  color: '#08100c',
   padding: 0,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
   fontSize: 13,
   fontWeight: 900,
-  boxShadow: 'inset 0 2px 0 rgba(255,255,255,0.86), inset 0 -3px 0 rgba(28, 48, 18, 0.28), 0 0 22px rgba(206, 255, 53, 0.24)',
-  textShadow: '0 1px 0 rgba(255,255,255,0.44)',
+  boxShadow: 'none',
+  textShadow: 'none',
 };
 
 function transportIconButtonStyle(disabled: boolean): CSSProperties {
@@ -7290,12 +7273,10 @@ function inspectorTabButtonStyle(active: boolean): CSSProperties {
     ...editorButtonChromeStyle({ tone: 'purple', compact: true, active }),
     minHeight: 30,
     borderRadius: 7,
-    color: active ? '#f2ebff' : '#9ca3af',
+    color: active ? '#f6f8ff' : '#9ca3af',
     fontSize: 12,
     fontWeight: 900,
-    boxShadow: active
-      ? 'inset 0 1px 0 rgba(255,255,255,0.14), inset 0 -2px 0 rgba(0,0,0,0.34), 0 0 14px rgba(206, 255, 53, 0.18)'
-      : 'inset 0 1px 0 rgba(255,255,255,0.04), inset 0 -2px 0 rgba(0,0,0,0.2)',
+    boxShadow: 'none',
   };
 }
 
@@ -7500,9 +7481,9 @@ const recordingInputPanelStyle: CSSProperties = {
   marginTop: 10,
   padding: 12,
   borderRadius: 8,
-  border: '1px solid rgba(82, 214, 198, 0.2)',
+  border: '1px solid rgba(94, 102, 132, 0.34)',
   background: `
-    linear-gradient(135deg, rgba(82, 214, 198, 0.08), transparent 34%),
+    linear-gradient(135deg, rgba(122, 167, 255, 0.05), transparent 34%),
     linear-gradient(180deg, rgba(9, 14, 22, 0.98), rgba(5, 8, 14, 0.96))
   `,
   boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.045), 0 12px 26px rgba(0,0,0,0.18)',
@@ -7564,9 +7545,7 @@ function monitoringButtonStyle(active: boolean): CSSProperties {
     gap: 7,
     fontSize: 11,
     fontWeight: 950,
-    boxShadow: active
-      ? '0 0 22px rgba(206, 255, 53, 0.22), inset 0 1px 0 rgba(255,255,255,0.22)'
-      : 'inset 0 1px 0 rgba(255,255,255,0.06)',
+    boxShadow: 'none',
   };
 }
 
@@ -8464,11 +8443,11 @@ const trackAddDropzoneButtonStyle: CSSProperties = {
   gap: 2,
   borderRadius: 8,
   border: '2px dashed rgba(148, 163, 184, 0.26)',
-  background: 'linear-gradient(180deg, rgba(0, 0, 0, 0.34), rgba(2, 6, 12, 0.58))',
-  color: '#f8fbff',
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.035), 0 12px 28px rgba(0,0,0,0.24)',
+  background: 'rgba(5, 8, 14, 0.62)',
+  color: '#dfe6f3',
+  boxShadow: 'none',
   cursor: 'pointer',
-  transition: 'border-color 140ms ease, background 140ms ease, transform 140ms ease, color 140ms ease',
+  transition: 'border-color 140ms ease, background 140ms ease, color 140ms ease',
 };
 
 const trackAddDropzoneIconStyle: CSSProperties = {
@@ -8572,9 +8551,9 @@ const timelineZoomFitButtonStyle: CSSProperties = {
 
 const timelineToolbarPillStyle: CSSProperties = {
   borderRadius: 999,
-  border: '1px solid rgba(206, 255, 53, 0.28)',
-  background: 'rgba(206, 255, 53, 0.08)',
-  color: '#eaff9e',
+  border: '1px solid rgba(151, 165, 196, 0.22)',
+  background: 'rgba(20, 25, 36, 0.66)',
+  color: '#cfd7e8',
   padding: '3px 8px',
   fontSize: 11,
   fontWeight: 800,
@@ -8799,9 +8778,9 @@ const timelineRulerAddTrackButtonStyle: CSSProperties = {
   ...editorButtonChromeStyle({ tone: 'neutral', compact: true, round: true }),
   minHeight: 32,
   padding: '0 13px',
-  borderColor: 'rgba(255,255,255,0.1)',
-  background: 'linear-gradient(180deg, #262c35, #171c23)',
-  color: '#f8fafc',
+  borderColor: 'rgba(151, 165, 196, 0.28)',
+  background: 'rgba(23, 29, 41, 0.92)',
+  color: '#e2e7f3',
   fontSize: 13,
   fontWeight: 950,
 };
