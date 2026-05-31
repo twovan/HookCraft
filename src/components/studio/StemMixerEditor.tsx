@@ -8960,26 +8960,35 @@ function timelineGlobalPlayheadBadgeStyle(currentTime: number, duration: number,
 
 const timelineRulerLabelStyle: CSSProperties = {
   position: 'sticky',
-  left: 8,
-  zIndex: 6,
+  left: 0,
+  zIndex: 8,
   alignSelf: 'stretch',
   display: 'flex',
   alignItems: 'center',
+  justifyContent: 'flex-start',
   gap: 8,
+  minWidth: 0,
+  boxSizing: 'border-box',
+  padding: '0 8px 0 2px',
   borderRadius: 0,
   background: 'linear-gradient(180deg, rgba(10, 14, 18, 0.98), rgba(5, 8, 12, 0.98))',
   borderRight: '1px solid rgba(255,255,255,0.06)',
+  boxShadow: '10px 0 18px rgba(3, 6, 12, 0.42)',
+  overflow: 'hidden',
 };
 
 const timelineRulerAddTrackButtonStyle: CSSProperties = {
   ...editorButtonChromeStyle({ tone: 'neutral', compact: true, round: true }),
-  minHeight: 32,
-  padding: '0 13px',
+  minHeight: 28,
+  maxWidth: 150,
+  padding: '0 12px',
   borderColor: 'rgba(151, 165, 196, 0.28)',
-  background: 'rgba(23, 29, 41, 0.92)',
+  background: 'rgba(15, 20, 30, 0.96)',
   color: '#e2e7f3',
-  fontSize: 13,
+  fontSize: 12,
   fontWeight: 950,
+  boxShadow: 'none',
+  whiteSpace: 'nowrap',
 };
 
 const timelineRulerMarksStyle: CSSProperties = {
