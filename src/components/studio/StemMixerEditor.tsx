@@ -163,6 +163,10 @@ type StemClipClipboard = {
   clip: StemClip;
   sourceTrackType: string;
 };
+type SelectedClipSelection = {
+  trackType: string;
+  clipId: string;
+} | null;
 
 const RECORDING_CHANNEL_OPTIONS: Array<{ value: RecordingInputChannel; label: string }> = [
   { value: 'channel-1', label: '通道 1' },
@@ -1186,6 +1190,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   const [trackDensity, setTrackDensity] = useState<TrackDensity>('comfortable');
   const [showShortcutHelp, setShowShortcutHelp] = useState(false);
   const [clipClipboard, setClipClipboard] = useState<StemClipClipboard | null>(null);
+  const [selectedClipSelection, setSelectedClipSelection] = useState<SelectedClipSelection>(null);
   const [trackContextMenu, setTrackContextMenu] = useState<TrackContextMenuState | null>(null);
   const [editorDialog, setEditorDialog] = useState<StemEditorDialogState | null>(null);
   const [isTimelinePanning, setIsTimelinePanning] = useState(false);
@@ -1285,6 +1290,19 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   useEffect(() => {
     timelineZoomRef.current = timelineZoom;
   }, [timelineZoom]);
+
+  useEffect(() => {
+    if (!selectedClipSelection) return;
+    const state = tracks[selectedClipSelection.trackType];
+    if (!state) {
+      setSelectedClipSelection(null);
+      return;
+    }
+    const clipState = resolveTrackClipState(state, duration);
+    if (!clipState.clips.some((clip) => clip.id === selectedClipSelection.clipId)) {
+      setSelectedClipSelection(null);
+    }
+  }, [duration, selectedClipSelection, tracks]);
 
   useEffect(() => {
     if (!recordingSelectMenu) return undefined;
@@ -1772,6 +1790,12 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     ? resolveTrackClipState(selectedTrackState, duration)
     : null;
   const selectedTrackClipCount = selectedTrackClipState?.clips.length ?? 0;
+  const selectedClip = useMemo(() => {
+    if (!selectedClipSelection) return null;
+    const state = tracks[selectedClipSelection.trackType] || defaultTrackState();
+    const clipState = resolveTrackClipState(state, duration);
+    return clipState.clips.find((clip) => clip.id === selectedClipSelection.clipId) || null;
+  }, [duration, selectedClipSelection, tracks]);
   const selectedTrackMutedRanges = selectedTrackState
     ? normalizeStemMutedRanges(selectedTrackState.mutedRanges, duration)
     : [];
@@ -2970,6 +2994,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       setSkippedEmptyCount((count) => Math.max(0, count - 1));
     }
     setSelectedTrackType(nextSelectedTrack?.type ?? null);
+    setSelectedClipSelection(null);
     setRecordingStatus(null);
     setSaveStatus(`已删除“${label}”，可用上一步恢复。`);
   }, [initialStems, pauseAll, rememberEditorHistory, stems]);
@@ -2987,12 +3012,8 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       return;
     }
 
-    setEditorDialog({
-      kind: 'delete-track',
-      trackType: trackToDelete.type,
-      label: getStemDisplayName(trackToDelete).zh,
-    });
-  }, [isRecording, selectedTrack, stems]);
+    performDeleteTrack(trackToDelete);
+  }, [isRecording, performDeleteTrack, selectedTrack, stems]);
 
   const clearTrackReorderPress = useCallback(() => {
     if (trackReorderPressTimerRef.current !== null) {
@@ -3228,8 +3249,33 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     setSaveStatus(`已在 ${formatStemTimecode(currentTime)} 切分“${getStemDisplayName(selectedTrack).zh}”。`);
   }, [currentTime, duration, selectedTrack, selectedTrackState, setTrackClips]);
 
+  const deleteTrackClipById = useCallback((trackType: string, clipId: string) => {
+    const stem = stems.find((candidate) => candidate.type === trackType) || null;
+    const state = tracks[trackType] || defaultTrackState();
+    const clipState = resolveTrackClipState(state, duration);
+    const targetClip = clipState.clips.find((clip) => clip.id === clipId);
+    if (!targetClip) {
+      setPlaybackError('当前片段已经不存在。');
+      setSelectedClipSelection(null);
+      return false;
+    }
+
+    const nextClips = clipState.clips.filter((clip) => clip.id !== clipId);
+    setTrackClips(trackType, nextClips);
+    setSelectedTrackType(trackType);
+    setSelectedClipSelection(null);
+    setPlaybackError(null);
+    setSaveStatus(`已删除“${stem ? getStemDisplayName(stem).zh : '轨道'}”片段，可用上一步恢复。`);
+    return true;
+  }, [duration, setTrackClips, stems, tracks]);
+
   const deleteSelectedTrackClipAtPlayhead = useCallback(() => {
     if (!selectedTrack || !selectedTrackState || duration <= 0) return;
+
+    if (selectedClipSelection?.trackType === selectedTrack.type && selectedClip) {
+      deleteTrackClipById(selectedTrack.type, selectedClip.id);
+      return;
+    }
 
     const clipState = resolveTrackClipState(selectedTrackState, duration);
     const targetClip = findStemClipAtTime(clipState.clips, currentTime);
@@ -3238,14 +3284,8 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       return;
     }
 
-    const label = getStemDisplayName(selectedTrack).zh;
-    setEditorDialog({
-      kind: 'delete-clip',
-      trackType: selectedTrack.type,
-      label,
-      time: currentTime,
-    });
-  }, [currentTime, duration, selectedTrack, selectedTrackState]);
+    deleteTrackClipById(selectedTrack.type, targetClip.id);
+  }, [currentTime, deleteTrackClipById, duration, selectedClip, selectedClipSelection, selectedTrack, selectedTrackState]);
 
   const moveTrackClip = useCallback((type: string, clipId: string, nextStart: number, shouldSnap = snapToGrid, historyMode: StemHistoryMode = 'immediate') => {
     const stateBeforeMove = tracks[type] || defaultTrackState();
@@ -3517,6 +3557,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       : Math.min(event.clientY, Math.max(12, window.innerHeight - menuHeight - 12));
 
     setSelectedTrackType(type);
+    setSelectedClipSelection(targetClip ? { trackType: type, clipId: targetClip.id } : null);
     handleSeek(safeTime);
     setTrackContextMenu({
       x,
@@ -3569,12 +3610,16 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       return;
     }
     if (action === 'delete') {
-      deleteSelectedTrack(trackType);
+      if (trackContextMenu.clipId) {
+        deleteTrackClipById(trackType, trackContextMenu.clipId);
+      } else {
+        deleteSelectedTrack(trackType);
+      }
       closeTrackContextMenu();
       return;
     }
     setTrackContextMenu((current) => current ? { ...current, colorOpen: !current.colorOpen } : current);
-  }, [closeTrackContextMenu, copyTrackClipAtTime, cutTrackClipAtTime, deleteSelectedTrack, pasteClipToTrack, renameTrackFromMenu, trackContextMenu]);
+  }, [closeTrackContextMenu, copyTrackClipAtTime, cutTrackClipAtTime, deleteSelectedTrack, deleteTrackClipById, pasteClipToTrack, renameTrackFromMenu, trackContextMenu]);
 
   useEffect(() => {
     if (!trackContextMenu) return;
@@ -4253,7 +4298,11 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         return;
       }
       if (action === 'delete-selected-track') {
-        deleteSelectedTrack();
+        if (selectedClipSelection?.trackType === selectedTrack.type && selectedClip) {
+          deleteTrackClipById(selectedTrack.type, selectedClip.id);
+        } else {
+          deleteSelectedTrack();
+        }
         return;
       }
       resetTrackEdit(selectedTrack.type);
@@ -4270,6 +4319,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     copyTrackClipAtTime,
     cutTrackClipAtTime,
     deleteSelectedTrack,
+    deleteTrackClipById,
     duration,
     editorDialog,
     focusSelectedTrackRange,
@@ -4285,6 +4335,8 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     restoreSelectedTrackRange,
     saveEditState,
     selectAdjacentTrack,
+    selectedClip,
+    selectedClipSelection,
     selectedTrack,
     closeEditorDialog,
     setSelectedTrackTrimToCurrentTime,
@@ -5860,7 +5912,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
             <span>重命名轨道</span>
           </button>
           <button type="button" role="menuitem" style={trackContextMenuItemStyle(false)} onClick={() => performTrackContextMenuAction('delete')}>
-            <span>删除轨道</span>
+            <span>{trackContextMenu.clipId ? '删除片段' : '删除轨道'}</span>
             <kbd>Del</kbd>
           </button>
           <button type="button" role="menuitem" style={trackContextMenuItemStyle(false)} onClick={() => performTrackContextMenuAction('color')}>
@@ -5937,7 +5989,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         >
           {formatStemTimecode(currentTime)}
         </div>
-        <div style={timelineToolbarStyle(timelineMinWidth, dawLayoutMetrics)} data-timeline-pan-zone="true" title="拖动空白处移动时间线视野">
+        <div style={timelineToolbarStyle(dawLayoutMetrics)} data-timeline-pan-zone="true" title="拖动空白处移动时间线视野">
           <div>
             <div style={timelineToolbarEyebrowStyle}>时间线</div>
             <div style={timelineToolbarTitleStyle}>多轨时间线</div>
@@ -6096,7 +6148,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
           </div>
         </div>
         {showShortcutHelp && (
-          <div style={timelineShortcutHelpStyle(timelineMinWidth, dawLayoutMetrics)}>
+          <div style={timelineShortcutHelpStyle(dawLayoutMetrics)}>
             <span><strong>播放</strong> 空格 / Esc / P / L</span>
             <span><strong>选轨</strong> ↑ ↓ / M / S / R / Del</span>
             <span><strong>裁剪</strong> [ ] / Shift+[ ] / Shift+R</span>
@@ -6201,16 +6253,17 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
               onClick={() => {
                 if (ignoreNextTrackClickRef.current) return;
                 setSelectedTrackType(stem.type);
+                setSelectedClipSelection(null);
               }}
               onContextMenu={(event) => openTrackContextMenu(event, stem.type, currentTime)}
               style={{
-                ...stemTrackStyle(isAudible, state.solo, showAdvancedControls, isSelectedTrack, trackColor, timelineGridColumns, timelineMinWidth, trackDensity, isTrackCollapsed),
+                ...stemTrackStyle(state.solo, showAdvancedControls, isSelectedTrack, trackColor, timelineGridColumns, timelineMinWidth, trackDensity, isTrackCollapsed),
                 ...(reorderingTrackType === stem.type ? activeTrackReorderStyle : {}),
               }}
             >
               <div
                 className="stem-track-header"
-                style={stemNameStyle(isSelectedTrack, isAudible, trackColor, reorderingTrackType === stem.type, isTrackCollapsed)}
+                style={stemNameStyle(isSelectedTrack, trackColor, reorderingTrackType === stem.type, isTrackCollapsed)}
                 data-timeline-pan-zone="true"
                 title="点击选择轨道"
               >
@@ -6383,7 +6436,15 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                 collapsed={isTrackCollapsed}
                 recording={isRecordingTarget}
                 trackLabel={displayName.zh}
-                onSelect={() => setSelectedTrackType(stem.type)}
+                selectedClipId={selectedClipSelection?.trackType === stem.type ? selectedClipSelection.clipId : null}
+                onSelect={() => {
+                  setSelectedTrackType(stem.type);
+                  setSelectedClipSelection(null);
+                }}
+                onClipSelect={(clipId) => {
+                  setSelectedTrackType(stem.type);
+                  setSelectedClipSelection({ trackType: stem.type, clipId });
+                }}
                 onTrackContextMenu={(event, time) => openTrackContextMenu(event, stem.type, time)}
                 onSeek={(time, shouldSnap) => handleSeek(snapStemEditorTime(time, duration, shouldSnap, snapStepSeconds))}
                 onTrimChange={(edge, time, shouldSnap, phase) => {
@@ -6631,10 +6692,10 @@ const timelineScrollbarCss = `
     position: absolute;
     top: 0;
     bottom: 0;
-    left: -18px;
-    width: 18px;
+    left: -24px;
+    width: 24px;
     background: linear-gradient(90deg, rgba(5, 8, 14, 0.99), rgba(13, 17, 22, 0.98));
-    box-shadow: -1px 0 0 rgba(48, 52, 76, 0.48);
+    box-shadow: -1px 0 0 rgba(48, 52, 76, 0.48), 8px 0 18px rgba(3, 6, 12, 0.42);
     pointer-events: none;
   }
 
@@ -8593,19 +8654,22 @@ const trackAddDropzoneTextStyle: CSSProperties = {
   lineHeight: 1.2,
 };
 
-function timelineToolbarStyle(minWidth: number, metrics: DawEditorLayoutMetrics): CSSProperties {
+function timelineToolbarStyle(metrics: DawEditorLayoutMetrics): CSSProperties {
   return {
     position: 'sticky',
     top: metrics.headerHeight + 4,
+    left: 0,
     zIndex: 22,
     display: 'grid',
     gridTemplateColumns: 'minmax(130px, auto) auto minmax(0, 1fr)',
     alignItems: 'center',
     gap: 12,
-    minWidth,
     boxSizing: 'border-box',
     minHeight: 44,
     padding: '7px 10px',
+    width: '100%',
+    minWidth: 0,
+    maxWidth: '100%',
     borderRadius: 0,
     border: 'none',
     borderBottom: '1px solid rgba(48, 52, 76, 0.82)',
@@ -8752,15 +8816,18 @@ function timelineHelpButtonStyle(active: boolean): CSSProperties {
   };
 }
 
-function timelineShortcutHelpStyle(minWidth: number, metrics: DawEditorLayoutMetrics): CSSProperties {
+function timelineShortcutHelpStyle(metrics: DawEditorLayoutMetrics): CSSProperties {
   return {
     position: 'sticky',
     top: metrics.headerHeight + 53,
+    left: 0,
     zIndex: 21,
     display: 'grid',
     gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
     gap: 6,
-    minWidth,
+    width: '100%',
+    minWidth: 0,
+    maxWidth: '100%',
     boxSizing: 'border-box',
     padding: '7px 10px',
     borderRadius: 7,
@@ -8961,16 +9028,16 @@ function timelineSelectedRangeEdgeStyle(time: number, duration: number, edge: 's
     top: 2,
     bottom: 2,
     zIndex: 8,
-    width: 5,
+    width: 3,
     transform: 'translateX(-50%)',
     borderRadius: 999,
-    border: '1px solid rgba(255,255,255,0.68)',
+    border: '1px solid rgba(255,255,255,0.52)',
     background: edge === 'start'
       ? 'linear-gradient(180deg, #f7ffd0, #b9ff2f)'
       : 'linear-gradient(180deg, #ecfeff, #20c7dc)',
     boxShadow: edge === 'start'
-      ? '0 0 0 2px rgba(6, 10, 18, 0.78), 0 0 10px rgba(206, 255, 53, 0.26)'
-      : '0 0 0 2px rgba(6, 10, 18, 0.78), 0 0 10px rgba(103, 232, 249, 0.32)',
+      ? '0 0 0 1px rgba(6, 10, 18, 0.78), 0 0 8px rgba(206, 255, 53, 0.2)'
+      : '0 0 0 1px rgba(6, 10, 18, 0.78), 0 0 8px rgba(103, 232, 249, 0.24)',
     pointerEvents: 'none',
   };
 }
@@ -9042,7 +9109,6 @@ const timelineRulerMetaStyle: CSSProperties = {
 };
 
 function stemTrackStyle(
-  audible: boolean,
   solo: boolean,
   advanced: boolean,
   selectedTrack: boolean,
@@ -9082,7 +9148,7 @@ function stemTrackStyle(
       : solo
         ? 'inset 3px 0 0 rgba(206, 255, 53, 0.58)'
         : 'none',
-    opacity: audible ? 1 : 0.46,
+    opacity: 1,
     padding: selectedTrack
       ? collapsed ? '4px 8px' : compact ? '4px 8px' : '5px 8px'
       : collapsed ? '4px 8px' : compact ? '4px 8px' : '5px 8px',
@@ -9098,16 +9164,17 @@ const activeTrackReorderStyle: CSSProperties = {
   opacity: 1,
 };
 
-function stemNameStyle(selectedTrack: boolean, audible: boolean, trackColor: string, reordering = false, collapsed = false): CSSProperties {
+function stemNameStyle(selectedTrack: boolean, trackColor: string, reordering = false, collapsed = false): CSSProperties {
   return {
     position: 'sticky',
     left: 0,
-    zIndex: 9,
+    zIndex: 28,
     display: 'grid',
     gridTemplateColumns: '18px 10px minmax(0, 1fr) 22px auto',
     gridTemplateRows: collapsed ? 'auto' : 'auto auto auto',
     alignItems: 'center',
     gap: 6,
+    width: '100%',
     minWidth: 0,
     maxWidth: '100%',
     alignSelf: 'stretch',
@@ -9119,8 +9186,9 @@ function stemNameStyle(selectedTrack: boolean, audible: boolean, trackColor: str
       ? `linear-gradient(90deg, ${colorWithAlpha(trackColor, 0.18)}, rgba(12, 15, 21, 0.98))`
       : 'linear-gradient(90deg, rgba(10, 14, 19, 0.99), rgba(8, 11, 16, 0.98))',
     boxShadow: selectedTrack ? `inset 3px 0 0 ${trackColor}` : 'none',
-    overflow: 'visible',
-    opacity: audible ? 1 : 0.8,
+    overflow: 'hidden',
+    isolation: 'isolate',
+    opacity: 1,
     cursor: reordering ? 'grabbing' : 'grab',
     touchAction: 'none',
   };
@@ -9521,7 +9589,9 @@ function WaveformTrackCanvas({
   collapsed,
   recording,
   trackLabel,
+  selectedClipId,
   onSelect,
+  onClipSelect,
   onTrackContextMenu,
   onSeek,
   onTrimChange,
@@ -9548,7 +9618,9 @@ function WaveformTrackCanvas({
   collapsed: boolean;
   recording: boolean;
   trackLabel: string;
+  selectedClipId: string | null;
   onSelect: () => void;
+  onClipSelect: (clipId: string) => void;
   onTrackContextMenu: (event: MouseEvent<HTMLCanvasElement>, time: number) => void;
   onSeek: (time: number, shouldSnap: boolean) => void;
   onTrimChange: (edge: 'start' | 'end', time: number, shouldSnap: boolean, phase: StemInteractionPhase) => void;
@@ -9742,6 +9814,7 @@ function WaveformTrackCanvas({
       const sourceDuration = Math.max(waveform?.duration || 0, buffer?.duration || 0, duration);
       const takeBarHeight = selected ? 15 * ratio : 13 * ratio;
       const renderClipWaveform = (clip: StemClip) => {
+        const isSelectedClip = selected && clip.id === selectedClipId;
         const clipStartX = (Math.max(0, Math.min(duration, clip.start)) / duration) * width;
         const clipEndX = (Math.max(0, Math.min(duration, clip.start + getStemClipDuration(clip))) / duration) * width;
         const clipWidth = Math.max(0, clipEndX - clipStartX);
@@ -9749,9 +9822,9 @@ function WaveformTrackCanvas({
 
         const clipPeaks = sliceStemClipPeaks(clip, sourceDuration, displayPeaks);
         const clipGradient = context.createLinearGradient(clipStartX, 0, clipEndX, 0);
-        clipGradient.addColorStop(0, colorWithAlpha(baseColor, recording ? 0.42 : selected ? 0.36 : 0.24));
-        clipGradient.addColorStop(0.55, colorWithAlpha(baseColor, recording ? 0.34 : selected ? 0.28 : 0.18));
-        clipGradient.addColorStop(1, colorWithAlpha(baseColor, recording ? 0.24 : selected ? 0.22 : 0.13));
+        clipGradient.addColorStop(0, colorWithAlpha(baseColor, recording ? 0.42 : isSelectedClip ? 0.48 : selected ? 0.36 : 0.24));
+        clipGradient.addColorStop(0.55, colorWithAlpha(baseColor, recording ? 0.34 : isSelectedClip ? 0.36 : selected ? 0.28 : 0.18));
+        clipGradient.addColorStop(1, colorWithAlpha(baseColor, recording ? 0.24 : isSelectedClip ? 0.28 : selected ? 0.22 : 0.13));
         context.fillStyle = clipGradient;
         context.fillRect(clipStartX, 0, clipWidth, height);
 
@@ -9824,8 +9897,8 @@ function WaveformTrackCanvas({
 
         context.restore();
 
-        context.strokeStyle = selected ? colorWithAlpha(baseColor, 0.92) : colorWithAlpha(baseColor, 0.46);
-        context.lineWidth = Math.max(1, selected ? 1.2 * ratio : ratio);
+        context.strokeStyle = isSelectedClip ? '#f8fafc' : selected ? colorWithAlpha(baseColor, 0.82) : colorWithAlpha(baseColor, 0.46);
+        context.lineWidth = Math.max(1, isSelectedClip ? 1.6 * ratio : selected ? 1.1 * ratio : ratio);
         context.strokeRect(clipStartX + 0.5 * ratio, 0.5 * ratio, Math.max(0, clipWidth - ratio), Math.max(0, height - ratio));
       };
 
@@ -9866,7 +9939,7 @@ function WaveformTrackCanvas({
     const observer = new ResizeObserver(draw);
     observer.observe(canvas);
     return () => observer.disconnect();
-  }, [clips, color, displayPeaks, duration, muted, mutedRanges, recording, selected, snapEnabled, snapStepSeconds, trackLabel, trimEnd, trimStart]);
+  }, [clips, color, displayPeaks, duration, muted, mutedRanges, recording, selected, selectedClipId, snapEnabled, snapStepSeconds, trackLabel, trimEnd, trimStart]);
 
   const handlePointerDown = useCallback((event: PointerEvent<HTMLCanvasElement>) => {
     if (duration <= 0) return;
@@ -9899,6 +9972,7 @@ function WaveformTrackCanvas({
       const { time } = interactionTimeFromPointer(event);
       const targetClip = resolveStemClipDragTarget(clips, time);
       if (targetClip) {
+        onClipSelect(targetClip.id);
         clipDragRef.current = {
           clipId: targetClip.id,
           anchorTime: time,
@@ -9943,7 +10017,7 @@ function WaveformTrackCanvas({
       }
     }
     event.currentTarget.setPointerCapture(event.pointerId);
-  }, [clips, currentTime, duration, editable, interactionTimeFromPointer, onSelect, selected, trimEnd, trimStart, updatePointerGuide]);
+  }, [clips, currentTime, duration, editable, interactionTimeFromPointer, onClipSelect, onSelect, selected, trimEnd, trimStart, updatePointerGuide]);
 
   const handlePointerMove = useCallback((event: PointerEvent<HTMLCanvasElement>) => {
     if (trimDragRef.current) {
@@ -10032,6 +10106,7 @@ function WaveformTrackCanvas({
       if (clipDragRef.current.moved) {
         onClipMove(clipDragRef.current.clipId, clipDragRef.current.clipStart + time - clipDragRef.current.anchorTime, shouldSnap, 'commit');
       } else {
+        onClipSelect(clipDragRef.current.clipId);
         onSeek(time, shouldSnap);
       }
       clipDragRef.current = null;
@@ -10050,14 +10125,14 @@ function WaveformTrackCanvas({
       return;
     }
     updatePointerGuide(event, '选择', false);
-  }, [cancelScheduledSeekChange, cancelScheduledTrimChange, interactionTimeFromPointer, onClipMove, onSeek, onTrimChange, onTrimRangeMove, updatePointerGuide]);
+  }, [cancelScheduledSeekChange, cancelScheduledTrimChange, interactionTimeFromPointer, onClipMove, onClipSelect, onSeek, onTrimChange, onTrimRangeMove, updatePointerGuide]);
 
   return (
     <div style={waveformCanvasWrapStyle}>
       <canvas
         ref={canvasRef}
         draggable={false}
-        aria-label="Stem waveform. Select the track, drag the playhead, or drag trim handles to edit this track."
+        aria-label="分轨波形。可选择轨道、拖动播放头或拖动边界编辑。"
         onContextMenu={(event) => onTrackContextMenu(event, timeFromPointer(event))}
         onDragStart={(event) => event.preventDefault()}
         onPointerDown={handlePointerDown}
@@ -10141,13 +10216,13 @@ function waveformTrimHandleStyle(time: number, duration: number, selected: boole
     right: stickToEnd ? 0 : undefined,
     transform: stickToStart || stickToEnd ? 'none' : edge === 'start' ? 'translateX(0)' : 'translateX(-100%)',
     zIndex: selected ? 12 : 3,
-    width: selected ? 7 : 3,
+    width: selected ? 3 : 2,
     borderRadius: 999,
-    border: selected ? '1px solid rgba(255,255,255,0.78)' : '1px solid rgba(206, 255, 53, 0.36)',
-    background: selected ? 'linear-gradient(180deg, #f7ffd0, #ceff35)' : 'rgba(206, 255, 53, 0.42)',
+    border: selected ? '1px solid rgba(255,255,255,0.64)' : '1px solid rgba(206, 255, 53, 0.28)',
+    background: selected ? 'linear-gradient(180deg, #fbffdb, #ceff35)' : 'rgba(206, 255, 53, 0.34)',
     boxShadow: selected
-      ? '0 0 0 2px rgba(6, 10, 18, 0.82), 0 0 14px rgba(206, 255, 53, 0.34)'
-      : '0 0 8px rgba(206, 255, 53, 0.12)',
+      ? '0 0 0 1px rgba(6, 10, 18, 0.82), 0 0 8px rgba(206, 255, 53, 0.22)'
+      : '0 0 6px rgba(206, 255, 53, 0.1)',
     pointerEvents: 'none',
   };
 }
