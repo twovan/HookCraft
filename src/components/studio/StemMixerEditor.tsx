@@ -357,7 +357,7 @@ function resolveTimelineChromeWidths(advanced: boolean, viewportWidth = 0): Time
   }
 
   return {
-    label: advanced ? 116 : 112,
+    label: TIMELINE_LABEL_WIDTH,
     buttons: advanced ? 92 : 80,
     volume: advanced ? 102 : 88,
     pan: 102,
@@ -10308,6 +10308,10 @@ function WaveformTrackCanvas({
     updatePointerGuide(event, '选择', false);
   }, [cancelScheduledSeekChange, cancelScheduledTrimChange, interactionTimeFromPointer, onClipMove, onClipSelect, onSeek, onTrimChange, onTrimRangeMove, updatePointerGuide]);
 
+  const selectedClipForOverlay = clips.length > 1 && selectedClipId
+    ? clips.find((clip) => clip.id === selectedClipId) || null
+    : null;
+
   return (
     <div style={waveformCanvasWrapStyle}>
       <canvas
@@ -10327,7 +10331,23 @@ function WaveformTrackCanvas({
         }}
         style={waveformCanvasStyle(selected, muted, editable, compact, collapsed, recording)}
       />
-      {duration > 0 && (
+      {duration > 0 && selectedClipForOverlay && (
+        <>
+          <span
+            aria-hidden="true"
+            style={waveformSelectedClipOverlayStyle(selectedClipForOverlay, duration, color)}
+          />
+          <span
+            aria-hidden="true"
+            style={waveformClipHandleStyle(selectedClipForOverlay.start, duration, 'start')}
+          />
+          <span
+            aria-hidden="true"
+            style={waveformClipHandleStyle(selectedClipForOverlay.start + getStemClipDuration(selectedClipForOverlay), duration, 'end')}
+          />
+        </>
+      )}
+      {duration > 0 && !selectedClipForOverlay && (
         <>
           <span
             aria-hidden="true"
@@ -10381,6 +10401,49 @@ function waveformCanvasStyle(selected: boolean, muted: boolean, editable: boolea
     WebkitUserSelect: 'none',
     WebkitTouchCallout: 'none',
     transition: 'border-color 140ms ease, box-shadow 140ms ease, opacity 140ms ease',
+  };
+}
+
+function waveformSelectedClipOverlayStyle(clip: StemClip, duration: number, color: string): CSSProperties {
+  const startRatio = duration > 0 ? Math.max(0, Math.min(1, clip.start / duration)) : 0;
+  const endRatio = duration > 0 ? Math.max(startRatio, Math.min(1, (clip.start + getStemClipDuration(clip)) / duration)) : startRatio;
+  const left = startRatio * 100;
+  const width = Math.max(0, (endRatio - startRatio) * 100);
+
+  return {
+    position: 'absolute',
+    top: 2,
+    bottom: 2,
+    left: `${left}%`,
+    width: `${width}%`,
+    zIndex: 13,
+    borderRadius: 5,
+    border: '2px solid rgba(255, 255, 255, 0.94)',
+    boxShadow: `inset 0 0 0 1px ${colorWithAlpha(color, 0.72)}, 0 0 0 1px rgba(4, 7, 13, 0.92), 0 0 18px ${colorWithAlpha(color, 0.3)}`,
+    background: colorWithAlpha(color, 0.08),
+    pointerEvents: 'none',
+  };
+}
+
+function waveformClipHandleStyle(time: number, duration: number, edge: 'start' | 'end'): CSSProperties {
+  const safeRatio = duration > 0 ? Math.max(0, Math.min(1, time / duration)) : 0;
+  const stickToStart = edge === 'start' && safeRatio <= 0.002;
+  const stickToEnd = edge === 'end' && safeRatio >= 0.998;
+
+  return {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: stickToEnd ? undefined : `${safeRatio * 100}%`,
+    right: stickToEnd ? 0 : undefined,
+    transform: stickToStart || stickToEnd ? 'none' : edge === 'start' ? 'translateX(-50%)' : 'translateX(-50%)',
+    zIndex: 14,
+    width: 5,
+    borderRadius: 999,
+    border: '1px solid rgba(6, 10, 18, 0.92)',
+    background: 'linear-gradient(180deg, #ffffff, #ceff35)',
+    boxShadow: '0 0 0 1px rgba(255,255,255,0.72), 0 0 12px rgba(206, 255, 53, 0.44)',
+    pointerEvents: 'none',
   };
 }
 
