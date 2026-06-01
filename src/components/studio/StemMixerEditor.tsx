@@ -6592,7 +6592,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                     }}
                     style={trackCollapseButtonStyle(isTrackCollapsed)}
                   >
-                    <TransportIcon name={isTrackCollapsed ? 'chevronRight' : 'chevronDown'} />
+                    <TransportIcon name={isTrackCollapsed ? 'chevronDown' : 'chevronRight'} />
                   </button>
                 </div>
                 {!isTrackCollapsed && (
