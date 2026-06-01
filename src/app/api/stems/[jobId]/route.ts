@@ -124,7 +124,7 @@ export async function GET(
   try {
     const user = await getAuthUser();
     if (!user) {
-      return NextResponse.json({ error: 'Please sign in first' }, { status: 401 });
+      return NextResponse.json({ error: '请先登录后再加载分轨。' }, { status: 401 });
     }
 
     const statelessProviderTaskId = getStatelessKieProviderTaskId(params.jobId);

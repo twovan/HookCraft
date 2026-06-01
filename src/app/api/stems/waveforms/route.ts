@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
   try {
     const user = await getAuthUser();
     if (!user) {
-      return NextResponse.json({ error: 'Please sign in first' }, { status: 401 });
+      return NextResponse.json({ error: '请先登录后再保存波形。' }, { status: 401 });
     }
 
     const body = await req.json().catch(() => null);

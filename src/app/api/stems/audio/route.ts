@@ -122,7 +122,7 @@ export async function GET(req: NextRequest) {
   try {
     const user = await getAuthUser();
     if (!user) {
-      return NextResponse.json({ error: 'Please sign in first' }, { status: 401 });
+      return NextResponse.json({ error: '请先登录后再加载音频。' }, { status: 401 });
     }
 
     const sourceUrl = req.nextUrl.searchParams.get('url') || '';

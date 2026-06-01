@@ -993,13 +993,31 @@ async function uploadCustomStemAudio({
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || !data?.url || !data?.storagePath) {
-    throw new Error(data?.error || '自定义轨道音频上传失败');
+    const message = data?.error || '自定义轨道音频上传失败';
+    const error = new Error(message) as Error & { status?: number };
+    error.status = response.status;
+    throw error;
   }
 
   return {
     url: String(data.url),
     storagePath: String(data.storagePath),
   };
+}
+
+function isEditorAuthError(status: number, message: string) {
+  const normalized = message.toLowerCase();
+  return status === 401
+    || normalized.includes('sign in first')
+    || normalized.includes('please sign in')
+    || normalized.includes('请先登录')
+    || normalized.includes('登录已过期');
+}
+
+function redirectToLoginFromStemEditor() {
+  if (typeof window === 'undefined') return;
+  const currentPath = `${window.location.pathname}${window.location.search}`;
+  window.location.assign(`/login?redirectTo=${encodeURIComponent(currentPath)}`);
 }
 
 function encodeWav(audioBuffer: AudioBuffer) {
@@ -2864,7 +2882,13 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         : `已为“${displayLabel}”载入音频；当前没有缓存 ID，刷新后不能恢复。`);
     } catch (error) {
       setRecordingStatus(null);
-      setPlaybackError(error instanceof Error ? error.message : '音频解析或上传失败，请换一个常见格式文件，或重新录音。');
+      const message = error instanceof Error ? error.message : '音频解析或上传失败，请换一个常见格式文件，或重新录音。';
+      if (isEditorAuthError((error as { status?: number })?.status ?? 0, message)) {
+        setPlaybackError('登录已过期，正在跳转登录页。');
+        redirectToLoginFromStemEditor();
+        return;
+      }
+      setPlaybackError(message);
     }
   }, [customStems, getAudioContext, jobId, pauseAll, rememberEditorHistory]);
 
@@ -4236,7 +4260,12 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(data.error || '保存编辑状态失败');
+        const message = data.error || '保存编辑状态失败';
+        if (isEditorAuthError(response.status, message)) {
+          redirectToLoginFromStemEditor();
+          throw new Error('登录已过期，正在跳转登录页。');
+        }
+        throw new Error(message);
       }
       if (source === 'manual') {
         setSaveStatus('编辑状态已保存，下次进入会自动恢复。');
