@@ -10127,7 +10127,9 @@ function WaveformTrackCanvas({
 
   const selectedClipForOverlay = selectedClipId
     ? clips.find((clip) => clip.id === selectedClipId) || null
-    : null;
+    : selected && clips.length === 1
+      ? clips[0]
+      : null;
 
   return (
     <div style={waveformCanvasWrapStyle}>
