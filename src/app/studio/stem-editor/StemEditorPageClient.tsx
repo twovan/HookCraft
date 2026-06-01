@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import StemMixerEditor, {
@@ -80,9 +80,16 @@ const TEXT = {
   apiRefilled: 'API \u56de\u586b',
   apiStateless: 'API \u4e34\u65f6\u7ed3\u679c',
   savedResult: '\u5df2\u4fdd\u5b58\u7ed3\u679c',
+  authExpired: '\u767b\u5f55\u5df2\u8fc7\u671f\uff0c\u6b63\u5728\u8df3\u8f6c\u767b\u5f55\u9875\u3002',
 };
 
+function isAuthRequiredResponse(status: number, data: any) {
+  const message = String(data?.error || data?.errorMessage || '').toLowerCase();
+  return status === 401 || message.includes('sign in first') || message.includes('please sign in');
+}
+
 export default function StemEditorPageClient() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const generationTaskId = searchParams.get('generationTaskId')?.trim() || '';
   const initialJobId = searchParams.get('jobId')?.trim() || '';
@@ -90,6 +97,16 @@ export default function StemEditorPageClient() {
   const [job, setJob] = useState<StemEditorJob | null>(null);
   const [phase, setPhase] = useState<LoadingPhase>('checking-cache');
   const [error, setError] = useState<string | null>(null);
+
+  const redirectToLogin = useCallback(() => {
+    setError(TEXT.authExpired);
+    setPhase('failed');
+
+    const currentPath = typeof window === 'undefined'
+      ? '/studio/stem-editor'
+      : `${window.location.pathname}${window.location.search}`;
+    router.replace(`/login?redirectTo=${encodeURIComponent(currentPath)}`);
+  }, [router]);
 
   const applyJobData = useCallback((data: any) => {
     const stems = Array.isArray(data.stems) ? data.stems : [];
@@ -133,11 +150,15 @@ export default function StemEditorPageClient() {
     const res = await fetch(`/api/stems/${encodeURIComponent(jobId)}`, { cache: 'no-store' });
     const data = await res.json();
     if (!res.ok) {
+      if (isAuthRequiredResponse(res.status, data)) {
+        redirectToLogin();
+        return;
+      }
       throw new Error(data.error || TEXT.loadStemFailed);
     }
 
     applyJobData(data);
-  }, [applyJobData]);
+  }, [applyJobData, redirectToLogin]);
 
   const createJob = useCallback(async (force = false) => {
     if (!generationTaskId) {
@@ -161,6 +182,10 @@ export default function StemEditorPageClient() {
     });
     const data = await res.json();
     if (!res.ok) {
+      if (isAuthRequiredResponse(res.status, data)) {
+        redirectToLogin();
+        return;
+      }
       if (data.jobId) {
         applyJobData({
           ...data,
@@ -182,7 +207,7 @@ export default function StemEditorPageClient() {
     if (data.status !== 'failed') {
       await refreshJob(data.jobId);
     }
-  }, [applyJobData, generationTaskId, refreshJob]);
+  }, [applyJobData, generationTaskId, redirectToLogin, refreshJob]);
 
   useEffect(() => {
     if (requestedRef.current) return;
