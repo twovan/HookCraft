@@ -9750,6 +9750,7 @@ function WaveformTrackCanvas({
     label: string;
     active: boolean;
     snapBypassed: boolean;
+    placement: 'above' | 'inside';
   } | null>(null);
   const displayPeaks = useMemo(() => {
     if (waveform?.peaks?.length) return waveform.peaks;
@@ -9777,6 +9778,9 @@ function WaveformTrackCanvas({
     active = false,
   ) => {
     const rect = event.currentTarget.getBoundingClientRect();
+    const scrollContainer = event.currentTarget.closest('.stem-timeline-track-body');
+    const containerRect = scrollContainer?.getBoundingClientRect();
+    const placement = containerRect && rect.top - containerRect.top < 26 ? 'inside' : 'above';
     const { time, shouldSnap } = interactionTimeFromPointer(event);
     setPointerGuide({
       x: Math.max(0, Math.min(rect.width, event.clientX - rect.left)),
@@ -9784,6 +9788,7 @@ function WaveformTrackCanvas({
       label,
       active,
       snapBypassed: snapEnabled && !shouldSnap,
+      placement,
     });
   }, [interactionTimeFromPointer, snapEnabled]);
 
@@ -10292,7 +10297,7 @@ function WaveformTrackCanvas({
         </>
       )}
       {pointerGuide && (
-        <div style={waveformPointerGuideStyle(pointerGuide.x, pointerGuide.active)}>
+        <div style={waveformPointerGuideStyle(pointerGuide.x, pointerGuide.active, pointerGuide.placement)}>
           <span>{pointerGuide.label}</span>
           <strong>{formatStemTimecode(pointerGuide.time)}</strong>
           {pointerGuide.snapBypassed && <em>Alt</em>}
@@ -10403,11 +10408,11 @@ function waveformTrimHandleStyle(time: number, duration: number, selected: boole
   };
 }
 
-function waveformPointerGuideStyle(x: number, active: boolean): CSSProperties {
+function waveformPointerGuideStyle(x: number, active: boolean, placement: 'above' | 'inside'): CSSProperties {
   return {
     position: 'absolute',
     left: x,
-    top: active ? -23 : -19,
+    top: placement === 'inside' ? 5 : active ? -23 : -19,
     transform: 'translateX(-50%)',
     zIndex: 90,
     display: 'inline-flex',
