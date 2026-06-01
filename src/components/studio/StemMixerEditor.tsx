@@ -1020,6 +1020,14 @@ function redirectToLoginFromStemEditor() {
   window.location.assign(`/login?redirectTo=${encodeURIComponent(currentPath)}`);
 }
 
+function safelySetPointerCapture(target: Element, pointerId: number) {
+  try {
+    target.setPointerCapture(pointerId);
+  } catch {
+    // Synthetic or cancelled pointer events may not have an active pointer to capture.
+  }
+}
+
 function encodeWav(audioBuffer: AudioBuffer) {
   const channelCount = audioBuffer.numberOfChannels;
   const sampleRate = audioBuffer.sampleRate;
@@ -1796,7 +1804,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
 
   const handleTimelineNavigatorPointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
     scrollTimelineFromNavigatorPointer(event);
-    event.currentTarget.setPointerCapture(event.pointerId);
+    safelySetPointerCapture(event.currentTarget, event.pointerId);
   }, [scrollTimelineFromNavigatorPointer]);
 
   const handleTimelineNavigatorPointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
@@ -1877,7 +1885,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     };
     setIsTimelinePanning(true);
     setFollowPlayhead(false);
-    event.currentTarget.setPointerCapture(event.pointerId);
+    safelySetPointerCapture(event.currentTarget, event.pointerId);
     event.preventDefault();
   }, [shouldStartTimelinePan]);
 
@@ -3637,7 +3645,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     timelineRulerTrimDragRef.current = null;
     handleSeek(guide.time);
     updateTimelineRulerGuide(event, true);
-    event.currentTarget.setPointerCapture(event.pointerId);
+    safelySetPointerCapture(event.currentTarget, event.pointerId);
   }, [handleSeek, resolveTimelineRulerPointer, updateTimelineRulerGuide]);
 
   const handleTimelineRulerPointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
@@ -10454,7 +10462,7 @@ function WaveformTrackCanvas({
         trimRangeDragRef.current = null;
         pendingSeekRef.current = null;
         updatePointerGuide(event, '移动片段', true);
-        event.currentTarget.setPointerCapture(event.pointerId);
+        safelySetPointerCapture(event.currentTarget, event.pointerId);
         return;
       }
       if (intent.kind === 'move-trim' && clips.length <= 1) {
@@ -10486,7 +10494,7 @@ function WaveformTrackCanvas({
         }
       }
     }
-    event.currentTarget.setPointerCapture(event.pointerId);
+    safelySetPointerCapture(event.currentTarget, event.pointerId);
   }, [clips, currentTime, duration, editable, interactionTimeFromPointer, onClipSelect, onSelect, selected, trimEnd, trimStart, updatePointerGuide]);
 
   const handlePointerMove = useCallback((event: PointerEvent<HTMLCanvasElement>) => {
