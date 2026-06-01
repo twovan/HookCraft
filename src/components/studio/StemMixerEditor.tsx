@@ -9153,7 +9153,7 @@ function stemTrackStyle(
   const compact = trackDensity === 'compact';
   const rowHeight = resolveDawTrackHeight({ advanced, density: trackDensity, selected: selectedTrack });
   const collapsedHeight = compact ? 48 : 56;
-  const openHeight = compact ? 72 : 86;
+  const openHeight = compact ? 92 : 104;
 
   return {
     display: 'grid',
@@ -9198,6 +9198,7 @@ function stemNameStyle(selectedTrack: boolean, trackColor: string, collapsed = f
     alignItems: 'center',
     gap: 6,
     width: '100%',
+    minHeight: collapsed ? 44 : 94,
     minWidth: 0,
     maxWidth: '100%',
     alignSelf: 'stretch',
