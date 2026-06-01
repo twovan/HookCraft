@@ -9058,7 +9058,7 @@ function timelineGlobalPlayheadStyle(currentTime: number, duration: number, lane
     background: 'linear-gradient(180deg, rgba(255,255,255,0), rgba(255,255,255,0.92) 8%, rgba(156,108,255,0.96) 50%, rgba(255,255,255,0.74) 92%, rgba(255,255,255,0))',
     boxShadow: '0 0 0 1px rgba(156,108,255,0.18), 0 0 18px rgba(156,108,255,0.42)',
     pointerEvents: 'none',
-    zIndex: 3,
+    zIndex: 55,
   };
 }
 
@@ -9071,7 +9071,7 @@ function timelineGlobalPlayheadBadgeStyle(currentTime: number, duration: number,
     top: 51,
     left: playheadLeft,
     transform: 'translateX(-50%)',
-    zIndex: 7,
+    zIndex: 57,
     borderRadius: 999,
     border: '1px solid rgba(216, 201, 255, 0.7)',
     background: 'linear-gradient(180deg, rgba(206, 255, 53, 0.92), rgba(82, 214, 198, 0.86))',
