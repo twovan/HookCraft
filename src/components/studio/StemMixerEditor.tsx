@@ -6416,6 +6416,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                 snapStepSeconds={snapStepSeconds}
                 bufferVersion={bufferVersion}
                 liveSeekOnDrag={!isPlaying}
+                seekOnClipClick={!isPlaying}
                 compact={trackDensity === 'compact'}
                 collapsed={isTrackCollapsed}
                 recording={isRecordingTarget}
@@ -9693,6 +9694,7 @@ function WaveformTrackCanvas({
   snapStepSeconds,
   bufferVersion,
   liveSeekOnDrag,
+  seekOnClipClick,
   compact,
   collapsed,
   recording,
@@ -9722,6 +9724,7 @@ function WaveformTrackCanvas({
   snapStepSeconds: number;
   bufferVersion: number;
   liveSeekOnDrag: boolean;
+  seekOnClipClick: boolean;
   compact: boolean;
   collapsed: boolean;
   recording: boolean;
@@ -10220,7 +10223,7 @@ function WaveformTrackCanvas({
         onClipMove(clipDragRef.current.clipId, clipDragRef.current.clipStart + time - clipDragRef.current.anchorTime, shouldSnap, 'commit', event.clientX, event.clientY);
       } else {
         onClipSelect(clipDragRef.current.clipId);
-        onSeek(time, shouldSnap);
+        if (seekOnClipClick) onSeek(time, shouldSnap);
       }
       clipDragRef.current = null;
       pendingSeekRef.current = null;
@@ -10238,7 +10241,7 @@ function WaveformTrackCanvas({
       return;
     }
     updatePointerGuide(event, '选择', false);
-  }, [cancelScheduledSeekChange, cancelScheduledTrimChange, interactionTimeFromPointer, onClipMove, onClipSelect, onSeek, onTrimChange, onTrimRangeMove, updatePointerGuide]);
+  }, [cancelScheduledSeekChange, cancelScheduledTrimChange, interactionTimeFromPointer, onClipMove, onClipSelect, onSeek, onTrimChange, onTrimRangeMove, seekOnClipClick, updatePointerGuide]);
 
   const selectedClipForOverlay = selectedClipId
     ? clips.find((clip) => clip.id === selectedClipId) || null
