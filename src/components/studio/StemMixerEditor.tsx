@@ -3225,8 +3225,10 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     }
 
     if (targetType !== type && movingClip) {
+      const movedClipId = `${clipId}-moved-${targetType}-${Date.now().toString(36)}`;
       const movedClip: StemClip = {
         ...movingClip,
+        id: movedClipId,
         start: snappedStart,
         sourceTrackType: movingClip.sourceTrackType || type,
       };
@@ -3238,7 +3240,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         const targetClipState = resolveTrackClipState(targetState, nextDuration);
         const nextSourceClips = sourceClipState.clips.filter((clip) => clip.id !== clipId);
         const nextTargetClips = [
-          ...targetClipState.clips.filter((clip) => clip.id !== clipId),
+          ...targetClipState.clips.filter((clip) => clip.id !== movedClipId),
           movedClip,
         ];
         const normalizedTargetClipState = normalizeStemClipState({
@@ -3289,7 +3291,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         };
       }, historyMode);
       setSelectedTrackType(targetType);
-      setSelectedClipSelection({ trackType: targetType, clipId });
+      setSelectedClipSelection({ trackType: targetType, clipId: movedClipId });
       const sourceStem = stems.find((stem) => stem.type === type);
       const targetStem = stems.find((stem) => stem.type === targetType);
       setSaveStatus(`已把“${sourceStem ? getStemDisplayName(sourceStem).zh : '片段'}”片段移动到“${targetStem ? getStemDisplayName(targetStem).zh : '目标轨道'}”。`);
