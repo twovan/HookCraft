@@ -10130,7 +10130,10 @@ function WaveformTrackCanvas({
       : null;
 
   return (
-    <div style={waveformCanvasWrapStyle}>
+    <div
+      style={waveformCanvasWrapStyle}
+      onClick={(event) => event.stopPropagation()}
+    >
       <canvas
         ref={canvasRef}
         draggable={false}
