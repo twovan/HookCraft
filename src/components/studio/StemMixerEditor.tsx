@@ -3191,16 +3191,109 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     deleteTrackClipById(selectedTrack.type, targetClip.id);
   }, [currentTime, deleteTrackClipById, duration, selectedClip, selectedClipSelection, selectedTrack, selectedTrackState, tracks]);
 
-  const moveTrackClip = useCallback((type: string, clipId: string, nextStart: number, shouldSnap = snapToGrid, historyMode: StemHistoryMode = 'immediate') => {
+  const resolveTrackDropTarget = useCallback((clientX?: number, clientY?: number) => {
+    if (typeof document === 'undefined' || !Number.isFinite(clientX) || !Number.isFinite(clientY)) return null;
+    const target = document.elementFromPoint(clientX as number, clientY as number);
+    const row = target instanceof HTMLElement
+      ? target.closest<HTMLElement>('[data-stem-track-type]')
+      : null;
+    return row?.dataset.stemTrackType || null;
+  }, []);
+
+  const moveTrackClip = useCallback((
+    type: string,
+    clipId: string,
+    nextStart: number,
+    shouldSnap = snapToGrid,
+    historyMode: StemHistoryMode = 'immediate',
+    dropClientX?: number,
+    dropClientY?: number,
+  ) => {
     const stateBeforeMove = tracks[type] || defaultTrackState();
     const clipStateBeforeMove = resolveTrackClipState(stateBeforeMove, duration);
     const movingClip = clipStateBeforeMove.clips.find((clip) => clip.id === clipId);
     const snappedStart = snapStemEditorTime(nextStart, duration, shouldSnap, snapStepSeconds);
+    const dropTargetType = resolveTrackDropTarget(dropClientX, dropClientY);
+    const targetType = dropTargetType && stems.some((stem) => stem.type === dropTargetType)
+      ? dropTargetType
+      : type;
     const nextDuration = movingClip
       ? Math.max(duration, snappedStart + getStemClipDuration(movingClip))
       : duration;
     if (nextDuration > duration) {
       setDuration(Number(nextDuration.toFixed(3)));
+    }
+
+    if (targetType !== type && movingClip) {
+      const movedClip: StemClip = {
+        ...movingClip,
+        start: snappedStart,
+        sourceTrackType: movingClip.sourceTrackType || type,
+      };
+
+      commitTrackChange((current) => {
+        const sourceState = current[type] || defaultTrackState();
+        const targetState = current[targetType] || defaultTrackState();
+        const sourceClipState = resolveTrackClipState(sourceState, nextDuration);
+        const targetClipState = resolveTrackClipState(targetState, nextDuration);
+        const nextSourceClips = sourceClipState.clips.filter((clip) => clip.id !== clipId);
+        const nextTargetClips = [
+          ...targetClipState.clips.filter((clip) => clip.id !== clipId),
+          movedClip,
+        ];
+        const normalizedTargetClipState = normalizeStemClipState({
+          clips: nextTargetClips,
+          duration: nextDuration,
+          trimStart: targetState.trimStart,
+          trimEnd: targetState.trimEnd,
+        });
+        const targetClipDuration = Math.max(0, (normalizedTargetClipState.trimEnd ?? 0) - normalizedTargetClipState.trimStart);
+        const nextSourceState = nextSourceClips.length > 0
+          ? (() => {
+            const normalizedSourceClipState = normalizeStemClipState({
+              clips: nextSourceClips,
+              duration: nextDuration,
+              trimStart: sourceState.trimStart,
+              trimEnd: sourceState.trimEnd,
+            });
+            const sourceClipDuration = Math.max(0, (normalizedSourceClipState.trimEnd ?? 0) - normalizedSourceClipState.trimStart);
+            return {
+              ...sourceState,
+              trimStart: normalizedSourceClipState.trimStart,
+              trimEnd: normalizedSourceClipState.trimEnd,
+              fadeIn: Math.min(sourceState.fadeIn, sourceClipDuration),
+              fadeOut: Math.min(sourceState.fadeOut, sourceClipDuration),
+              clips: normalizedSourceClipState.clips,
+            };
+          })()
+          : {
+            ...sourceState,
+            trimStart: 0,
+            trimEnd: 0,
+            fadeIn: 0,
+            fadeOut: 0,
+            clips: [],
+          };
+
+        return {
+          ...current,
+          [type]: nextSourceState,
+          [targetType]: {
+            ...targetState,
+            trimStart: normalizedTargetClipState.trimStart,
+            trimEnd: normalizedTargetClipState.trimEnd,
+            fadeIn: Math.min(targetState.fadeIn, targetClipDuration),
+            fadeOut: Math.min(targetState.fadeOut, targetClipDuration),
+            clips: normalizedTargetClipState.clips,
+          },
+        };
+      }, historyMode);
+      setSelectedTrackType(targetType);
+      setSelectedClipSelection({ trackType: targetType, clipId });
+      const sourceStem = stems.find((stem) => stem.type === type);
+      const targetStem = stems.find((stem) => stem.type === targetType);
+      setSaveStatus(`已把“${sourceStem ? getStemDisplayName(sourceStem).zh : '片段'}”片段移动到“${targetStem ? getStemDisplayName(targetStem).zh : '目标轨道'}”。`);
+      return;
     }
 
     commitTrackChange((current) => {
@@ -3232,7 +3325,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         },
       };
     }, historyMode);
-  }, [commitTrackChange, duration, snapStepSeconds, snapToGrid, tracks]);
+  }, [commitTrackChange, duration, resolveTrackDropTarget, snapStepSeconds, snapToGrid, stems, tracks]);
 
   const resolveTimelineRulerPointer = useCallback((event: PointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -6152,6 +6245,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                 trackRowRefs.current[stem.type] = node;
               }}
               data-track-reorder-type={stem.type}
+              data-stem-track-type={stem.type}
               data-timeline-pan-zone="true"
               onClick={() => {
                 if (ignoreNextTrackClickRef.current) return;
@@ -6343,8 +6437,8 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                   setTrackTrimRange(stem.type, nextStart, shouldSnap, 'deferred');
                   if (phase === 'commit') commitDeferredHistory();
                 }}
-                onClipMove={(clipId, nextStart, shouldSnap, phase) => {
-                  moveTrackClip(stem.type, clipId, nextStart, shouldSnap, 'deferred');
+                onClipMove={(clipId, nextStart, shouldSnap, phase, clientX, clientY) => {
+                  moveTrackClip(stem.type, clipId, nextStart, shouldSnap, 'deferred', phase === 'commit' ? clientX : undefined, phase === 'commit' ? clientY : undefined);
                   if (phase === 'commit') commitDeferredHistory();
                 }}
               />
@@ -9167,6 +9261,8 @@ function stemTrackStyle(
   const openHeight = compact ? 92 : 104;
 
   return {
+    position: 'relative',
+    zIndex: selectedTrack ? 30 : 1,
     display: 'grid',
     gridTemplateColumns: gridColumns,
     alignItems: 'center',
@@ -9635,7 +9731,7 @@ function WaveformTrackCanvas({
   onSeek: (time: number, shouldSnap: boolean) => void;
   onTrimChange: (edge: 'start' | 'end', time: number, shouldSnap: boolean, phase: StemInteractionPhase) => void;
   onTrimRangeMove: (nextStart: number, shouldSnap: boolean, phase: StemInteractionPhase) => void;
-  onClipMove: (clipId: string, nextStart: number, shouldSnap: boolean, phase: StemInteractionPhase) => void;
+  onClipMove: (clipId: string, nextStart: number, shouldSnap: boolean, phase: StemInteractionPhase, clientX?: number, clientY?: number) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const pendingSeekRef = useRef<{ x: number; time: number; moved: boolean; mode: 'click' | 'playhead' } | null>(null);
@@ -10114,7 +10210,7 @@ function WaveformTrackCanvas({
     if (clipDragRef.current) {
       const { time, shouldSnap } = interactionTimeFromPointer(event);
       if (clipDragRef.current.moved) {
-        onClipMove(clipDragRef.current.clipId, clipDragRef.current.clipStart + time - clipDragRef.current.anchorTime, shouldSnap, 'commit');
+        onClipMove(clipDragRef.current.clipId, clipDragRef.current.clipStart + time - clipDragRef.current.anchorTime, shouldSnap, 'commit', event.clientX, event.clientY);
       } else {
         onClipSelect(clipDragRef.current.clipId);
         onSeek(time, shouldSnap);
@@ -10311,7 +10407,7 @@ function waveformPointerGuideStyle(x: number, active: boolean): CSSProperties {
     left: x,
     top: active ? -23 : -19,
     transform: 'translateX(-50%)',
-    zIndex: 4,
+    zIndex: 90,
     display: 'inline-flex',
     alignItems: 'center',
     gap: 5,
