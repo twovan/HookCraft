@@ -3158,23 +3158,24 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     return true;
   }, [duration, setTrackClips, stems, tracks]);
 
-  const deleteSelectedTrackClipAtPlayhead = useCallback(() => {
-    if (!selectedTrack || !selectedTrackState || duration <= 0) return;
+  const deleteSelectedClipOrActiveTrackClip = useCallback(() => {
+    if (!selectedTrack || duration <= 0) return;
 
-    if (selectedClipSelection?.trackType === selectedTrack.type && selectedClip) {
-      deleteTrackClipById(selectedTrack.type, selectedClip.id);
-      return;
-    }
+    const state = tracks[selectedTrack.type] || selectedTrackState || defaultTrackState();
+    const clipState = resolveTrackClipState(state, duration);
+    const targetClip = selectedClipSelection?.trackType === selectedTrack.type
+      ? clipState.clips.find((clip) => clip.id === selectedClipSelection.clipId) || null
+      : selectedClip
+        || (clipState.clips.length === 1 ? clipState.clips[0] : null)
+        || findStemClipAtTime(clipState.clips, currentTime);
 
-    const clipState = resolveTrackClipState(selectedTrackState, duration);
-    const targetClip = findStemClipAtTime(clipState.clips, currentTime);
     if (!targetClip) {
-      setPlaybackError('播放头没有落在可删除的片段上。');
+      setPlaybackError('请先选中要删除的片段。');
       return;
     }
 
     deleteTrackClipById(selectedTrack.type, targetClip.id);
-  }, [currentTime, deleteTrackClipById, duration, selectedClip, selectedClipSelection, selectedTrack, selectedTrackState]);
+  }, [currentTime, deleteTrackClipById, duration, selectedClip, selectedClipSelection, selectedTrack, selectedTrackState, tracks]);
 
   const moveTrackClip = useCallback((type: string, clipId: string, nextStart: number, shouldSnap = snapToGrid, historyMode: StemHistoryMode = 'immediate') => {
     const stateBeforeMove = tracks[type] || defaultTrackState();
@@ -4186,12 +4187,8 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         resetSelectedTrackTrimRange();
         return;
       }
-      if (action === 'delete-selected-track') {
-        if (selectedClipSelection?.trackType === selectedTrack.type && selectedClip) {
-          deleteTrackClipById(selectedTrack.type, selectedClip.id);
-        } else {
-          deleteSelectedTrack();
-        }
+      if (action === 'delete-selected-clip') {
+        deleteSelectedClipOrActiveTrackClip();
         return;
       }
       resetTrackEdit(selectedTrack.type);
@@ -4207,7 +4204,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     currentTime,
     copyTrackClipAtTime,
     cutTrackClipAtTime,
-    deleteSelectedTrack,
+    deleteSelectedClipOrActiveTrackClip,
     deleteTrackClipById,
     duration,
     editorDialog,
@@ -4818,7 +4815,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
               <button type="button" disabled={duration <= 0} style={transportEditButtonStyle(duration <= 0)} onClick={splitSelectedTrackClipAtPlayhead}>
                 切分
               </button>
-              <button type="button" disabled={duration <= 0 || selectedTrackClipCount === 0} style={transportEditButtonStyle(duration <= 0 || selectedTrackClipCount === 0)} onClick={deleteSelectedTrackClipAtPlayhead}>
+              <button type="button" disabled={duration <= 0 || selectedTrackClipCount === 0} style={transportEditButtonStyle(duration <= 0 || selectedTrackClipCount === 0)} onClick={deleteSelectedClipOrActiveTrackClip}>
                 删除片段
               </button>
               <button type="button" aria-pressed={loopSelectionPreview} style={transportLoopButtonStyle(loopSelectionPreview)} onClick={toggleLoopSelectionPreview}>
@@ -5157,7 +5154,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                       type="button"
                       disabled={duration <= 0 || selectedTrackClipCount === 0}
                       style={presetButtonStyle}
-                      onClick={deleteSelectedTrackClipAtPlayhead}
+                      onClick={deleteSelectedClipOrActiveTrackClip}
                     >
                       删除片段
                     </button>
@@ -5995,9 +5992,9 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                 <button
                   type="button"
                   disabled={duration <= 0 || selectedTrackClipCount === 0}
-                  title="删除播放头所在片段"
+                  title="删除当前选中片段"
                   style={timelineSelectionActionButtonStyle(duration <= 0 || selectedTrackClipCount === 0)}
-                  onClick={deleteSelectedTrackClipAtPlayhead}
+                  onClick={deleteSelectedClipOrActiveTrackClip}
                 >
                   删除
                 </button>
