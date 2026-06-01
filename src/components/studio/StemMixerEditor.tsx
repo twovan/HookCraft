@@ -10125,7 +10125,7 @@ function WaveformTrackCanvas({
     updatePointerGuide(event, '选择', false);
   }, [cancelScheduledSeekChange, cancelScheduledTrimChange, interactionTimeFromPointer, onClipMove, onClipSelect, onSeek, onTrimChange, onTrimRangeMove, updatePointerGuide]);
 
-  const selectedClipForOverlay = clips.length > 1 && selectedClipId
+  const selectedClipForOverlay = selectedClipId
     ? clips.find((clip) => clip.id === selectedClipId) || null
     : null;
 
@@ -10276,13 +10276,13 @@ function waveformTrimHandleStyle(time: number, duration: number, selected: boole
     left: stickToEnd ? undefined : `${safeRatio * 100}%`,
     right: stickToEnd ? 0 : undefined,
     transform: stickToStart || stickToEnd ? 'none' : edge === 'start' ? 'translateX(0)' : 'translateX(-100%)',
-    zIndex: selected ? 12 : 3,
-    width: selected ? 3 : 2,
+    zIndex: selected ? 8 : 3,
+    width: selected ? 2 : 2,
     borderRadius: 999,
-    border: selected ? '1px solid rgba(255,255,255,0.64)' : '1px solid rgba(206, 255, 53, 0.28)',
-    background: selected ? 'linear-gradient(180deg, #fbffdb, #ceff35)' : 'rgba(206, 255, 53, 0.34)',
+    border: selected ? '1px solid rgba(206, 255, 53, 0.34)' : '1px solid rgba(206, 255, 53, 0.28)',
+    background: selected ? 'rgba(206, 255, 53, 0.42)' : 'rgba(206, 255, 53, 0.34)',
     boxShadow: selected
-      ? '0 0 0 1px rgba(6, 10, 18, 0.82), 0 0 8px rgba(206, 255, 53, 0.22)'
+      ? '0 0 0 1px rgba(6, 10, 18, 0.72), 0 0 6px rgba(206, 255, 53, 0.14)'
       : '0 0 6px rgba(206, 255, 53, 0.1)',
     pointerEvents: 'none',
   };
