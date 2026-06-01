@@ -1144,14 +1144,6 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   const recordingMonitorGainRef = useRef<GainNode | null>(null);
   const recordingWaveformFrameRef = useRef<number | null>(null);
   const importTargetTypeRef = useRef<string | null>(null);
-  const trackReorderPressTimerRef = useRef<number | null>(null);
-  const trackReorderDragTypeRef = useRef<string | null>(null);
-  const trackReorderPressRef = useRef<{
-    type: string;
-    pointerId: number;
-    x: number;
-    y: number;
-  } | null>(null);
   const [customStems, setCustomStems] = useState<EditableStem[]>([]);
   const [trackLabels, setTrackLabels] = useState<Record<string, string>>(() => normalizeTrackLabels(initialEditState?.trackLabels));
   const [trackColors, setTrackColors] = useState<Record<string, string>>(() => normalizeTrackColors(initialEditState?.trackColors));
@@ -1255,7 +1247,6 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   const [monitoringEnabled, setMonitoringEnabled] = useState(false);
   const [isMonitoringPreview, setIsMonitoringPreview] = useState(false);
   const [recordingSelectMenu, setRecordingSelectMenu] = useState<RecordingSelectMenu>(null);
-  const [reorderingTrackType, setReorderingTrackType] = useState<string | null>(null);
   const timelineZoomRef = useRef(timelineZoom);
 
   const masterStem = stems[0] || null;
@@ -1355,10 +1346,6 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     recordingInputGainRef.current = null;
     recordingMonitorGainRef.current = null;
     void recordingContext?.close();
-    if (trackReorderPressTimerRef.current !== null) {
-      window.clearTimeout(trackReorderPressTimerRef.current);
-      trackReorderPressTimerRef.current = null;
-    }
   }, []);
 
   const refreshAudioInputDevices = useCallback(async () => {
@@ -2053,9 +2040,6 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     const recordingContext = recordingAudioContextRef.current;
     recordingAudioContextRef.current = null;
     void recordingContext?.close();
-    setReorderingTrackType(null);
-    trackReorderDragTypeRef.current = null;
-    trackReorderPressRef.current = null;
     setIsPlaying(false);
     setCurrentTime(0);
     const activeInitialStems = filterDeletedStems(initialStems, nextDeletedTrackTypes);
@@ -3039,126 +3023,6 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
 
     performDeleteTrack(trackToDelete);
   }, [isRecording, performDeleteTrack, selectedTrack, stems]);
-
-  const clearTrackReorderPress = useCallback(() => {
-    if (trackReorderPressTimerRef.current !== null) {
-      window.clearTimeout(trackReorderPressTimerRef.current);
-      trackReorderPressTimerRef.current = null;
-    }
-    trackReorderPressRef.current = null;
-  }, []);
-
-  const swapTrackOrder = useCallback((fromType: string, toType: string, historyMode: StemHistoryMode = 'immediate') => {
-    if (fromType === toType) return;
-    if (historyMode === 'deferred') {
-      beginDeferredHistory();
-      deferredHistoryChangedRef.current = true;
-    }
-    setTrackOrder((current) => {
-      const normalized = normalizeTrackOrderForStems(current, stems);
-      const fromIndex = normalized.indexOf(fromType);
-      const toIndex = normalized.indexOf(toType);
-      if (fromIndex < 0 || toIndex < 0) return normalized;
-      const next = [...normalized];
-      [next[fromIndex], next[toIndex]] = [next[toIndex], next[fromIndex]];
-      if (historyMode === 'immediate') {
-        pushHistorySnapshot({ ...editorHistoryRef.current, trackOrder: current });
-      } else if (historyMode === 'deferred') {
-        beginDeferredHistory({ ...editorHistoryRef.current, trackOrder: current });
-        deferredHistoryChangedRef.current = true;
-      }
-      return next;
-    });
-  }, [beginDeferredHistory, pushHistorySnapshot, stems]);
-
-  const beginTrackReorder = useCallback((type: string) => {
-    trackReorderDragTypeRef.current = type;
-    setReorderingTrackType(type);
-    setSelectedTrackType(type);
-    ignoreNextTrackClickRef.current = true;
-    setSaveStatus('拖到另一条轨道上即可互换位置。');
-  }, []);
-
-  const startTrackReorderPress = useCallback((event: PointerEvent<HTMLElement>, type: string) => {
-    if (event.pointerType === 'mouse' && event.button !== 0) return;
-    const target = event.target instanceof HTMLElement ? event.target : null;
-    if (!target?.closest('[data-track-drag-handle="true"]') && target?.closest('button, input, textarea, select, a')) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-    setSelectedTrackType(type);
-    clearTrackReorderPress();
-    trackReorderPressRef.current = {
-      type,
-      pointerId: event.pointerId,
-      x: event.clientX,
-      y: event.clientY,
-    };
-    trackReorderPressTimerRef.current = window.setTimeout(() => {
-      trackReorderPressTimerRef.current = null;
-      beginTrackReorder(type);
-    }, 360);
-
-    try {
-      event.currentTarget.setPointerCapture(event.pointerId);
-    } catch {
-      // The pointer may already be captured by the browser.
-    }
-  }, [beginTrackReorder, clearTrackReorderPress]);
-
-  const moveTrackReorderPointer = useCallback((event: PointerEvent<HTMLElement>) => {
-    const pending = trackReorderPressRef.current;
-    if (pending && pending.pointerId === event.pointerId && !trackReorderDragTypeRef.current) {
-      const moved = Math.hypot(event.clientX - pending.x, event.clientY - pending.y);
-      if (moved > 6) {
-        if (trackReorderPressTimerRef.current !== null) {
-          window.clearTimeout(trackReorderPressTimerRef.current);
-          trackReorderPressTimerRef.current = null;
-        }
-        beginTrackReorder(pending.type);
-      } else {
-        return;
-      }
-    }
-
-    const activeType = trackReorderDragTypeRef.current;
-    if (!activeType) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-    const target = document.elementFromPoint(event.clientX, event.clientY);
-    const targetRow = target instanceof HTMLElement
-      ? target.closest<HTMLElement>('[data-track-reorder-type]')
-      : null;
-    const targetType = targetRow?.dataset.trackReorderType;
-    if (targetType && targetType !== activeType) {
-      swapTrackOrder(activeType, targetType, 'deferred');
-    }
-  }, [beginTrackReorder, swapTrackOrder]);
-
-  const finishTrackReorderPointer = useCallback((event: PointerEvent<HTMLElement>) => {
-    const activeType = trackReorderDragTypeRef.current;
-    clearTrackReorderPress();
-    trackReorderDragTypeRef.current = null;
-    setReorderingTrackType(null);
-
-    try {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    } catch {
-      // Pointer capture may already be released.
-    }
-
-    if (activeType) {
-      commitDeferredHistory();
-      event.preventDefault();
-      event.stopPropagation();
-      setSaveStatus('轨道顺序已更新，会随编辑状态自动保存。');
-      ignoreNextTrackClickRef.current = true;
-      window.setTimeout(() => {
-        ignoreNextTrackClickRef.current = false;
-      }, 0);
-    }
-  }, [clearTrackReorderPress, commitDeferredHistory]);
 
   const handleSeek = useCallback((nextTime: number) => {
     const safeTime = Math.max(0, Math.min(duration || nextTime, nextTime));
@@ -6286,12 +6150,11 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
               onContextMenu={(event) => openTrackContextMenu(event, stem.type, currentTime)}
               style={{
                 ...stemTrackStyle(state.solo, showAdvancedControls, isSelectedTrack, trackColor, timelineGridColumns, timelineMinWidth, trackDensity, isTrackCollapsed),
-                ...(reorderingTrackType === stem.type ? activeTrackReorderStyle : {}),
               }}
             >
               <div
                 className="stem-track-header"
-                style={stemNameStyle(isSelectedTrack, trackColor, reorderingTrackType === stem.type, isTrackCollapsed)}
+                style={stemNameStyle(isSelectedTrack, trackColor, isTrackCollapsed)}
                 data-timeline-pan-zone="true"
                 title="点击选择轨道"
               >
@@ -6313,20 +6176,6 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                     {state.mutedRanges.length > 0 && <span style={stemStateBadgeStyle('range')}>{state.mutedRanges.length} 段</span>}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  data-track-drag-handle="true"
-                  aria-label={`拖动排序 ${displayName.zh}`}
-                  title="长按并拖到另一条轨道上互换位置"
-                  style={trackDragHandleStyle(reorderingTrackType === stem.type)}
-                  onPointerDown={(event) => startTrackReorderPress(event, stem.type)}
-                  onPointerMove={moveTrackReorderPointer}
-                  onPointerUp={finishTrackReorderPointer}
-                  onPointerCancel={finishTrackReorderPointer}
-                  onClick={(event) => event.preventDefault()}
-                >
-                  ⋮
-                </button>
                 <div style={trackHeaderSwitchesStyle}>
                   <button
                     type="button"
@@ -9338,14 +9187,7 @@ function stemTrackStyle(
   };
 }
 
-const activeTrackReorderStyle: CSSProperties = {
-  transform: 'translateY(-1px)',
-  borderColor: 'rgba(206, 255, 53, 0.72)',
-  boxShadow: 'inset 3px 0 0 var(--hc-lime), 0 18px 36px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(206, 255, 53, 0.18)',
-  opacity: 1,
-};
-
-function stemNameStyle(selectedTrack: boolean, trackColor: string, reordering = false, collapsed = false): CSSProperties {
+function stemNameStyle(selectedTrack: boolean, trackColor: string, collapsed = false): CSSProperties {
   return {
     position: 'sticky',
     left: 0,
@@ -9370,7 +9212,7 @@ function stemNameStyle(selectedTrack: boolean, trackColor: string, reordering = 
     overflow: 'hidden',
     isolation: 'isolate',
     opacity: 1,
-    cursor: reordering ? 'grabbing' : 'grab',
+    cursor: 'pointer',
     touchAction: 'none',
   };
 }
@@ -9539,31 +9381,6 @@ const stemTypeStyle: CSSProperties = {
   whiteSpace: 'nowrap',
   flex: '1 1 32px',
 };
-
-function trackDragHandleStyle(active: boolean): CSSProperties {
-  return {
-    gridColumn: '4',
-    gridRow: '1',
-    width: 20,
-    height: 24,
-    display: 'inline-grid',
-    placeItems: 'center',
-    justifySelf: 'center',
-    padding: 0,
-    borderRadius: 7,
-    border: active ? '1px solid rgba(206, 255, 53, 0.62)' : '1px solid transparent',
-    background: active ? 'rgba(206, 255, 53, 0.13)' : 'transparent',
-    color: active ? '#ceff35' : '#f8fafc',
-    appearance: 'none',
-    fontSize: 18,
-    fontWeight: 900,
-    lineHeight: 1,
-    cursor: active ? 'grabbing' : 'grab',
-    touchAction: 'none',
-    userSelect: 'none',
-    WebkitUserSelect: 'none',
-  };
-}
 
 const trackHeaderSwitchesStyle: CSSProperties = {
   gridColumn: '5',
