@@ -93,6 +93,13 @@ export interface StemWaveform {
   peaks: number[];
 }
 
+type StemClipWaveformSource = {
+  duration: number;
+  peaks: number[];
+  label: string;
+  color: string;
+};
+
 interface StemTrackState {
   volume: number;
   pan: number;
@@ -1754,6 +1761,26 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
 
     return stemHasDetectedContent(stem, audioBuffersRef.current[stem.type]);
   }), [bufferVersion, hasSoloTrack, stems, trackViewMode, tracks]);
+
+  const clipWaveformSources = useMemo<Record<string, StemClipWaveformSource>>(() => {
+    const nextSources: Record<string, StemClipWaveformSource> = {};
+    stems.forEach((stem) => {
+      const buffer = audioBuffersRef.current[stem.type] || null;
+      const waveform = stem.waveform;
+      const peaks = waveform?.peaks?.length
+        ? waveform.peaks
+        : buffer
+          ? buildWaveformPeaksFromSamples(buffer.getChannelData(0), 720)
+          : [];
+      nextSources[stem.type] = {
+        duration: Math.max(waveform?.duration || 0, buffer?.duration || 0, duration),
+        peaks,
+        label: getStemDisplayName(stem).zh,
+        color: getTrackColor(stem.type),
+      };
+    });
+    return nextSources;
+  }, [bufferVersion, duration, getTrackColor, stems]);
 
   useEffect(() => {
     if (!selectedTrackType) return;
@@ -6417,6 +6444,8 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                 bufferVersion={bufferVersion}
                 liveSeekOnDrag={!isPlaying}
                 seekOnClipClick={!isPlaying}
+                trackType={stem.type}
+                clipWaveformSources={clipWaveformSources}
                 compact={trackDensity === 'compact'}
                 collapsed={isTrackCollapsed}
                 recording={isRecordingTarget}
@@ -9695,6 +9724,8 @@ function WaveformTrackCanvas({
   bufferVersion,
   liveSeekOnDrag,
   seekOnClipClick,
+  trackType,
+  clipWaveformSources,
   compact,
   collapsed,
   recording,
@@ -9725,6 +9756,8 @@ function WaveformTrackCanvas({
   bufferVersion: number;
   liveSeekOnDrag: boolean;
   seekOnClipClick: boolean;
+  trackType: string;
+  clipWaveformSources: Record<string, StemClipWaveformSource>;
   compact: boolean;
   collapsed: boolean;
   recording: boolean;
@@ -9906,7 +9939,12 @@ function WaveformTrackCanvas({
       context.lineTo(width, centerY);
       context.stroke();
 
-      if (!displayPeaks.length) {
+      const hasClipSourcePeaks = clips.some((clip) => {
+        const sourceType = clip.sourceTrackType || trackType;
+        return Boolean(clipWaveformSources[sourceType]?.peaks.length);
+      });
+
+      if (!displayPeaks.length && !hasClipSourcePeaks) {
         context.fillStyle = 'rgba(206, 255, 53, 0.12)';
         context.fillRect(0, 0, width, height);
         context.fillStyle = '#8f92aa';
@@ -9927,7 +9965,6 @@ function WaveformTrackCanvas({
         context.fillRect(startX, 0, Math.max(0, endX - startX), height);
       }
 
-      const sourceDuration = Math.max(waveform?.duration || 0, buffer?.duration || 0, duration);
       const takeBarHeight = selected ? 15 * ratio : 13 * ratio;
       const renderClipWaveform = (clip: StemClip) => {
         const isSelectedClip = selected && clip.id === selectedClipId;
@@ -9936,17 +9973,28 @@ function WaveformTrackCanvas({
         const clipWidth = Math.max(0, clipEndX - clipStartX);
         if (clipWidth <= 1) return;
 
-        const clipPeaks = sliceStemClipPeaks(clip, sourceDuration, displayPeaks);
+        const sourceType = clip.sourceTrackType || trackType;
+        const clipSource = clipWaveformSources[sourceType];
+        const sourcePeaks = clipSource?.peaks?.length ? clipSource.peaks : displayPeaks;
+        const sourceDuration = Math.max(clipSource?.duration || 0, waveform?.duration || 0, buffer?.duration || 0, duration);
+        const clipTrackLabel = clipSource?.label || trackLabel;
+        const clipBaseColor = clipSource?.color || baseColor;
+        const clipWaveformColor = recording
+          ? '#f97316'
+          : muted
+            ? colorWithAlpha(clipBaseColor, 0.42)
+            : clipBaseColor;
+        const clipPeaks = sliceStemClipPeaks(clip, sourceDuration, sourcePeaks);
         const clipGradient = context.createLinearGradient(clipStartX, 0, clipEndX, 0);
-        clipGradient.addColorStop(0, colorWithAlpha(baseColor, recording ? 0.42 : isSelectedClip ? 0.48 : selected ? 0.36 : 0.24));
-        clipGradient.addColorStop(0.55, colorWithAlpha(baseColor, recording ? 0.34 : isSelectedClip ? 0.36 : selected ? 0.28 : 0.18));
-        clipGradient.addColorStop(1, colorWithAlpha(baseColor, recording ? 0.24 : isSelectedClip ? 0.28 : selected ? 0.22 : 0.13));
+        clipGradient.addColorStop(0, colorWithAlpha(clipBaseColor, recording ? 0.42 : isSelectedClip ? 0.48 : selected ? 0.36 : 0.24));
+        clipGradient.addColorStop(0.55, colorWithAlpha(clipBaseColor, recording ? 0.34 : isSelectedClip ? 0.36 : selected ? 0.28 : 0.18));
+        clipGradient.addColorStop(1, colorWithAlpha(clipBaseColor, recording ? 0.24 : isSelectedClip ? 0.28 : selected ? 0.22 : 0.13));
         context.fillStyle = clipGradient;
         context.fillRect(clipStartX, 0, clipWidth, height);
 
         const takeGradient = context.createLinearGradient(clipStartX, 0, clipEndX, 0);
-        takeGradient.addColorStop(0, colorWithAlpha(baseColor, recording ? 0.94 : 0.9));
-        takeGradient.addColorStop(1, colorWithAlpha(baseColor, recording ? 0.68 : 0.58));
+        takeGradient.addColorStop(0, colorWithAlpha(clipBaseColor, recording ? 0.94 : 0.9));
+        takeGradient.addColorStop(1, colorWithAlpha(clipBaseColor, recording ? 0.68 : 0.58));
         context.fillStyle = takeGradient;
         context.fillRect(clipStartX, 0, clipWidth, takeBarHeight);
 
@@ -9968,7 +10016,7 @@ function WaveformTrackCanvas({
         context.fillStyle = '#fff7ff';
         context.font = `${Math.max(8, 9 * ratio)}px sans-serif`;
         context.textAlign = 'left';
-        context.fillText(`♛ Takes   ${trackLabel}`, clipStartX + 7 * ratio, Math.max(10 * ratio, takeBarHeight - 4 * ratio));
+        context.fillText(`♛ Takes   ${clipTrackLabel}`, clipStartX + 7 * ratio, Math.max(10 * ratio, takeBarHeight - 4 * ratio));
 
         if (clipPeaks.length) {
           const step = clipPeaks.length > 1 ? clipWidth / (clipPeaks.length - 1) : clipWidth;
@@ -9985,12 +10033,12 @@ function WaveformTrackCanvas({
           });
 
           const waveformFill = context.createLinearGradient(0, takeBarHeight, 0, height);
-          waveformFill.addColorStop(0, muted ? colorWithAlpha(baseColor, 0.44) : colorWithAlpha(waveformColor, recording ? 0.94 : 0.96));
-          waveformFill.addColorStop(0.5, muted ? colorWithAlpha(baseColor, 0.34) : colorWithAlpha(waveformColor, recording ? 0.9 : 0.88));
-          waveformFill.addColorStop(1, muted ? colorWithAlpha(baseColor, 0.26) : colorWithAlpha(waveformColor, recording ? 0.72 : 0.68));
+          waveformFill.addColorStop(0, muted ? colorWithAlpha(clipBaseColor, 0.44) : colorWithAlpha(clipWaveformColor, recording ? 0.94 : 0.96));
+          waveformFill.addColorStop(0.5, muted ? colorWithAlpha(clipBaseColor, 0.34) : colorWithAlpha(clipWaveformColor, recording ? 0.9 : 0.88));
+          waveformFill.addColorStop(1, muted ? colorWithAlpha(clipBaseColor, 0.26) : colorWithAlpha(clipWaveformColor, recording ? 0.72 : 0.68));
 
           context.save();
-          context.shadowColor = recording ? 'rgba(249, 115, 22, 0.62)' : muted ? 'transparent' : colorWithAlpha(baseColor, selected ? 0.38 : 0.22);
+          context.shadowColor = recording ? 'rgba(249, 115, 22, 0.62)' : muted ? 'transparent' : colorWithAlpha(clipBaseColor, selected ? 0.38 : 0.22);
           context.shadowBlur = recording ? 7 * ratio : selected ? 4 * ratio : 1.5 * ratio;
           context.fillStyle = waveformFill;
           context.beginPath();
@@ -10013,7 +10061,7 @@ function WaveformTrackCanvas({
 
         context.restore();
 
-        context.strokeStyle = isSelectedClip ? '#f8fafc' : selected ? colorWithAlpha(baseColor, 0.82) : colorWithAlpha(baseColor, 0.46);
+        context.strokeStyle = isSelectedClip ? '#f8fafc' : selected ? colorWithAlpha(clipBaseColor, 0.82) : colorWithAlpha(clipBaseColor, 0.46);
         context.lineWidth = Math.max(1, isSelectedClip ? 1.6 * ratio : selected ? 1.1 * ratio : ratio);
         context.strokeRect(clipStartX + 0.5 * ratio, 0.5 * ratio, Math.max(0, clipWidth - ratio), Math.max(0, height - ratio));
       };
@@ -10055,7 +10103,7 @@ function WaveformTrackCanvas({
     const observer = new ResizeObserver(draw);
     observer.observe(canvas);
     return () => observer.disconnect();
-  }, [clips, color, displayPeaks, duration, muted, mutedRanges, recording, selected, selectedClipId, snapEnabled, snapStepSeconds, trackLabel, trimEnd, trimStart]);
+  }, [buffer, clipWaveformSources, clips, color, displayPeaks, duration, muted, mutedRanges, recording, selected, selectedClipId, snapEnabled, snapStepSeconds, trackLabel, trackType, trimEnd, trimStart, waveform?.duration]);
 
   const handlePointerDown = useCallback((event: PointerEvent<HTMLCanvasElement>) => {
     if (duration <= 0) return;
@@ -10236,7 +10284,7 @@ function WaveformTrackCanvas({
     pendingSeekRef.current = null;
     if (pendingSeek?.mode === 'playhead') {
       const { time, shouldSnap } = interactionTimeFromPointer(event);
-      onSeek(time, shouldSnap);
+      if (seekOnClipClick) onSeek(time, shouldSnap);
       updatePointerGuide(event, '播放头', false);
       return;
     }
