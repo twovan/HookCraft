@@ -3101,6 +3101,20 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   const setTrackClips = useCallback((type: string, clips: StemClip[]) => {
     commitTrackChange((current) => {
       const state = current[type] || defaultTrackState();
+      if (clips.length === 0) {
+        return {
+          ...current,
+          [type]: {
+            ...state,
+            trimStart: 0,
+            trimEnd: 0,
+            fadeIn: 0,
+            fadeOut: 0,
+            clips: [],
+          },
+        };
+      }
+
       const clipState = normalizeStemClipState({
         clips,
         duration,
