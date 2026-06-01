@@ -10,10 +10,95 @@ interface TrackStatePayload {
   pan: number;
   muted: boolean;
   solo: boolean;
+  collapsed: boolean;
   trimStart: number;
   trimEnd: number | null;
   fadeIn: number;
   fadeOut: number;
+  mutedRanges: Array<{
+    start: number;
+    end: number;
+  }>;
+  clips?: Array<{
+    id: string;
+    start: number;
+    sourceStart: number;
+    sourceEnd: number;
+    sourceTrackType?: string;
+  }>;
+}
+
+function roundTime(value: number) {
+  return Number(value.toFixed(3));
+}
+
+function normalizeMutedRanges(value: unknown) {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((range) => {
+      const item = range && typeof range === 'object'
+        ? range as Record<string, unknown>
+        : null;
+      if (!item) return null;
+      const start = typeof item.start === 'number' && Number.isFinite(item.start)
+        ? Math.max(0, item.start)
+        : null;
+      const end = typeof item.end === 'number' && Number.isFinite(item.end)
+        ? Math.max(0, item.end)
+        : null;
+      if (start === null || end === null || end - start <= 0.001) return null;
+      return {
+        start: roundTime(start),
+        end: roundTime(end),
+      };
+    })
+    .filter((range): range is { start: number; end: number } => Boolean(range))
+    .slice(0, 256);
+}
+
+function normalizeTrackClips(value: unknown) {
+  if (!Array.isArray(value)) return undefined;
+
+  const clips = value
+    .map((clip, index) => {
+      const item = clip && typeof clip === 'object'
+        ? clip as Record<string, unknown>
+        : null;
+      if (!item) return null;
+      const start = typeof item.start === 'number' && Number.isFinite(item.start)
+        ? Math.max(0, item.start)
+        : null;
+      const sourceStart = typeof item.sourceStart === 'number' && Number.isFinite(item.sourceStart)
+        ? Math.max(0, item.sourceStart)
+        : null;
+      const sourceEnd = typeof item.sourceEnd === 'number' && Number.isFinite(item.sourceEnd)
+        ? Math.max(0, item.sourceEnd)
+        : null;
+      if (start === null || sourceStart === null || sourceEnd === null || sourceEnd - sourceStart <= 0.001) {
+        return null;
+      }
+
+      const rawId = typeof item.id === 'string' ? item.id.trim() : '';
+      const rawSourceTrackType = typeof item.sourceTrackType === 'string' ? item.sourceTrackType.trim() : '';
+      return {
+        id: (rawId || `clip-${index + 1}`).slice(0, 120),
+        start: roundTime(start),
+        sourceStart: roundTime(sourceStart),
+        sourceEnd: roundTime(sourceEnd),
+        ...(rawSourceTrackType ? { sourceTrackType: rawSourceTrackType.slice(0, 96) } : {}),
+      };
+    })
+    .filter((clip): clip is {
+      id: string;
+      start: number;
+      sourceStart: number;
+      sourceEnd: number;
+      sourceTrackType?: string;
+    } => Boolean(clip))
+    .slice(0, 512);
+
+  return clips.length > 0 ? clips : undefined;
 }
 
 function normalizeTrackState(value: unknown): TrackStatePayload | null {
@@ -40,16 +125,20 @@ function normalizeTrackState(value: unknown): TrackStatePayload | null {
   const fadeOut = typeof state.fadeOut === 'number' && Number.isFinite(state.fadeOut)
     ? Math.max(0, state.fadeOut)
     : 0;
+  const clips = normalizeTrackClips(state.clips);
 
   return {
     volume,
     pan,
     muted: state.muted === true,
     solo: state.solo === true,
+    collapsed: state.collapsed === true,
     trimStart,
     trimEnd,
     fadeIn,
     fadeOut,
+    mutedRanges: normalizeMutedRanges(state.mutedRanges),
+    ...(clips ? { clips } : {}),
   };
 }
 
@@ -70,6 +159,32 @@ function normalizeTrackLabels(value: unknown) {
 }
 
 function normalizeTrackOrder(value: unknown, knownTrackTypes: string[]) {
+  if (!Array.isArray(value)) return [];
+  const knownTrackTypeSet = new Set(knownTrackTypes);
+
+  return value
+    .map((type) => String(type || '').trim().slice(0, 80))
+    .filter((type, index, types) => type.length > 0 && knownTrackTypeSet.has(type) && types.indexOf(type) === index)
+    .slice(0, 64);
+}
+
+function normalizeTrackColors(value: unknown) {
+  const colors = value && typeof value === 'object'
+    ? value as Record<string, unknown>
+    : null;
+  if (!colors) return {};
+
+  return Object.fromEntries(
+    Object.entries(colors)
+      .map(([type, color]) => [
+        type.trim().slice(0, 80),
+        typeof color === 'string' && /^#[0-9a-f]{6}$/i.test(color.trim()) ? color.trim() : '',
+      ])
+      .filter(([type, color]) => type.length > 0 && color.length > 0),
+  );
+}
+
+function normalizeDeletedTrackTypes(value: unknown, knownTrackTypes: string[]) {
   if (!Array.isArray(value)) return [];
   const knownTrackTypeSet = new Set(knownTrackTypes);
 
@@ -101,12 +216,16 @@ function normalizeEditState(value: unknown) {
 
   const trackLabels = normalizeTrackLabels(editState?.trackLabels);
   const trackOrder = normalizeTrackOrder(editState?.trackOrder, Object.keys(normalizedTracks));
+  const trackColors = normalizeTrackColors(editState?.trackColors);
+  const deletedTrackTypes = normalizeDeletedTrackTypes(editState?.deletedTrackTypes, Object.keys(normalizedTracks));
 
   return {
     tracks: normalizedTracks,
     master: normalizeStemMasterState(editState?.master as any),
     ...(Object.keys(trackLabels).length > 0 ? { trackLabels } : {}),
+    ...(Object.keys(trackColors).length > 0 ? { trackColors } : {}),
     ...(trackOrder.length > 0 ? { trackOrder } : {}),
+    ...(deletedTrackTypes.length > 0 ? { deletedTrackTypes } : {}),
     savedAt: new Date().toISOString(),
   };
 }

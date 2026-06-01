@@ -10282,6 +10282,14 @@ function WaveformTrackCanvas({
       const targetClip = resolveStemClipDragTarget(clips, time);
       if (targetClip) {
         onClipSelect(targetClip.id);
+        if (event.detail > 1) {
+          trimDragRef.current = null;
+          trimRangeDragRef.current = null;
+          clipDragRef.current = null;
+          pendingSeekRef.current = null;
+          updatePointerGuide(event, '选择片段', false);
+          return;
+        }
         clipDragRef.current = {
           clipId: targetClip.id,
           anchorTime: time,
@@ -10416,7 +10424,6 @@ function WaveformTrackCanvas({
         onClipMove(clipDragRef.current.clipId, clipDragRef.current.clipStart + time - clipDragRef.current.anchorTime, shouldSnap, 'commit', event.clientX, event.clientY);
       } else {
         onClipSelect(clipDragRef.current.clipId);
-        if (seekOnClipClick) onSeek(time, shouldSnap);
       }
       clipDragRef.current = null;
       pendingSeekRef.current = null;
@@ -10446,6 +10453,10 @@ function WaveformTrackCanvas({
     <div
       style={waveformCanvasWrapStyle}
       onClick={(event) => event.stopPropagation()}
+      onDoubleClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      }}
     >
       <canvas
         ref={canvasRef}
@@ -10453,6 +10464,10 @@ function WaveformTrackCanvas({
         aria-label="分轨波形。可选择轨道、拖动播放头或拖动边界编辑。"
         onContextMenu={(event) => onTrackContextMenu(event, timeFromPointer(event))}
         onDragStart={(event) => event.preventDefault()}
+        onDoubleClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+        }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
