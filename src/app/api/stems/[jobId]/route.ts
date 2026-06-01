@@ -49,7 +49,7 @@ function proxiedStems(req: NextRequest, jobId: string, resultPayload: unknown) {
   return readNormalizedStems(resultPayload).map((stem) => ({
     ...stem,
     sourceUrl: stem.url,
-    url: `${req.nextUrl.origin}/api/stems/audio?jobId=${encodeURIComponent(jobId)}&stemType=${encodeURIComponent(stem.type)}&url=${encodeURIComponent(stem.url)}`,
+    url: `/api/stems/audio?jobId=${encodeURIComponent(jobId)}&stemType=${encodeURIComponent(stem.type)}&url=${encodeURIComponent(stem.url)}`,
     waveform: waveformPeaks[stem.type] || null,
   }));
 }

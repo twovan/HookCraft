@@ -281,7 +281,7 @@ export default function StemEditorPageClient() {
             gap: 10px !important;
           }
           .stem-editor-brand,
-          .stem-editor-header-primary > a {
+          .stem-editor-header-primary a {
             min-width: 128px !important;
             padding-right: 12px !important;
           }
@@ -291,7 +291,7 @@ export default function StemEditorPageClient() {
             overflow: visible !important;
           }
           .stem-editor-rail,
-          .stem-editor-page > aside {
+          .stem-editor-page aside {
             display: none !important;
           }
           .stem-editor-stage {
@@ -302,7 +302,7 @@ export default function StemEditorPageClient() {
             grid-template-columns: 1fr !important;
           }
           .stem-editor-inspector,
-          .stem-editor-workspace > aside {
+          .stem-editor-workspace aside {
             min-height: auto !important;
           }
           .stem-editor-loading {
@@ -312,7 +312,7 @@ export default function StemEditorPageClient() {
           .stem-editor-transport {
             grid-template-columns: 34px 42px 86px minmax(0, 1fr) !important;
           }
-          .stem-editor-transport > div:first-child {
+          .stem-editor-transport div:first-child {
             display: none !important;
           }
         }
@@ -326,7 +326,7 @@ export default function StemEditorPageClient() {
             gap: 7px !important;
             padding: 8px 10px !important;
           }
-          .stem-editor-transport > div:nth-child(2) {
+          .stem-editor-transport div:nth-child(2) {
             display: none !important;
           }
         }

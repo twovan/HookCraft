@@ -86,6 +86,7 @@ export interface EditableStem {
   waveform?: StemWaveform | null;
   displayLabel?: string;
   isPlaceholder?: boolean;
+  storagePath?: string;
 }
 
 export interface StemWaveform {
@@ -120,6 +121,8 @@ export interface StemEditState {
   trackColors?: Record<string, string>;
   trackOrder?: string[];
   deletedTrackTypes?: string[];
+  customStems?: EditableStem[];
+  skippedEmptyCount?: number;
   savedAt?: string;
 }
 
@@ -540,6 +543,51 @@ function normalizeTrackState(value: Partial<StemTrackState> | undefined | null, 
       };
 }
 
+function normalizeSavedCustomStems(value: unknown): EditableStem[] {
+  if (!Array.isArray(value)) return [];
+
+  const stems: EditableStem[] = [];
+  value.forEach((stem) => {
+      const item = stem && typeof stem === 'object'
+        ? stem as Record<string, unknown>
+        : null;
+      if (!item) return;
+
+      const type = typeof item.type === 'string' ? item.type.trim().slice(0, 80) : '';
+      const label = sanitizeTrackLabel(String(item.label || item.displayLabel || ''));
+      const url = typeof item.url === 'string' ? item.url.trim() : '';
+      const storagePath = typeof item.storagePath === 'string' ? item.storagePath.trim().slice(0, 400) : '';
+      const rawWaveform = item.waveform && typeof item.waveform === 'object'
+        ? item.waveform as Record<string, unknown>
+        : null;
+      const duration = typeof rawWaveform?.duration === 'number' && Number.isFinite(rawWaveform.duration)
+        ? Math.max(0, rawWaveform.duration)
+        : 0;
+      const peaks = Array.isArray(rawWaveform?.peaks)
+        ? rawWaveform.peaks
+            .map((peak) => (typeof peak === 'number' && Number.isFinite(peak) ? Math.max(0, Math.min(1, peak)) : 0))
+            .slice(0, 1200)
+        : [];
+      const isPlaceholder = item.isPlaceholder === true || (!url && peaks.length > 0 && !waveformHasContent({ duration, peaks }));
+
+      if (!type || (!url && !isPlaceholder)) return;
+
+      stems.push({
+        type,
+        label: label || type,
+        displayLabel: label || type,
+        url,
+        isPlaceholder,
+        ...(storagePath ? { storagePath } : {}),
+        ...(duration > 0 && peaks.length > 0 ? { waveform: { duration, peaks } } : {}),
+      });
+    });
+
+  return stems
+    .filter((stem, index, stems) => stems.findIndex((candidate) => candidate.type === stem.type) === index)
+    .slice(0, 48);
+}
+
 function createTrackState(stems: EditableStem[], editState?: StemEditState | null) {
   const fallbackDuration = stems.reduce((maxDuration, stem) => (
     Math.max(maxDuration, stem.waveform?.duration || 0)
@@ -922,6 +970,38 @@ async function persistWaveform(jobId: string | undefined, stemType: string, wave
   }).catch(() => undefined);
 }
 
+async function uploadCustomStemAudio({
+  jobId,
+  stemType,
+  blob,
+  label,
+}: {
+  jobId: string;
+  stemType: string;
+  blob: Blob;
+  label: string;
+}) {
+  const form = new FormData();
+  form.set('jobId', jobId);
+  form.set('stemType', stemType);
+  form.set('label', label);
+  form.set('file', blob, `${stemType}.webm`);
+
+  const response = await fetch('/api/stems/custom-audio', {
+    method: 'POST',
+    body: form,
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data?.url || !data?.storagePath) {
+    throw new Error(data?.error || '自定义轨道音频上传失败');
+  }
+
+  return {
+    url: String(data.url),
+    storagePath: String(data.storagePath),
+  };
+}
+
 function encodeWav(audioBuffer: AudioBuffer) {
   const channelCount = audioBuffer.numberOfChannels;
   const sampleRate = audioBuffer.sampleRate;
@@ -1164,7 +1244,15 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   const frameRef = useRef<number | null>(null);
   const skipNextTimeInputCommitRef = useRef(false);
   const skipNextTrimInputCommitRef = useRef(false);
-  const loadingCountRef = useRef(initialStems.length);
+  const initialCustomStems = useMemo(
+    () => normalizeSavedCustomStems(initialEditState?.customStems),
+    [initialEditState?.customStems],
+  );
+  const initialAllStems = useMemo(
+    () => [...initialStems, ...initialCustomStems],
+    [initialCustomStems, initialStems],
+  );
+  const loadingCountRef = useRef(initialAllStems.filter((stem) => !stemHasKnownEmptyWaveform(stem)).length);
   const failedLoadCountRef = useRef(0);
   const autoSaveTimerRef = useRef<number | null>(null);
   const skipNextAutoSaveRef = useRef(true);
@@ -1174,19 +1262,19 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   const deferredHistorySnapshotRef = useRef<StemEditorHistorySnapshot | null>(null);
   const deferredHistoryChangedRef = useRef(false);
   const initialDeletedTrackTypes = useMemo(
-    () => normalizeDeletedStemTypes(initialEditState?.deletedTrackTypes, initialStems),
-    [initialEditState?.deletedTrackTypes, initialStems],
+    () => normalizeDeletedStemTypes(initialEditState?.deletedTrackTypes, initialAllStems),
+    [initialAllStems, initialEditState?.deletedTrackTypes],
   );
   const editorHistoryRef = useRef<StemEditorHistorySnapshot>({
-    tracks: createTrackState(initialStems, initialEditState),
+    tracks: createTrackState(initialAllStems, initialEditState),
     master: normalizeStemMasterState(initialEditState?.master),
     trackLabels: normalizeTrackLabels(initialEditState?.trackLabels),
     trackColors: normalizeTrackColors(initialEditState?.trackColors),
-    trackOrder: normalizeTrackOrderForStems(initialEditState?.trackOrder, initialStems),
+    trackOrder: normalizeTrackOrderForStems(initialEditState?.trackOrder, initialAllStems),
     deletedTrackTypes: initialDeletedTrackTypes,
-    customStems: [],
-    skippedEmptyCount: 0,
-    selectedTrackType: filterDeletedStems(initialStems, initialDeletedTrackTypes)[0]?.type ?? null,
+    customStems: initialCustomStems,
+    skippedEmptyCount: typeof initialEditState?.skippedEmptyCount === 'number' ? Math.max(0, initialEditState.skippedEmptyCount) : 0,
+    selectedTrackType: filterDeletedStems(initialAllStems, initialDeletedTrackTypes)[0]?.type ?? null,
   });
   const timelineViewportRef = useRef<HTMLDivElement | null>(null);
   const inspectorViewportRef = useRef<HTMLDivElement | null>(null);
@@ -1206,10 +1294,10 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   const recordingMonitorGainRef = useRef<GainNode | null>(null);
   const recordingWaveformFrameRef = useRef<number | null>(null);
   const importTargetTypeRef = useRef<string | null>(null);
-  const [customStems, setCustomStems] = useState<EditableStem[]>([]);
+  const [customStems, setCustomStems] = useState<EditableStem[]>(() => initialCustomStems);
   const [trackLabels, setTrackLabels] = useState<Record<string, string>>(() => normalizeTrackLabels(initialEditState?.trackLabels));
   const [trackColors, setTrackColors] = useState<Record<string, string>>(() => normalizeTrackColors(initialEditState?.trackColors));
-  const [trackOrder, setTrackOrder] = useState<string[]>(() => normalizeTrackOrderForStems(initialEditState?.trackOrder, initialStems));
+  const [trackOrder, setTrackOrder] = useState<string[]>(() => normalizeTrackOrderForStems(initialEditState?.trackOrder, initialAllStems));
   const [deletedTrackTypes, setDeletedTrackTypes] = useState<string[]>(() => initialDeletedTrackTypes);
   const sourceStems = useMemo(() => {
     const activeInitialStems = filterDeletedStems(initialStems, deletedTrackTypes);
@@ -1220,16 +1308,16 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     return label ? { ...stem, displayLabel: label } : stem;
   }), [sourceStems, trackLabels]);
   const getTrackColor = useCallback((type: string) => trackColors[type] || stemColorForType(type), [trackColors]);
-  const [tracks, setTracks] = useState<Record<string, StemTrackState>>(() => createTrackState(initialStems, initialEditState));
+  const [tracks, setTracks] = useState<Record<string, StemTrackState>>(() => createTrackState(initialAllStems, initialEditState));
   const [masterState, setMasterState] = useState<StemMasterState>(() => normalizeStemMasterState(initialEditState?.master));
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(() => getInitialWaveformDuration(initialStems));
-  const [loadingCount, setLoadingCount] = useState(initialStems.length);
+  const [duration, setDuration] = useState(() => getInitialWaveformDuration(initialAllStems));
+  const [loadingCount, setLoadingCount] = useState(initialAllStems.filter((stem) => !stemHasKnownEmptyWaveform(stem)).length);
   const [failedLoadCount, setFailedLoadCount] = useState(0);
   const [cachedLoadCount, setCachedLoadCount] = useState(0);
-  const [skippedEmptyCount, setSkippedEmptyCount] = useState(0);
-  const [loadingStemTypes, setLoadingStemTypes] = useState<Set<string>>(() => new Set(initialStems.map((stem) => stem.type)));
+  const [skippedEmptyCount, setSkippedEmptyCount] = useState(() => initialAllStems.filter((stem) => stemHasKnownEmptyWaveform(stem)).length);
+  const [loadingStemTypes, setLoadingStemTypes] = useState<Set<string>>(() => new Set(initialAllStems.filter((stem) => !stemHasKnownEmptyWaveform(stem)).map((stem) => stem.type)));
   const [failedStemTypes, setFailedStemTypes] = useState<Set<string>>(() => new Set());
   const [bufferVersion, setBufferVersion] = useState(0);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
@@ -2088,26 +2176,26 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   }, []);
 
   useEffect(() => {
-    setTracks(createTrackState(initialStems, initialEditState));
+    setTracks(createTrackState(initialAllStems, initialEditState));
     setMasterState(normalizeStemMasterState(initialEditState?.master));
     setTrackLabels(normalizeTrackLabels(initialEditState?.trackLabels));
     setTrackColors(normalizeTrackColors(initialEditState?.trackColors));
-    setTrackOrder(normalizeTrackOrderForStems(initialEditState?.trackOrder, initialStems));
-    const nextDeletedTrackTypes = normalizeDeletedStemTypes(initialEditState?.deletedTrackTypes, initialStems);
+    setTrackOrder(normalizeTrackOrderForStems(initialEditState?.trackOrder, initialAllStems));
+    const nextDeletedTrackTypes = normalizeDeletedStemTypes(initialEditState?.deletedTrackTypes, initialAllStems);
     setDeletedTrackTypes(nextDeletedTrackTypes);
     customObjectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     customObjectUrlsRef.current.clear();
-    setCustomStems([]);
+    setCustomStems(initialCustomStems);
     editorHistoryRef.current = {
-      tracks: createTrackState(initialStems, initialEditState),
+      tracks: createTrackState(initialAllStems, initialEditState),
       master: normalizeStemMasterState(initialEditState?.master),
       trackLabels: normalizeTrackLabels(initialEditState?.trackLabels),
       trackColors: normalizeTrackColors(initialEditState?.trackColors),
-      trackOrder: normalizeTrackOrderForStems(initialEditState?.trackOrder, initialStems),
+      trackOrder: normalizeTrackOrderForStems(initialEditState?.trackOrder, initialAllStems),
       deletedTrackTypes: nextDeletedTrackTypes,
-      customStems: [],
+      customStems: initialCustomStems,
       skippedEmptyCount: 0,
-      selectedTrackType: filterDeletedStems(initialStems, nextDeletedTrackTypes)[0]?.type ?? null,
+      selectedTrackType: filterDeletedStems(initialAllStems, nextDeletedTrackTypes)[0]?.type ?? null,
     };
     setRecordingStatus(null);
     setRecordingWaveform(Array.from({ length: 28 }, () => 0.08));
@@ -2124,8 +2212,8 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     void recordingContext?.close();
     setIsPlaying(false);
     setCurrentTime(0);
-    const activeInitialStems = filterDeletedStems(initialStems, nextDeletedTrackTypes);
-    setDuration(getInitialWaveformDuration(activeInitialStems.length > 0 ? activeInitialStems : initialStems));
+    const activeInitialStems = filterDeletedStems(initialAllStems, nextDeletedTrackTypes);
+    setDuration(getInitialWaveformDuration(activeInitialStems.length > 0 ? activeInitialStems : initialAllStems));
     const stemsToLoad = activeInitialStems.filter((stem) => !stemHasKnownEmptyWaveform(stem));
     const knownEmptyCount = activeInitialStems.length - stemsToLoad.length;
     setLoadingCount(stemsToLoad.length);
@@ -2237,7 +2325,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     return () => {
       abortController.abort();
     };
-  }, [getAudioContext, initialEditState, initialStems, jobId, stopFrame, stopSources]);
+  }, [getAudioContext, initialAllStems, initialCustomStems, initialEditState, jobId, stopFrame, stopSources]);
 
   useEffect(() => () => {
     if (autoSaveTimerRef.current !== null) {
@@ -2707,7 +2795,20 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       const displayLabel = shouldUseIncomingLabel
         ? (sanitizeTrackLabel(label) || `新增轨道 ${customStems.length + 1}`)
         : getStemDisplayName(existingStem).zh;
-      const url = URL.createObjectURL(blob);
+      let url = URL.createObjectURL(blob);
+      let storagePath = '';
+      if (jobId) {
+        setRecordingStatus('正在上传音频...');
+        const uploaded = await uploadCustomStemAudio({
+          jobId,
+          stemType: type,
+          blob,
+          label: displayLabel,
+        });
+        URL.revokeObjectURL(url);
+        url = uploaded.url;
+        storagePath = uploaded.storagePath;
+      }
       const stem: EditableStem = {
         type,
         label: displayLabel,
@@ -2715,6 +2816,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         url,
         isPlaceholder: false,
         waveform: calculateWaveform(audioBuffer),
+        ...(storagePath ? { storagePath } : {}),
       };
 
       rememberEditorHistory();
@@ -2722,7 +2824,9 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         URL.revokeObjectURL(existingStem.url);
         customObjectUrlsRef.current.delete(existingStem.url);
       }
-      customObjectUrlsRef.current.add(url);
+      if (!storagePath) {
+        customObjectUrlsRef.current.add(url);
+      }
       audioBuffersRef.current[type] = audioBuffer;
       setCustomStems((current) => {
         const existingIndex = current.findIndex((item) => item.type === type);
@@ -2755,12 +2859,14 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       setRecordingTrackWaveform(Array.from({ length: 220 }, () => 0));
       setRecordingLevel(0);
       setIsAddTrackPanelOpen(true);
-      setSaveStatus(`已为“${displayLabel}”载入音频，可参与预听、混音和导出。`);
-    } catch {
+      setSaveStatus(jobId
+        ? `已为“${displayLabel}”载入并保存音频，可参与预听、混音和导出。`
+        : `已为“${displayLabel}”载入音频；当前没有缓存 ID，刷新后不能恢复。`);
+    } catch (error) {
       setRecordingStatus(null);
-      setPlaybackError('音频解析失败，请换一个常见格式文件，或重新录音。');
+      setPlaybackError(error instanceof Error ? error.message : '音频解析或上传失败，请换一个常见格式文件，或重新录音。');
     }
-  }, [customStems, getAudioContext, pauseAll, rememberEditorHistory]);
+  }, [customStems, getAudioContext, jobId, pauseAll, rememberEditorHistory]);
 
   const importTrackFile = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -4123,6 +4229,8 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
             trackColors,
             trackOrder: stems.map((stem) => stem.type),
             deletedTrackTypes,
+            customStems,
+            skippedEmptyCount,
           },
         }),
       });
@@ -4155,7 +4263,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         setIsSaving(false);
       }
     }
-  }, [deletedTrackTypes, jobId, masterState, stems, trackColors, trackLabels, tracks]);
+  }, [customStems, deletedTrackTypes, jobId, masterState, skippedEmptyCount, stems, trackColors, trackLabels, tracks]);
 
   const saveEditState = useCallback(async () => {
     await persistEditState('manual');
@@ -4501,7 +4609,9 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     trackColors,
     trackOrder: stems.map((stem) => stem.type),
     deletedTrackTypes,
-  }), [deletedTrackTypes, masterState, stems, trackColors, trackLabels, tracks]);
+    customStems,
+    skippedEmptyCount,
+  }), [customStems, deletedTrackTypes, masterState, skippedEmptyCount, stems, trackColors, trackLabels, tracks]);
 
   useEffect(() => {
     if (!jobId) return;
@@ -6474,7 +6584,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                   </button>
                   <button
                     type="button"
-                    aria-pressed={isTrackCollapsed}
+                    aria-expanded={!isTrackCollapsed}
                     title={isTrackCollapsed ? '展开轨道' : '折叠轨道'}
                     onClick={(event) => {
                       event.stopPropagation();
@@ -6482,7 +6592,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                     }}
                     style={trackCollapseButtonStyle(isTrackCollapsed)}
                   >
-                    <TransportIcon name={isTrackCollapsed ? 'chevronDown' : 'chevronRight'} />
+                    <TransportIcon name={isTrackCollapsed ? 'chevronRight' : 'chevronDown'} />
                   </button>
                 </div>
                 {!isTrackCollapsed && (

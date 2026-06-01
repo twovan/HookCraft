@@ -28,6 +28,19 @@ interface TrackStatePayload {
   }>;
 }
 
+interface CustomStemPayload {
+  type: string;
+  label: string;
+  url: string;
+  displayLabel?: string;
+  isPlaceholder?: boolean;
+  storagePath?: string;
+  waveform?: {
+    duration: number;
+    peaks: number[];
+  };
+}
+
 function roundTime(value: number) {
   return Number(value.toFixed(3));
 }
@@ -99,6 +112,50 @@ function normalizeTrackClips(value: unknown) {
     .slice(0, 512);
 
   return clips.length > 0 ? clips : undefined;
+}
+
+function normalizeCustomStems(value: unknown): CustomStemPayload[] {
+  if (!Array.isArray(value)) return [];
+
+  const stems: CustomStemPayload[] = [];
+  value.forEach((stem) => {
+      const item = stem && typeof stem === 'object'
+        ? stem as Record<string, unknown>
+        : null;
+      if (!item) return;
+
+      const type = typeof item.type === 'string' ? item.type.trim().slice(0, 80) : '';
+      const label = String(item.label || item.displayLabel || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+      const url = typeof item.url === 'string' ? item.url.trim().slice(0, 600) : '';
+      const storagePath = typeof item.storagePath === 'string' ? item.storagePath.trim().slice(0, 400) : '';
+      const rawWaveform = item.waveform && typeof item.waveform === 'object'
+        ? item.waveform as Record<string, unknown>
+        : null;
+      const duration = typeof rawWaveform?.duration === 'number' && Number.isFinite(rawWaveform.duration)
+        ? Math.max(0, rawWaveform.duration)
+        : 0;
+      const peaks = Array.isArray(rawWaveform?.peaks)
+        ? rawWaveform.peaks
+            .map((peak) => (typeof peak === 'number' && Number.isFinite(peak) ? Math.max(0, Math.min(1, peak)) : 0))
+            .slice(0, 1200)
+        : [];
+
+      if (!type || (!url && item.isPlaceholder !== true)) return;
+
+      stems.push({
+        type,
+        label: label || type,
+        displayLabel: label || type,
+        url,
+        isPlaceholder: item.isPlaceholder === true,
+        ...(storagePath ? { storagePath } : {}),
+        ...(duration > 0 && peaks.length > 0 ? { waveform: { duration: roundTime(duration), peaks } } : {}),
+      });
+    });
+
+  return stems
+    .filter((stem, index, stems) => stems.findIndex((candidate) => candidate.type === stem.type) === index)
+    .slice(0, 48);
 }
 
 function normalizeTrackState(value: unknown): TrackStatePayload | null {
@@ -218,6 +275,10 @@ function normalizeEditState(value: unknown) {
   const trackOrder = normalizeTrackOrder(editState?.trackOrder, Object.keys(normalizedTracks));
   const trackColors = normalizeTrackColors(editState?.trackColors);
   const deletedTrackTypes = normalizeDeletedTrackTypes(editState?.deletedTrackTypes, Object.keys(normalizedTracks));
+  const customStems = normalizeCustomStems(editState?.customStems);
+  const skippedEmptyCount = typeof editState?.skippedEmptyCount === 'number' && Number.isFinite(editState.skippedEmptyCount)
+    ? Math.max(0, Math.min(128, Math.floor(editState.skippedEmptyCount)))
+    : 0;
 
   return {
     tracks: normalizedTracks,
@@ -226,6 +287,8 @@ function normalizeEditState(value: unknown) {
     ...(Object.keys(trackColors).length > 0 ? { trackColors } : {}),
     ...(trackOrder.length > 0 ? { trackOrder } : {}),
     ...(deletedTrackTypes.length > 0 ? { deletedTrackTypes } : {}),
+    ...(customStems.length > 0 ? { customStems } : {}),
+    ...(skippedEmptyCount > 0 ? { skippedEmptyCount } : {}),
     savedAt: new Date().toISOString(),
   };
 }

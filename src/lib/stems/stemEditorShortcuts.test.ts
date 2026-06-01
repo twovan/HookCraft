@@ -43,7 +43,7 @@ describe('resolveStemEditorShortcut', () => {
     expect(resolveStemEditorShortcut(keyEvent({ key: 'p' }))).toBe('preview-selected-range');
     expect(resolveStemEditorShortcut(keyEvent({ key: 'f', shiftKey: true }))).toBe('focus-selected-range');
     expect(resolveStemEditorShortcut(keyEvent({ key: 'r' }))).toBe('reset-selected-track');
-    expect(resolveStemEditorShortcut(keyEvent({ key: 'Delete' }))).toBe('delete-selected-track');
+    expect(resolveStemEditorShortcut(keyEvent({ key: 'Delete' }))).toBe('delete-selected-clip');
     expect(resolveStemEditorShortcut(keyEvent({ key: 'F2' }))).toBeNull();
     expect(resolveStemEditorShortcut(keyEvent({ key: 'c', shiftKey: true }))).toBe('edit-selected-track-color');
     expect(resolveStemEditorShortcut(keyEvent({ key: 'r', shiftKey: true }))).toBe('reset-selected-trim-range');
