@@ -4971,17 +4971,19 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
           <button type="button" onClick={saveEditState} disabled={isSaving} style={primarySmallButtonStyle}>
             {isSaving ? '保存中' : '保存'}
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              setInspectorTab('export');
-              setInspectorCollapsed(false);
-              setSaveStatus('已打开导出中心。');
-            }}
-            style={ghostButtonStyle}
-          >
-            导出
-          </button>
+          {inspectorCollapsed && (
+            <button
+              type="button"
+              onClick={() => {
+                setInspectorTab('export');
+                setInspectorCollapsed(false);
+                setSaveStatus('已打开导出中心。');
+              }}
+              style={ghostButtonStyle}
+            >
+              导出
+            </button>
+          )}
         </div>
       </div>
 
@@ -6480,7 +6482,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                     }}
                     style={trackCollapseButtonStyle(isTrackCollapsed)}
                   >
-                    <TransportIcon name={isTrackCollapsed ? 'chevronRight' : 'chevronDown'} />
+                    <TransportIcon name={isTrackCollapsed ? 'chevronDown' : 'chevronRight'} />
                   </button>
                 </div>
                 {!isTrackCollapsed && (
@@ -7635,23 +7637,31 @@ const inspectorBadgeStyle: CSSProperties = {
 const inspectorTabsStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-  gap: 4,
+  gap: 6,
   minWidth: 0,
-  padding: 3,
-  borderRadius: 9,
-  border: '1px solid rgba(48, 52, 76, 0.74)',
-  background: 'rgba(7, 9, 18, 0.72)',
+  padding: 5,
+  borderRadius: 8,
+  border: '1px solid rgba(125, 211, 252, 0.28)',
+  background: 'linear-gradient(180deg, rgba(9, 14, 25, 0.98), rgba(4, 7, 13, 0.98))',
+  boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 10px 26px rgba(0, 0, 0, 0.28)',
 };
 
 function inspectorTabButtonStyle(active: boolean): CSSProperties {
   return {
-    ...editorButtonChromeStyle({ tone: 'purple', compact: true, active }),
-    minHeight: 30,
+    border: active ? '1px solid rgba(206, 255, 53, 0.74)' : '1px solid rgba(71, 85, 105, 0.64)',
+    background: active
+      ? 'linear-gradient(180deg, rgba(206, 255, 53, 0.24), rgba(71, 97, 13, 0.34))'
+      : 'linear-gradient(180deg, rgba(30, 41, 59, 0.72), rgba(15, 23, 42, 0.72))',
+    minHeight: 34,
     borderRadius: 7,
-    color: active ? '#f6f8ff' : '#9ca3af',
+    color: active ? '#f7ffcf' : '#cbd5e1',
     fontSize: 12,
-    fontWeight: 900,
-    boxShadow: 'none',
+    fontWeight: 950,
+    letterSpacing: 0,
+    boxShadow: active
+      ? '0 0 0 1px rgba(206, 255, 53, 0.12), 0 10px 24px rgba(206, 255, 53, 0.12)'
+      : 'none',
+    cursor: 'pointer',
   };
 }
 
@@ -8584,12 +8594,13 @@ const loadingNoticeStyle: CSSProperties = {
 function editorStatusToastDockStyle(metrics: DawEditorLayoutMetrics): CSSProperties {
   return {
     position: 'fixed',
-    top: metrics.headerHeight + 10,
-    right: metrics.inspectorWidth + 28,
-    zIndex: 45,
+    top: metrics.headerHeight + 12,
+    left: '50%',
+    transform: 'translateX(-50%)',
+    zIndex: 78,
     display: 'grid',
-    gap: 6,
-    width: `min(390px, calc(100vw - ${metrics.inspectorWidth + 64}px))`,
+    gap: 8,
+    width: 'min(520px, calc(100vw - 40px))',
     pointerEvents: 'none',
   };
 }
@@ -8598,19 +8609,21 @@ function editorStatusToastStyle(tone: 'save' | 'auto', dismissing = false): CSSP
   const saveTone = tone === 'save';
   return {
     display: 'grid',
-    gridTemplateColumns: '18px minmax(0, 1fr)',
+    gridTemplateColumns: '22px minmax(0, 1fr)',
     alignItems: 'center',
-    gap: 8,
-    minHeight: 32,
+    gap: 10,
+    minHeight: 38,
     borderRadius: 8,
-    border: saveTone ? '1px solid rgba(34, 197, 94, 0.36)' : '1px solid rgba(59, 130, 246, 0.34)',
-    background: saveTone ? 'rgba(5, 46, 22, 0.86)' : 'rgba(15, 23, 42, 0.88)',
-    boxShadow: '0 12px 32px rgba(0, 0, 0, 0.28)',
-    backdropFilter: 'blur(14px)',
-    color: saveTone ? '#bbf7d0' : '#bfdbfe',
-    padding: '6px 10px',
-    fontSize: 11,
-    fontWeight: 800,
+    border: saveTone ? '1px solid rgba(134, 239, 172, 0.72)' : '1px solid rgba(125, 211, 252, 0.68)',
+    background: saveTone ? '#052e16' : '#082f49',
+    boxShadow: saveTone
+      ? '0 16px 38px rgba(0, 0, 0, 0.48), 0 0 0 1px rgba(187, 247, 208, 0.08), 0 0 28px rgba(34, 197, 94, 0.22)'
+      : '0 16px 38px rgba(0, 0, 0, 0.48), 0 0 0 1px rgba(186, 230, 253, 0.08), 0 0 28px rgba(14, 165, 233, 0.22)',
+    color: saveTone ? '#dcfce7' : '#e0f2fe',
+    padding: '8px 12px',
+    fontSize: 12,
+    fontWeight: 900,
+    letterSpacing: 0,
     pointerEvents: 'auto',
     opacity: dismissing ? 0 : 1,
     transform: dismissing ? 'translateY(-6px) scale(0.98)' : 'translateY(0) scale(1)',
@@ -8621,17 +8634,18 @@ function editorStatusToastStyle(tone: 'save' | 'auto', dismissing = false): CSSP
 function editorStatusToastIconStyle(tone: 'save' | 'auto'): CSSProperties {
   const saveTone = tone === 'save';
   return {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    border: saveTone ? '1px solid rgba(74, 222, 128, 0.46)' : '1px solid rgba(96, 165, 250, 0.46)',
-    background: saveTone ? 'rgba(34, 197, 94, 0.18)' : 'rgba(59, 130, 246, 0.18)',
-    color: saveTone ? '#86efac' : '#93c5fd',
-    fontSize: 11,
+    border: saveTone ? '1px solid rgba(187, 247, 208, 0.7)' : '1px solid rgba(186, 230, 253, 0.68)',
+    background: saveTone ? '#16a34a' : '#0284c7',
+    color: '#ffffff',
+    fontSize: 12,
     fontWeight: 900,
+    boxShadow: saveTone ? '0 0 16px rgba(34, 197, 94, 0.34)' : '0 0 16px rgba(14, 165, 233, 0.34)',
   };
 }
 
