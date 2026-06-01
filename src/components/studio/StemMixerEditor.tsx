@@ -97,7 +97,6 @@ type StemClipWaveformSource = {
   duration: number;
   peaks: number[];
   label: string;
-  color: string;
 };
 
 interface StemTrackState {
@@ -1784,11 +1783,10 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         duration: Math.max(waveform?.duration || 0, buffer?.duration || 0, duration),
         peaks,
         label: getStemDisplayName(stem).zh,
-        color: getTrackColor(stem.type),
       };
     });
     return nextSources;
-  }, [bufferVersion, duration, getTrackColor, stems]);
+  }, [bufferVersion, duration, stems]);
 
   useEffect(() => {
     if (!selectedTrackType) return;
@@ -10046,7 +10044,7 @@ function WaveformTrackCanvas({
         const sourcePeaks = clipSource?.peaks?.length ? clipSource.peaks : displayPeaks;
         const sourceDuration = Math.max(clipSource?.duration || 0, waveform?.duration || 0, buffer?.duration || 0, duration);
         const clipTrackLabel = clipSource?.label || trackLabel;
-        const clipBaseColor = clipSource?.color || baseColor;
+        const clipBaseColor = baseColor;
         const clipWaveformColor = recording
           ? '#f97316'
           : muted
