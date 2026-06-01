@@ -174,6 +174,13 @@ type SelectedClipSelection = {
   trackType: string;
   clipId: string;
 } | null;
+type ClipDragPreview = {
+  sourceTrackType: string;
+  targetTrackType: string;
+  clipId: string;
+  previewClipId: string;
+  clip: StemClip;
+};
 
 const RECORDING_CHANNEL_OPTIONS: Array<{ value: RecordingInputChannel; label: string }> = [
   { value: 'channel-1', label: '通道 1' },
@@ -1215,6 +1222,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   const [showShortcutHelp, setShowShortcutHelp] = useState(false);
   const [clipClipboard, setClipClipboard] = useState<StemClipClipboard | null>(null);
   const [selectedClipSelection, setSelectedClipSelection] = useState<SelectedClipSelection>(null);
+  const [clipDragPreview, setClipDragPreview] = useState<ClipDragPreview | null>(null);
   const [trackContextMenu, setTrackContextMenu] = useState<TrackContextMenuState | null>(null);
   const [editorDialog, setEditorDialog] = useState<StemEditorDialogState | null>(null);
   const [isTimelinePanning, setIsTimelinePanning] = useState(false);
@@ -3227,6 +3235,43 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     return row?.dataset.stemTrackType || null;
   }, []);
 
+  const previewTrackClipMove = useCallback((
+    type: string,
+    clipId: string,
+    nextStart: number,
+    shouldSnap = snapToGrid,
+    clientX?: number,
+    clientY?: number,
+  ) => {
+    const state = tracks[type] || defaultTrackState();
+    const clipState = resolveTrackClipState(state, duration);
+    const movingClip = clipState.clips.find((clip) => clip.id === clipId);
+    if (!movingClip) {
+      setClipDragPreview(null);
+      return;
+    }
+
+    const dropTargetType = resolveTrackDropTarget(clientX, clientY);
+    const targetType = dropTargetType && stems.some((stem) => stem.type === dropTargetType)
+      ? dropTargetType
+      : type;
+    const snappedStart = snapStemEditorTime(nextStart, duration, shouldSnap, snapStepSeconds);
+    const previewClipId = `${clipId}-drag-preview`;
+    setClipDragPreview({
+      sourceTrackType: type,
+      targetTrackType: targetType,
+      clipId,
+      previewClipId,
+      clip: {
+        ...movingClip,
+        id: previewClipId,
+        start: snappedStart,
+        sourceTrackType: movingClip.sourceTrackType || type,
+      },
+    });
+    setSelectedTrackType(targetType);
+  }, [duration, resolveTrackDropTarget, snapStepSeconds, snapToGrid, stems, tracks]);
+
   const moveTrackClip = useCallback((
     type: string,
     clipId: string,
@@ -3236,6 +3281,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     dropClientX?: number,
     dropClientY?: number,
   ) => {
+    setClipDragPreview(null);
     const stateBeforeMove = tracks[type] || defaultTrackState();
     const clipStateBeforeMove = resolveTrackClipState(stateBeforeMove, duration);
     const movingClip = clipStateBeforeMove.clips.find((clip) => clip.id === clipId);
@@ -6244,6 +6290,24 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
           {visibleStems.map((stem, index) => {
           const state = tracks[stem.type] || defaultTrackState();
           const trackClipState = resolveTrackClipState(state, duration);
+          const displayedClips = clipDragPreview
+            ? (() => {
+              const withoutSourceClip = stem.type === clipDragPreview.sourceTrackType
+                ? trackClipState.clips.filter((clip) => clip.id !== clipDragPreview.clipId)
+                : trackClipState.clips;
+              return stem.type === clipDragPreview.targetTrackType
+                ? [
+                  ...withoutSourceClip.filter((clip) => clip.id !== clipDragPreview.previewClipId),
+                  clipDragPreview.clip,
+                ]
+                : withoutSourceClip;
+            })()
+            : trackClipState.clips;
+          const displayedSelectedClipId = clipDragPreview?.targetTrackType === stem.type
+            ? clipDragPreview.previewClipId
+            : selectedClipSelection?.trackType === stem.type
+              ? selectedClipSelection.clipId
+              : null;
           const trimEnd = state.trimEnd ?? duration;
           const isAudible = !state.muted && (!hasSoloTrack || state.solo);
           const displayName = getStemDisplayName(stem);
@@ -6434,7 +6498,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                 duration={duration}
                 trimStart={state.trimStart}
                 trimEnd={trimEnd}
-                clips={trackClipState.clips}
+                clips={displayedClips}
                 mutedRanges={state.mutedRanges}
                 muted={!isAudible}
                 selected={isSelectedTrack}
@@ -6450,7 +6514,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                 collapsed={isTrackCollapsed}
                 recording={isRecordingTarget}
                 trackLabel={displayName.zh}
-                selectedClipId={selectedClipSelection?.trackType === stem.type ? selectedClipSelection.clipId : null}
+                selectedClipId={displayedSelectedClipId}
                 onSelect={() => {
                   setSelectedTrackType(stem.type);
                   setSelectedClipSelection(null);
@@ -6470,8 +6534,12 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                   if (phase === 'commit') commitDeferredHistory();
                 }}
                 onClipMove={(clipId, nextStart, shouldSnap, phase, clientX, clientY) => {
-                  moveTrackClip(stem.type, clipId, nextStart, shouldSnap, 'deferred', phase === 'commit' ? clientX : undefined, phase === 'commit' ? clientY : undefined);
-                  if (phase === 'commit') commitDeferredHistory();
+                  if (phase === 'preview') {
+                    previewTrackClipMove(stem.type, clipId, nextStart, shouldSnap, clientX, clientY);
+                    return;
+                  }
+                  moveTrackClip(stem.type, clipId, nextStart, shouldSnap, 'deferred', clientX, clientY);
+                  commitDeferredHistory();
                 }}
               />
 
@@ -10209,7 +10277,7 @@ function WaveformTrackCanvas({
       }
       clipDragRef.current.moved = true;
       const { time, shouldSnap } = interactionTimeFromPointer(event);
-      onClipMove(clipDragRef.current.clipId, clipDragRef.current.clipStart + time - clipDragRef.current.anchorTime, shouldSnap, 'preview');
+      onClipMove(clipDragRef.current.clipId, clipDragRef.current.clipStart + time - clipDragRef.current.anchorTime, shouldSnap, 'preview', event.clientX, event.clientY);
       updatePointerGuide(event, '移动片段', true);
       event.preventDefault();
       return;
