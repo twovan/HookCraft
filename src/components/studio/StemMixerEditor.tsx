@@ -300,6 +300,8 @@ function snapStemClipStartToNeighborEdges(
   clips: StemClip[],
   clipId: string,
   proposedStart: number,
+  rawStart: number,
+  originalStart: number | null,
   clipDuration: number,
   duration: number,
   enabled: boolean,
@@ -308,22 +310,32 @@ function snapStemClipStartToNeighborEdges(
   if (!enabled || clipDuration <= 0 || !Number.isFinite(proposedStart)) return proposedStart;
   const threshold = Math.max(0.08, Math.min(0.25, normalizeTimelineSnapStep(stepSeconds) * 0.75));
   const maxStart = Math.max(0, duration - clipDuration);
-  let bestStart = Math.max(0, Math.min(maxStart, proposedStart));
+  const originalEnd = originalStart === null ? null : originalStart + clipDuration;
+  const isEscapingOriginalStart = originalStart !== null
+    && Math.abs(proposedStart - originalStart) <= 0.001
+    && rawStart > originalStart + 0.001;
+  const isEscapingOriginalEnd = originalEnd !== null
+    && Math.abs(proposedStart + clipDuration - originalEnd) <= 0.001
+    && rawStart + clipDuration < originalEnd - 0.001;
+  const initialStart = isEscapingOriginalStart || isEscapingOriginalEnd ? rawStart : proposedStart;
+  let bestStart = Math.max(0, Math.min(maxStart, initialStart));
   let bestDistance = threshold;
-  const proposedEnd = proposedStart + clipDuration;
+  const proposedEnd = bestStart + clipDuration;
 
   clips.forEach((clip) => {
     if (clip.id === clipId) return;
     const clipStart = clip.start;
     const clipEnd = clip.start + getStemClipDuration(clip);
     [clipStart, clipEnd].forEach((edge) => {
-      const startDistance = Math.abs(proposedStart - edge);
-      if (startDistance <= bestDistance) {
+      const edgeIsOriginalStart = originalStart !== null && Math.abs(edge - originalStart) <= 0.001;
+      const edgeIsOriginalEnd = originalEnd !== null && Math.abs(edge - originalEnd) <= 0.001;
+      const startDistance = Math.abs(bestStart - edge);
+      if (!(edgeIsOriginalStart && rawStart > originalStart + 0.001) && startDistance <= bestDistance) {
         bestDistance = startDistance;
         bestStart = edge;
       }
       const endDistance = Math.abs(proposedEnd - edge);
-      if (endDistance <= bestDistance) {
+      if (!(edgeIsOriginalEnd && rawStart + clipDuration < originalEnd - 0.001) && endDistance <= bestDistance) {
         bestDistance = endDistance;
         bestStart = edge - clipDuration;
       }
@@ -3298,6 +3310,8 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       targetClipState.clips,
       clipId,
       snapStemEditorTime(nextStart, duration, shouldSnap, snapStepSeconds),
+      nextStart,
+      movingClip.start,
       getStemClipDuration(movingClip),
       duration,
       shouldSnap,
@@ -3345,6 +3359,8 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         targetClipStateBeforeMove.clips,
         clipId,
         snapStemEditorTime(nextStart, duration, shouldSnap, snapStepSeconds),
+        nextStart,
+        movingClip.start,
         getStemClipDuration(movingClip),
         duration,
         shouldSnap,
