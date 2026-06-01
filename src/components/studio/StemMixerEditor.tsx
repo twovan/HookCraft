@@ -296,6 +296,43 @@ function snapStemEditorTime(value: number, duration: number, enabled: boolean, s
   return Math.max(0, Math.min(duration || snapped, Number(snapped.toFixed(3))));
 }
 
+function snapStemClipStartToNeighborEdges(
+  clips: StemClip[],
+  clipId: string,
+  proposedStart: number,
+  clipDuration: number,
+  duration: number,
+  enabled: boolean,
+  stepSeconds: number,
+) {
+  if (!enabled || clipDuration <= 0 || !Number.isFinite(proposedStart)) return proposedStart;
+  const threshold = Math.max(0.08, Math.min(0.25, normalizeTimelineSnapStep(stepSeconds) * 0.75));
+  const maxStart = Math.max(0, duration - clipDuration);
+  let bestStart = Math.max(0, Math.min(maxStart, proposedStart));
+  let bestDistance = threshold;
+  const proposedEnd = proposedStart + clipDuration;
+
+  clips.forEach((clip) => {
+    if (clip.id === clipId) return;
+    const clipStart = clip.start;
+    const clipEnd = clip.start + getStemClipDuration(clip);
+    [clipStart, clipEnd].forEach((edge) => {
+      const startDistance = Math.abs(proposedStart - edge);
+      if (startDistance <= bestDistance) {
+        bestDistance = startDistance;
+        bestStart = edge;
+      }
+      const endDistance = Math.abs(proposedEnd - edge);
+      if (endDistance <= bestDistance) {
+        bestDistance = endDistance;
+        bestStart = edge - clipDuration;
+      }
+    });
+  });
+
+  return Number(Math.max(0, Math.min(maxStart, bestStart)).toFixed(3));
+}
+
 type TransportIconName = 'skipStart' | 'skipEnd' | 'back' | 'forward' | 'play' | 'pause' | 'stop' | 'collapse' | 'expand' | 'chevronRight' | 'chevronDown';
 
 function TransportIcon({ name }: { name: TransportIconName }) {
@@ -3253,7 +3290,19 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     const targetType = dropTargetType && stems.some((stem) => stem.type === dropTargetType)
       ? dropTargetType
       : type;
-    const snappedStart = snapStemEditorTime(nextStart, duration, shouldSnap, snapStepSeconds);
+    const targetState = tracks[targetType] || defaultTrackState();
+    const targetClipState = targetType === type
+      ? clipState
+      : resolveTrackClipState(targetState, duration);
+    const snappedStart = snapStemClipStartToNeighborEdges(
+      targetClipState.clips,
+      clipId,
+      snapStemEditorTime(nextStart, duration, shouldSnap, snapStepSeconds),
+      getStemClipDuration(movingClip),
+      duration,
+      shouldSnap,
+      snapStepSeconds,
+    );
     const previewClipId = `${clipId}-drag-preview`;
     setClipDragPreview({
       sourceTrackType: type,
@@ -3283,11 +3332,25 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     const stateBeforeMove = tracks[type] || defaultTrackState();
     const clipStateBeforeMove = resolveTrackClipState(stateBeforeMove, duration);
     const movingClip = clipStateBeforeMove.clips.find((clip) => clip.id === clipId);
-    const snappedStart = snapStemEditorTime(nextStart, duration, shouldSnap, snapStepSeconds);
     const dropTargetType = resolveTrackDropTarget(dropClientX, dropClientY);
     const targetType = dropTargetType && stems.some((stem) => stem.type === dropTargetType)
       ? dropTargetType
       : type;
+    const targetStateBeforeMove = tracks[targetType] || defaultTrackState();
+    const targetClipStateBeforeMove = targetType === type
+      ? clipStateBeforeMove
+      : resolveTrackClipState(targetStateBeforeMove, duration);
+    const snappedStart = movingClip
+      ? snapStemClipStartToNeighborEdges(
+        targetClipStateBeforeMove.clips,
+        clipId,
+        snapStemEditorTime(nextStart, duration, shouldSnap, snapStepSeconds),
+        getStemClipDuration(movingClip),
+        duration,
+        shouldSnap,
+        snapStepSeconds,
+      )
+      : snapStemEditorTime(nextStart, duration, shouldSnap, snapStepSeconds);
     const nextDuration = movingClip
       ? Math.max(duration, snappedStart + getStemClipDuration(movingClip))
       : duration;
