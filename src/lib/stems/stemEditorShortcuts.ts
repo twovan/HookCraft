@@ -33,8 +33,6 @@ export type StemEditorShortcutAction =
   | 'zoom-out'
   | 'zoom-reset'
   | 'toggle-follow-playhead'
-  | 'toggle-snap-grid'
-  | 'cycle-snap-step'
   | 'toggle-track-density'
   | 'preview-selected-range'
   | 'toggle-loop-preview'
@@ -86,7 +84,6 @@ export function resolveStemEditorShortcut(event: KeyboardShortcutEvent): StemEdi
     if (key === 'm') return 'toggle-selected-mute';
     if (key === 's') return 'toggle-selected-solo';
     if (key === 'f') return 'toggle-follow-playhead';
-    if (key === 'g') return 'toggle-snap-grid';
     if (key === 'd') return 'toggle-track-density';
     if (key === 'l') return 'toggle-loop-preview';
     if (key === 'p') return 'preview-selected-range';
@@ -107,7 +104,6 @@ export function resolveStemEditorShortcut(event: KeyboardShortcutEvent): StemEdi
   if (!hasCommandModifier && event.shiftKey) {
     if (key === 'c') return 'edit-selected-track-color';
     if (key === 'f') return 'focus-selected-range';
-    if (key === 'g') return 'cycle-snap-step';
     if (key === 'r') return 'reset-selected-trim-range';
     if (event.key === 'ArrowLeft') return 'seek-backward-large';
     if (event.key === 'ArrowRight') return 'seek-forward-large';

@@ -35,8 +35,8 @@ describe('resolveStemEditorShortcut', () => {
     expect(resolveStemEditorShortcut(keyEvent({ key: 'm' }))).toBe('toggle-selected-mute');
     expect(resolveStemEditorShortcut(keyEvent({ key: 's' }))).toBe('toggle-selected-solo');
     expect(resolveStemEditorShortcut(keyEvent({ key: 'f' }))).toBe('toggle-follow-playhead');
-    expect(resolveStemEditorShortcut(keyEvent({ key: 'g' }))).toBe('toggle-snap-grid');
-    expect(resolveStemEditorShortcut(keyEvent({ key: 'g', shiftKey: true }))).toBe('cycle-snap-step');
+    expect(resolveStemEditorShortcut(keyEvent({ key: 'g' }))).toBeNull();
+    expect(resolveStemEditorShortcut(keyEvent({ key: 'g', shiftKey: true }))).toBeNull();
     expect(resolveStemEditorShortcut(keyEvent({ key: 'b' }))).toBeNull();
     expect(resolveStemEditorShortcut(keyEvent({ key: 'd' }))).toBe('toggle-track-density');
     expect(resolveStemEditorShortcut(keyEvent({ key: 'l' }))).toBe('toggle-loop-preview');

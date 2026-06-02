@@ -1428,7 +1428,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   const [timelineZoom, setTimelineZoom] = useState(1);
   const [timelineViewportWidth, setTimelineViewportWidth] = useState(0);
   const [followPlayhead, setFollowPlayhead] = useState(true);
-  const [snapToGrid, setSnapToGrid] = useState(true);
+  const [snapToGrid, setSnapToGrid] = useState(false);
   const [magnetSnap, setMagnetSnap] = useState(true);
   const [snapStepSeconds, setSnapStepSeconds] = useState(DEFAULT_TIMELINE_SNAP_STEP_SECONDS);
   const [compactTransport, setCompactTransport] = useState(true);
@@ -1776,9 +1776,6 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     }
     if (typeof preferences.followPlayhead === 'boolean') {
       setFollowPlayhead(preferences.followPlayhead);
-    }
-    if (typeof preferences.snapToGrid === 'boolean') {
-      setSnapToGrid(preferences.snapToGrid);
     }
     if (typeof preferences.magnetSnap === 'boolean') {
       setMagnetSnap(preferences.magnetSnap);
@@ -3512,6 +3509,51 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       const state = current[type] || defaultTrackState();
       const currentEnd = state.trimEnd ?? duration;
       const nextTrim = clampTrimEdge(edge, snapStemEditorTime(value, duration, shouldSnap, snapStepSeconds), state.trimStart, currentEnd, duration);
+      const currentClipState = resolveTrackClipState(state, duration);
+
+      if (currentClipState.clips.length > 0) {
+        const targetClip = edge === 'start'
+          ? currentClipState.clips.reduce((earliest, clip) => (clip.start < earliest.start ? clip : earliest), currentClipState.clips[0])
+          : currentClipState.clips.reduce((latest, clip) => (
+            clip.start + getStemClipDuration(clip) > latest.start + getStemClipDuration(latest) ? clip : latest
+          ), currentClipState.clips[0]);
+        const edgeTime = edge === 'start' ? nextTrim.trimStart : nextTrim.trimEnd;
+        const nextClips = resizeStemClipEdge(
+          currentClipState.clips,
+          targetClip.id,
+          edge,
+          snapStemClipEdgeToNeighborEdges(
+            currentClipState.clips,
+            targetClip.id,
+            edge,
+            edgeTime,
+            duration,
+            magnetSnap,
+            snapStepSeconds,
+          ),
+          duration,
+        );
+        const clipState = normalizeStemClipState({
+          clips: nextClips,
+          duration,
+          trimStart: state.trimStart,
+          trimEnd: state.trimEnd,
+        });
+        const nextClipDuration = Math.max(0, (clipState.trimEnd ?? 0) - clipState.trimStart);
+
+        return {
+          ...current,
+          [type]: {
+            ...state,
+            trimStart: clipState.trimStart,
+            trimEnd: clipState.trimEnd,
+            fadeIn: Math.min(state.fadeIn, nextClipDuration),
+            fadeOut: Math.min(state.fadeOut, nextClipDuration),
+            clips: clipState.clips,
+          },
+        };
+      }
+
       const nextClipDuration = Math.max(0, Math.min(duration, nextTrim.trimEnd) - nextTrim.trimStart);
       const clipState = normalizeStemClipState({
         clips: null,
@@ -3532,7 +3574,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         },
       };
     }, historyMode);
-  }, [commitTrackChange, duration, snapStepSeconds, snapToGrid]);
+  }, [commitTrackChange, duration, magnetSnap, snapStepSeconds, snapToGrid]);
 
   const setTrackClipTrim = useCallback((
     type: string,
@@ -4813,27 +4855,10 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         setFollowPlayhead((value) => !value);
         return;
       }
-      if (action === 'toggle-snap-grid') {
-        setSnapToGrid((value) => {
-          const next = !value;
-          setSaveStatus(next ? `已开启时间吸附，当前步长 ${snapStepSeconds}s。` : '已关闭时间吸附。');
-          return next;
-        });
-        return;
-      }
       if (action === 'toggle-track-density') {
         setTrackDensity((value) => {
           const next = value === 'compact' ? 'comfortable' : 'compact';
           setSaveStatus(next === 'compact' ? '轨道视图已切换为紧凑模式。' : '轨道视图已切换为舒展模式。');
-          return next;
-        });
-        return;
-      }
-      if (action === 'cycle-snap-step') {
-        setSnapToGrid(true);
-        setSnapStepSeconds((value) => {
-          const next = getNextTimelineSnapStep(value);
-          setSaveStatus(`吸附步长已切换为 ${next}s。`);
           return next;
         });
         return;
@@ -6705,19 +6730,6 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
             </button>
             <button
               type="button"
-              aria-pressed={snapToGrid}
-              title="G 开关网格吸附"
-              onClick={() => setSnapToGrid((value) => {
-                const next = !value;
-                setSaveStatus(next ? `网格吸附已开启，步长 ${snapStepSeconds}s。` : '网格吸附已关闭。');
-                return next;
-              })}
-              style={timelineFollowButtonStyle(snapToGrid)}
-            >
-              网格 {snapToGrid ? '开' : '关'}
-            </button>
-            <button
-              type="button"
               aria-pressed={magnetSnap}
               title="片段边缘靠近时自动贴合"
               onClick={() => setMagnetSnap((value) => {
@@ -6736,7 +6748,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
             <span><strong>播放</strong> 空格 / Esc / P / L</span>
             <span><strong>选轨</strong> ↑ ↓ / M / S / R / Del</span>
             <span><strong>裁剪</strong> [ ] / Shift+[ ] / Shift+R</span>
-            <span><strong>时间线</strong> ← → / Shift+← → / G / Shift+G / D / 磁吸按钮 / Alt</span>
+            <span><strong>时间线</strong> ← → / Shift+← → / D / 磁吸按钮 / Alt</span>
             <span><strong>视野</strong> Ctrl+± / Ctrl+0 / Ctrl+滚轮 / Shift+F</span>
             <span><strong>编辑</strong> C / Ctrl+S / Ctrl+Z / Ctrl+Y / Ctrl+C/X/V / Shift+C / X / Shift+X</span>
           </div>
