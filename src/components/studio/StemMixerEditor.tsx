@@ -4587,11 +4587,11 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     master: masterState,
     trackLabels,
     trackColors,
-    trackOrder: stems.map((stem) => stem.type),
+    trackOrder,
     deletedTrackTypes,
     customStems,
     skippedEmptyCount,
-  }), [customStems, deletedTrackTypes, masterState, skippedEmptyCount, stems, trackColors, trackLabels, tracks]);
+  }), [customStems, deletedTrackTypes, masterState, skippedEmptyCount, trackColors, trackLabels, trackOrder, tracks]);
 
   currentEditStateRef.current = currentEditState;
 

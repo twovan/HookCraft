@@ -241,13 +241,12 @@ function normalizeTrackColors(value: unknown) {
   );
 }
 
-function normalizeDeletedTrackTypes(value: unknown, knownTrackTypes: string[]) {
+function normalizeDeletedTrackTypes(value: unknown) {
   if (!Array.isArray(value)) return [];
-  const knownTrackTypeSet = new Set(knownTrackTypes);
 
   return value
     .map((type) => String(type || '').trim().slice(0, 80))
-    .filter((type, index, types) => type.length > 0 && knownTrackTypeSet.has(type) && types.indexOf(type) === index)
+    .filter((type, index, types) => type.length > 0 && types.indexOf(type) === index)
     .slice(0, 64);
 }
 
@@ -274,7 +273,7 @@ function normalizeEditState(value: unknown) {
   const trackLabels = normalizeTrackLabels(editState?.trackLabels);
   const trackOrder = normalizeTrackOrder(editState?.trackOrder, Object.keys(normalizedTracks));
   const trackColors = normalizeTrackColors(editState?.trackColors);
-  const deletedTrackTypes = normalizeDeletedTrackTypes(editState?.deletedTrackTypes, Object.keys(normalizedTracks));
+  const deletedTrackTypes = normalizeDeletedTrackTypes(editState?.deletedTrackTypes);
   const customStems = normalizeCustomStems(editState?.customStems);
   const skippedEmptyCount = typeof editState?.skippedEmptyCount === 'number' && Number.isFinite(editState.skippedEmptyCount)
     ? Math.max(0, Math.min(128, Math.floor(editState.skippedEmptyCount)))
