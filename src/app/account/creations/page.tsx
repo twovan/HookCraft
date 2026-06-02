@@ -24,6 +24,7 @@ interface BatchSummary {
   canEditSong?: boolean;
   hasStemCache?: boolean;
   stemJobId?: string | null;
+  stemEditSavedAt?: string | null;
 }
 
 interface VersionDetail {
@@ -38,6 +39,7 @@ interface VersionDetail {
   canEditSong?: boolean;
   hasStemCache?: boolean;
   stemJobId?: string | null;
+  stemEditSavedAt?: string | null;
 }
 
 type TimeRange = '7d' | '30d' | 'all';

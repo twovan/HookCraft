@@ -132,6 +132,7 @@ export async function GET(req: NextRequest) {
         hasStemCache: Boolean(stemCache),
         hasReadableStemCache: stemCache?.hasStemCache === true,
         stemJobId: stemCache?.jobId ?? null,
+        stemEditSavedAt: stemCache?.editSavedAt ?? null,
       };
     });
 

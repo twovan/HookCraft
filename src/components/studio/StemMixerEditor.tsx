@@ -3750,12 +3750,17 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         || findStemClipAtTime(clipState.clips, currentTime);
 
     if (!targetClip) {
+      if (clipState.clips.length === 0) {
+        setSelectedClipSelection(null);
+        deleteSelectedTrack(selectedTrack.type);
+        return;
+      }
       setPlaybackError('请先选中要删除的片段。');
       return;
     }
 
     deleteTrackClipById(selectedTrack.type, targetClip.id);
-  }, [currentTime, deleteTrackClipById, duration, selectedClip, selectedClipSelection, selectedTrack, selectedTrackState, tracks]);
+  }, [currentTime, deleteSelectedTrack, deleteTrackClipById, duration, selectedClip, selectedClipSelection, selectedTrack, selectedTrackState, tracks]);
 
   const resolveTrackDropTarget = useCallback((clientX?: number, clientY?: number) => {
     if (typeof document === 'undefined' || !Number.isFinite(clientX) || !Number.isFinite(clientY)) return null;
@@ -6691,9 +6696,9 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                 </button>
                 <button
                   type="button"
-                  disabled={duration <= 0 || selectedTrackClipCount === 0}
-                  title="删除当前选中片段"
-                  style={timelineSelectionActionButtonStyle(duration <= 0 || selectedTrackClipCount === 0)}
+                  disabled={duration <= 0 || !selectedTrack}
+                  title={selectedTrackClipCount > 0 ? '删除当前选中片段' : '删除当前轨道'}
+                  style={timelineSelectionActionButtonStyle(duration <= 0 || !selectedTrack)}
                   onClick={deleteSelectedClipOrActiveTrackClip}
                 >
                   删除

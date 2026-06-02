@@ -26,6 +26,7 @@ interface BatchSummary {
   canEditSong?: boolean;
   hasStemCache?: boolean;
   stemJobId?: string | null;
+  stemEditSavedAt?: string | null;
 }
 
 interface VersionDetail {
@@ -44,6 +45,7 @@ interface VersionDetail {
   canEditSong?: boolean;
   hasStemCache?: boolean;
   stemJobId?: string | null;
+  stemEditSavedAt?: string | null;
 }
 
 interface HistoryListProps {
@@ -141,6 +143,17 @@ export default function HistoryList({
     const m = Math.floor(seconds / 60);
     const s = Math.floor(seconds % 60);
     return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const formatEditSavedAt = (dateStr: string) => {
+    const d = new Date(dateStr);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toLocaleString('zh-CN', {
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
   const getBatchTitle = (batch: BatchSummary) => {
@@ -266,6 +279,11 @@ export default function HistoryList({
                   {batch.canEditSong && batch.taskId && (
                     <>
                       {batch.hasStemCache && <span style={stemCacheBadgeStyle}>分轨已缓存</span>}
+                      {batch.stemEditSavedAt && (
+                        <span style={stemEditSavedBadgeStyle}>
+                          最近保存 {formatEditSavedAt(batch.stemEditSavedAt)}
+                        </span>
+                      )}
                       <Link href={buildStemEditorHref(batch.taskId, batch.stemJobId)} style={editSongLinkStyle}>
                         编辑歌曲
                       </Link>
@@ -339,6 +357,11 @@ export default function HistoryList({
                           <span key={tag} style={tagStyle}>{tag}</span>
                         ))}
                         {version.hasStemCache && <span style={stemCacheBadgeStyle}>分轨已缓存</span>}
+                        {version.stemEditSavedAt && (
+                          <span style={stemEditSavedBadgeStyle}>
+                            最近保存 {formatEditSavedAt(version.stemEditSavedAt)}
+                          </span>
+                        )}
                       </div>
                     </div>
                     {version.audioUrl && (
@@ -570,6 +593,17 @@ const stemCacheBadgeStyle: CSSProperties = {
   border: '1px solid rgba(82, 214, 198, 0.34)',
   background: 'rgba(82, 214, 198, 0.10)',
   color: 'var(--hc-cyan)',
+  borderRadius: 999,
+  padding: '4px 8px',
+  fontSize: 11,
+  fontWeight: 900,
+  whiteSpace: 'nowrap',
+};
+
+const stemEditSavedBadgeStyle: CSSProperties = {
+  border: '1px solid rgba(206, 255, 53, 0.28)',
+  background: 'rgba(206, 255, 53, 0.08)',
+  color: 'var(--hc-lime)',
   borderRadius: 999,
   padding: '4px 8px',
   fontSize: 11,

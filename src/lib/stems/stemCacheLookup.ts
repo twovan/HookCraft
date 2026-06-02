@@ -13,11 +13,24 @@ interface StemJobRow {
   source_generation_task_id: string;
   source_provider_task_id: string | null;
   source_provider_audio_id: string | null;
+  result_payload?: unknown;
 }
 
 export interface StemCacheSummary {
   jobId: string;
   hasStemCache: boolean;
+  editSavedAt?: string | null;
+}
+
+function readStemEditSavedAt(resultPayload: unknown) {
+  const payload = resultPayload && typeof resultPayload === 'object'
+    ? resultPayload as Record<string, unknown>
+    : null;
+  const editState = payload?.editState && typeof payload.editState === 'object'
+    ? payload.editState as Record<string, unknown>
+    : null;
+  const savedAt = typeof editState?.savedAt === 'string' ? editState.savedAt : null;
+  return savedAt && !Number.isNaN(Date.parse(savedAt)) ? savedAt : null;
 }
 
 function parseKieTaskId(rawAudioPath?: string | null) {
@@ -34,11 +47,13 @@ function setCacheOnce(
   cacheByTaskId: Map<string, StemCacheSummary>,
   taskId: string | undefined,
   jobId: string,
+  editSavedAt: string | null,
 ) {
   if (!taskId || cacheByTaskId.has(taskId)) return;
   cacheByTaskId.set(taskId, {
     jobId,
     hasStemCache: true,
+    editSavedAt,
   });
 }
 
@@ -51,21 +66,24 @@ function applyStemJobMatches(
 ) {
   for (const job of jobs) {
     if (taskIdSet.has(job.source_generation_task_id)) {
-      setCacheOnce(cacheByTaskId, job.source_generation_task_id, job.id);
+      setCacheOnce(cacheByTaskId, job.source_generation_task_id, job.id, readStemEditSavedAt(job.result_payload));
       continue;
     }
 
     if (job.source_provider_task_id && job.source_provider_audio_id) {
+      const taskId = taskIdByProviderAudio.get(`${job.source_provider_task_id}::${job.source_provider_audio_id}`);
       setCacheOnce(
         cacheByTaskId,
-        taskIdByProviderAudio.get(`${job.source_provider_task_id}::${job.source_provider_audio_id}`),
+        taskId,
         job.id,
+        readStemEditSavedAt(job.result_payload),
       );
       continue;
     }
 
     if (job.source_provider_task_id) {
-      setCacheOnce(cacheByTaskId, uniqueTaskIdByProviderTask.get(job.source_provider_task_id), job.id);
+      const taskId = uniqueTaskIdByProviderTask.get(job.source_provider_task_id);
+      setCacheOnce(cacheByTaskId, taskId, job.id, readStemEditSavedAt(job.result_payload));
     }
   }
 }
@@ -103,7 +121,7 @@ export async function loadStemCacheByTaskId(
   if (taskIds.length > 0) {
     const { data: exactJobs, error } = await supabase
       .from('audio_stem_jobs')
-      .select('id,source_generation_task_id,source_provider_task_id,source_provider_audio_id')
+      .select('id,source_generation_task_id,source_provider_task_id,source_provider_audio_id,result_payload')
       .eq('user_id', userId)
       .in('source_generation_task_id', taskIds)
       .eq('status', 'completed')
@@ -125,7 +143,7 @@ export async function loadStemCacheByTaskId(
   if (providerTaskIds.length > 0) {
     const { data: providerJobs, error } = await supabase
       .from('audio_stem_jobs')
-      .select('id,source_generation_task_id,source_provider_task_id,source_provider_audio_id')
+      .select('id,source_generation_task_id,source_provider_task_id,source_provider_audio_id,result_payload')
       .eq('user_id', userId)
       .in('source_provider_task_id', providerTaskIds)
       .eq('status', 'completed')

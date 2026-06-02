@@ -106,6 +106,7 @@ export async function GET(
         hasStemCache: Boolean(stemCache),
         hasReadableStemCache: stemCache?.hasStemCache === true,
         stemJobId: stemCache?.jobId ?? null,
+        stemEditSavedAt: stemCache?.editSavedAt ?? null,
       };
     }));
 
