@@ -73,6 +73,7 @@ import {
   moveStemClip,
   normalizeStemClipState,
   removeStemClipAtTime,
+  resizeStemClipEdge,
   resolveStemClipDragTarget,
   sliceStemClipPeaks,
   splitStemClipAtTime,
@@ -151,6 +152,13 @@ type TimelineRulerTrimDragState = {
   anchorTime: number;
   trimStart: number;
   trimEnd: number;
+  moved: boolean;
+};
+type TrackReorderDragState = {
+  pointerId: number;
+  trackType: string;
+  startX: number;
+  startY: number;
   moved: boolean;
 };
 type StemEditorHistorySnapshot = {
@@ -1306,6 +1314,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   const inspectorViewportRef = useRef<HTMLDivElement | null>(null);
   const timelinePanRef = useRef<TimelinePanState | null>(null);
   const timelineRulerTrimDragRef = useRef<TimelineRulerTrimDragState | null>(null);
+  const trackReorderDragRef = useRef<TrackReorderDragState | null>(null);
   const ignoreNextTrackClickRef = useRef(false);
   const trackRowRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -2120,6 +2129,109 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     setHistoryVersion((version) => version + 1);
     setSaveStatus('已前进到下一步，自动保存后下次进入会恢复。');
   }, [restoreEditorHistorySnapshot]);
+
+  const moveTrackOrderByPointer = useCallback((trackType: string, clientY: number) => {
+    const visibleTypes = visibleStems.map((stem) => stem.type);
+    if (!visibleTypes.includes(trackType)) return false;
+
+    const targetType = visibleTypes.find((type) => {
+      if (type === trackType) return false;
+      const row = trackRowRefs.current[type];
+      if (!row) return false;
+      const rect = row.getBoundingClientRect();
+      return clientY >= rect.top && clientY <= rect.bottom;
+    });
+    if (!targetType) return false;
+
+    const targetRow = trackRowRefs.current[targetType];
+    if (!targetRow) return false;
+    const targetRect = targetRow.getBoundingClientRect();
+    const insertAfterTarget = clientY > targetRect.top + targetRect.height / 2;
+
+    let changed = false;
+    setTrackOrder((current) => {
+      const normalizedOrder = normalizeTrackOrderForStems(current, stems);
+      const withoutMoving = normalizedOrder.filter((type) => type !== trackType);
+      const targetIndex = withoutMoving.indexOf(targetType);
+      if (targetIndex < 0) return current;
+
+      const insertIndex = targetIndex + (insertAfterTarget ? 1 : 0);
+      const nextOrder = [
+        ...withoutMoving.slice(0, insertIndex),
+        trackType,
+        ...withoutMoving.slice(insertIndex),
+      ];
+      if (nextOrder.join('\u0000') === normalizedOrder.join('\u0000')) return current;
+      changed = true;
+      return nextOrder;
+    });
+
+    if (changed) {
+      deferredHistoryChangedRef.current = true;
+      setSaveStatus('轨道顺序已调整，自动保存后下次进入会恢复。');
+    }
+    return changed;
+  }, [stems, visibleStems]);
+
+  const handleTrackHeaderPointerDown = useCallback((event: PointerEvent<HTMLDivElement>, trackType: string) => {
+    const target = event.target;
+    if (event.button !== 0 || !(target instanceof HTMLElement)) return;
+    if (target.closest('button,input,textarea,select,a,canvas')) return;
+
+    trackReorderDragRef.current = {
+      pointerId: event.pointerId,
+      trackType,
+      startX: event.clientX,
+      startY: event.clientY,
+      moved: false,
+    };
+    setSelectedTrackType(trackType);
+    setSelectedClipSelection(null);
+    safelySetPointerCapture(event.currentTarget, event.pointerId);
+    event.preventDefault();
+    event.stopPropagation();
+  }, []);
+
+  const handleTrackHeaderPointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    const drag = trackReorderDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    const deltaX = event.clientX - drag.startX;
+    const deltaY = event.clientY - drag.startY;
+    if (!drag.moved && Math.abs(deltaY) < 8 && Math.abs(deltaY) <= Math.abs(deltaX)) {
+      return;
+    }
+
+    if (!drag.moved) {
+      drag.moved = true;
+      beginDeferredHistory();
+      deferredHistoryChangedRef.current = false;
+    }
+    moveTrackOrderByPointer(drag.trackType, event.clientY);
+    event.preventDefault();
+    event.stopPropagation();
+  }, [beginDeferredHistory, moveTrackOrderByPointer]);
+
+  const handleTrackHeaderPointerUp = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    const drag = trackReorderDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    trackReorderDragRef.current = null;
+    if (drag.moved) {
+      ignoreNextTrackClickRef.current = true;
+      window.setTimeout(() => {
+        ignoreNextTrackClickRef.current = false;
+      }, 0);
+      commitDeferredHistory();
+    }
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch {
+      // Pointer capture may already be released on cancel.
+    }
+    event.preventDefault();
+    event.stopPropagation();
+  }, [commitDeferredHistory]);
 
   const stopFrame = useCallback(() => {
     if (frameRef.current !== null) {
@@ -3280,6 +3392,48 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
           fadeIn: Math.min(state.fadeIn, nextClipDuration),
           fadeOut: Math.min(state.fadeOut, nextClipDuration),
           clips: clipState.clips,
+        },
+      };
+    }, historyMode);
+  }, [commitTrackChange, duration, snapStepSeconds, snapToGrid]);
+
+  const setTrackClipTrim = useCallback((
+    type: string,
+    clipId: string,
+    edge: 'start' | 'end',
+    value: number,
+    shouldSnap = snapToGrid,
+    historyMode: StemHistoryMode = 'immediate',
+  ) => {
+    commitTrackChange((current) => {
+      const state = current[type] || defaultTrackState();
+      const currentClipState = resolveTrackClipState(state, duration);
+      if (!currentClipState.clips.some((clip) => clip.id === clipId)) return current;
+
+      const nextClips = resizeStemClipEdge(
+        currentClipState.clips,
+        clipId,
+        edge,
+        snapStemEditorTime(value, duration, shouldSnap, snapStepSeconds),
+        duration,
+      );
+      const nextClipState = normalizeStemClipState({
+        clips: nextClips,
+        duration,
+        trimStart: state.trimStart,
+        trimEnd: state.trimEnd,
+      });
+      const nextClipDuration = Math.max(0, (nextClipState.trimEnd ?? 0) - nextClipState.trimStart);
+
+      return {
+        ...current,
+        [type]: {
+          ...state,
+          trimStart: nextClipState.trimStart,
+          trimEnd: nextClipState.trimEnd,
+          fadeIn: Math.min(state.fadeIn, nextClipDuration),
+          fadeOut: Math.min(state.fadeOut, nextClipDuration),
+          clips: nextClipState.clips,
         },
       };
     }, historyMode);
@@ -6579,8 +6733,11 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
               <div
                 className="stem-track-header"
                 style={stemNameStyle(isSelectedTrack, trackColor, isTrackCollapsed)}
-                data-timeline-pan-zone="true"
                 title="点击选择轨道"
+                onPointerDown={(event) => handleTrackHeaderPointerDown(event, stem.type)}
+                onPointerMove={handleTrackHeaderPointerMove}
+                onPointerUp={handleTrackHeaderPointerUp}
+                onPointerCancel={handleTrackHeaderPointerUp}
               >
                 <span
                   aria-hidden="true"
@@ -6751,8 +6908,12 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                 }}
                 onTrackContextMenu={(event, time) => openTrackContextMenu(event, stem.type, time)}
                 onSeek={(time, shouldSnap) => handleSeek(snapStemEditorTime(time, duration, shouldSnap, snapStepSeconds))}
-                onTrimChange={(edge, time, shouldSnap, phase) => {
-                  setTrackTrim(stem.type, edge, time, shouldSnap, 'deferred');
+                onTrimChange={(edge, time, shouldSnap, phase, clipId) => {
+                  if (clipId) {
+                    setTrackClipTrim(stem.type, clipId, edge, time, shouldSnap, 'deferred');
+                  } else {
+                    setTrackTrim(stem.type, edge, time, shouldSnap, 'deferred');
+                  }
                   if (phase === 'commit') commitDeferredHistory();
                 }}
                 onTrimRangeMove={(nextStart, shouldSnap, phase) => {
@@ -10073,13 +10234,13 @@ function WaveformTrackCanvas({
   onClipSelect: (clipId: string) => void;
   onTrackContextMenu: (event: MouseEvent<HTMLCanvasElement>, time: number) => void;
   onSeek: (time: number, shouldSnap: boolean) => void;
-  onTrimChange: (edge: 'start' | 'end', time: number, shouldSnap: boolean, phase: StemInteractionPhase) => void;
+  onTrimChange: (edge: 'start' | 'end', time: number, shouldSnap: boolean, phase: StemInteractionPhase, clipId?: string | null) => void;
   onTrimRangeMove: (nextStart: number, shouldSnap: boolean, phase: StemInteractionPhase) => void;
   onClipMove: (clipId: string, nextStart: number, shouldSnap: boolean, phase: StemInteractionPhase, clientX?: number, clientY?: number) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const pendingSeekRef = useRef<{ x: number; time: number; moved: boolean; mode: 'click' | 'playhead' } | null>(null);
-  const trimDragRef = useRef<{ edge: 'start' | 'end'; moved: boolean } | null>(null);
+  const trimDragRef = useRef<{ edge: 'start' | 'end'; moved: boolean; clipId: string | null } | null>(null);
   const trimRangeDragRef = useRef<{ anchorTime: number; trimStart: number; trimEnd: number; moved: boolean } | null>(null);
   const clipDragRef = useRef<{ clipId: string; anchorTime: number; clipStart: number; pointerX: number; moved: boolean } | null>(null);
   const pendingTrimRef = useRef<{ time: number; shouldSnap: boolean } | null>(null);
@@ -10144,7 +10305,7 @@ function WaveformTrackCanvas({
       const pendingTrim = pendingTrimRef.current;
       pendingTrimRef.current = null;
       if (!dragState || !pendingTrim) return;
-      onTrimChange(dragState.edge, pendingTrim.time, pendingTrim.shouldSnap, 'preview');
+      onTrimChange(dragState.edge, pendingTrim.time, pendingTrim.shouldSnap, 'preview', dragState.clipId);
     });
   }, [onTrimChange]);
 
@@ -10416,13 +10577,22 @@ function WaveformTrackCanvas({
     event.preventDefault();
     const rect = event.currentTarget.getBoundingClientRect();
     const pointerX = event.clientX - rect.left;
+    const selectedClipForIntent = selectedClipId
+      ? clips.find((clip) => clip.id === selectedClipId) || null
+      : selected && clips.length === 1
+        ? clips[0]
+        : null;
+    const intentTrimStart = selectedClipForIntent?.start ?? trimStart;
+    const intentTrimEnd = selectedClipForIntent
+      ? selectedClipForIntent.start + getStemClipDuration(selectedClipForIntent)
+      : trimEnd;
     const intent = resolveWaveformPointerIntent({
       editable,
       pointerX,
       width: rect.width,
       duration,
-      trimStart,
-      trimEnd,
+      trimStart: intentTrimStart,
+      trimEnd: intentTrimEnd,
       currentTime,
       hitSize: selected ? 48 : 40,
     });
@@ -10433,6 +10603,7 @@ function WaveformTrackCanvas({
       trimDragRef.current = {
         edge: intent.edge,
         moved: false,
+        clipId: selectedClipForIntent?.id ?? null,
       };
       trimRangeDragRef.current = null;
       clipDragRef.current = null;
@@ -10495,7 +10666,7 @@ function WaveformTrackCanvas({
       }
     }
     safelySetPointerCapture(event.currentTarget, event.pointerId);
-  }, [clips, currentTime, duration, editable, interactionTimeFromPointer, onClipSelect, onSelect, selected, trimEnd, trimStart, updatePointerGuide]);
+  }, [clips, currentTime, duration, editable, interactionTimeFromPointer, onClipSelect, onSelect, selected, selectedClipId, trimEnd, trimStart, updatePointerGuide]);
 
   const handlePointerMove = useCallback((event: PointerEvent<HTMLCanvasElement>) => {
     if (trimDragRef.current) {
@@ -10559,9 +10730,9 @@ function WaveformTrackCanvas({
       cancelScheduledTrimChange();
       const { time, shouldSnap } = interactionTimeFromPointer(event);
       if (!trimDragRef.current.moved) {
-        onTrimChange(trimDragRef.current.edge, time, shouldSnap, 'commit');
+        onTrimChange(trimDragRef.current.edge, time, shouldSnap, 'commit', trimDragRef.current.clipId);
       } else {
-        onTrimChange(trimDragRef.current.edge, time, shouldSnap, 'commit');
+        onTrimChange(trimDragRef.current.edge, time, shouldSnap, 'commit', trimDragRef.current.clipId);
       }
       trimDragRef.current = null;
       pendingSeekRef.current = null;

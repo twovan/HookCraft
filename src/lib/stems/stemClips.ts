@@ -18,6 +18,8 @@ export interface StemClipState {
   trimEnd: number | null;
 }
 
+const MIN_STEM_CLIP_DURATION_SECONDS = 0.25;
+
 function roundTime(value: number) {
   return Number(value.toFixed(3));
 }
@@ -139,6 +141,61 @@ export function moveStemClip(clips: StemClip[], clipId: string, nextStart: numbe
     return {
       ...clip,
       start: roundTime(clampNumber(nextStart, 0, Math.max(0, duration - clipDuration))),
+    };
+  }).sort((left, right) => left.start - right.start || left.sourceStart - right.sourceStart);
+}
+
+export function resizeStemClipEdge(
+  clips: StemClip[],
+  clipId: string,
+  edge: 'start' | 'end',
+  nextTime: number,
+  duration: number,
+) {
+  const safeDuration = Math.max(0, Number.isFinite(duration) ? duration : 0);
+  const safeNextTime = clampNumber(nextTime, 0, safeDuration);
+
+  return clips.map((clip) => {
+    if (clip.id !== clipId) return clip;
+
+    const clipDuration = getStemClipDuration(clip);
+    if (clipDuration <= MIN_STEM_CLIP_DURATION_SECONDS) return clip;
+
+    if (edge === 'start') {
+      const clipTimelineEnd = clip.start + clipDuration;
+      const nextTimelineStart = clampNumber(
+        safeNextTime,
+        0,
+        Math.max(0, clipTimelineEnd - MIN_STEM_CLIP_DURATION_SECONDS),
+      );
+      const nextSourceStart = clampNumber(
+        clip.sourceStart + (nextTimelineStart - clip.start),
+        0,
+        Math.max(0, clip.sourceEnd - MIN_STEM_CLIP_DURATION_SECONDS),
+      );
+      const actualDelta = nextSourceStart - clip.sourceStart;
+
+      return {
+        ...clip,
+        start: roundTime(clip.start + actualDelta),
+        sourceStart: roundTime(nextSourceStart),
+      };
+    }
+
+    const nextTimelineEnd = clampNumber(
+      safeNextTime,
+      clip.start + MIN_STEM_CLIP_DURATION_SECONDS,
+      safeDuration,
+    );
+    const nextSourceEnd = clampNumber(
+      clip.sourceStart + (nextTimelineEnd - clip.start),
+      clip.sourceStart + MIN_STEM_CLIP_DURATION_SECONDS,
+      safeDuration,
+    );
+
+    return {
+      ...clip,
+      sourceEnd: roundTime(nextSourceEnd),
     };
   }).sort((left, right) => left.start - right.start || left.sourceStart - right.sourceStart);
 }

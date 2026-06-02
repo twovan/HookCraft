@@ -6,6 +6,7 @@ import {
   normalizeStemClipState,
   normalizeStemClips,
   removeStemClipAtTime,
+  resizeStemClipEdge,
   resolveStemClipDragTarget,
   sliceStemClipPeaks,
   splitStemClipAtTime,
@@ -44,6 +45,38 @@ describe('stem clips', () => {
       start: 80,
       sourceStart: 35,
       sourceEnd: 70,
+    });
+  });
+
+  it('resizes only the selected clip edge without merging split clips', () => {
+    const clips = [
+      { id: 'left', start: 0, sourceStart: 0, sourceEnd: 8.59 },
+      { id: 'right', start: 17.19, sourceStart: 17.19, sourceEnd: 34.38 },
+    ];
+
+    const resized = resizeStemClipEdge(clips, 'right', 'end', 40, 120);
+
+    expect(resized).toHaveLength(2);
+    expect(resized.find((clip) => clip.id === 'left')).toEqual(clips[0]);
+    expect(resized.find((clip) => clip.id === 'right')).toMatchObject({
+      start: 17.19,
+      sourceStart: 17.19,
+      sourceEnd: 40,
+    });
+  });
+
+  it('moves a selected clip start by trimming its source start', () => {
+    const clips = [
+      { id: 'left', start: 0, sourceStart: 0, sourceEnd: 8.59 },
+      { id: 'right', start: 17.19, sourceStart: 17.19, sourceEnd: 34.38 },
+    ];
+
+    const resized = resizeStemClipEdge(clips, 'right', 'start', 20, 120);
+
+    expect(resized.find((clip) => clip.id === 'right')).toMatchObject({
+      start: 20,
+      sourceStart: 20,
+      sourceEnd: 34.38,
     });
   });
 
