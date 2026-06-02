@@ -27,6 +27,12 @@ import {
   type StemTrackAudioStatus,
 } from '@/lib/stems/stemTrackAudioStatus';
 import {
+  buildStemEditLocalDraftKey,
+  resolveStemAutoSaveRetryDelay,
+  resolveStemLocalDraftRecovery,
+  shouldWarnBeforeLeavingStemEditor,
+} from '@/lib/stems/stemEditPersistence';
+import {
   addDeletedStemType,
   filterDeletedStems,
   normalizeDeletedStemTypes,
@@ -1322,8 +1328,11 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   const loadingCountRef = useRef(initialAllStems.filter((stem) => !stemHasKnownEmptyWaveform(stem)).length);
   const failedLoadCountRef = useRef(0);
   const autoSaveTimerRef = useRef<number | null>(null);
+  const autoSaveRetryTimerRef = useRef<number | null>(null);
+  const autoSaveRetryAttemptRef = useRef(0);
   const skipNextAutoSaveRef = useRef(true);
   const lastAutoSaveSignatureRef = useRef<string | null>(null);
+  const currentEditStateRef = useRef<StemEditState | null>(null);
   const undoStackRef = useRef<StemEditorHistorySnapshot[]>([]);
   const redoStackRef = useRef<StemEditorHistorySnapshot[]>([]);
   const deferredHistorySnapshotRef = useRef<StemEditorHistorySnapshot | null>(null);
@@ -1393,6 +1402,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   const [autoSaveStatus, setAutoSaveStatus] = useState<string | null>(null);
   const [saveStatusDismissing, setSaveStatusDismissing] = useState(false);
   const [autoSaveStatusDismissing, setAutoSaveStatusDismissing] = useState(false);
+  const [localDraftState, setLocalDraftState] = useState<StemEditState | null>(null);
   const [hasPendingEditChanges, setHasPendingEditChanges] = useState(false);
   const [isContinuousEditing, setIsContinuousEditing] = useState(false);
   const [saveRequestVersion, setSaveRequestVersion] = useState(0);
@@ -1481,6 +1491,10 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     () => buildStemExportHistoryStorageKey(jobId || versionLabel),
     [jobId, versionLabel],
   );
+  const localDraftStorageKey = useMemo(
+    () => (jobId ? buildStemEditLocalDraftKey(jobId) : null),
+    [jobId],
+  );
   const exportStatus = useMemo(() => resolveStemExportStatus(exportStatusInput), [exportStatusInput]);
   const recentExportRecords = useMemo(
     () => exportRecords.map((record) => ({ ...record, view: formatStemExportRecord(record) })),
@@ -1554,6 +1568,10 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   useEffect(() => () => {
     customObjectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     customObjectUrlsRef.current.clear();
+    if (autoSaveRetryTimerRef.current !== null) {
+      window.clearTimeout(autoSaveRetryTimerRef.current);
+      autoSaveRetryTimerRef.current = null;
+    }
     recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
     monitoringPreviewStreamRef.current?.getTracks().forEach((track) => track.stop());
     recordingProcessedStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -1567,6 +1585,20 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     recordingMonitorGainRef.current = null;
     void recordingContext?.close();
   }, []);
+
+  useEffect(() => {
+    if (!shouldWarnBeforeLeavingStemEditor({ hasPendingChanges: hasPendingEditChanges, isSaving })) {
+      return undefined;
+    }
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasPendingEditChanges, isSaving]);
 
   const refreshAudioInputDevices = useCallback(async () => {
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.enumerateDevices) return;
@@ -1681,6 +1713,31 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     setExportRecords(parseStemExportRecords(window.localStorage.getItem(exportHistoryStorageKey)));
     setExportHistoryLoadedKey(exportHistoryStorageKey);
   }, [exportHistoryStorageKey]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    setLocalDraftState(null);
+    if (!localDraftStorageKey) return;
+
+    try {
+      const rawDraft = window.localStorage.getItem(localDraftStorageKey);
+      const draft = rawDraft ? JSON.parse(rawDraft) as StemEditState : null;
+      if (!draft?.tracks) return;
+
+      const recovery = resolveStemLocalDraftRecovery({
+        draftSavedAt: draft.savedAt,
+        remoteSavedAt: initialEditState?.savedAt,
+      });
+
+      if (recovery === 'local-newer') {
+        setLocalDraftState(draft);
+      } else if (recovery === 'remote-current') {
+        window.localStorage.removeItem(localDraftStorageKey);
+      }
+    } catch {
+      window.localStorage.removeItem(localDraftStorageKey);
+    }
+  }, [initialEditState?.savedAt, localDraftStorageKey]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -2123,6 +2180,43 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     editorHistoryRef.current = next;
   }, []);
 
+  const applyEditStateDraft = useCallback((draft: StemEditState) => {
+    const draftCustomStems = normalizeSavedCustomStems(draft.customStems);
+    const draftAllStems = [...initialStems, ...draftCustomStems];
+    const draftDeletedTrackTypes = normalizeDeletedStemTypes(draft.deletedTrackTypes, draftAllStems);
+    const activeDraftStems = filterDeletedStems(draftAllStems, draftDeletedTrackTypes);
+    const nextSnapshot: StemEditorHistorySnapshot = {
+      tracks: createTrackState(draftAllStems, draft),
+      master: normalizeStemMasterState(draft.master),
+      trackLabels: normalizeTrackLabels(draft.trackLabels),
+      trackColors: normalizeTrackColors(draft.trackColors),
+      trackOrder: normalizeTrackOrderForStems(draft.trackOrder, draftAllStems),
+      deletedTrackTypes: draftDeletedTrackTypes,
+      customStems: draftCustomStems,
+      skippedEmptyCount: typeof draft.skippedEmptyCount === 'number' ? Math.max(0, draft.skippedEmptyCount) : 0,
+      selectedTrackType: activeDraftStems[0]?.type ?? null,
+    };
+
+    restoreEditorHistorySnapshot(nextSnapshot);
+    setDuration(getInitialWaveformDuration(activeDraftStems.length > 0 ? activeDraftStems : draftAllStems));
+    setSaveStatus('已恢复本地未同步编辑，正在等待自动保存。');
+    setLocalDraftState(null);
+    setHasPendingEditChanges(true);
+    setSaveRequestVersion((version) => version + 1);
+  }, [initialStems, restoreEditorHistorySnapshot]);
+
+  const dismissLocalDraft = useCallback(() => {
+    if (localDraftStorageKey) {
+      window.localStorage.removeItem(localDraftStorageKey);
+    }
+    setLocalDraftState(null);
+  }, [localDraftStorageKey]);
+
+  const restoreLocalDraft = useCallback(() => {
+    if (!localDraftState) return;
+    applyEditStateDraft(localDraftState);
+  }, [applyEditStateDraft, localDraftState]);
+
   const commitTrackChange = useCallback((
     updater: Record<string, StemTrackState> | ((current: Record<string, StemTrackState>) => Record<string, StemTrackState>),
     historyMode: StemHistoryMode = 'immediate',
@@ -2409,6 +2503,11 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     setSaveStatus(initialEditState?.savedAt ? '已读取上次保存的编辑状态。' : null);
     setAutoSaveStatus(null);
     setHasPendingEditChanges(false);
+    autoSaveRetryAttemptRef.current = 0;
+    if (autoSaveRetryTimerRef.current !== null) {
+      window.clearTimeout(autoSaveRetryTimerRef.current);
+      autoSaveRetryTimerRef.current = null;
+    }
     setExportingStemType(null);
     setExportStatusInput({ phase: 'idle' });
     setSelectedTrackType(activeInitialStems[0]?.type ?? null);
@@ -4436,6 +4535,25 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     setSaveStatus(`已应用“${actionLabel}”，自动保存后下次进入会恢复。`);
   }, [bufferVersion, commitTrackChange, stems]);
 
+  const currentEditState = useMemo<StemEditState>(() => ({
+    tracks,
+    master: masterState,
+    trackLabels,
+    trackColors,
+    trackOrder: stems.map((stem) => stem.type),
+    deletedTrackTypes,
+    customStems,
+    skippedEmptyCount,
+  }), [customStems, deletedTrackTypes, masterState, skippedEmptyCount, stems, trackColors, trackLabels, tracks]);
+
+  currentEditStateRef.current = currentEditState;
+
+  const clearAutoSaveRetryTimer = useCallback(() => {
+    if (autoSaveRetryTimerRef.current === null) return;
+    window.clearTimeout(autoSaveRetryTimerRef.current);
+    autoSaveRetryTimerRef.current = null;
+  }, []);
+
   const persistEditState = useCallback(async (source: 'manual' | 'auto' | 'export') => {
     if (!jobId) {
       if (source === 'manual') {
@@ -4457,16 +4575,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           jobId,
-          editState: {
-            tracks,
-            master: masterState,
-            trackLabels,
-            trackColors,
-            trackOrder: stems.map((stem) => stem.type),
-            deletedTrackTypes,
-            customStems,
-            skippedEmptyCount,
-          },
+          editState: currentEditStateRef.current,
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -4478,12 +4587,17 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         }
         throw new Error(message);
       }
+      autoSaveRetryAttemptRef.current = 0;
+      clearAutoSaveRetryTimer();
+      if (localDraftStorageKey) {
+        window.localStorage.removeItem(localDraftStorageKey);
+      }
       if (source === 'manual') {
-        setSaveStatus('编辑状态已保存，下次进入会自动恢复。');
+        setSaveStatus(`编辑状态已保存 ${new Date().toLocaleTimeString('zh-CN', { hour12: false })}`);
       } else if (source === 'export') {
         setAutoSaveStatus(`导出前已保存 ${new Date().toLocaleTimeString('zh-CN', { hour12: false })}`);
       } else {
-        setAutoSaveStatus(null);
+        setAutoSaveStatus(`已自动保存 ${new Date().toLocaleTimeString('zh-CN', { hour12: false })}`);
       }
       setHasPendingEditChanges(false);
       return true;
@@ -4495,7 +4609,18 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       } else if (source === 'export') {
         setAutoSaveStatus(`导出前保存失败：${message}，仍按当前页面状态导出。`);
       } else {
-        setAutoSaveStatus(`自动保存失败：${message}`);
+        autoSaveRetryAttemptRef.current += 1;
+        const retryDelayMs = resolveStemAutoSaveRetryDelay(autoSaveRetryAttemptRef.current);
+        if (retryDelayMs === null) {
+          setAutoSaveStatus(`自动保存失败：${message}，请手动保存。`);
+        } else {
+          clearAutoSaveRetryTimer();
+          autoSaveRetryTimerRef.current = window.setTimeout(() => {
+            autoSaveRetryTimerRef.current = null;
+            void persistEditState('auto');
+          }, retryDelayMs);
+          setAutoSaveStatus(`网络异常，本地已保留，${Math.round(retryDelayMs / 1000)} 秒后自动重试。`);
+        }
       }
       return false;
     } finally {
@@ -4503,7 +4628,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         setIsSaving(false);
       }
     }
-  }, [customStems, deletedTrackTypes, jobId, masterState, skippedEmptyCount, stems, trackColors, trackLabels, tracks]);
+  }, [clearAutoSaveRetryTimer, jobId, localDraftStorageKey]);
 
   const saveEditState = useCallback(async () => {
     await persistEditState('manual');
@@ -4847,16 +4972,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     undoTrackChange,
   ]);
 
-  const editStateSignature = useMemo(() => JSON.stringify({
-    tracks,
-    master: masterState,
-    trackLabels,
-    trackColors,
-    trackOrder: stems.map((stem) => stem.type),
-    deletedTrackTypes,
-    customStems,
-    skippedEmptyCount,
-  }), [customStems, deletedTrackTypes, masterState, skippedEmptyCount, stems, trackColors, trackLabels, tracks]);
+  const editStateSignature = useMemo(() => JSON.stringify(currentEditState), [currentEditState]);
 
   useEffect(() => {
     if (!jobId) return;
@@ -4868,6 +4984,15 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     if (lastAutoSaveSignatureRef.current === editStateSignature) return;
 
     setHasPendingEditChanges(true);
+    clearAutoSaveRetryTimer();
+    autoSaveRetryAttemptRef.current = 0;
+
+    if (localDraftStorageKey) {
+      window.localStorage.setItem(localDraftStorageKey, JSON.stringify({
+        ...currentEditState,
+        savedAt: new Date().toISOString(),
+      }));
+    }
 
     if (isContinuousEditing) {
       return;
@@ -4889,7 +5014,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         autoSaveTimerRef.current = null;
       }
     };
-  }, [editStateSignature, isContinuousEditing, jobId, persistEditState, saveRequestVersion]);
+  }, [clearAutoSaveRetryTimer, currentEditState, editStateSignature, isContinuousEditing, jobId, localDraftStorageKey, persistEditState, saveRequestVersion]);
 
   const waitForStemLoadingToSettle = useCallback(async () => {
     const startedAt = Date.now();
@@ -6210,6 +6335,19 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         </div>
       </div>
 
+      {localDraftState && (
+        <div style={localDraftNoticeStyle}>
+          <span>检测到未同步的本地编辑，可恢复后继续自动保存。</span>
+          <div style={localDraftNoticeActionsStyle}>
+            <button type="button" onClick={restoreLocalDraft} style={inlineRetryButtonStyle}>
+              恢复
+            </button>
+            <button type="button" onClick={dismissLocalDraft} style={secondaryInlineButtonStyle}>
+              忽略
+            </button>
+          </div>
+        </div>
+      )}
       {loadingCount > 0 && (
         <div style={loadingNoticeStyle}>
           分轨在后台缓存中，已就绪的轨道可以先播放和编辑。
@@ -8881,6 +9019,39 @@ const inlineRetryButtonStyle: CSSProperties = {
   padding: '4px 9px',
   fontSize: 12,
   fontWeight: 900,
+};
+
+const secondaryInlineButtonStyle: CSSProperties = {
+  ...editorButtonChromeStyle({ compact: true }),
+  minHeight: 26,
+  borderRadius: 7,
+  padding: '4px 9px',
+  fontSize: 12,
+  fontWeight: 850,
+};
+
+const localDraftNoticeStyle: CSSProperties = {
+  gridColumn: '1 / -1',
+  order: 2,
+  marginTop: 10,
+  borderRadius: 8,
+  border: '1px solid rgba(56, 189, 248, 0.28)',
+  background: 'rgba(8, 47, 73, 0.72)',
+  color: '#dff7ff',
+  padding: '8px 10px',
+  fontSize: 12,
+  fontWeight: 780,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 12,
+};
+
+const localDraftNoticeActionsStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  flexShrink: 0,
 };
 
 const loadingNoticeStyle: CSSProperties = {
