@@ -4,6 +4,7 @@ node_modules/
 .env*.local
 .vercel
 .superpowers/
+TEST_ACCOUNTS.local.md
 .deploy-*/
 .hotfix-deploy-*/
 .rewrite-backup/
