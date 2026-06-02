@@ -239,6 +239,7 @@ type EditorPreferences = {
   timelineZoom?: number;
   followPlayhead?: boolean;
   snapToGrid?: boolean;
+  magnetSnap?: boolean;
   snapStepSeconds?: number;
   compactTransport?: boolean;
   inspectorCollapsed?: boolean;
@@ -354,6 +355,37 @@ function snapStemClipStartToNeighborEdges(
   });
 
   return Number(Math.max(0, Math.min(maxStart, bestStart)).toFixed(3));
+}
+
+function snapStemClipEdgeToNeighborEdges(
+  clips: StemClip[],
+  clipId: string,
+  edge: 'start' | 'end',
+  proposedTime: number,
+  duration: number,
+  enabled: boolean,
+  stepSeconds: number,
+) {
+  if (!enabled || !Number.isFinite(proposedTime)) return proposedTime;
+  const threshold = Math.max(0.08, Math.min(0.28, normalizeTimelineSnapStep(stepSeconds) * 0.85));
+  const safeTime = Math.max(0, Math.min(duration, proposedTime));
+  let bestTime = safeTime;
+  let bestDistance = threshold;
+
+  clips.forEach((clip) => {
+    if (clip.id === clipId) return;
+    const clipStart = clip.start;
+    const clipEnd = clip.start + getStemClipDuration(clip);
+    [clipStart, clipEnd].forEach((neighborEdge) => {
+      const distance = Math.abs(safeTime - neighborEdge);
+      if (distance <= bestDistance) {
+        bestDistance = distance;
+        bestTime = neighborEdge;
+      }
+    });
+  });
+
+  return Number(Math.max(0, Math.min(duration, bestTime)).toFixed(3));
 }
 
 type TransportIconName = 'skipStart' | 'skipEnd' | 'back' | 'forward' | 'play' | 'pause' | 'stop' | 'collapse' | 'expand' | 'chevronRight' | 'chevronDown';
@@ -1386,6 +1418,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   const [timelineViewportWidth, setTimelineViewportWidth] = useState(0);
   const [followPlayhead, setFollowPlayhead] = useState(true);
   const [snapToGrid, setSnapToGrid] = useState(true);
+  const [magnetSnap, setMagnetSnap] = useState(true);
   const [snapStepSeconds, setSnapStepSeconds] = useState(DEFAULT_TIMELINE_SNAP_STEP_SECONDS);
   const [compactTransport, setCompactTransport] = useState(true);
   const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
@@ -1689,6 +1722,9 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     if (typeof preferences.snapToGrid === 'boolean') {
       setSnapToGrid(preferences.snapToGrid);
     }
+    if (typeof preferences.magnetSnap === 'boolean') {
+      setMagnetSnap(preferences.magnetSnap);
+    }
     if (typeof preferences.snapStepSeconds === 'number') {
       setSnapStepSeconds(normalizeTimelineSnapStep(preferences.snapStepSeconds));
     }
@@ -1714,12 +1750,13 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       timelineZoom,
       followPlayhead,
       snapToGrid,
+      magnetSnap,
       snapStepSeconds,
       compactTransport,
       inspectorCollapsed,
       trackDensity,
     }));
-  }, [compactTransport, editorPreferencesLoaded, exportMode, exportReadiness, followPlayhead, inspectorCollapsed, inspectorTab, snapStepSeconds, snapToGrid, timelineZoom, trackDensity, trackViewMode]);
+  }, [compactTransport, editorPreferencesLoaded, exportMode, exportReadiness, followPlayhead, inspectorCollapsed, inspectorTab, magnetSnap, snapStepSeconds, snapToGrid, timelineZoom, trackDensity, trackViewMode]);
 
   useEffect(() => {
     setSaveStatusDismissing(false);
@@ -3414,7 +3451,15 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         currentClipState.clips,
         clipId,
         edge,
-        snapStemEditorTime(value, duration, shouldSnap, snapStepSeconds),
+        snapStemClipEdgeToNeighborEdges(
+          currentClipState.clips,
+          clipId,
+          edge,
+          snapStemEditorTime(value, duration, shouldSnap, snapStepSeconds),
+          duration,
+          magnetSnap,
+          snapStepSeconds,
+        ),
         duration,
       );
       const nextClipState = normalizeStemClipState({
@@ -3437,7 +3482,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         },
       };
     }, historyMode);
-  }, [commitTrackChange, duration, snapStepSeconds, snapToGrid]);
+  }, [commitTrackChange, duration, magnetSnap, snapStepSeconds, snapToGrid]);
 
   const setTrackTrimRange = useCallback((type: string, nextStart: number, shouldSnap = snapToGrid, historyMode: StemHistoryMode = 'immediate') => {
     commitTrackChange((current) => {
@@ -3606,7 +3651,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       movingClip.start,
       getStemClipDuration(movingClip),
       duration,
-      shouldSnap,
+      magnetSnap,
       snapStepSeconds,
     );
     const previewClipId = `${clipId}-drag-preview`;
@@ -3623,7 +3668,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       },
     });
     setSelectedTrackType(targetType);
-  }, [duration, resolveTrackDropTarget, snapStepSeconds, snapToGrid, stems, tracks]);
+  }, [duration, magnetSnap, resolveTrackDropTarget, snapStepSeconds, snapToGrid, stems, tracks]);
 
   const moveTrackClip = useCallback((
     type: string,
@@ -3655,7 +3700,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         movingClip.start,
         getStemClipDuration(movingClip),
         duration,
-        shouldSnap,
+        magnetSnap,
         snapStepSeconds,
       )
       : snapStemEditorTime(nextStart, duration, shouldSnap, snapStepSeconds);
@@ -3769,7 +3814,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         },
       };
     }, historyMode);
-  }, [commitTrackChange, duration, resolveTrackDropTarget, snapStepSeconds, snapToGrid, stems, tracks]);
+  }, [commitTrackChange, duration, magnetSnap, resolveTrackDropTarget, snapStepSeconds, snapToGrid, stems, tracks]);
 
   const resolveTimelineRulerPointer = useCallback((event: PointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -4647,14 +4692,6 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         });
         return;
       }
-      if (action === 'toggle-transport-compact') {
-        setCompactTransport((value) => {
-          const next = !value;
-          setSaveStatus(next ? '底部工具条已切换为紧凑模式。' : '底部工具条已展开。');
-          return next;
-        });
-        return;
-      }
       if (action === 'toggle-track-density') {
         setTrackDensity((value) => {
           const next = value === 'compact' ? 'comfortable' : 'compact';
@@ -4703,6 +4740,10 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       }
       if (action === 'preview-selected-range') {
         previewSelectedTrackRange();
+        return;
+      }
+      if (action === 'split-selected-clip') {
+        splitSelectedTrackClipAtPlayhead();
         return;
       }
       if (action === 'toggle-loop-preview') {
@@ -4784,6 +4825,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     selectedTrack,
     closeEditorDialog,
     setSelectedTrackTrimToCurrentTime,
+    splitSelectedTrackClipAtPlayhead,
     setTrackTrim,
     snapStepSeconds,
     stopPlaybackPreview,
@@ -5289,7 +5331,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       </div>
 
       <div style={workbenchTopStyle}>
-        <div style={transportPanelStyle(compactTransport)}>
+        <div style={transportPanelStyle(true)}>
           <div style={transportStyle}>
             <div style={transportButtonGroupStyle}>
               <button type="button" aria-label="回到开头" title="回到开头" onClick={() => handleSeek(0)} style={transportIconButtonStyle(false)}>
@@ -5311,16 +5353,6 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
               </button>
               <button type="button" aria-label="跳到结尾" title="跳到结尾" onClick={() => handleSeek(duration)} style={transportIconButtonStyle(false)}>
                 <TransportIcon name="skipEnd" />
-              </button>
-              <button
-                type="button"
-                aria-label={compactTransport ? '展开底部工具条' : '收起底部工具条'}
-                title="B 收起或展开底部工具条"
-                aria-pressed={compactTransport}
-                onClick={() => setCompactTransport((value) => !value)}
-                style={transportIconButtonStyle(false)}
-              >
-                <TransportIcon name={compactTransport ? 'expand' : 'collapse'} />
               </button>
             </div>
             <input
@@ -5362,79 +5394,6 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
             />
             <span style={timeStyle}>{formatStemTimecode(duration)}</span>
           </div>
-          {selectedTrack && !compactTransport && (
-            <div style={transportEditBarStyle}>
-              <span style={transportEditLabelStyle}>{getStemDisplayName(selectedTrack).zh}</span>
-              <button type="button" style={transportEditButtonStyle(false)} onClick={() => setSelectedTrackTrimToCurrentTime('start')}>
-                设入点
-              </button>
-              <button type="button" style={transportEditButtonStyle(false)} onClick={() => setSelectedTrackTrimToCurrentTime('end')}>
-                设出点
-              </button>
-              <button type="button" disabled={!selectedTrackBuffer} style={transportEditButtonStyle(!selectedTrackBuffer)} onClick={previewSelectedTrackRange}>
-                预听选区
-              </button>
-              <button type="button" disabled={duration <= 0} style={transportEditButtonStyle(duration <= 0)} onClick={splitSelectedTrackClipAtPlayhead}>
-                切分
-              </button>
-              <button type="button" disabled={duration <= 0 || selectedTrackClipCount === 0} style={transportEditButtonStyle(duration <= 0 || selectedTrackClipCount === 0)} onClick={deleteSelectedClipOrActiveTrackClip}>
-                删除片段
-              </button>
-              <button type="button" aria-pressed={loopSelectionPreview} style={transportLoopButtonStyle(loopSelectionPreview)} onClick={toggleLoopSelectionPreview}>
-                循环 {loopSelectionPreview ? '开' : '关'}
-              </button>
-            </div>
-          )}
-          {!compactTransport && (
-          <div style={transportOptionBarStyle}>
-            <button
-              type="button"
-              aria-pressed={followPlayhead}
-              style={transportOptionButtonStyle(followPlayhead, false)}
-              onClick={() => setFollowPlayhead((value) => !value)}
-            >
-              {followPlayhead ? '跟随开' : '跟随关'}
-            </button>
-            <button type="button" style={transportOptionButtonStyle(false, false)} onClick={() => applyTimelineZoom(MIN_TIMELINE_ZOOM)}>
-              适合视野
-            </button>
-            <button
-              type="button"
-              aria-pressed={showShortcutHelp}
-              style={transportOptionButtonStyle(showShortcutHelp, false)}
-              onClick={() => setShowShortcutHelp((value) => !value)}
-            >
-              快捷键
-            </button>
-            <button
-              type="button"
-              aria-pressed={!inspectorCollapsed}
-              style={transportOptionButtonStyle(!inspectorCollapsed, false)}
-              onClick={() => setInspectorCollapsed((value) => !value)}
-            >
-              检查器 {!inspectorCollapsed ? '开' : '收起'}
-            </button>
-          </div>
-          )}
-          {!compactTransport && (
-            <div style={mixerSummaryStyle}>
-              <span>{stems.length} 条分轨</span>
-              <span>{hasSoloTrack ? '独奏模式' : '全轨预听'}</span>
-              <span>{selectedTrack ? `选中 ${getStemDisplayName(selectedTrack).zh}` : '未选轨道'}</span>
-              {selectedTrack && <span>选区 {formatStemTimecode(selectedTrackClipDuration)}</span>}
-              <span>
-                {loadingCount > 0
-                  ? `缓存中 ${readyStemCount}/${loadableStemCount}${cachedLoadCount > 0 ? `，本地命中 ${cachedLoadCount}` : ''}`
-                  : failedLoadCount > 0
-                    ? `可播放 ${loadableStemCount - failedLoadCount}/${loadableStemCount}`
-                    : `轨道就绪${cachedLoadCount > 0 ? `，本地命中 ${cachedLoadCount}` : ''}`}
-              </span>
-              <span>{snapToGrid ? `吸附 ${snapStepSeconds}s` : '自由定位'}</span>
-              <span>缩放 {Math.round(timelineZoom * 100)}%</span>
-              <span>{followPlayhead ? '跟随播放头' : '自由视野'}</span>
-              {skippedEmptyCount > 0 && <span>已跳过空轨 {skippedEmptyCount}</span>}
-            </div>
-          )}
         </div>
 
         <div style={readinessDockStyle}>
@@ -5984,7 +5943,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                   <button type="button" style={presetButtonStyle} onClick={() => resetTrackEdit(selectedTrack.type)}>
                     重置当前轨裁剪
                   </button>
-                  <span style={selectedTrackShortcutStyle}>快捷键：↑/↓ 选轨，M 静音，S 独奏，Ctrl+C/X/V 复制剪切粘贴，Shift+C 改色，Del 删除</span>
+                  <span style={selectedTrackShortcutStyle}>快捷键：↑/↓ 选轨，M 静音，S 独奏，C 切分，Ctrl+C/X/V 复制剪切粘贴，Shift+C 改色，Del 删除</span>
                 </div>
                 {selectedTrackMutedRanges.length > 0 && (
                   <div style={mutedRangeListStyle} aria-label={`${getStemDisplayName(selectedTrack).zh} 静音片段`}>
@@ -6595,6 +6554,32 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
             >
               跟随播放头
             </button>
+            <button
+              type="button"
+              aria-pressed={snapToGrid}
+              title="G 开关网格吸附"
+              onClick={() => setSnapToGrid((value) => {
+                const next = !value;
+                setSaveStatus(next ? `网格吸附已开启，步长 ${snapStepSeconds}s。` : '网格吸附已关闭。');
+                return next;
+              })}
+              style={timelineFollowButtonStyle(snapToGrid)}
+            >
+              网格 {snapToGrid ? '开' : '关'}
+            </button>
+            <button
+              type="button"
+              aria-pressed={magnetSnap}
+              title="片段边缘靠近时自动贴合"
+              onClick={() => setMagnetSnap((value) => {
+                const next = !value;
+                setSaveStatus(next ? '片段磁吸已开启。' : '片段磁吸已关闭。');
+                return next;
+              })}
+              style={timelineFollowButtonStyle(magnetSnap)}
+            >
+              磁吸 {magnetSnap ? '开' : '关'}
+            </button>
           </div>
         </div>
         {showShortcutHelp && (
@@ -6602,9 +6587,9 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
             <span><strong>播放</strong> 空格 / Esc / P / L</span>
             <span><strong>选轨</strong> ↑ ↓ / M / S / R / Del</span>
             <span><strong>裁剪</strong> [ ] / Shift+[ ] / Shift+R</span>
-            <span><strong>时间线</strong> ← → / Shift+← → / G / Shift+G / B / D / Alt</span>
+            <span><strong>时间线</strong> ← → / Shift+← → / G / Shift+G / D / 磁吸按钮 / Alt</span>
             <span><strong>视野</strong> Ctrl+± / Ctrl+0 / Ctrl+滚轮 / Shift+F</span>
-            <span><strong>编辑</strong> Ctrl+S / Ctrl+Z / Ctrl+Y / Ctrl+C/X/V / Shift+C / X / Shift+X</span>
+            <span><strong>编辑</strong> C / Ctrl+S / Ctrl+Z / Ctrl+Y / Ctrl+C/X/V / Shift+C / X / Shift+X</span>
           </div>
         )}
         <div className="stem-timeline-ruler" style={timelineRulerStyle(timelineGridColumns, timelineMinWidth, dawLayoutMetrics)} data-timeline-pan-zone="true">

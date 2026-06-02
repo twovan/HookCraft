@@ -65,6 +65,23 @@ describe('stem clips', () => {
     });
   });
 
+  it('shrinks the selected clip end without merging split clips', () => {
+    const clips = [
+      { id: 'left', start: 0, sourceStart: 0, sourceEnd: 8.59 },
+      { id: 'right', start: 17.19, sourceStart: 17.19, sourceEnd: 34.38 },
+    ];
+
+    const resized = resizeStemClipEdge(clips, 'right', 'end', 24, 120);
+
+    expect(resized).toHaveLength(2);
+    expect(resized.find((clip) => clip.id === 'left')).toEqual(clips[0]);
+    expect(resized.find((clip) => clip.id === 'right')).toMatchObject({
+      start: 17.19,
+      sourceStart: 17.19,
+      sourceEnd: 24,
+    });
+  });
+
   it('moves a selected clip start by trimming its source start', () => {
     const clips = [
       { id: 'left', start: 0, sourceStart: 0, sourceEnd: 8.59 },

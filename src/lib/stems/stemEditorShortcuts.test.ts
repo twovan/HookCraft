@@ -37,12 +37,13 @@ describe('resolveStemEditorShortcut', () => {
     expect(resolveStemEditorShortcut(keyEvent({ key: 'f' }))).toBe('toggle-follow-playhead');
     expect(resolveStemEditorShortcut(keyEvent({ key: 'g' }))).toBe('toggle-snap-grid');
     expect(resolveStemEditorShortcut(keyEvent({ key: 'g', shiftKey: true }))).toBe('cycle-snap-step');
-    expect(resolveStemEditorShortcut(keyEvent({ key: 'b' }))).toBe('toggle-transport-compact');
+    expect(resolveStemEditorShortcut(keyEvent({ key: 'b' }))).toBeNull();
     expect(resolveStemEditorShortcut(keyEvent({ key: 'd' }))).toBe('toggle-track-density');
     expect(resolveStemEditorShortcut(keyEvent({ key: 'l' }))).toBe('toggle-loop-preview');
     expect(resolveStemEditorShortcut(keyEvent({ key: 'p' }))).toBe('preview-selected-range');
     expect(resolveStemEditorShortcut(keyEvent({ key: 'f', shiftKey: true }))).toBe('focus-selected-range');
     expect(resolveStemEditorShortcut(keyEvent({ key: 'r' }))).toBe('reset-selected-track');
+    expect(resolveStemEditorShortcut(keyEvent({ key: 'c' }))).toBe('split-selected-clip');
     expect(resolveStemEditorShortcut(keyEvent({ key: 'Delete' }))).toBe('delete-selected-clip');
     expect(resolveStemEditorShortcut(keyEvent({ key: 'F2' }))).toBeNull();
     expect(resolveStemEditorShortcut(keyEvent({ key: 'c', shiftKey: true }))).toBe('edit-selected-track-color');
