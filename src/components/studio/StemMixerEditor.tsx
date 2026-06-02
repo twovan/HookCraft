@@ -151,6 +151,21 @@ type TimelinePanState = {
   scrollLeft: number;
   moved: boolean;
 };
+type TimelineIconName =
+  | 'trimStart'
+  | 'setTrimStart'
+  | 'trimEnd'
+  | 'setTrimEnd'
+  | 'fullRange'
+  | 'focus'
+  | 'preview'
+  | 'split'
+  | 'delete'
+  | 'loop'
+  | 'keyboard'
+  | 'locate'
+  | 'follow'
+  | 'magnet';
 type TimelineRulerTrimDragState = {
   pointerId: number;
   kind: 'edge' | 'range';
@@ -866,6 +881,193 @@ function downloadBlob(blob: Blob, fileName: string, revokeDelayMs = 1000) {
   const url = URL.createObjectURL(blob);
   triggerDownloadUrl(url, fileName);
   window.setTimeout(() => URL.revokeObjectURL(url), revokeDelayMs);
+}
+
+function TimelineIcon({ name }: { name: TimelineIconName }) {
+  const baseProps = {
+    width: 14,
+    height: 14,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 2,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+    'aria-hidden': true,
+    focusable: false,
+  };
+
+  if (name === 'trimStart') {
+    return (
+      <svg {...baseProps}>
+        <path d="M6 5v14" />
+        <path d="M18 7 10 12l8 5" />
+      </svg>
+    );
+  }
+  if (name === 'setTrimStart') {
+    return (
+      <svg {...baseProps}>
+        <path d="M6 4v16" />
+        <path d="M11 8h7" />
+        <path d="M11 12h5" />
+        <path d="M11 16h7" />
+      </svg>
+    );
+  }
+  if (name === 'trimEnd') {
+    return (
+      <svg {...baseProps}>
+        <path d="M18 5v14" />
+        <path d="m6 7 8 5-8 5" />
+      </svg>
+    );
+  }
+  if (name === 'setTrimEnd') {
+    return (
+      <svg {...baseProps}>
+        <path d="M18 4v16" />
+        <path d="M6 8h7" />
+        <path d="M8 12h5" />
+        <path d="M6 16h7" />
+      </svg>
+    );
+  }
+  if (name === 'fullRange') {
+    return (
+      <svg {...baseProps}>
+        <path d="M4 7v10" />
+        <path d="M20 7v10" />
+        <path d="M8 12h8" />
+        <path d="m8 12 3-3" />
+        <path d="m8 12 3 3" />
+        <path d="m16 12-3-3" />
+        <path d="m16 12-3 3" />
+      </svg>
+    );
+  }
+  if (name === 'focus') {
+    return (
+      <svg {...baseProps}>
+        <path d="M8 4H5a1 1 0 0 0-1 1v3" />
+        <path d="M16 4h3a1 1 0 0 1 1 1v3" />
+        <path d="M20 16v3a1 1 0 0 1-1 1h-3" />
+        <path d="M8 20H5a1 1 0 0 1-1-1v-3" />
+        <path d="M9 12h6" />
+      </svg>
+    );
+  }
+  if (name === 'preview') {
+    return (
+      <svg {...baseProps}>
+        <path d="M8 5v14l11-7Z" />
+      </svg>
+    );
+  }
+  if (name === 'split') {
+    return (
+      <svg {...baseProps}>
+        <path d="M12 3v18" />
+        <path d="M7 7 3 12l4 5" />
+        <path d="m17 7 4 5-4 5" />
+      </svg>
+    );
+  }
+  if (name === 'delete') {
+    return (
+      <svg {...baseProps}>
+        <path d="M4 7h16" />
+        <path d="M9 7V5h6v2" />
+        <path d="M7 7l1 14h8l1-14" />
+        <path d="M10 11v6" />
+        <path d="M14 11v6" />
+      </svg>
+    );
+  }
+  if (name === 'loop') {
+    return (
+      <svg {...baseProps}>
+        <path d="M17 2 21 6l-4 4" />
+        <path d="M3 11V9a3 3 0 0 1 3-3h15" />
+        <path d="m7 22-4-4 4-4" />
+        <path d="M21 13v2a3 3 0 0 1-3 3H3" />
+      </svg>
+    );
+  }
+  if (name === 'keyboard') {
+    return (
+      <svg {...baseProps}>
+        <rect x="3" y="6" width="18" height="12" rx="2" />
+        <path d="M7 10h.01" />
+        <path d="M11 10h.01" />
+        <path d="M15 10h.01" />
+        <path d="M19 10h.01" />
+        <path d="M7 14h10" />
+      </svg>
+    );
+  }
+  if (name === 'locate') {
+    return (
+      <svg {...baseProps}>
+        <circle cx="12" cy="12" r="7" />
+        <path d="M12 3v3" />
+        <path d="M12 18v3" />
+        <path d="M3 12h3" />
+        <path d="M18 12h3" />
+        <circle cx="12" cy="12" r="2" />
+      </svg>
+    );
+  }
+  if (name === 'follow') {
+    return (
+      <svg {...baseProps}>
+        <path d="M4 12h11" />
+        <path d="m12 5 7 7-7 7" />
+        <path d="M4 6v12" />
+      </svg>
+    );
+  }
+  return (
+    <svg {...baseProps}>
+      <path d="M7 4v8" />
+      <path d="M17 4v8" />
+      <path d="M7 12a5 5 0 0 0 10 0" />
+      <path d="M7 4H4" />
+      <path d="M17 4h3" />
+      <path d="M9 19h6" />
+    </svg>
+  );
+}
+
+function TimelineIconButton({
+  active = false,
+  disabled = false,
+  icon,
+  label,
+  onClick,
+  tone = 'info',
+}: {
+  active?: boolean;
+  disabled?: boolean;
+  icon: TimelineIconName;
+  label: string;
+  onClick: () => void;
+  tone?: 'info' | 'purple' | 'success' | 'danger';
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      aria-pressed={active || undefined}
+      className="stem-timeline-icon-button"
+      data-stem-tooltip={label}
+      disabled={disabled}
+      style={timelineIconButtonStyle({ active, disabled, tone })}
+      onClick={onClick}
+    >
+      <TimelineIcon name={icon} />
+    </button>
+  );
 }
 
 const STEM_LOAD_CONCURRENCY = 3;
@@ -6628,129 +6830,94 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
             )}
             {selectedTrack && selectedTrackTrimControls && (
               <span style={timelineSelectionActionsStyle}>
-                <button
-                  type="button"
-                  title="跳到当前轨道入点"
-                  style={timelineSelectionActionButtonStyle(false)}
+                <TimelineIconButton
+                  icon="trimStart"
+                  label="入点"
                   onClick={() => seekSelectedTrackTrimEdge('start')}
-                >
-                  入点
-                </button>
-                <button
-                  type="button"
-                  title="[ 把入点设到当前播放头"
-                  style={timelineSelectionActionButtonStyle(false)}
+                />
+                <TimelineIconButton
+                  icon="setTrimStart"
+                  label="设入"
                   onClick={() => setSelectedTrackTrimToCurrentTime('start')}
-                >
-                  设入
-                </button>
-                <button
-                  type="button"
-                  title="跳到当前轨道出点"
-                  style={timelineSelectionActionButtonStyle(false)}
+                />
+                <TimelineIconButton
+                  icon="trimEnd"
+                  label="出点"
                   onClick={() => seekSelectedTrackTrimEdge('end')}
-                >
-                  出点
-                </button>
-                <button
-                  type="button"
-                  title="] 把出点设到当前播放头"
-                  style={timelineSelectionActionButtonStyle(false)}
+                />
+                <TimelineIconButton
+                  icon="setTrimEnd"
+                  label="设出"
                   onClick={() => setSelectedTrackTrimToCurrentTime('end')}
-                >
-                  设出
-                </button>
-                <button
-                  type="button"
-                  title="Shift+R 恢复当前轨道选区为整首全长"
-                  style={timelineSelectionActionButtonStyle(false)}
+                />
+                <TimelineIconButton
+                  icon="fullRange"
+                  label="全长"
                   onClick={resetSelectedTrackTrimRange}
-                >
-                  全长
-                </button>
-                <button
-                  type="button"
-                  title="Shift+F 聚焦当前选区"
-                  style={timelineSelectionActionButtonStyle(false)}
+                />
+                <TimelineIconButton
+                  icon="focus"
+                  label="聚焦"
                   onClick={focusSelectedTrackRange}
-                >
-                  聚焦
-                </button>
-                <button
-                  type="button"
+                />
+                <TimelineIconButton
+                  icon="preview"
+                  label="预听"
                   disabled={!selectedTrackBuffer}
-                  title="P 预听当前选区"
-                  style={timelineSelectionActionButtonStyle(!selectedTrackBuffer)}
                   onClick={previewSelectedTrackRange}
-                >
-                  预听
-                </button>
-                <button
-                  type="button"
+                />
+                <TimelineIconButton
+                  icon="split"
+                  label="切分"
                   disabled={duration <= 0}
-                  title="在播放头位置切分当前片段"
-                  style={timelineSelectionActionButtonStyle(duration <= 0)}
                   onClick={splitSelectedTrackClipAtPlayhead}
-                >
-                  切分
-                </button>
-                <button
-                  type="button"
+                />
+                <TimelineIconButton
+                  icon="delete"
+                  label={selectedTrackClipCount > 0 ? '删除片段' : '删除轨道'}
                   disabled={duration <= 0 || !selectedTrack}
-                  title={selectedTrackClipCount > 0 ? '删除当前选中片段' : '删除当前轨道'}
-                  style={timelineSelectionActionButtonStyle(duration <= 0 || !selectedTrack)}
+                  tone="danger"
                   onClick={deleteSelectedClipOrActiveTrackClip}
-                >
-                  删除
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={loopSelectionPreview}
-                  title="L 开关循环预听"
-                  style={timelineSelectionLoopButtonStyle(loopSelectionPreview)}
+                />
+                <TimelineIconButton
+                  icon="loop"
+                  label={`循环预听 ${loopSelectionPreview ? '开' : '关'}`}
+                  active={loopSelectionPreview}
+                  tone="success"
                   onClick={toggleLoopSelectionPreview}
-                >
-                  循环 {loopSelectionPreview ? '开' : '关'}
-                </button>
+                />
               </span>
             )}
-            <button
-              type="button"
-              aria-pressed={showShortcutHelp}
-              title="? 显示或隐藏快捷键"
+            <TimelineIconButton
+              icon="keyboard"
+              label="快捷键"
+              active={showShortcutHelp}
+              tone="purple"
               onClick={() => setShowShortcutHelp((value) => !value)}
-              style={timelineHelpButtonStyle(showShortcutHelp)}
-            >
-              快捷键
-            </button>
-            <button
-              type="button"
+            />
+            <TimelineIconButton
+              icon="locate"
+              label="定位播放头"
               onClick={() => centerTimelineOnPlaybackPosition()}
-              style={timelineLocateButtonStyle}
-            >
-              定位播放头
-            </button>
-            <button
-              type="button"
-              aria-pressed={followPlayhead}
+            />
+            <TimelineIconButton
+              icon="follow"
+              label="跟随播放头"
+              active={followPlayhead}
+              tone="success"
               onClick={() => setFollowPlayhead((value) => !value)}
-              style={timelineFollowButtonStyle(followPlayhead)}
-            >
-              跟随播放头
-            </button>
-            <button
-              type="button"
-              aria-pressed={magnetSnap}
-              title="片段边缘靠近时自动贴合"
+            />
+            <TimelineIconButton
+              icon="magnet"
+              label={`磁吸 ${magnetSnap ? '开' : '关'}`}
+              active={magnetSnap}
+              tone="success"
               onClick={() => setMagnetSnap((value) => {
                 const next = !value;
                 setSaveStatus(next ? '片段磁吸已开启。' : '片段磁吸已关闭。');
                 return next;
               })}
-              style={timelineFollowButtonStyle(magnetSnap)}
-            >
-              磁吸 {magnetSnap ? '开' : '关'}
-            </button>
+            />
           </div>
         </div>
         {showShortcutHelp && (
@@ -7339,6 +7506,76 @@ const timelineScrollbarCss = `
 
   .stem-timeline-toolbar-strip::-webkit-scrollbar {
     display: none;
+  }
+
+  .stem-timeline-icon-button:hover:not(:disabled),
+  .stem-timeline-icon-button:focus-visible:not(:disabled) {
+    transform: translateY(-1px);
+    border-color: rgba(206, 255, 53, 0.44) !important;
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.045) inset,
+      0 7px 18px rgba(0, 0, 0, 0.24),
+      0 0 16px rgba(122, 167, 255, 0.12) !important;
+    outline: none;
+  }
+
+  .stem-timeline-icon-button:active:not(:disabled) {
+    transform: translateY(0);
+  }
+
+  .stem-timeline-icon-button::after {
+    content: attr(data-stem-tooltip);
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 9px);
+    transform: translate(-50%, 4px) scale(0.98);
+    z-index: 90;
+    min-width: max-content;
+    max-width: 160px;
+    padding: 5px 8px;
+    border: 1px solid rgba(139, 153, 186, 0.28);
+    border-radius: 7px;
+    background: linear-gradient(180deg, rgba(18, 22, 35, 0.98), rgba(7, 10, 19, 0.98));
+    color: #eef3ff;
+    font-size: 11px;
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: 0;
+    white-space: nowrap;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.36);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease, transform 120ms ease;
+  }
+
+  .stem-timeline-icon-button::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 4px);
+    transform: translate(-50%, 4px) rotate(45deg);
+    z-index: 89;
+    width: 7px;
+    height: 7px;
+    border-right: 1px solid rgba(139, 153, 186, 0.28);
+    border-bottom: 1px solid rgba(139, 153, 186, 0.28);
+    background: rgba(7, 10, 19, 0.98);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease, transform 120ms ease;
+  }
+
+  .stem-timeline-icon-button:hover::after,
+  .stem-timeline-icon-button:focus-visible::after,
+  .stem-timeline-icon-button:hover::before,
+  .stem-timeline-icon-button:focus-visible::before {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+
+  .stem-timeline-icon-button:hover::before,
+  .stem-timeline-icon-button:focus-visible::before {
+    transform: translate(-50%, 0) rotate(45deg);
   }
 
   #stem-editor-timeline .stem-add-track-dropzone:hover,
@@ -9506,7 +9743,7 @@ const timelineToolbarStatsStyle: CSSProperties = {
   minWidth: 0,
   maxWidth: '100%',
   overflowX: 'auto',
-  overflowY: 'hidden',
+  overflowY: 'visible',
   scrollbarWidth: 'none',
   paddingBottom: 1,
 };
@@ -9579,51 +9816,44 @@ const timelineSelectionActionsStyle: CSSProperties = {
   flex: '0 0 auto',
   display: 'inline-flex',
   alignItems: 'center',
-  gap: 4,
-  minHeight: 24,
-  padding: 2,
-  borderRadius: 999,
-  border: '1px solid rgba(83, 88, 123, 0.52)',
-  background: 'rgba(10, 13, 24, 0.64)',
+  gap: 3,
+  minHeight: 28,
+  padding: '3px 4px',
+  borderRadius: 10,
+  border: '1px solid rgba(83, 91, 124, 0.46)',
+  background: 'linear-gradient(180deg, rgba(13, 17, 29, 0.84), rgba(8, 11, 20, 0.74))',
+  boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 8px 18px rgba(0, 0, 0, 0.16)',
   whiteSpace: 'nowrap',
 };
 
-function timelineSelectionActionButtonStyle(disabled: boolean): CSSProperties {
+function timelineIconButtonStyle({
+  active,
+  disabled,
+  tone,
+}: {
+  active: boolean;
+  disabled: boolean;
+  tone: EditorButtonTone;
+}): CSSProperties {
   return {
-    ...editorButtonChromeStyle({ tone: 'info', compact: true, round: true, disabled }),
-    minHeight: 20,
-    padding: '0 7px',
-    fontSize: 10,
-    fontWeight: 900,
-  };
-}
-
-function timelineSelectionLoopButtonStyle(active: boolean): CSSProperties {
-  return {
-    ...editorButtonChromeStyle({ tone: active ? 'success' : 'info', compact: true, round: true, active }),
-    minHeight: 20,
-    padding: '0 7px',
-    fontSize: 10,
-    fontWeight: 900,
-  };
-}
-
-function timelineFollowButtonStyle(active: boolean): CSSProperties {
-  return {
-    ...editorButtonChromeStyle({ tone: 'success', compact: true, round: true, active }),
-    minHeight: 24,
-    padding: '0 9px',
-    fontSize: 11,
-    fontWeight: 900,
-  };
-}
-
-function timelineHelpButtonStyle(active: boolean): CSSProperties {
-  return {
-    ...editorButtonChromeStyle({ tone: 'purple', compact: true, round: true, active }),
-    minHeight: 24,
-    padding: '0 9px',
-    fontSize: 11,
+    ...editorButtonChromeStyle({ tone, compact: true, active, disabled }),
+    position: 'relative',
+    flex: '0 0 auto',
+    width: 28,
+    height: 26,
+    minWidth: 28,
+    minHeight: 26,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    padding: 0,
+    color: disabled ? 'rgba(143, 153, 181, 0.46)' : undefined,
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    boxShadow: active
+      ? '0 0 0 1px rgba(255,255,255,0.05) inset, 0 0 13px rgba(190, 232, 95, 0.18)'
+      : '0 0 0 1px rgba(255,255,255,0.025) inset',
+    transition: 'transform 120ms ease, border-color 120ms ease, background 120ms ease, box-shadow 120ms ease',
     fontWeight: 900,
   };
 }
@@ -9654,14 +9884,6 @@ function timelineShortcutHelpStyle(metrics: DawEditorLayoutMetrics, viewportWidt
     boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
   };
 }
-
-const timelineLocateButtonStyle: CSSProperties = {
-  ...editorButtonChromeStyle({ tone: 'info', compact: true, round: true }),
-  minHeight: 24,
-  padding: '0 9px',
-  fontSize: 11,
-  fontWeight: 900,
-};
 
 function timelineScrollProgressStyle(metrics: DawEditorLayoutMetrics): CSSProperties {
   return {
