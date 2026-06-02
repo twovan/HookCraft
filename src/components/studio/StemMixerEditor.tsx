@@ -315,6 +315,11 @@ function snapStemEditorTime(value: number, duration: number, enabled: boolean, s
   return Math.max(0, Math.min(duration || snapped, Number(snapped.toFixed(3))));
 }
 
+function resolveStemClipMagnetThreshold(duration: number, stepSeconds: number) {
+  const durationAwareThreshold = Math.max(normalizeTimelineSnapStep(stepSeconds), duration * 0.006);
+  return Math.max(0.6, Math.min(1.25, durationAwareThreshold));
+}
+
 function snapStemClipStartToNeighborEdges(
   clips: StemClip[],
   clipId: string,
@@ -327,7 +332,7 @@ function snapStemClipStartToNeighborEdges(
   stepSeconds: number,
 ) {
   if (!enabled || clipDuration <= 0 || !Number.isFinite(proposedStart)) return proposedStart;
-  const threshold = Math.max(0.08, Math.min(0.25, normalizeTimelineSnapStep(stepSeconds) * 0.75));
+  const threshold = resolveStemClipMagnetThreshold(duration, stepSeconds);
   const maxStart = Math.max(0, duration - clipDuration);
   const originalEnd = originalStart === null ? null : originalStart + clipDuration;
   const isEscapingOriginalStart = originalStart !== null
@@ -374,7 +379,7 @@ function snapStemClipEdgeToNeighborEdges(
   stepSeconds: number,
 ) {
   if (!enabled || !Number.isFinite(proposedTime)) return proposedTime;
-  const threshold = Math.max(0.08, Math.min(0.28, normalizeTimelineSnapStep(stepSeconds) * 0.85));
+  const threshold = resolveStemClipMagnetThreshold(duration, stepSeconds);
   const safeTime = Math.max(0, Math.min(duration, proposedTime));
   let bestTime = safeTime;
   let bestDistance = threshold;
@@ -7033,6 +7038,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                 selected={isSelectedTrack}
                 editable
                 snapEnabled={snapToGrid}
+                magnetSnapEnabled={magnetSnap}
                 snapStepSeconds={snapStepSeconds}
                 bufferVersion={bufferVersion}
                 liveSeekOnDrag={!isPlaying}
@@ -10366,6 +10372,7 @@ function WaveformTrackCanvas({
   selected,
   editable,
   snapEnabled,
+  magnetSnapEnabled,
   snapStepSeconds,
   bufferVersion,
   liveSeekOnDrag,
@@ -10398,6 +10405,7 @@ function WaveformTrackCanvas({
   selected: boolean;
   editable: boolean;
   snapEnabled: boolean;
+  magnetSnapEnabled: boolean;
   snapStepSeconds: number;
   bufferVersion: number;
   liveSeekOnDrag: boolean;
@@ -10454,6 +10462,40 @@ function WaveformTrackCanvas({
     return { time, shouldSnap };
   }, [duration, snapEnabled, snapStepSeconds, timeFromPointer]);
 
+  const resolveMagnetGuide = useCallback((time: number): { time: number; distance: number } | null => {
+    if (!magnetSnapEnabled) return null;
+    const draggedClipId = trimDragRef.current?.clipId || clipDragRef.current?.clipId || null;
+    if (!draggedClipId) return null;
+    const draggedClip = clips.find((clip) => clip.id === draggedClipId) || null;
+    if (!draggedClip) return null;
+
+    const threshold = resolveStemClipMagnetThreshold(duration, snapStepSeconds);
+    const clipDuration = getStemClipDuration(draggedClip);
+    const candidateEdges = trimDragRef.current
+      ? [time]
+      : clipDragRef.current
+        ? (() => {
+          const nextStart = clipDragRef.current.clipStart + time - clipDragRef.current.anchorTime;
+          return [nextStart, nextStart + clipDuration];
+        })()
+        : [];
+
+    let best: { time: number; distance: number } | null = null;
+    clips.forEach((clip) => {
+      if (clip.id === draggedClipId) return;
+      [clip.start, clip.start + getStemClipDuration(clip)].forEach((edgeTime) => {
+        candidateEdges.forEach((candidateTime) => {
+          const distance = Math.abs(candidateTime - edgeTime);
+          if (distance <= threshold && (!best || distance < best.distance)) {
+            best = { time: edgeTime, distance };
+          }
+        });
+      });
+    });
+
+    return best;
+  }, [clips, duration, magnetSnapEnabled, snapStepSeconds]);
+
   const updatePointerGuide = useCallback((
     event: PointerEvent<HTMLCanvasElement>,
     label = event.altKey && snapEnabled ? '精修' : '定位',
@@ -10464,15 +10506,16 @@ function WaveformTrackCanvas({
     const containerRect = scrollContainer?.getBoundingClientRect();
     const placement = containerRect && rect.top - containerRect.top < 26 ? 'inside' : 'above';
     const { time, shouldSnap } = interactionTimeFromPointer(event);
+    const magnetGuide = active ? resolveMagnetGuide(time) : null;
     setPointerGuide({
       x: Math.max(0, Math.min(rect.width, event.clientX - rect.left)),
-      time,
-      label,
+      time: magnetGuide?.time ?? time,
+      label: magnetGuide ? '磁吸' : label,
       active,
       snapBypassed: snapEnabled && !shouldSnap,
       placement,
     });
-  }, [interactionTimeFromPointer, snapEnabled]);
+  }, [interactionTimeFromPointer, resolveMagnetGuide, snapEnabled]);
 
   const scheduleTrimChange = useCallback((time: number, shouldSnap: boolean) => {
     pendingTrimRef.current = { time, shouldSnap };
