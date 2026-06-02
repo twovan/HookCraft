@@ -6784,7 +6784,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         >
           {formatStemTimecode(currentTime)}
         </div>
-        <div className="stem-timeline-toolbar" style={timelineToolbarStyle(dawLayoutMetrics, timelineViewportWidth)} data-timeline-pan-zone="true" title="拖动空白处移动时间线视野">
+        <div className="stem-timeline-toolbar" style={timelineToolbarStyle(dawLayoutMetrics, timelineViewportWidth)} data-timeline-pan-zone="true">
           <div>
             <div style={timelineToolbarEyebrowStyle}>时间线</div>
             <div style={timelineToolbarTitleStyle}>多轨时间线</div>
