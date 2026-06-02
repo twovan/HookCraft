@@ -249,6 +249,7 @@ type EditorPreferences = {
 const SELECTED_TRIM_NUDGE_SECONDS = 0.1;
 const STATUS_TOAST_VISIBLE_MS = 3600;
 const STATUS_TOAST_FADE_MS = 360;
+const AUTO_SAVE_IDLE_DELAY_MS = 3000;
 const TRACK_COLOR_PALETTE = [
   '#4d8cff',
   '#38bdf8',
@@ -3962,12 +3963,14 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     }, historyMode);
   }, [commitTrackChange, duration]);
 
-  const copyTrackClipAtTime = useCallback((type: string, time: number) => {
+  const copyTrackClipAtTime = useCallback((type: string, time: number, clipId?: string | null) => {
     const state = tracks[type] || defaultTrackState();
     const clipState = resolveTrackClipState(state, duration);
-    const clip = findStemClipAtTime(clipState.clips, time);
+    const clip = clipId
+      ? clipState.clips.find((candidate) => candidate.id === clipId) || null
+      : findStemClipAtTime(clipState.clips, time);
     if (!clip) {
-      setPlaybackError('当前位置没有可复制的片段。');
+      setPlaybackError(clipId ? '当前选中的片段已经不存在。' : '当前位置没有可复制的片段。');
       return false;
     }
 
@@ -3978,11 +3981,14 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     return true;
   }, [duration, tracks]);
 
-  const cutTrackClipAtTime = useCallback((type: string, time: number) => {
-    if (!copyTrackClipAtTime(type, time)) return;
+  const cutTrackClipAtTime = useCallback((type: string, time: number, clipId?: string | null) => {
+    if (!copyTrackClipAtTime(type, time, clipId)) return;
     const state = tracks[type] || defaultTrackState();
     const clipState = resolveTrackClipState(state, duration);
-    setTrackClips(type, removeStemClipAtTime(clipState.clips, time));
+    setTrackClips(type, clipId
+      ? clipState.clips.filter((clip) => clip.id !== clipId)
+      : removeStemClipAtTime(clipState.clips, time));
+    if (clipId) setSelectedClipSelection(null);
     setSaveStatus('片段已剪切，可在目标时间点粘贴。');
   }, [copyTrackClipAtTime, duration, setTrackClips, tracks]);
 
@@ -4443,8 +4449,6 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       setSaveStatus(null);
     } else if (source === 'export') {
       setAutoSaveStatus('导出前保存编辑中...');
-    } else {
-      setAutoSaveStatus('自动保存中...');
     }
 
     try {
@@ -4479,7 +4483,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       } else if (source === 'export') {
         setAutoSaveStatus(`导出前已保存 ${new Date().toLocaleTimeString('zh-CN', { hour12: false })}`);
       } else {
-        setAutoSaveStatus(`已自动保存 ${new Date().toLocaleTimeString('zh-CN', { hour12: false })}`);
+        setAutoSaveStatus(null);
       }
       setHasPendingEditChanges(false);
       return true;
@@ -4711,11 +4715,19 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       }
       if (!selectedTrack) return;
       if (action === 'copy-selected-clip') {
-        copyTrackClipAtTime(selectedTrack.type, currentTime);
+        copyTrackClipAtTime(
+          selectedTrack.type,
+          currentTime,
+          selectedClipSelection?.trackType === selectedTrack.type ? selectedClipSelection.clipId : null,
+        );
         return;
       }
       if (action === 'cut-selected-clip') {
-        cutTrackClipAtTime(selectedTrack.type, currentTime);
+        cutTrackClipAtTime(
+          selectedTrack.type,
+          currentTime,
+          selectedClipSelection?.trackType === selectedTrack.type ? selectedClipSelection.clipId : null,
+        );
         return;
       }
       if (action === 'paste-clip') {
@@ -4856,7 +4868,6 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     if (lastAutoSaveSignatureRef.current === editStateSignature) return;
 
     setHasPendingEditChanges(true);
-    setAutoSaveStatus('有未保存编辑，稍后自动保存...');
 
     if (isContinuousEditing) {
       return;
@@ -4870,7 +4881,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       autoSaveTimerRef.current = null;
       lastAutoSaveSignatureRef.current = editStateSignature;
       void persistEditState('auto');
-    }, 1400);
+    }, AUTO_SAVE_IDLE_DELAY_MS);
 
     return () => {
       if (autoSaveTimerRef.current !== null) {
