@@ -4460,15 +4460,15 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     await persistEditState('manual');
   }, [persistEditState]);
 
-  const returnToStudioAfterSave = useCallback(async () => {
+  const returnToCreationsAfterSave = useCallback(async () => {
     setPlaybackError(null);
-    setSaveStatus('正在自动保存当前项目，保存完成后返回创作中心...');
+    setSaveStatus('正在自动保存当前项目，保存完成后返回我的作品...');
     const saved = await persistEditState('manual');
     if (!saved) return;
 
-    setSaveStatus('当前项目已自动保存，正在返回创作中心。');
+    setSaveStatus('当前项目已自动保存，正在返回我的作品。');
     window.setTimeout(() => {
-      window.location.assign('/studio');
+      window.location.assign('/account/creations');
     }, 180);
   }, [persistEditState]);
 
@@ -5262,9 +5262,9 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
           </button>
           <button
             type="button"
-            onClick={() => void returnToStudioAfterSave()}
+            onClick={() => void returnToCreationsAfterSave()}
             disabled={isSaving}
-            title="自动保存当前项目后返回创作中心"
+            title="自动保存当前项目后返回我的作品"
             style={ghostButtonStyle}
           >
             返回
