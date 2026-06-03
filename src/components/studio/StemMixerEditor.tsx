@@ -6782,7 +6782,6 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         ref={timelineViewportRef}
         tabIndex={-1}
         aria-label="多轨时间线"
-        title="Ctrl+鼠标滚轮缩放波形，Shift+滚轮横向移动"
         style={trackListStyle(trackDensity, dawLayoutMetrics, isTimelinePanning, shouldAllowTimelineHorizontalScroll)}
         onContextMenu={(event) => {
           event.preventDefault();
@@ -6992,7 +6991,6 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
             onPointerUp={handleTimelineRulerPointerUp}
             onPointerCancel={handleTimelineRulerPointerUp}
             onPointerLeave={() => setTimelineRulerGuide(null)}
-            title="拖动时间尺定位播放头"
           >
             {selectedTrackTrimControls && duration > 0 && (
               <>
@@ -7325,7 +7323,6 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
             style={timelineScrollProgressStyle(dawLayoutMetrics)}
             onPointerDown={handleTimelineNavigatorPointerDown}
             onPointerMove={handleTimelineNavigatorPointerMove}
-            title="拖动快速移动时间线视野"
           >
             <div style={timelineScrollThumbStyle(timelineScrollState.progress, timelineScrollState.viewRatio)} />
           </div>
@@ -9852,20 +9849,21 @@ function timelineFloatingTooltipStyle(tooltip: TimelineTooltipState): CSSPropert
     position: 'fixed',
     left: tooltip.left,
     top: tooltip.top,
-    zIndex: 120,
+    zIndex: 220,
     transform: 'translate(-50%, -100%)',
     maxWidth: 180,
-    padding: '6px 9px',
-    border: '1px solid rgba(139, 153, 186, 0.30)',
-    borderRadius: 7,
-    background: 'linear-gradient(180deg, rgba(18, 22, 35, 0.98), rgba(7, 10, 19, 0.98))',
-    color: '#eef3ff',
-    fontSize: 11,
+    padding: '7px 10px',
+    border: '1px solid rgba(190, 232, 95, 0.34)',
+    borderRadius: 8,
+    background: 'linear-gradient(180deg, rgba(9, 14, 24, 0.995), rgba(2, 6, 14, 0.995))',
+    color: '#f8fbff',
+    fontSize: 12,
     fontWeight: 900,
     lineHeight: 1,
     letterSpacing: 0,
     whiteSpace: 'nowrap',
-    boxShadow: '0 12px 28px rgba(0, 0, 0, 0.38)',
+    textShadow: '0 1px 0 rgba(0, 0, 0, 0.55)',
+    boxShadow: '0 14px 32px rgba(0, 0, 0, 0.58), 0 0 0 1px rgba(255, 255, 255, 0.04) inset',
     pointerEvents: 'none',
   };
 }
