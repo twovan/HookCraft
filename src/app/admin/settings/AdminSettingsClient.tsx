@@ -45,19 +45,19 @@ const STEM_EDITOR_FEATURE_GROUPS = [
   {
     group: 'modes',
     title: '入口与模式',
-    description: '控制用户进入编辑器时能选择的模式，以及是否允许重新分析、升级引导和积分确认。',
+    description: '控制基础编辑器和专业编辑器的入口，以及是否允许重新分析、升级引导和积分确认。',
     items: [
-      ['basicEditor', '简版编辑器'],
-      ['proEditor', '完整版编辑器'],
+      ['basicEditor', '基础编辑器入口'],
+      ['proEditor', '专业编辑器入口'],
       ['showCreditConfirm', '积分确认弹窗'],
-      ['allowUpgradeFromBasic', '简版升级引导'],
+      ['allowUpgradeFromBasic', '基础编辑器升级引导'],
       ['allowForceRefresh', '允许重新分析'],
     ],
   },
   {
     group: 'stems',
     title: '分轨能力',
-    description: '控制调用 KIE 分轨时的能力边界：简版为人声 + 伴奏，完整版为分析结果中的多分轨组。',
+    description: '控制调用 KIE 分轨时的能力边界：基础编辑器为人声 + 伴奏，专业编辑器使用分析结果中的多分轨组。',
     items: [
       ['separateVocal', '2 轨分离：人声 + 伴奏'],
       ['splitStem', '多分轨分析结果'],
@@ -66,7 +66,7 @@ const STEM_EDITOR_FEATURE_GROUPS = [
   {
     group: 'editing',
     title: '基础剪辑',
-    description: 'Plus 默认保留这些高频剪辑操作；关闭后会同步影响按钮、快捷键和画布操作。',
+    description: '控制每个编辑器面板内的高频剪辑操作；关闭后会同步影响按钮、快捷键和画布操作。',
     items: [
       ['playback', '播放与预听'],
       ['trackVolume', '轨道音量'],
@@ -93,7 +93,7 @@ const STEM_EDITOR_FEATURE_GROUPS = [
   {
     group: 'advanced',
     title: '高级制作',
-    description: '更偏 Pro 的制作能力，适合需要自定义轨道、录音、轨道管理和高级视图的用户。',
+    description: '控制专业制作能力，适合需要自定义轨道、录音、轨道管理和高级视图的编辑器面板。',
     items: [
       ['addTrack', '添加空轨道'],
       ['importAudio', '导入自定义音频'],
@@ -113,7 +113,7 @@ const STEM_EDITOR_FEATURE_GROUPS = [
   {
     group: 'export',
     title: '导出权限',
-    description: 'Plus 只开放 MP3；Pro 可开放 WAV、独奏导出、高级导出模式和导出历史。',
+    description: '基础编辑器通常只开放 MP3；专业编辑器可开放 WAV、独奏导出、高级导出模式和导出历史。',
     items: [
       ['mp3Mix', '导出混音 MP3'],
       ['mp3Stems', '批量导出分轨 MP3'],
@@ -130,6 +130,10 @@ function countEnabledFeatures(settings: StemEditorFeatureSettings[keyof StemEdit
   return STEM_EDITOR_FEATURE_GROUPS.reduce((total, group) => (
     total + group.items.filter(([key]) => Boolean((settings as any)[group.group][key])).length
   ), 0);
+}
+
+function getEditorPanelLabel(tier: keyof StemEditorFeatureSettings) {
+  return tier === 'plus' ? '基础编辑器' : '专业编辑器';
 }
 
 export default function AdminSettingsClient({ view = 'system' }: { view?: 'system' | 'editor' }) {
@@ -422,26 +426,26 @@ export default function AdminSettingsClient({ view = 'system' }: { view?: 'syste
               <p style={editorManagerEyebrowStyle}>Stem 编辑器权限</p>
               <h3 style={editorManagerTitleStyle}>编辑器功能开关</h3>
               <p style={editorManagerDescriptionStyle}>
-                这里控制 Plus 简版和 Pro 完整版的编辑器入口、分轨方式、剪辑工具和导出权限。修改后会影响按钮、快捷键、右键菜单和导出模式。
+                这里按编辑器面板控制入口、分轨方式、剪辑工具和导出权限。基础编辑器对应 Plus 用户，专业编辑器对应 Pro 用户；修改后会影响按钮、快捷键、右键菜单和导出模式。
               </p>
             </div>
             <div style={editorSummaryGridStyle}>
               <div style={editorSummaryCardStyle}>
-                <span style={editorSummaryLabelStyle}>Plus 简版</span>
+                <span style={editorSummaryLabelStyle}>基础编辑器</span>
                 <strong style={editorSummaryValueStyle}>{countEnabledFeatures(stemEditorFeatures.plus)}</strong>
-                <span style={editorSummaryMetaStyle}>2 轨编辑 / MP3 导出</span>
+                <span style={editorSummaryMetaStyle}>Plus 用户 / 2 轨编辑 / MP3 导出</span>
               </div>
               <div style={editorSummaryCardStyle}>
-                <span style={editorSummaryLabelStyle}>Pro 完整版</span>
+                <span style={editorSummaryLabelStyle}>专业编辑器</span>
                 <strong style={editorSummaryValueStyle}>{countEnabledFeatures(stemEditorFeatures.pro)}</strong>
-                <span style={editorSummaryMetaStyle}>多分轨分析 / 完整工具</span>
+                <span style={editorSummaryMetaStyle}>Pro 用户 / 分析结果分轨 / 完整工具</span>
               </div>
             </div>
           </div>
 
           <div style={editorTierLegendStyle}>
-            <span style={editorTierPillStyle('#2563eb')}>Plus：保留基础剪辑，限制高级制作和 WAV</span>
-            <span style={editorTierPillStyle('#b45309')}>Pro：默认开放当前完整编辑器能力</span>
+            <span style={editorTierPillStyle('#2563eb')}>基础编辑器：面向 Plus 用户，保留基础剪辑，限制高级制作和 WAV</span>
+            <span style={editorTierPillStyle('#b45309')}>专业编辑器：面向 Pro 用户，默认开放当前完整编辑器能力</span>
           </div>
 
           <div style={editorFeatureGridStyle}>
@@ -453,9 +457,9 @@ export default function AdminSettingsClient({ view = 'system' }: { view?: 'syste
                     <p style={editorFeatureGroupDescriptionStyle}>{group.description}</p>
                   </div>
                   <div style={editorFeatureGroupCountStyle}>
-                    Plus {group.items.filter(([key]) => Boolean((stemEditorFeatures.plus as any)[group.group][key])).length}
+                    基础 {group.items.filter(([key]) => Boolean((stemEditorFeatures.plus as any)[group.group][key])).length}
                     {' / '}
-                    Pro {group.items.filter(([key]) => Boolean((stemEditorFeatures.pro as any)[group.group][key])).length}
+                    专业 {group.items.filter(([key]) => Boolean((stemEditorFeatures.pro as any)[group.group][key])).length}
                   </div>
                 </div>
                 <div style={editorFeatureRowsStyle}>
@@ -473,7 +477,7 @@ export default function AdminSettingsClient({ view = 'system' }: { view?: 'syste
                             style={editorSwitchButtonStyle(enabled)}
                           >
                             <span style={editorSwitchDotStyle(enabled)} />
-                            {tier === 'plus' ? 'Plus' : 'Pro'}
+                            {getEditorPanelLabel(tier)}
                           </button>
                         );
                       })}
@@ -720,7 +724,7 @@ const editorFeatureRowsStyle: React.CSSProperties = {
 
 const editorFeatureRowStyle: React.CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'minmax(160px, 1fr) 86px 86px',
+  gridTemplateColumns: 'minmax(160px, 1fr) 116px 116px',
   alignItems: 'center',
   gap: 8,
   minHeight: 44,
@@ -741,6 +745,7 @@ function editorSwitchButtonStyle(enabled: boolean): React.CSSProperties {
     justifyContent: 'center',
     gap: 6,
     minHeight: 28,
+    padding: '0 10px',
     borderRadius: 8,
     border: enabled ? '1px solid #2f7d58' : '1px solid #d1d5db',
     background: enabled ? '#e7f5ee' : '#f9fafb',
