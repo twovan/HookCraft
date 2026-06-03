@@ -1067,7 +1067,7 @@ function TimelineIconButton({
     onTooltipChange({
       label,
       left: rect.left + rect.width / 2,
-      top: rect.top - 9,
+      top: rect.top - 22,
     });
   };
 
@@ -9318,13 +9318,13 @@ const loadingNoticeStyle: CSSProperties = {
 function editorStatusToastDockStyle(metrics: DawEditorLayoutMetrics): CSSProperties {
   return {
     position: 'fixed',
-    top: metrics.headerHeight + 12,
+    top: Math.max(14, metrics.headerHeight - 48),
     left: '50%',
     transform: 'translateX(-50%)',
     zIndex: 78,
     display: 'grid',
     gap: 8,
-    width: 'min(520px, calc(100vw - 40px))',
+    width: 'min(500px, calc(100vw - 40px))',
     pointerEvents: 'none',
   };
 }
@@ -9336,7 +9336,7 @@ function editorStatusToastStyle(tone: 'save' | 'auto', dismissing = false): CSSP
     gridTemplateColumns: '22px minmax(0, 1fr)',
     alignItems: 'center',
     gap: 10,
-    minHeight: 38,
+    minHeight: 34,
     borderRadius: 8,
     border: saveTone ? '1px solid rgba(134, 239, 172, 0.72)' : '1px solid rgba(125, 211, 252, 0.68)',
     background: saveTone ? '#052e16' : '#082f49',
@@ -9344,7 +9344,7 @@ function editorStatusToastStyle(tone: 'save' | 'auto', dismissing = false): CSSP
       ? '0 16px 38px rgba(0, 0, 0, 0.48), 0 0 0 1px rgba(187, 247, 208, 0.08), 0 0 28px rgba(34, 197, 94, 0.22)'
       : '0 16px 38px rgba(0, 0, 0, 0.48), 0 0 0 1px rgba(186, 230, 253, 0.08), 0 0 28px rgba(14, 165, 233, 0.22)',
     color: saveTone ? '#dcfce7' : '#e0f2fe',
-    padding: '8px 12px',
+    padding: '6px 12px',
     fontSize: 12,
     fontWeight: 900,
     letterSpacing: 0,
