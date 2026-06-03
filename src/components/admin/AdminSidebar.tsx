@@ -61,6 +61,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: '系统',
     items: [
       { label: '系统设置', icon: '⚙️', href: '/admin/settings' },
+      { label: '编辑器开关', icon: '🎚️', href: '/admin/settings#stem-editor-features' },
       { label: '操作日志', icon: '📝', href: '/admin/logs' },
       { label: '敏感词检测日志', icon: '🛡️', href: '/admin/sensitivity-logs' },
     ],
@@ -124,9 +125,10 @@ export default function AdminSidebar() {
   };
 
   const isActive = (href: string) => {
-    if (href === '/admin') return pathname === '/admin';
-    if (href === '/admin/credits') return pathname === '/admin/credits';
-    return pathname.startsWith(href);
+    const pathOnly = href.split('#')[0];
+    if (pathOnly === '/admin') return pathname === '/admin';
+    if (pathOnly === '/admin/credits') return pathname === '/admin/credits';
+    return pathname.startsWith(pathOnly);
   };
 
   return (

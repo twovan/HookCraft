@@ -392,8 +392,8 @@ export default function AdminSettingsPage() {
             {saving === 'studio_tabs' ? '保存中...' : '保存设置'}
           </button>
         </div>
-        <div style={{ ...cardStyle, gridColumn: '1 / -1' }}>
-          <h3 style={cardTitleStyle}>Stem Editor Feature Switches</h3>
+        <div id="stem-editor-features" style={{ ...cardStyle, gridColumn: '1 / -1', scrollMarginTop: 88 }}>
+          <h3 style={cardTitleStyle}>Stem 编辑器功能开关</h3>
           <div style={editorMatrixStyle}>
             <div style={editorMatrixHeaderStyle}>Feature</div>
             <div style={editorMatrixHeaderStyle}>Plus / Basic</div>
