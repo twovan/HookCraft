@@ -127,6 +127,7 @@ export default function StemEditorPageClient() {
   const activeFeatureSettings = accessTier === 'pro'
     ? featureSettings.pro
     : featureSettings.plus;
+  const canForceRefresh = activeFeatureSettings.modes.allowForceRefresh;
 
   const redirectToLogin = useCallback(() => {
     setError(TEXT.authExpired);
@@ -419,6 +420,7 @@ export default function StemEditorPageClient() {
               {!selectedSeparationMode && !initialJobId && (
                 <ModeSelectionPanel
                   accessTier={accessTier}
+                  featureSettings={featureSettings}
                   onSelect={(mode) => {
                     setSelectedSeparationMode(mode);
                     requestedRef.current = false;
@@ -443,7 +445,7 @@ export default function StemEditorPageClient() {
                       {TEXT.rereadCache}
                     </button>
                   )}
-                  {(job?.status === 'failed' || error) && generationTaskId && (
+                  {(job?.status === 'failed' || error) && generationTaskId && canForceRefresh && (
                     <button type="button" onClick={() => void createJob(true)} style={refreshButtonStyle}>
                       {TEXT.retryApi}
                     </button>
@@ -779,13 +781,22 @@ function normalizeSeparationMode(value: unknown): StemSeparationMode | null {
 
 function ModeSelectionPanel({
   accessTier,
+  featureSettings,
   onSelect,
 }: {
   accessTier: 'free' | 'plus' | 'pro';
+  featureSettings: StemEditorFeatureSettings;
   onSelect: (mode: StemSeparationMode) => void;
 }) {
-  const canUseBasic = accessTier === 'plus' || accessTier === 'pro';
-  const canUsePro = accessTier === 'pro';
+  const activeSettings = accessTier === 'pro' ? featureSettings.pro : featureSettings.plus;
+  const canUseBasic = accessTier !== 'free'
+    && activeSettings.modes.basicEditor
+    && activeSettings.stems.separateVocal;
+  const canUsePro = accessTier === 'pro'
+    && activeSettings.modes.proEditor
+    && activeSettings.stems.splitStem;
+  const showUpgradePrompt = activeSettings.modes.allowUpgradeFromBasic;
+  const showCreditConfirm = activeSettings.modes.showCreditConfirm;
 
   return (
     <div style={modePanelStyle}>
@@ -799,6 +810,7 @@ function ModeSelectionPanel({
         >
           <strong>{TEXT.basicEditor}</strong>
           <span>{TEXT.basicEditorDesc}</span>
+          {showCreditConfirm && canUseBasic && <small style={modeHintStyle}>开始前会确认积分消耗</small>}
           <em>{canUseBasic ? TEXT.startBasic : TEXT.freeLocked}</em>
         </button>
         <button
@@ -809,7 +821,8 @@ function ModeSelectionPanel({
         >
           <strong>{TEXT.proEditor}</strong>
           <span>{TEXT.proEditorDesc}</span>
-          <em>{canUsePro ? TEXT.startPro : TEXT.proLocked}</em>
+          {showCreditConfirm && canUsePro && <small style={modeHintStyle}>开始前会确认积分消耗</small>}
+          <em>{canUsePro ? TEXT.startPro : showUpgradePrompt ? TEXT.proLocked : '当前未开放'}</em>
         </button>
       </div>
     </div>
@@ -1126,6 +1139,13 @@ function modeCardStyle(disabled: boolean): CSSProperties {
     fontFamily: 'var(--hc-font)',
   };
 }
+
+const modeHintStyle: CSSProperties = {
+  color: '#d9f99d',
+  fontSize: 12,
+  fontWeight: 800,
+  fontStyle: 'normal',
+};
 
 const fallbackTransportStyle: CSSProperties = {
   display: 'none',

@@ -1582,6 +1582,9 @@ export default function StemMixerEditor({
   featureSettings,
 }: StemMixerEditorProps) {
   const editorFeatures = featureSettings || DEFAULT_STEM_EDITOR_FEATURE_SETTINGS.pro;
+  const canUsePlayback = editorFeatures.editing.playback;
+  const canUseTrackVolume = editorFeatures.editing.trackVolume;
+  const canUseMuteSolo = editorFeatures.editing.muteSolo;
   const canUseTimelineZoom = editorFeatures.editing.zoom;
   const canUseSnap = editorFeatures.editing.snap;
   const canUseTrim = editorFeatures.editing.trim;
@@ -1599,6 +1602,11 @@ export default function StemMixerEditor({
   const canUseLocalDraftRecovery = editorFeatures.editing.localDraftRecovery;
   const canUseTrackFilter = editorFeatures.advanced.trackViewFilter;
   const canUseTrackDensity = editorFeatures.advanced.trackDensity;
+  const canUseTrackReorder = editorFeatures.advanced.trackReorder;
+  const canUseRecordingDeviceSelect = editorFeatures.advanced.recordingDeviceSelect;
+  const canUseRecordingChannelSelect = editorFeatures.advanced.recordingChannelSelect;
+  const canUseRecordingInputLevel = editorFeatures.advanced.recordingInputLevel;
+  const canUseRecordingMonitoring = editorFeatures.advanced.recordingMonitoring;
   const canUseAdvancedProduction = editorFeatures.advanced.addTrack
     || editorFeatures.advanced.importAudio
     || editorFeatures.advanced.recording;
@@ -2092,7 +2100,7 @@ export default function StemMixerEditor({
     if (canUseTimelineZoom && typeof preferences.timelineZoom === 'number' && Number.isFinite(preferences.timelineZoom)) {
       setTimelineZoom(clampTimelineZoom(preferences.timelineZoom));
     }
-    if (typeof preferences.followPlayhead === 'boolean') {
+    if (editorFeatures.editing.followPlayhead && typeof preferences.followPlayhead === 'boolean') {
       setFollowPlayhead(preferences.followPlayhead);
     }
     if (canUseSnap && typeof preferences.magnetSnap === 'boolean') {
@@ -2111,7 +2119,7 @@ export default function StemMixerEditor({
       setTrackDensity(preferences.trackDensity);
     }
     setEditorPreferencesLoaded(true);
-  }, [canUseAdvancedExportModes, canUseSnap, canUseSoloOnlyExport, canUseTimelineZoom, canUseTrackDensity, canUseTrackFilter]);
+  }, [canUseAdvancedExportModes, canUseSnap, canUseSoloOnlyExport, canUseTimelineZoom, canUseTrackDensity, canUseTrackFilter, editorFeatures.editing.followPlayhead]);
 
   useEffect(() => {
     if (!editorPreferencesLoaded) return;
@@ -2146,10 +2154,13 @@ export default function StemMixerEditor({
       if (snapToGrid) setSnapToGrid(false);
       if (magnetSnap) setMagnetSnap(false);
     }
+    if (!editorFeatures.editing.followPlayhead && followPlayhead) {
+      setFollowPlayhead(false);
+    }
     if (!canUseTimelineZoom && timelineZoom !== 1) {
       setTimelineZoom(1);
     }
-  }, [canUseAdvancedExportModes, canUseSnap, canUseSoloOnlyExport, canUseTimelineZoom, canUseTrackDensity, canUseTrackFilter, exportMode, magnetSnap, snapToGrid, timelineZoom, trackDensity, trackViewMode]);
+  }, [canUseAdvancedExportModes, canUseSnap, canUseSoloOnlyExport, canUseTimelineZoom, canUseTrackDensity, canUseTrackFilter, editorFeatures.editing.followPlayhead, exportMode, followPlayhead, magnetSnap, snapToGrid, timelineZoom, trackDensity, trackViewMode]);
 
   useEffect(() => {
     setSaveStatusDismissing(false);
@@ -2601,6 +2612,7 @@ export default function StemMixerEditor({
   }, [restoreEditorHistorySnapshot]);
 
   const moveTrackOrderByPointer = useCallback((trackType: string, clientY: number) => {
+    if (!canUseTrackReorder) return false;
     const visibleTypes = visibleStems.map((stem) => stem.type);
     if (!visibleTypes.includes(trackType)) return false;
 
@@ -2641,9 +2653,10 @@ export default function StemMixerEditor({
       setSaveStatus('轨道顺序已调整，自动保存后下次进入会恢复。');
     }
     return changed;
-  }, [stems, visibleStems]);
+  }, [canUseTrackReorder, stems, visibleStems]);
 
   const handleTrackHeaderPointerDown = useCallback((event: PointerEvent<HTMLDivElement>, trackType: string) => {
+    if (!canUseTrackReorder) return;
     const target = event.target;
     if (event.button !== 0 || !(target instanceof HTMLElement)) return;
     if (target.closest('button,input,textarea,select,a,canvas')) return;
@@ -2660,7 +2673,7 @@ export default function StemMixerEditor({
     safelySetPointerCapture(event.currentTarget, event.pointerId);
     event.preventDefault();
     event.stopPropagation();
-  }, []);
+  }, [canUseTrackReorder]);
 
   const handleTrackHeaderPointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
     const drag = trackReorderDragRef.current;
@@ -2990,6 +3003,7 @@ export default function StemMixerEditor({
   }, [clearLoopPreviewTimer, duration, stopFrame, stopSources]);
 
   const playAll = useCallback(async () => {
+    if (!canUsePlayback) return;
     if (!masterStem) return;
 
     const previewStemType = previewStemTypeRef.current;
@@ -3098,9 +3112,10 @@ export default function StemMixerEditor({
       pauseAll();
       setPlaybackError('分轨混音启动失败，请刷新页面后重试。');
     }
-  }, [duration, getAudioContext, hasSoloTrack, loadableStemCount, masterState, masterStem, pauseAll, stems, stopFrame, stopSources, tracks]);
+  }, [canUsePlayback, duration, getAudioContext, hasSoloTrack, loadableStemCount, masterState, masterStem, pauseAll, stems, stopFrame, stopSources, tracks]);
 
   const handleTogglePlayback = useCallback(() => {
+    if (!canUsePlayback) return;
     if (isPlaying) {
       pauseAll();
       return;
@@ -3110,7 +3125,7 @@ export default function StemMixerEditor({
     playbackStopAtRef.current = null;
     previewStemTypeRef.current = null;
     void playAll();
-  }, [clearLoopPreviewTimer, isPlaying, pauseAll, playAll]);
+  }, [canUsePlayback, clearLoopPreviewTimer, isPlaying, pauseAll, playAll]);
 
   const stopPlaybackPreview = useCallback(() => {
     pauseAll();
@@ -3537,12 +3552,12 @@ export default function StemMixerEditor({
 
   useEffect(() => {
     if (recordingInputGainRef.current) {
-      recordingInputGainRef.current.gain.value = recordingInputLevel;
+      recordingInputGainRef.current.gain.value = canUseRecordingInputLevel ? recordingInputLevel : 1;
     }
     if (recordingMonitorGainRef.current) {
-      recordingMonitorGainRef.current.gain.value = monitoringEnabled ? 1 : 0;
+      recordingMonitorGainRef.current.gain.value = canUseRecordingMonitoring && monitoringEnabled ? 1 : 0;
     }
-  }, [monitoringEnabled, recordingInputLevel]);
+  }, [canUseRecordingInputLevel, canUseRecordingMonitoring, monitoringEnabled, recordingInputLevel]);
 
   const startRecordingMeter = useCallback((stream: MediaStream, forceMonitoring = monitoringEnabled) => {
     stopRecordingMeter();
@@ -3553,17 +3568,18 @@ export default function StemMixerEditor({
     const analyser = context.createAnalyser();
     const recordingDestination = context.createMediaStreamDestination();
     analyser.fftSize = 256;
-    inputGain.gain.value = recordingInputLevel;
-    monitorGain.gain.value = forceMonitoring ? 1 : 0;
+    inputGain.gain.value = canUseRecordingInputLevel ? recordingInputLevel : 1;
+    monitorGain.gain.value = canUseRecordingMonitoring && forceMonitoring ? 1 : 0;
     void context.resume().catch(() => undefined);
 
-    if (recordingInputChannel === 'stereo') {
+    const effectiveInputChannel = canUseRecordingChannelSelect ? recordingInputChannel : 'channel-1';
+    if (effectiveInputChannel === 'stereo') {
       source.connect(inputGain);
     } else {
       const splitter = context.createChannelSplitter(2);
       source.connect(splitter);
       try {
-        splitter.connect(inputGain, recordingInputChannel === 'channel-2' ? 1 : 0);
+        splitter.connect(inputGain, effectiveInputChannel === 'channel-2' ? 1 : 0);
       } catch {
         splitter.connect(inputGain, 0);
       }
@@ -3599,9 +3615,10 @@ export default function StemMixerEditor({
 
     tick();
     return recordingDestination.stream;
-  }, [monitoringEnabled, recordingInputChannel, recordingInputLevel, stopRecordingMeter]);
+  }, [canUseRecordingChannelSelect, canUseRecordingInputLevel, canUseRecordingMonitoring, monitoringEnabled, recordingInputChannel, recordingInputLevel, stopRecordingMeter]);
 
   const toggleInputMonitoring = useCallback(async () => {
+    if (!canUseRecordingMonitoring) return;
     if (monitoringEnabled) {
       setMonitoringEnabled(false);
       if (recordingMonitorGainRef.current) {
@@ -3616,7 +3633,7 @@ export default function StemMixerEditor({
     setMonitoringEnabled(true);
     if (recordingAudioContextRef.current && recordingMonitorGainRef.current) {
       await recordingAudioContextRef.current.resume().catch(() => undefined);
-      recordingMonitorGainRef.current.gain.value = 1;
+      recordingMonitorGainRef.current.gain.value = canUseRecordingMonitoring ? 1 : 0;
       if (!isRecording) {
         setIsMonitoringPreview(true);
         setRecordingStatus('监听中...');
@@ -3635,8 +3652,8 @@ export default function StemMixerEditor({
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          deviceId: selectedAudioInputDeviceId ? { exact: selectedAudioInputDeviceId } : undefined,
-          channelCount: recordingInputChannel === 'channel-1' ? { ideal: 1 } : { ideal: 2 },
+          deviceId: canUseRecordingDeviceSelect && selectedAudioInputDeviceId ? { exact: selectedAudioInputDeviceId } : undefined,
+          channelCount: canUseRecordingChannelSelect && recordingInputChannel !== 'channel-1' ? { ideal: 2 } : { ideal: 1 },
           echoCancellation: false,
           noiseSuppression: false,
           autoGainControl: false,
@@ -3655,6 +3672,9 @@ export default function StemMixerEditor({
       setPlaybackError('无法打开麦克风监听，请检查浏览器权限和输入设备。');
     }
   }, [
+    canUseRecordingChannelSelect,
+    canUseRecordingDeviceSelect,
+    canUseRecordingMonitoring,
     isRecording,
     monitoringEnabled,
     recordingInputChannel,
@@ -3689,15 +3709,15 @@ export default function StemMixerEditor({
       setRecordingLevel(0);
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          deviceId: selectedAudioInputDeviceId ? { exact: selectedAudioInputDeviceId } : undefined,
-          channelCount: recordingInputChannel === 'channel-1' ? { ideal: 1 } : { ideal: 2 },
+          deviceId: canUseRecordingDeviceSelect && selectedAudioInputDeviceId ? { exact: selectedAudioInputDeviceId } : undefined,
+          channelCount: canUseRecordingChannelSelect && recordingInputChannel !== 'channel-1' ? { ideal: 2 } : { ideal: 1 },
           echoCancellation: false,
           noiseSuppression: false,
           autoGainControl: false,
         },
       });
       void refreshAudioInputDevices();
-      const processedStream = startRecordingMeter(stream, monitoringEnabled);
+      const processedStream = startRecordingMeter(stream, canUseRecordingMonitoring && monitoringEnabled);
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus'
         : '';
@@ -3754,7 +3774,7 @@ export default function StemMixerEditor({
       setRecordingLevel(0);
       setPlaybackError('无法打开麦克风，请检查浏览器录音权限。');
     }
-  }, [addCustomStemFromBlob, customStems.length, monitoringEnabled, recordingInputChannel, refreshAudioInputDevices, resolveAudioInputTargetType, selectedAudioInputDeviceId, startRecordingMeter, stopMonitoringPreview, stopRecordingMeter]);
+  }, [addCustomStemFromBlob, canUseRecordingChannelSelect, canUseRecordingDeviceSelect, canUseRecordingMonitoring, customStems.length, monitoringEnabled, recordingInputChannel, refreshAudioInputDevices, resolveAudioInputTargetType, selectedAudioInputDeviceId, startRecordingMeter, stopMonitoringPreview, stopRecordingMeter]);
 
   const stopRecordingTrack = useCallback(() => {
     const recorder = mediaRecorderRef.current;
@@ -4391,6 +4411,7 @@ export default function StemMixerEditor({
   }, [currentTime, handleSeek]);
 
   const toggleTrackFlag = useCallback((type: string, flag: 'muted' | 'solo') => {
+    if (!canUseMuteSolo) return;
     commitTrackChange((current) => ({
       ...current,
       [type]: {
@@ -4398,7 +4419,7 @@ export default function StemMixerEditor({
         [flag]: !current[type]?.[flag],
       },
     }));
-  }, [commitTrackChange]);
+  }, [canUseMuteSolo, commitTrackChange]);
 
   const toggleTrackCollapsed = useCallback((type: string) => {
     commitTrackChange((current) => {
@@ -4414,6 +4435,7 @@ export default function StemMixerEditor({
   }, [commitTrackChange]);
 
   const soloOnlyTrack = useCallback((type: string) => {
+    if (!canUseMuteSolo) return;
     commitTrackChange((current) => Object.fromEntries(stems.map((stem) => {
       const existing = current[stem.type] || defaultTrackState();
       const isTarget = stem.type === type;
@@ -4432,9 +4454,10 @@ export default function StemMixerEditor({
     setSaveStatus(stem
       ? `已切换为只听“${getStemDisplayName(stem).zh}”。`
       : '已切换为只听当前轨道。');
-  }, [commitTrackChange, stems]);
+  }, [canUseMuteSolo, commitTrackChange, stems]);
 
   const setTrackVolume = useCallback((type: string, volume: number, historyMode: StemHistoryMode = 'immediate') => {
+    if (!canUseTrackVolume) return;
     commitTrackChange((current) => ({
       ...current,
       [type]: {
@@ -4442,7 +4465,7 @@ export default function StemMixerEditor({
         volume,
       },
     }), historyMode);
-  }, [commitTrackChange]);
+  }, [canUseTrackVolume, commitTrackChange]);
 
   const setTrackPan = useCallback((type: string, pan: number, historyMode: StemHistoryMode = 'immediate') => {
     if (!canUsePan) return;
@@ -5183,10 +5206,12 @@ export default function StemMixerEditor({
 
       event.preventDefault();
       if (action === 'toggle-playback') {
+        if (!canUsePlayback) return;
         handleTogglePlayback();
         return;
       }
       if (action === 'stop-playback') {
+        if (!canUsePlayback) return;
         stopPlaybackPreview();
         return;
       }
@@ -5218,26 +5243,32 @@ export default function StemMixerEditor({
         return;
       }
       if (action === 'seek-start') {
+        if (!canUsePlayback) return;
         handleSeek(0);
         return;
       }
       if (action === 'seek-end') {
+        if (!canUsePlayback) return;
         handleSeek(duration);
         return;
       }
       if (action === 'seek-backward') {
+        if (!canUsePlayback) return;
         nudgePlaybackHead(-1);
         return;
       }
       if (action === 'seek-forward') {
+        if (!canUsePlayback) return;
         nudgePlaybackHead(1);
         return;
       }
       if (action === 'seek-backward-large') {
+        if (!canUsePlayback) return;
         nudgePlaybackHead(-1, true);
         return;
       }
       if (action === 'seek-forward-large') {
+        if (!canUsePlayback) return;
         nudgePlaybackHead(1, true);
         return;
       }
@@ -5257,6 +5288,7 @@ export default function StemMixerEditor({
         return;
       }
       if (action === 'toggle-follow-playhead') {
+        if (!canUsePlayback || !editorFeatures.editing.followPlayhead) return;
         setFollowPlayhead((value) => !value);
         return;
       }
@@ -5327,10 +5359,12 @@ export default function StemMixerEditor({
         return;
       }
       if (action === 'toggle-selected-mute') {
+        if (!canUseMuteSolo) return;
         toggleTrackFlag(selectedTrack.type, 'muted');
         return;
       }
       if (action === 'toggle-selected-solo') {
+        if (!canUseMuteSolo) return;
         toggleTrackFlag(selectedTrack.type, 'solo');
         return;
       }
@@ -5387,7 +5421,9 @@ export default function StemMixerEditor({
     canUseDeleteClip,
     canUseFade,
     canUseLoopPreview,
+    canUseMuteSolo,
     canUseMuteRanges,
+    canUsePlayback,
     canUseSplitClip,
     canUseTimelineZoom,
     canUseTrackDensity,
@@ -5943,24 +5979,24 @@ export default function StemMixerEditor({
         <div style={transportPanelStyle(true)}>
           <div style={transportStyle}>
             <div style={transportButtonGroupStyle}>
-              <button type="button" aria-label="回到开头" title="回到开头" onClick={() => handleSeek(0)} style={transportIconButtonStyle(false)}>
+              <button type="button" aria-label="回到开头" title="回到开头" disabled={!canUsePlayback} onClick={() => handleSeek(0)} style={transportIconButtonStyle(!canUsePlayback)}>
                 <TransportIcon name="skipStart" />
               </button>
-              <button type="button" aria-label="后退 1 秒" title="后退 1 秒" onClick={() => nudgePlaybackHead(-1, true)} style={transportIconButtonStyle(false)}>
+              <button type="button" aria-label="后退 1 秒" title="后退 1 秒" disabled={!canUsePlayback} onClick={() => nudgePlaybackHead(-1, true)} style={transportIconButtonStyle(!canUsePlayback)}>
                 <TransportIcon name="back" />
                 <span style={transportNudgeBadgeStyle}>1s</span>
               </button>
-              <button type="button" aria-label={isPlaying ? '暂停' : '播放'} title="播放/暂停" onClick={handleTogglePlayback} style={playButtonStyle}>
+              <button type="button" aria-label={isPlaying ? '暂停' : '播放'} title="播放/暂停" disabled={!canUsePlayback} onClick={handleTogglePlayback} style={canUsePlayback ? playButtonStyle : { ...playButtonStyle, opacity: 0.45, cursor: 'not-allowed' }}>
                 <TransportIcon name={isPlaying ? 'pause' : 'play'} />
               </button>
-              <button type="button" aria-label="停止预听" title="停止预听" onClick={stopPlaybackPreview} style={transportIconButtonStyle(false)}>
+              <button type="button" aria-label="停止预听" title="停止预听" disabled={!canUsePlayback} onClick={stopPlaybackPreview} style={transportIconButtonStyle(!canUsePlayback)}>
                 <TransportIcon name="stop" />
               </button>
-              <button type="button" aria-label="前进 1 秒" title="前进 1 秒" onClick={() => nudgePlaybackHead(1, true)} style={transportIconButtonStyle(false)}>
+              <button type="button" aria-label="前进 1 秒" title="前进 1 秒" disabled={!canUsePlayback} onClick={() => nudgePlaybackHead(1, true)} style={transportIconButtonStyle(!canUsePlayback)}>
                 <TransportIcon name="forward" />
                 <span style={transportNudgeBadgeStyle}>1s</span>
               </button>
-              <button type="button" aria-label="跳到结尾" title="跳到结尾" onClick={() => handleSeek(duration)} style={transportIconButtonStyle(false)}>
+              <button type="button" aria-label="跳到结尾" title="跳到结尾" disabled={!canUsePlayback} onClick={() => handleSeek(duration)} style={transportIconButtonStyle(!canUsePlayback)}>
                 <TransportIcon name="skipEnd" />
               </button>
             </div>
@@ -6105,7 +6141,7 @@ export default function StemMixerEditor({
               <>
                 <div style={recordingInputPanelStyle}>
                   <div style={recordingInputLabelStyle}>输入</div>
-                  <div style={recordingSelectGroupStyle} data-recording-select="true">
+                  {canUseRecordingDeviceSelect && <div style={recordingSelectGroupStyle} data-recording-select="true">
                     <button
                       type="button"
                       aria-haspopup="listbox"
@@ -6136,8 +6172,8 @@ export default function StemMixerEditor({
                         ))}
                       </div>
                     )}
-                  </div>
-                  <div style={recordingSelectGroupStyle} data-recording-select="true">
+                  </div>}
+                  {canUseRecordingChannelSelect && <div style={recordingSelectGroupStyle} data-recording-select="true">
                     <button
                       type="button"
                       aria-haspopup="listbox"
@@ -6168,9 +6204,9 @@ export default function StemMixerEditor({
                         ))}
                       </div>
                     )}
-                  </div>
-                  <div style={recordingInputFooterStyle}>
-                    <label style={recordingInputLevelStyle}>
+                  </div>}
+                  {(canUseRecordingInputLevel || canUseRecordingMonitoring) && <div style={recordingInputFooterStyle}>
+                    {canUseRecordingInputLevel && <label style={recordingInputLevelStyle}>
                       <span>输入电平</span>
                       <input
                         aria-label="录音输入电平"
@@ -6182,8 +6218,8 @@ export default function StemMixerEditor({
                         onChange={(event) => setRecordingInputLevel(Number(event.target.value))}
                         style={recordingInputRangeStyle}
                       />
-                    </label>
-                    <button
+                    </label>}
+                    {canUseRecordingMonitoring && <button
                       type="button"
                       aria-pressed={monitoringEnabled}
                       title={monitoringEnabled ? '关闭监听' : '开启监听'}
@@ -6191,8 +6227,8 @@ export default function StemMixerEditor({
                       onClick={() => void toggleInputMonitoring()}
                     >
                       {monitoringEnabled ? '监听中' : '监听'}
-                    </button>
-                  </div>
+                    </button>}
+                  </div>}
                 </div>
                 <div style={recordPanelStyle}>
                   <div style={recordingStatusBlockStyle}>
@@ -6261,15 +6297,15 @@ export default function StemMixerEditor({
                     )}
                   </div>
                   <div style={selectedTrackActionsStyle}>
-                    <button type="button" style={presetButtonStyle} onClick={() => toggleTrackFlag(selectedTrack.type, 'muted')}>
+                    {canUseMuteSolo && <button type="button" style={presetButtonStyle} onClick={() => toggleTrackFlag(selectedTrack.type, 'muted')}>
                       {selectedTrackState.muted ? '取消静音' : '静音'}
-                    </button>
-                    <button type="button" style={presetButtonStyle} onClick={() => toggleTrackFlag(selectedTrack.type, 'solo')}>
+                    </button>}
+                    {canUseMuteSolo && <button type="button" style={presetButtonStyle} onClick={() => toggleTrackFlag(selectedTrack.type, 'solo')}>
                       {selectedTrackState.solo ? '取消独奏' : '独奏'}
-                    </button>
-                    <button type="button" style={presetButtonStyle} onClick={() => soloOnlyTrack(selectedTrack.type)}>
+                    </button>}
+                    {canUseMuteSolo && <button type="button" style={presetButtonStyle} onClick={() => soloOnlyTrack(selectedTrack.type)}>
                       只听当前
-                    </button>
+                    </button>}
                     {editorFeatures.editing.previewSelection && <button
                       type="button"
                       disabled={!selectedTrackBuffer}
@@ -6443,7 +6479,7 @@ export default function StemMixerEditor({
                       />
                     </div>
                   </label>}
-                  <label style={selectedTrackControlStyle}>
+                  {canUseTrackVolume && <label style={selectedTrackControlStyle}>
                     <span>音量 {Math.round(selectedTrackState.volume * 100)}%</span>
                     <input
                       aria-label={`${getStemDisplayName(selectedTrack).zh} 音量`}
@@ -6459,7 +6495,7 @@ export default function StemMixerEditor({
                       onKeyUp={finishContinuousControlEdit}
                       onChange={(event) => setTrackVolume(selectedTrack.type, Number(event.target.value), 'deferred')}
                     />
-                  </label>
+                  </label>}
                   {canUsePan && <label style={selectedTrackControlStyle}>
                     <span>声像 {formatPan(selectedTrackState.pan)}</span>
                     <input
@@ -7190,14 +7226,14 @@ export default function StemMixerEditor({
               onTooltipChange={setTimelineTooltip}
               onClick={() => centerTimelineOnPlaybackPosition()}
             />
-            <TimelineIconButton
+            {editorFeatures.editing.followPlayhead && <TimelineIconButton
               icon="follow"
               label="跟随播放头"
               active={followPlayhead}
               tone="success"
               onTooltipChange={setTimelineTooltip}
               onClick={() => setFollowPlayhead((value) => !value)}
-            />
+            />}
             {canUseSnap && <TimelineIconButton
               icon="magnet"
               label={`磁吸 ${magnetSnap ? '开' : '关'}`}
@@ -7381,7 +7417,7 @@ export default function StemMixerEditor({
                   </div>
                 </div>
                 <div style={trackHeaderSwitchesStyle}>
-                  <button
+                  {canUseMuteSolo && <button
                     type="button"
                     aria-pressed={state.muted}
                     title={state.muted ? '取消静音' : '静音'}
@@ -7389,8 +7425,8 @@ export default function StemMixerEditor({
                     style={trackToggleStyle(state.muted, 'mute')}
                   >
                     M
-                  </button>
-                  <button
+                  </button>}
+                  {canUseMuteSolo && <button
                     type="button"
                     aria-pressed={state.solo}
                     title={state.solo ? '取消独奏' : '独奏'}
@@ -7398,7 +7434,7 @@ export default function StemMixerEditor({
                     style={trackToggleStyle(state.solo, 'solo')}
                   >
                     S
-                  </button>
+                  </button>}
                   <button
                     type="button"
                     aria-expanded={!isTrackCollapsed}
@@ -7447,7 +7483,7 @@ export default function StemMixerEditor({
                         </button>
                       )}
                     </div>
-                    <label style={trackHeaderVolumeStyle}>
+                    {canUseTrackVolume && <label style={trackHeaderVolumeStyle}>
                       <span>Vol</span>
                       <input
                         className="stem-track-volume-range"
@@ -7468,7 +7504,7 @@ export default function StemMixerEditor({
                         onKeyUp={finishContinuousControlEdit}
                         onChange={(event) => setTrackVolume(stem.type, Number(event.target.value), 'deferred')}
                       />
-                    </label>
+                    </label>}
                     {canUsePan && <label style={trackHeaderPanStyle}>
                       <span>L</span>
                       <input
