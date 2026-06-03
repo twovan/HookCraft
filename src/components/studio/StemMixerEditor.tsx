@@ -166,6 +166,11 @@ type TimelineIconName =
   | 'locate'
   | 'follow'
   | 'magnet';
+type TimelineTooltipState = {
+  label: string;
+  left: number;
+  top: number;
+};
 type TimelineRulerTrimDragState = {
   pointerId: number;
   kind: 'edge' | 'range';
@@ -1045,6 +1050,7 @@ function TimelineIconButton({
   icon,
   label,
   onClick,
+  onTooltipChange,
   tone = 'info',
 }: {
   active?: boolean;
@@ -1052,8 +1058,19 @@ function TimelineIconButton({
   icon: TimelineIconName;
   label: string;
   onClick: () => void;
+  onTooltipChange?: (tooltip: TimelineTooltipState | null) => void;
   tone?: 'info' | 'purple' | 'success' | 'danger';
 }) {
+  const showTooltip = (target: HTMLElement) => {
+    if (!onTooltipChange) return;
+    const rect = target.getBoundingClientRect();
+    onTooltipChange({
+      label,
+      left: rect.left + rect.width / 2,
+      top: rect.top - 9,
+    });
+  };
+
   return (
     <button
       type="button"
@@ -1063,7 +1080,11 @@ function TimelineIconButton({
       data-stem-tooltip={label}
       disabled={disabled}
       style={timelineIconButtonStyle({ active, disabled, tone })}
+      onBlur={() => onTooltipChange?.(null)}
       onClick={onClick}
+      onFocus={(event) => showTooltip(event.currentTarget)}
+      onPointerEnter={(event) => showTooltip(event.currentTarget)}
+      onPointerLeave={() => onTooltipChange?.(null)}
     >
       <TimelineIcon name={icon} />
     </button>
@@ -1607,6 +1628,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<string | null>(initialEditState?.savedAt ? '已读取上次保存的编辑状态。' : null);
   const [autoSaveStatus, setAutoSaveStatus] = useState<string | null>(null);
+  const [timelineTooltip, setTimelineTooltip] = useState<TimelineTooltipState | null>(null);
   const [saveStatusDismissing, setSaveStatusDismissing] = useState(false);
   const [autoSaveStatusDismissing, setAutoSaveStatusDismissing] = useState(false);
   const [localDraftState, setLocalDraftState] = useState<StemEditState | null>(null);
@@ -6833,43 +6855,51 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                 <TimelineIconButton
                   icon="trimStart"
                   label="入点"
+                  onTooltipChange={setTimelineTooltip}
                   onClick={() => seekSelectedTrackTrimEdge('start')}
                 />
                 <TimelineIconButton
                   icon="setTrimStart"
                   label="设入"
+                  onTooltipChange={setTimelineTooltip}
                   onClick={() => setSelectedTrackTrimToCurrentTime('start')}
                 />
                 <TimelineIconButton
                   icon="trimEnd"
                   label="出点"
+                  onTooltipChange={setTimelineTooltip}
                   onClick={() => seekSelectedTrackTrimEdge('end')}
                 />
                 <TimelineIconButton
                   icon="setTrimEnd"
                   label="设出"
+                  onTooltipChange={setTimelineTooltip}
                   onClick={() => setSelectedTrackTrimToCurrentTime('end')}
                 />
                 <TimelineIconButton
                   icon="fullRange"
                   label="全长"
+                  onTooltipChange={setTimelineTooltip}
                   onClick={resetSelectedTrackTrimRange}
                 />
                 <TimelineIconButton
                   icon="focus"
                   label="聚焦"
+                  onTooltipChange={setTimelineTooltip}
                   onClick={focusSelectedTrackRange}
                 />
                 <TimelineIconButton
                   icon="preview"
                   label="预听"
                   disabled={!selectedTrackBuffer}
+                  onTooltipChange={setTimelineTooltip}
                   onClick={previewSelectedTrackRange}
                 />
                 <TimelineIconButton
                   icon="split"
                   label="切分"
                   disabled={duration <= 0}
+                  onTooltipChange={setTimelineTooltip}
                   onClick={splitSelectedTrackClipAtPlayhead}
                 />
                 <TimelineIconButton
@@ -6877,6 +6907,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                   label={selectedTrackClipCount > 0 ? '删除片段' : '删除轨道'}
                   disabled={duration <= 0 || !selectedTrack}
                   tone="danger"
+                  onTooltipChange={setTimelineTooltip}
                   onClick={deleteSelectedClipOrActiveTrackClip}
                 />
                 <TimelineIconButton
@@ -6884,6 +6915,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                   label={`循环预听 ${loopSelectionPreview ? '开' : '关'}`}
                   active={loopSelectionPreview}
                   tone="success"
+                  onTooltipChange={setTimelineTooltip}
                   onClick={toggleLoopSelectionPreview}
                 />
               </span>
@@ -6893,11 +6925,13 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
               label="快捷键"
               active={showShortcutHelp}
               tone="purple"
+              onTooltipChange={setTimelineTooltip}
               onClick={() => setShowShortcutHelp((value) => !value)}
             />
             <TimelineIconButton
               icon="locate"
               label="定位播放头"
+              onTooltipChange={setTimelineTooltip}
               onClick={() => centerTimelineOnPlaybackPosition()}
             />
             <TimelineIconButton
@@ -6905,6 +6939,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
               label="跟随播放头"
               active={followPlayhead}
               tone="success"
+              onTooltipChange={setTimelineTooltip}
               onClick={() => setFollowPlayhead((value) => !value)}
             />
             <TimelineIconButton
@@ -6912,6 +6947,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
               label={`磁吸 ${magnetSnap ? '开' : '关'}`}
               active={magnetSnap}
               tone="success"
+              onTooltipChange={setTimelineTooltip}
               onClick={() => setMagnetSnap((value) => {
                 const next = !value;
                 setSaveStatus(next ? '片段磁吸已开启。' : '片段磁吸已关闭。');
@@ -6920,6 +6956,14 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
             />
           </div>
         </div>
+        {timelineTooltip && (
+          <div
+            className="stem-timeline-floating-tooltip"
+            style={timelineFloatingTooltipStyle(timelineTooltip)}
+          >
+            {timelineTooltip.label}
+          </div>
+        )}
         {showShortcutHelp && (
           <div style={timelineShortcutHelpStyle(dawLayoutMetrics, timelineViewportWidth)}>
             <span><strong>播放</strong> 空格 / Esc / P / L</span>
@@ -7521,61 +7565,6 @@ const timelineScrollbarCss = `
 
   .stem-timeline-icon-button:active:not(:disabled) {
     transform: translateY(0);
-  }
-
-  .stem-timeline-icon-button::after {
-    content: attr(data-stem-tooltip);
-    position: absolute;
-    left: 50%;
-    bottom: calc(100% + 9px);
-    transform: translate(-50%, 4px) scale(0.98);
-    z-index: 90;
-    min-width: max-content;
-    max-width: 160px;
-    padding: 5px 8px;
-    border: 1px solid rgba(139, 153, 186, 0.28);
-    border-radius: 7px;
-    background: linear-gradient(180deg, rgba(18, 22, 35, 0.98), rgba(7, 10, 19, 0.98));
-    color: #eef3ff;
-    font-size: 11px;
-    font-weight: 900;
-    line-height: 1;
-    letter-spacing: 0;
-    white-space: nowrap;
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.36);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 120ms ease, transform 120ms ease;
-  }
-
-  .stem-timeline-icon-button::before {
-    content: "";
-    position: absolute;
-    left: 50%;
-    bottom: calc(100% + 4px);
-    transform: translate(-50%, 4px) rotate(45deg);
-    z-index: 89;
-    width: 7px;
-    height: 7px;
-    border-right: 1px solid rgba(139, 153, 186, 0.28);
-    border-bottom: 1px solid rgba(139, 153, 186, 0.28);
-    background: rgba(7, 10, 19, 0.98);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 120ms ease, transform 120ms ease;
-  }
-
-  .stem-timeline-icon-button:hover::after,
-  .stem-timeline-icon-button:focus-visible::after,
-  .stem-timeline-icon-button:hover::before,
-  .stem-timeline-icon-button:focus-visible::before {
-    opacity: 1;
-    transform: translate(-50%, 0) scale(1);
-  }
-
-  .stem-timeline-icon-button:hover::before,
-  .stem-timeline-icon-button:focus-visible::before {
-    transform: translate(-50%, 0) rotate(45deg);
   }
 
   #stem-editor-timeline .stem-add-track-dropzone:hover,
@@ -9855,6 +9844,29 @@ function timelineIconButtonStyle({
       : '0 0 0 1px rgba(255,255,255,0.025) inset',
     transition: 'transform 120ms ease, border-color 120ms ease, background 120ms ease, box-shadow 120ms ease',
     fontWeight: 900,
+  };
+}
+
+function timelineFloatingTooltipStyle(tooltip: TimelineTooltipState): CSSProperties {
+  return {
+    position: 'fixed',
+    left: tooltip.left,
+    top: tooltip.top,
+    zIndex: 120,
+    transform: 'translate(-50%, -100%)',
+    maxWidth: 180,
+    padding: '6px 9px',
+    border: '1px solid rgba(139, 153, 186, 0.30)',
+    borderRadius: 7,
+    background: 'linear-gradient(180deg, rgba(18, 22, 35, 0.98), rgba(7, 10, 19, 0.98))',
+    color: '#eef3ff',
+    fontSize: 11,
+    fontWeight: 900,
+    lineHeight: 1,
+    letterSpacing: 0,
+    whiteSpace: 'nowrap',
+    boxShadow: '0 12px 28px rgba(0, 0, 0, 0.38)',
+    pointerEvents: 'none',
   };
 }
 
