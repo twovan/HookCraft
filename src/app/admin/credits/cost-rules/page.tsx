@@ -13,7 +13,7 @@ interface CostRule {
   enabled?: boolean;
 }
 
-const OP_LABELS: Record<CreditOperationType, string> = {
+const OP_LABELS: Partial<Record<CreditOperationType, string>> = {
   preview: 'Preview 试听创作',
   full_demo_short: '完整 Demo（短版）',
   full_demo_long: '完整 Demo（长版）',

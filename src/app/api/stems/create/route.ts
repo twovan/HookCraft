@@ -45,7 +45,7 @@ function readSeparationMode(payload: unknown): StemSeparationMode {
 function creditOperationsForMode(mode: StemSeparationMode): CreditOperationType[] {
   return mode === 'separate_vocal'
     ? ['stem_split']
-    : ['stem_split', 'stem_split', 'stem_split', 'stem_split', 'stem_split'];
+    : ['stem_split_advanced'];
 }
 
 async function readUserMembershipTier(userId: string): Promise<MembershipTier> {

@@ -54,6 +54,7 @@ export type CreditOperationType =
   | 'cover_generation'    // AI 翻唱 / Upload Cover
   | 'add_instrumental'    // AI 加伴奏
   | 'stem_split'          // AI 分轨
+  | 'stem_split_advanced' // AI 专业分轨分析
   | 'ai_preprocess'       // AI 预处理 / 分析
   | 'purchase';           // 购买入账
 

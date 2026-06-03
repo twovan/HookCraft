@@ -13,6 +13,7 @@ export const CREDITS_COST: Record<CreditOperationType, number> = {
   cover_generation: 20,
   add_instrumental: 20,
   stem_split: 10,
+  stem_split_advanced: 50,
   ai_preprocess: 2,
   purchase: 0,
 };
@@ -28,6 +29,7 @@ export const CREDITS_COST_RULES: CreditsCostRule[] = [
   { operation: 'cover_generation', cost: 20, description: 'AI cover generation', enabled: true },
   { operation: 'add_instrumental', cost: 20, description: 'AI add instrumental', enabled: true },
   { operation: 'stem_split', cost: 10, description: 'AI stem split', enabled: true },
+  { operation: 'stem_split_advanced', cost: 50, description: 'AI advanced stem analysis result', enabled: true },
   { operation: 'ai_preprocess', cost: 2, description: 'AI preprocess or audio analysis', enabled: true },
 ];
 
