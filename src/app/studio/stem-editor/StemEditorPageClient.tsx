@@ -517,6 +517,7 @@ export default function StemEditorPageClient() {
             initialEditState={job.editState || null}
             separationMode={job.separationMode || selectedSeparationMode}
             featureSettings={activeFeatureSettings}
+            editorPanel={editorPanel}
           />
         ) : null}
       </section>

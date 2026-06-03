@@ -88,6 +88,7 @@ import {
 } from '@/lib/stems/stemClips';
 import {
   DEFAULT_STEM_EDITOR_FEATURE_SETTINGS,
+  type EditorPanelAccess,
   type StemEditorTierFeatureSettings,
   type StemSeparationMode,
 } from '@/config/stemEditorFeatures';
@@ -555,6 +556,7 @@ interface StemMixerEditorProps {
   initialEditState?: StemEditState | null;
   separationMode?: StemSeparationMode | null;
   featureSettings?: StemEditorTierFeatureSettings;
+  editorPanel?: EditorPanelAccess;
 }
 
 function defaultTrackState(): StemTrackState {
@@ -1580,6 +1582,7 @@ export default function StemMixerEditor({
   initialEditState,
   separationMode,
   featureSettings,
+  editorPanel = 'proEditor',
 }: StemMixerEditorProps) {
   const editorFeatures = featureSettings || DEFAULT_STEM_EDITOR_FEATURE_SETTINGS.proEditor;
   const canUsePlayback = editorFeatures.editing.playback;
@@ -5922,6 +5925,9 @@ export default function StemMixerEditor({
           </Link>
           <div style={editorProjectTitleStyle}>
             <span style={editorTitleStyle}>歌曲编辑</span>
+            <span style={editorPanelBadgeStyle(editorPanel)}>
+              {editorPanel === 'basicEditor' ? '基础编辑器' : '专业编辑器'}
+            </span>
           </div>
           <div style={editorStatusClusterStyle}>
             <span style={saveBadgeStyle(saveBadge.tone)}>{saveBadge.label}</span>
@@ -8267,6 +8273,21 @@ const editorTitleStyle: CSSProperties = {
   fontSize: 17,
   fontWeight: 900,
 };
+
+function editorPanelBadgeStyle(editorPanel: EditorPanelAccess): CSSProperties {
+  const isProEditor = editorPanel === 'proEditor';
+  return {
+    borderRadius: 999,
+    border: isProEditor ? '1px solid rgba(245, 158, 11, 0.46)' : '1px solid rgba(96, 165, 250, 0.46)',
+    background: isProEditor ? 'rgba(245, 158, 11, 0.14)' : 'rgba(37, 99, 235, 0.18)',
+    color: isProEditor ? '#fcd38a' : '#bfdbfe',
+    padding: '3px 9px',
+    fontSize: 11,
+    fontWeight: 900,
+    lineHeight: 1.35,
+    whiteSpace: 'nowrap',
+  };
+}
 
 const editorProjectMetaStyle: CSSProperties = {
   display: 'flex',
