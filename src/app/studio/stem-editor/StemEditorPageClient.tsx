@@ -8,6 +8,7 @@ import type { CSSProperties } from 'react';
 import { useMembershipStore } from '@/store/membershipStore';
 import {
   DEFAULT_STEM_EDITOR_FEATURE_SETTINGS,
+  editorPanelForSeparationMode,
   type EditorPanelAccess,
   normalizeStemEditorFeatureSettings,
   resolveEditorPanelAccess,
@@ -125,7 +126,11 @@ export default function StemEditorPageClient() {
   );
 
   const editorPanel = resolveEditorPanelAccess(membership?.tier || 'free');
-  const activeFeatureSettings = editorPanel === 'proEditor'
+  const selectedEditorPanel = selectedSeparationMode
+    ? editorPanelForSeparationMode(selectedSeparationMode)
+    : null;
+  const effectiveEditorPanel = selectedEditorPanel || editorPanel;
+  const activeFeatureSettings = effectiveEditorPanel === 'proEditor'
     ? featureSettings.proEditor
     : featureSettings.basicEditor;
   const canForceRefresh = activeFeatureSettings.modes.allowForceRefresh;
@@ -517,7 +522,7 @@ export default function StemEditorPageClient() {
             initialEditState={job.editState || null}
             separationMode={job.separationMode || selectedSeparationMode}
             featureSettings={activeFeatureSettings}
-            editorPanel={editorPanel}
+            editorPanel={effectiveEditorPanel === 'free' ? 'basicEditor' : effectiveEditorPanel}
           />
         ) : null}
       </section>
@@ -790,15 +795,17 @@ function ModeSelectionPanel({
   featureSettings: StemEditorFeatureSettings;
   onSelect: (mode: StemSeparationMode) => void;
 }) {
-  const activeSettings = editorPanel === 'proEditor' ? featureSettings.proEditor : featureSettings.basicEditor;
+  const basicSettings = featureSettings.basicEditor;
+  const proSettings = featureSettings.proEditor;
   const canUseBasic = editorPanel !== 'free'
-    && activeSettings.modes.basicEditor
-    && activeSettings.stems.separateVocal;
+    && basicSettings.modes.basicEditor
+    && basicSettings.stems.separateVocal;
   const canUsePro = editorPanel === 'proEditor'
-    && activeSettings.modes.proEditor
-    && activeSettings.stems.splitStem;
-  const showUpgradePrompt = activeSettings.modes.allowUpgradeFromBasic;
-  const showCreditConfirm = activeSettings.modes.showCreditConfirm;
+    && proSettings.modes.proEditor
+    && proSettings.stems.splitStem;
+  const showUpgradePrompt = basicSettings.modes.allowUpgradeFromBasic;
+  const showBasicCreditConfirm = basicSettings.modes.showCreditConfirm;
+  const showProCreditConfirm = proSettings.modes.showCreditConfirm;
   const tierLabel = editorPanel === 'proEditor' ? '专业编辑器' : editorPanel === 'basicEditor' ? '基础编辑器' : '未开通会员';
 
   return (
@@ -832,7 +839,7 @@ function ModeSelectionPanel({
             <span>片段剪辑</span>
             <span>MP3 导出</span>
           </div>
-          {showCreditConfirm && canUseBasic && <small style={modeHintStyle}>开始前会确认积分消耗</small>}
+          {showBasicCreditConfirm && canUseBasic && <small style={modeHintStyle}>开始前会确认积分消耗</small>}
           <em style={modeActionStyle(!canUseBasic)}>{canUseBasic ? TEXT.startBasic : TEXT.freeLocked}</em>
         </button>
         <button
@@ -852,7 +859,7 @@ function ModeSelectionPanel({
             <span>高级制作</span>
             <span>WAV / 批量导出</span>
           </div>
-          {showCreditConfirm && canUsePro && <small style={modeHintStyle}>开始前会确认积分消耗</small>}
+          {showProCreditConfirm && canUsePro && <small style={modeHintStyle}>开始前会确认积分消耗</small>}
           <em style={modeActionStyle(!canUsePro)}>{canUsePro ? TEXT.startPro : showUpgradePrompt ? TEXT.proLocked : '当前未开放'}</em>
         </button>
       </div>

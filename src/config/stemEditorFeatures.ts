@@ -286,6 +286,10 @@ export function resolveEditorPanelAccess(tier: MembershipTier | null | undefined
   return 'free';
 }
 
+export function editorPanelForSeparationMode(mode: StemSeparationMode): Exclude<EditorPanelAccess, 'free'> {
+  return mode === 'split_stem' ? 'proEditor' : 'basicEditor';
+}
+
 export function resolveStemSeparationMode(
   settings: StemEditorFeatureSettings,
   editorPanel: EditorPanelAccess,

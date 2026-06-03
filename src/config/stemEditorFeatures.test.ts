@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_STEM_EDITOR_FEATURE_SETTINGS,
+  editorPanelForSeparationMode,
   normalizeStemEditorFeatureSettings,
   resolveEditorPanelAccess,
   resolveStemSeparationMode,
@@ -87,5 +88,10 @@ describe('stem editor feature settings', () => {
     expect(resolveStemSeparationMode(settings, 'proEditor', 'split_stem')).toBe('split_stem');
     expect(resolveStemSeparationMode(settings, 'proEditor', 'separate_vocal')).toBe('separate_vocal');
     expect(resolveStemSeparationMode(settings, 'free', 'split_stem')).toBe(null);
+  });
+
+  it('maps the resolved separation mode to the actual editor panel', () => {
+    expect(editorPanelForSeparationMode('separate_vocal')).toBe('basicEditor');
+    expect(editorPanelForSeparationMode('split_stem')).toBe('proEditor');
   });
 });

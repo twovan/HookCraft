@@ -8,6 +8,7 @@ import { CreditService } from '@/lib/credits/CreditService';
 import type { CreditOperationType } from '@/types/credits';
 import type { MembershipTier } from '@/types/membership';
 import {
+  editorPanelForSeparationMode,
   normalizeStemEditorFeatureSettings,
   resolveEditorPanelAccess,
   resolveStemSeparationMode,
@@ -81,11 +82,12 @@ export async function POST(req: NextRequest) {
       readUserMembershipTier(user.id),
       readStemEditorFeatureSettings(supabaseAdmin).catch(() => normalizeStemEditorFeatureSettings(null)),
     ]);
-    const editorPanel = resolveEditorPanelAccess(membershipTier);
-    const separationMode = resolveStemSeparationMode(featureSettings, editorPanel, requestedSeparationMode);
+    const membershipEditorPanel = resolveEditorPanelAccess(membershipTier);
+    const separationMode = resolveStemSeparationMode(featureSettings, membershipEditorPanel, requestedSeparationMode);
     if (!separationMode) {
       return NextResponse.json({ error: 'Stem editor is not available for this membership tier' }, { status: 403 });
     }
+    const editorPanel = editorPanelForSeparationMode(separationMode);
 
     const { data: existingJobs, error: existingError } = await supabaseAdmin
       .from('audio_stem_jobs')
@@ -133,6 +135,7 @@ export async function POST(req: NextRequest) {
         analysisSource: isCachedCompleted ? 'cache' : 'existing-job',
         cachedStemCount: recoveredStems.length,
         separationMode,
+        editorPanel,
       });
     }
 
@@ -152,6 +155,8 @@ export async function POST(req: NextRequest) {
         reused: false,
         setupRequired: true,
         analysisSource: 'storage-missing',
+        separationMode,
+        editorPanel,
       }, { status: 503 });
     }
 
@@ -226,6 +231,8 @@ export async function POST(req: NextRequest) {
           error: 'Credits deduction failed',
           reused: false,
           analysisSource: 'billing-failed',
+          separationMode,
+          editorPanel,
         }, { status: 402 });
       }
 
@@ -236,6 +243,7 @@ export async function POST(req: NextRequest) {
         reused: false,
         analysisSource: 'api-created',
         separationMode,
+        editorPanel,
       }, { status: 202 });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'KIE stem split request failed';
@@ -257,6 +265,8 @@ export async function POST(req: NextRequest) {
         errorMessage,
         reused: false,
         analysisSource: 'api-failed',
+        separationMode,
+        editorPanel,
       }, { status: errorMessage.toLowerCase().includes('credit') ? 402 : 502 });
     }
   } catch (error: any) {
