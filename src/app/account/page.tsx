@@ -467,9 +467,7 @@ export default function AccountPage() {
   );
 }
 
-function AccountStyles() {
-  return (
-    <style>{`
+const accountStyles = `
       .account-page {
         min-height: 100vh;
         background:
@@ -1024,6 +1022,8 @@ function AccountStyles() {
           flex: 1;
         }
       }
-    `}</style>
-  );
+`;
+
+function AccountStyles() {
+  return <style dangerouslySetInnerHTML={{ __html: accountStyles }} />;
 }
