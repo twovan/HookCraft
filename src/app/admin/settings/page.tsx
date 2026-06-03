@@ -44,74 +44,93 @@ interface ReviewSettings {
 const STEM_EDITOR_FEATURE_GROUPS = [
   {
     group: 'modes',
-    title: 'Entry and modes',
+    title: '入口与模式',
+    description: '控制用户进入编辑器时能选择的模式，以及是否允许重新分析、升级引导和积分确认。',
     items: [
-      ['basicEditor', 'Basic editor'],
-      ['proEditor', 'Pro editor'],
-      ['showCreditConfirm', 'Credit confirmation'],
-      ['allowUpgradeFromBasic', 'Upgrade from basic'],
-      ['allowForceRefresh', 'Allow re-analysis'],
+      ['basicEditor', '简版编辑器'],
+      ['proEditor', '完整版编辑器'],
+      ['showCreditConfirm', '积分确认弹窗'],
+      ['allowUpgradeFromBasic', '简版升级引导'],
+      ['allowForceRefresh', '允许重新分析'],
     ],
   },
   {
     group: 'stems',
-    title: 'Stem separation',
+    title: '分轨能力',
+    description: '控制调用 KIE 分轨时的能力边界：简版为人声 + 伴奏，完整版为分析结果中的多分轨组。',
     items: [
-      ['separateVocal', '2 tracks: vocal + instrumental'],
-      ['splitStem', '12 stem groups result'],
+      ['separateVocal', '2 轨分离：人声 + 伴奏'],
+      ['splitStem', '多分轨分析结果'],
     ],
   },
   {
     group: 'editing',
-    title: 'Editing tools',
+    title: '基础剪辑',
+    description: 'Plus 默认保留这些高频剪辑操作；关闭后会同步影响按钮、快捷键和画布操作。',
     items: [
-      ['splitClip', 'Split clip'],
-      ['deleteClip', 'Delete clip'],
-      ['copyCutPaste', 'Copy / cut / paste'],
-      ['clipDrag', 'Clip drag'],
-      ['crossTrackDrag', 'Cross-track drag'],
-      ['snap', 'Snap'],
-      ['zoom', 'Timeline zoom'],
-      ['trim', 'Trim in / out'],
-      ['fade', 'Fade in / out'],
-      ['pan', 'Pan'],
-      ['muteRanges', 'Mute selection'],
-      ['loopPreview', 'Loop preview'],
+      ['playback', '播放与预听'],
+      ['trackVolume', '轨道音量'],
+      ['muteSolo', '静音 / 独奏'],
+      ['splitClip', '切分片段'],
+      ['deleteClip', '删除片段'],
+      ['copyCutPaste', '复制 / 剪切 / 粘贴'],
+      ['clipDrag', '片段拖拽'],
+      ['crossTrackDrag', '跨轨拖拽'],
+      ['snap', '磁吸对齐'],
+      ['zoom', '时间线缩放'],
+      ['trim', '入点 / 出点裁剪'],
+      ['fade', '淡入 / 淡出'],
+      ['pan', '声像调节'],
+      ['previewSelection', '预听选区'],
+      ['muteRanges', '静音选区'],
+      ['followPlayhead', '跟随播放头'],
+      ['loopPreview', '循环预听'],
+      ['undoRedo', '撤销 / 重做'],
+      ['autoSave', '自动保存工程'],
+      ['localDraftRecovery', '本地草稿恢复'],
     ],
   },
   {
     group: 'advanced',
-    title: 'Advanced production',
+    title: '高级制作',
+    description: '更偏 Pro 的制作能力，适合需要自定义轨道、录音、轨道管理和高级视图的用户。',
     items: [
-      ['addTrack', 'Add empty track'],
-      ['importAudio', 'Import custom audio'],
-      ['recording', 'Live recording'],
-      ['recordingDeviceSelect', 'Recording device'],
-      ['recordingChannelSelect', 'Recording channel'],
-      ['recordingInputLevel', 'Input level'],
-      ['recordingMonitoring', 'Monitoring'],
-      ['trackRename', 'Track rename'],
-      ['trackColor', 'Track color'],
-      ['trackReorder', 'Track reorder'],
-      ['trackViewFilter', 'Track filter'],
-      ['trackDensity', 'Track density'],
-      ['shortcutHelp', 'Shortcut help'],
+      ['addTrack', '添加空轨道'],
+      ['importAudio', '导入自定义音频'],
+      ['recording', '现场录音'],
+      ['recordingDeviceSelect', '选择录音设备'],
+      ['recordingChannelSelect', '选择录音声道'],
+      ['recordingInputLevel', '输入电平显示'],
+      ['recordingMonitoring', '录音监听'],
+      ['trackRename', '轨道重命名'],
+      ['trackColor', '轨道颜色'],
+      ['trackReorder', '轨道排序'],
+      ['trackViewFilter', '轨道视图筛选'],
+      ['trackDensity', '轨道密度切换'],
+      ['shortcutHelp', '快捷键帮助'],
     ],
   },
   {
     group: 'export',
-    title: 'Export permissions',
+    title: '导出权限',
+    description: 'Plus 只开放 MP3；Pro 可开放 WAV、独奏导出、高级导出模式和导出历史。',
     items: [
-      ['mp3Mix', 'Export mix MP3'],
-      ['mp3Stems', 'Export stems MP3'],
-      ['wavMix', 'Export mix WAV'],
-      ['wavStems', 'Export stems WAV'],
-      ['soloOnly', 'Solo-only export'],
-      ['advancedExportModes', 'Advanced export modes'],
-      ['exportHistory', 'Export history'],
+      ['mp3Mix', '导出混音 MP3'],
+      ['mp3Stems', '批量导出分轨 MP3'],
+      ['wavMix', '导出混音 WAV'],
+      ['wavStems', '导出分轨 WAV'],
+      ['soloOnly', '只导出独奏'],
+      ['advancedExportModes', '高级导出模式'],
+      ['exportHistory', '导出历史'],
     ],
   },
 ] as const;
+
+function countEnabledFeatures(settings: StemEditorFeatureSettings[keyof StemEditorFeatureSettings]) {
+  return STEM_EDITOR_FEATURE_GROUPS.reduce((total, group) => (
+    total + group.items.filter(([key]) => Boolean((settings as any)[group.group][key])).length
+  ), 0);
+}
 
 export default function AdminSettingsPage() {
   const [basic, setBasic] = useState<BasicSettings>({ platformName: '', platformDescription: '', contactEmail: '', icpNumber: '' });
@@ -224,7 +243,7 @@ export default function AdminSettingsPage() {
   return (
     <div>
       {/* Toast */}
-      {toast && <div style={toastStyle}>✅ {toast}</div>}
+      {toast && <div style={toastStyle}>已保存：{toast}</div>}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
         {/* Basic Settings */}
@@ -392,46 +411,88 @@ export default function AdminSettingsPage() {
             {saving === 'studio_tabs' ? '保存中...' : '保存设置'}
           </button>
         </div>
-        <div id="stem-editor-features" style={{ ...cardStyle, gridColumn: '1 / -1', scrollMarginTop: 88 }}>
-          <h3 style={cardTitleStyle}>Stem 编辑器功能开关</h3>
-          <div style={editorMatrixStyle}>
-            <div style={editorMatrixHeaderStyle}>Feature</div>
-            <div style={editorMatrixHeaderStyle}>Plus / Basic</div>
-            <div style={editorMatrixHeaderStyle}>Pro / Professional</div>
-            {STEM_EDITOR_FEATURE_GROUPS.map((group) => (
-              <div key={group.group} style={editorMatrixGroupStyle}>
-                <div style={editorMatrixGroupTitleStyle}>{group.title}</div>
-                {group.items.map(([key, label]) => (
-                  <div key={`${group.group}-${key}`} style={editorMatrixRowStyle}>
-                    <div>{label}</div>
-                    {(['plus', 'pro'] as const).map((tier) => (
-                      <label key={tier} style={editorMatrixCheckboxStyle}>
-                        <input
-                          type="checkbox"
-                          checked={Boolean((stemEditorFeatures[tier] as any)[group.group][key])}
-                          onChange={() => toggleStemEditorFeature(tier, group.group, key)}
-                        />
-                      </label>
-                    ))}
-                  </div>
-                ))}
+        <div id="stem-editor-features" style={editorManagerCardStyle}>
+          <div style={editorManagerHeaderStyle}>
+            <div>
+              <p style={editorManagerEyebrowStyle}>Stem 编辑器权限</p>
+              <h3 style={editorManagerTitleStyle}>编辑器功能开关</h3>
+              <p style={editorManagerDescriptionStyle}>
+                这里控制 Plus 简版和 Pro 完整版的编辑器入口、分轨方式、剪辑工具和导出权限。修改后会影响按钮、快捷键、右键菜单和导出模式。
+              </p>
+            </div>
+            <div style={editorSummaryGridStyle}>
+              <div style={editorSummaryCardStyle}>
+                <span style={editorSummaryLabelStyle}>Plus 简版</span>
+                <strong style={editorSummaryValueStyle}>{countEnabledFeatures(stemEditorFeatures.plus)}</strong>
+                <span style={editorSummaryMetaStyle}>2 轨编辑 / MP3 导出</span>
               </div>
+              <div style={editorSummaryCardStyle}>
+                <span style={editorSummaryLabelStyle}>Pro 完整版</span>
+                <strong style={editorSummaryValueStyle}>{countEnabledFeatures(stemEditorFeatures.pro)}</strong>
+                <span style={editorSummaryMetaStyle}>多分轨分析 / 完整工具</span>
+              </div>
+            </div>
+          </div>
+
+          <div style={editorTierLegendStyle}>
+            <span style={editorTierPillStyle('#2563eb')}>Plus：保留基础剪辑，限制高级制作和 WAV</span>
+            <span style={editorTierPillStyle('#b45309')}>Pro：默认开放当前完整编辑器能力</span>
+          </div>
+
+          <div style={editorFeatureGridStyle}>
+            {STEM_EDITOR_FEATURE_GROUPS.map((group) => (
+              <section key={group.group} style={editorFeatureGroupStyle}>
+                <div style={editorFeatureGroupHeaderStyle}>
+                  <div>
+                    <h4 style={editorFeatureGroupTitleStyle}>{group.title}</h4>
+                    <p style={editorFeatureGroupDescriptionStyle}>{group.description}</p>
+                  </div>
+                  <div style={editorFeatureGroupCountStyle}>
+                    Plus {group.items.filter(([key]) => Boolean((stemEditorFeatures.plus as any)[group.group][key])).length}
+                    {' / '}
+                    Pro {group.items.filter(([key]) => Boolean((stemEditorFeatures.pro as any)[group.group][key])).length}
+                  </div>
+                </div>
+                <div style={editorFeatureRowsStyle}>
+                  {group.items.map(([key, label]) => (
+                    <div key={`${group.group}-${key}`} style={editorFeatureRowStyle}>
+                      <span style={editorFeatureLabelStyle}>{label}</span>
+                      {(['plus', 'pro'] as const).map((tier) => {
+                        const enabled = Boolean((stemEditorFeatures[tier] as any)[group.group][key]);
+                        return (
+                          <button
+                            key={tier}
+                            type="button"
+                            aria-pressed={enabled}
+                            onClick={() => toggleStemEditorFeature(tier, group.group, key)}
+                            style={editorSwitchButtonStyle(enabled)}
+                          >
+                            <span style={editorSwitchDotStyle(enabled)} />
+                            {tier === 'plus' ? 'Plus' : 'Pro'}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              </section>
             ))}
           </div>
+
           <div style={editorMatrixActionsStyle}>
             <button
               onClick={() => setStemEditorFeatures(DEFAULT_STEM_EDITOR_FEATURE_SETTINGS)}
               disabled={saving === 'stem_editor_features'}
               style={secondaryBtnStyle}
             >
-              Reset defaults
+              恢复默认配置
             </button>
             <button
               onClick={() => saveSection('stem_editor_features', stemEditorFeatures)}
               disabled={saving === 'stem_editor_features'}
               style={saveBtnStyle}
             >
-              {saving === 'stem_editor_features' ? 'Saving...' : 'Save editor switches'}
+              {saving === 'stem_editor_features' ? '保存中...' : '保存编辑器开关'}
             </button>
           </div>
         </div>
@@ -507,54 +568,192 @@ const secondaryBtnStyle: React.CSSProperties = {
   border: '1px solid #e5e7eb',
 };
 
-const editorMatrixStyle: React.CSSProperties = {
+const editorManagerCardStyle: React.CSSProperties = {
+  ...cardStyle,
+  gridColumn: '1 / -1',
+  scrollMarginTop: 88,
+  padding: 0,
+  overflow: 'hidden',
+  background: '#fbfaf7',
+};
+
+const editorManagerHeaderStyle: React.CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'minmax(220px, 1fr) 160px 160px',
-  border: '1px solid #e5e7eb',
+  gridTemplateColumns: 'minmax(0, 1fr) 360px',
+  gap: 20,
+  padding: '22px 24px',
+  borderBottom: '1px solid #e7e2d8',
+  background: 'linear-gradient(135deg, #fffdf8 0%, #f7efe4 100%)',
+};
+
+const editorManagerEyebrowStyle: React.CSSProperties = {
+  margin: '0 0 6px',
+  color: '#b45309',
+  fontSize: 12,
+  fontWeight: 800,
+  letterSpacing: 0,
+};
+
+const editorManagerTitleStyle: React.CSSProperties = {
+  margin: 0,
+  color: '#1f2937',
+  fontSize: 20,
+  fontWeight: 800,
+};
+
+const editorManagerDescriptionStyle: React.CSSProperties = {
+  margin: '10px 0 0',
+  maxWidth: 720,
+  color: '#5f6470',
+  fontSize: 13,
+  lineHeight: 1.7,
+};
+
+const editorSummaryGridStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '1fr 1fr',
+  gap: 10,
+};
+
+const editorSummaryCardStyle: React.CSSProperties = {
+  border: '1px solid #e5dece',
   borderRadius: 8,
+  background: 'rgba(255, 255, 255, 0.72)',
+  padding: '14px 16px',
+};
+
+const editorSummaryLabelStyle: React.CSSProperties = {
+  display: 'block',
+  color: '#6b7280',
+  fontSize: 12,
+  fontWeight: 700,
+};
+
+const editorSummaryValueStyle: React.CSSProperties = {
+  display: 'block',
+  marginTop: 5,
+  color: '#111827',
+  fontSize: 28,
+  lineHeight: 1,
+};
+
+const editorSummaryMetaStyle: React.CSSProperties = {
+  display: 'block',
+  marginTop: 8,
+  color: '#7c6f5b',
+  fontSize: 12,
+};
+
+const editorTierLegendStyle: React.CSSProperties = {
+  display: 'flex',
+  gap: 10,
+  flexWrap: 'wrap',
+  padding: '14px 24px 0',
+};
+
+function editorTierPillStyle(color: string): React.CSSProperties {
+  return {
+    padding: '7px 10px',
+    borderRadius: 8,
+    border: `1px solid ${color}22`,
+    background: `${color}0d`,
+    color,
+    fontSize: 12,
+    fontWeight: 700,
+  };
+}
+
+const editorFeatureGridStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  gap: 14,
+  padding: 24,
+};
+
+const editorFeatureGroupStyle: React.CSSProperties = {
+  border: '1px solid #e7e2d8',
+  borderRadius: 8,
+  background: '#fff',
   overflow: 'hidden',
 };
 
-const editorMatrixHeaderStyle: React.CSSProperties = {
-  padding: '10px 12px',
-  background: '#f9fafb',
-  color: '#374151',
-  fontSize: 13,
-  fontWeight: 700,
-  borderBottom: '1px solid #e5e7eb',
-};
-
-const editorMatrixGroupStyle: React.CSSProperties = {
-  display: 'contents',
-};
-
-const editorMatrixGroupTitleStyle: React.CSSProperties = {
-  gridColumn: '1 / -1',
-  padding: '9px 12px',
-  background: '#fff7ed',
-  color: '#92400e',
-  fontSize: 13,
-  fontWeight: 700,
-  borderTop: '1px solid #e5e7eb',
-  borderBottom: '1px solid #e5e7eb',
-};
-
-const editorMatrixRowStyle: React.CSSProperties = {
-  display: 'grid',
-  gridColumn: '1 / -1',
-  gridTemplateColumns: 'minmax(220px, 1fr) 160px 160px',
-  alignItems: 'center',
-  minHeight: 38,
-  padding: '0 12px',
-  borderBottom: '1px solid #f3f4f6',
-  color: '#374151',
-  fontSize: 13,
-};
-
-const editorMatrixCheckboxStyle: React.CSSProperties = {
+const editorFeatureGroupHeaderStyle: React.CSSProperties = {
   display: 'flex',
-  justifyContent: 'center',
+  justifyContent: 'space-between',
+  gap: 12,
+  padding: '14px 16px',
+  background: '#f9f6ef',
+  borderBottom: '1px solid #ece5d8',
 };
+
+const editorFeatureGroupTitleStyle: React.CSSProperties = {
+  margin: 0,
+  color: '#1f2937',
+  fontSize: 14,
+  fontWeight: 800,
+};
+
+const editorFeatureGroupDescriptionStyle: React.CSSProperties = {
+  margin: '6px 0 0',
+  color: '#6b7280',
+  fontSize: 12,
+  lineHeight: 1.6,
+};
+
+const editorFeatureGroupCountStyle: React.CSSProperties = {
+  flex: '0 0 auto',
+  color: '#92400e',
+  fontSize: 12,
+  fontWeight: 800,
+  whiteSpace: 'nowrap',
+};
+
+const editorFeatureRowsStyle: React.CSSProperties = {
+  display: 'grid',
+};
+
+const editorFeatureRowStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'minmax(160px, 1fr) 86px 86px',
+  alignItems: 'center',
+  gap: 8,
+  minHeight: 44,
+  padding: '8px 12px 8px 16px',
+  borderBottom: '1px solid #f3f0ea',
+};
+
+const editorFeatureLabelStyle: React.CSSProperties = {
+  color: '#374151',
+  fontSize: 13,
+  fontWeight: 600,
+};
+
+function editorSwitchButtonStyle(enabled: boolean): React.CSSProperties {
+  return {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    minHeight: 28,
+    borderRadius: 8,
+    border: enabled ? '1px solid #2f7d58' : '1px solid #d1d5db',
+    background: enabled ? '#e7f5ee' : '#f9fafb',
+    color: enabled ? '#166534' : '#6b7280',
+    fontSize: 12,
+    fontWeight: 800,
+    cursor: 'pointer',
+    fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+  };
+}
+
+function editorSwitchDotStyle(enabled: boolean): React.CSSProperties {
+  return {
+    width: 7,
+    height: 7,
+    borderRadius: 999,
+    background: enabled ? '#16a34a' : '#cbd5e1',
+  };
+}
 
 const editorMatrixActionsStyle: React.CSSProperties = {
   marginTop: 14,
