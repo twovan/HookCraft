@@ -30,53 +30,19 @@ export async function GET(req: NextRequest) {
     try {
       const credits = await creditService.getCreditsEnhanced(user.id);
       
-      // If purchasedBalance is 0, try to recover from payments table
-      let purchasedBalance = credits.purchasedBalance;
-      if (purchasedBalance === 0) {
-        const packPriceMap: Record<number, number> = {
-          9900: 50, 7900: 50,
-          17900: 100, 14300: 100,
-          32900: 200, 26300: 200,
-        };
-        const { data: payments } = await supabaseAdmin
-          .from('payments')
-          .select('amount')
-          .eq('user_id', user.id)
-          .eq('status', 'completed');
-        
-        let totalCreditsFromPayments = 0;
-        for (const p of payments || []) {
-          const c = packPriceMap[p.amount];
-          if (c) totalCreditsFromPayments += c;
-        }
-        if (totalCreditsFromPayments > 0) {
-          purchasedBalance = totalCreditsFromPayments;
-          await supabaseAdmin
-            .from('purchased_credits')
-            .upsert({
-              user_id: user.id,
-              balance: totalCreditsFromPayments,
-              total_purchased: totalCreditsFromPayments,
-              version: 0,
-            } as any, { onConflict: 'user_id' });
-        }
-      }
-      
-      const totalAvailable = credits.monthlyRemaining + purchasedBalance;
-      
       return NextResponse.json({
         userId: credits.userId,
         tier: credits.tier,
         monthlyUsed: credits.monthlyUsed,
         monthlyTotal: credits.monthlyTotal,
         monthlyRemaining: credits.monthlyRemaining,
-        purchasedBalance,
-        totalAvailable,
+        purchasedBalance: credits.purchasedBalance,
+        totalAvailable: credits.totalAvailable,
         periodStart: credits.periodStart,
         periodEnd: credits.periodEnd,
         used: credits.monthlyUsed,
         total: credits.monthlyTotal,
-        remaining: totalAvailable,
+        remaining: credits.totalAvailable,
       });
     } catch (serviceError: any) {
       // Log the actual error for debugging

@@ -48,6 +48,9 @@ function createMockSupabase() {
   const purchasedUpdateEq2 = vi.fn().mockReturnValue({ select: purchasedUpdateSelect });
   const purchasedUpdateEq = vi.fn().mockReturnValue({ eq: purchasedUpdateEq2 });
   const purchasedUpdate = vi.fn().mockReturnValue({ eq: purchasedUpdateEq });
+  const purchasedUpsertMaybeSingle = vi.fn().mockResolvedValue({ data: createPurchasedRow(), error: null });
+  const purchasedUpsertSelect = vi.fn().mockReturnValue({ maybeSingle: purchasedUpsertMaybeSingle });
+  const purchasedUpsert = vi.fn().mockReturnValue({ select: purchasedUpsertSelect });
 
   // --- credit_transactions table mocks ---
   const txInsert = vi.fn().mockResolvedValue({ data: null, error: null });
@@ -66,6 +69,11 @@ function createMockSupabase() {
   const membershipMaybeSingle = vi.fn().mockResolvedValue({ data: { tier: 'pro' }, error: null });
   const membershipEq = vi.fn().mockReturnValue({ maybeSingle: membershipMaybeSingle });
   const membershipSelect = vi.fn().mockReturnValue({ eq: membershipEq });
+
+  // --- payments table mocks ---
+  const paymentsStatusEq = vi.fn().mockResolvedValue({ data: [], error: null });
+  const paymentsUserEq = vi.fn().mockReturnValue({ eq: paymentsStatusEq });
+  const paymentsSelect = vi.fn().mockReturnValue({ eq: paymentsUserEq });
 
   // --- RPC mock ---
   const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
@@ -118,6 +126,10 @@ function createMockSupabase() {
           purchasedUpdate(data);
           return { eq: purchasedUpdateEq };
         },
+        upsert: (data: any, options: any) => {
+          purchasedUpsert(data, options);
+          return { select: purchasedUpsertSelect };
+        },
       };
     }
     if (table === 'credit_transactions') {
@@ -134,6 +146,11 @@ function createMockSupabase() {
     if (table === 'memberships') {
       return {
         select: membershipSelect,
+      };
+    }
+    if (table === 'payments') {
+      return {
+        select: paymentsSelect,
       };
     }
     return {};
@@ -177,6 +194,9 @@ function createMockSupabase() {
     purchasedUpdateEq,
     purchasedUpdateEq2,
     purchasedUpdateSelect,
+    purchasedUpsert,
+    purchasedUpsertSelect,
+    purchasedUpsertMaybeSingle,
     // credit_transactions
     txInsert,
     txSelect,
@@ -190,6 +210,9 @@ function createMockSupabase() {
     membershipSelect,
     membershipEq,
     membershipMaybeSingle,
+    paymentsSelect,
+    paymentsUserEq,
+    paymentsStatusEq,
   };
 }
 
@@ -377,6 +400,33 @@ describe('CreditService', () => {
       expect(result.remaining).toBe(10);
     });
 
+    it('recovers purchased credits from completed payments before consumption when purchased_credits is missing', async () => {
+      const row = createCreditsRow({ used: 100, total: 100, version: 5 });
+      const recoveredPurchased = createPurchasedRow({ balance: 50, total_purchased: 50, version: 0 });
+      mocks.creditsSingle.mockResolvedValue({ data: row, error: null });
+      mocks.purchasedMaybeSingle.mockResolvedValue({ data: null, error: null });
+      mocks.paymentsStatusEq.mockResolvedValue({ data: [{ amount: 9900 }], error: null });
+      mocks.purchasedUpsertMaybeSingle.mockResolvedValue({ data: recoveredPurchased, error: null });
+      mocks.rpc.mockResolvedValue({
+        data: { success: false, error: 'no_credits' },
+        error: null,
+      });
+
+      const result = await service.consumeCredits('user-1', ['stem_split_advanced']);
+
+      expect(result.success).toBe(true);
+      expect(result.consumed).toBe(50);
+      expect(result.monthlyCost).toBe(0);
+      expect(result.purchasedCost).toBe(50);
+      expect(result.remaining).toBe(0);
+      expect(mocks.purchasedUpsert).toHaveBeenCalledWith({
+        user_id: 'user-1',
+        balance: 50,
+        total_purchased: 50,
+        version: 0,
+      }, { onConflict: 'user_id' });
+    });
+
     it('乐观锁冲突时返回 concurrent_limit 错误', async () => {
       const row = createCreditsRow({ used: 0, total: 100, version: 3 });
       mocks.creditsSingle.mockResolvedValue({ data: row, error: null });
@@ -458,6 +508,19 @@ describe('CreditService', () => {
       mocks.creditsSingle.mockResolvedValue({ data: row, error: null });
 
       expect(await service.hasEnoughCredits('user-1', ['full_demo_long'])).toBe(false);
+    });
+
+    it('uses recovered purchased credits from completed payments in balance precheck', async () => {
+      const row = createCreditsRow({ used: 100, total: 100 });
+      mocks.creditsSingle.mockResolvedValue({ data: row, error: null });
+      mocks.purchasedMaybeSingle.mockResolvedValue({ data: null, error: null });
+      mocks.paymentsStatusEq.mockResolvedValue({ data: [{ amount: 9900 }], error: null });
+      mocks.purchasedUpsertMaybeSingle.mockResolvedValue({
+        data: createPurchasedRow({ balance: 50, total_purchased: 50, version: 0 }),
+        error: null,
+      });
+
+      expect(await service.hasEnoughCredits('user-1', ['stem_split_advanced'])).toBe(true);
     });
 
     it('复合操作余额检查', async () => {

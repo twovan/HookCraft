@@ -178,10 +178,18 @@ describe('Property 2: Credits 乐观锁并发安全', () => {
               }),
             }),
           });
+          const makeEmptyPaymentsQuery = () => ({
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+              }),
+            }),
+          });
 
           const mockFrom = vi.fn().mockImplementation((table: string) => {
             if (table === 'credits') return makeMaybeSingleQuery(row);
             if (table === 'purchased_credits') return makeMaybeSingleQuery(null);
+            if (table === 'payments') return makeEmptyPaymentsQuery();
             return {};
           });
           const mockRpc = vi.fn().mockResolvedValue({

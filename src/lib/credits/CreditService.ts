@@ -15,9 +15,12 @@ import type {
   PurchaseResult,
 } from '../../types/credits';
 import { CREDITS_COST, CREDITS_COST_RULES } from '../../config/creditsCost';
+import { DEFAULT_CREDITS_PACKS } from '../../config/creditsPack';
 import { TIER_CONFIGS } from '../../config/tierConfig';
 import { toCreditInfo, toCreditHistory, toCreditInfoEnhanced, toCreditHistoryEnhanced, toPreviewCount } from '../supabase/mappers/credits';
 import { toAppError } from '../supabase/errors';
+
+type PurchasedCreditsRow = Database['public']['Tables']['purchased_credits']['Row'];
 
 /**
  * CreditService - AI 创作额度管理服务
@@ -33,6 +36,56 @@ export class CreditService {
 
   constructor(supabase: SupabaseClient<Database>) {
     this.supabase = supabase;
+  }
+
+  private creditsFromCompletedPaymentAmount(amount: number): number {
+    const pack = DEFAULT_CREDITS_PACKS.find((item) => {
+      const discountPrice = Math.round(item.price * item.businessDiscount);
+      return item.price === amount || discountPrice === amount;
+    });
+    return pack?.credits ?? 0;
+  }
+
+  private async recoverPurchasedCreditsFromCompletedPayments(userId: string): Promise<PurchasedCreditsRow | null> {
+    const { data: payments, error: paymentsError } = await this.supabase
+      .from('payments')
+      .select('amount')
+      .eq('user_id', userId)
+      .eq('status', 'completed');
+
+    if (paymentsError) throw toAppError(paymentsError, 'payments', 'select');
+
+    const recoveredCredits = (payments ?? []).reduce((sum, payment) => (
+      sum + this.creditsFromCompletedPaymentAmount(payment.amount)
+    ), 0);
+
+    if (recoveredCredits <= 0) return null;
+
+    const { data: recoveredRow, error: upsertError } = await this.supabase
+      .from('purchased_credits')
+      .upsert({
+        user_id: userId,
+        balance: recoveredCredits,
+        total_purchased: recoveredCredits,
+        version: 0,
+      }, { onConflict: 'user_id' })
+      .select('*')
+      .maybeSingle();
+
+    if (upsertError) throw toAppError(upsertError, 'purchased_credits', 'upsert');
+    return recoveredRow;
+  }
+
+  private async readPurchasedCreditsRow(userId: string): Promise<PurchasedCreditsRow | null> {
+    const { data, error } = await this.supabase
+      .from('purchased_credits')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (error) throw toAppError(error, 'purchased_credits', 'select');
+    if (data) return data;
+    return this.recoverPurchasedCreditsFromCompletedPayments(userId);
   }
 
   /**
@@ -116,13 +169,7 @@ export class CreditService {
     if (!currentCredits) throw new Error('Credits record not found');
 
     // 2. 读取当前 purchased_credits 及 version（可能不存在）
-    const { data: currentPurchased, error: purchasedReadError } = await this.supabase
-      .from('purchased_credits')
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    if (purchasedReadError) throw toAppError(purchasedReadError, 'purchased_credits', 'select');
+    const currentPurchased = await this.readPurchasedCreditsRow(userId);
 
     const purchasedVersion = currentPurchased?.version ?? 0;
 
@@ -218,13 +265,7 @@ export class CreditService {
    * 从 purchased_credits 表查询，无记录时返回 0
    */
   async getPurchasedBalance(userId: string): Promise<number> {
-    const { data, error } = await this.supabase
-      .from('purchased_credits')
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    if (error) throw toAppError(error, 'purchased_credits', 'select');
+    const data = await this.readPurchasedCreditsRow(userId);
     return data?.balance ?? 0;
   }
 
@@ -282,13 +323,7 @@ export class CreditService {
       }
     }
 
-    const { data: purchasedRow, error: purchasedError } = await this.supabase
-      .from('purchased_credits')
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    if (purchasedError) throw toAppError(purchasedError, 'purchased_credits', 'select');
+    const purchasedRow = await this.readPurchasedCreditsRow(userId);
 
     // Ensure credits.total and tier match the user's membership
     const { data: membershipCheck } = await this.supabase
