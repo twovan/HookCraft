@@ -981,12 +981,9 @@ describe('CreditService', () => {
 
   describe('calculateTotalCost', () => {
     it('单操作成本正确', () => {
-      expect(service.calculateTotalCost(['preview'])).toBe(1);
-      expect(service.calculateTotalCost(['full_demo_short'])).toBe(10);
-      expect(service.calculateTotalCost(['full_demo_long'])).toBe(20);
-      expect(service.calculateTotalCost(['premium_singer'])).toBe(5);
-      expect(service.calculateTotalCost(['export_wav'])).toBe(3);
-      expect(service.calculateTotalCost(['export_stems'])).toBe(10);
+      for (const [operation, cost] of Object.entries(CREDITS_COST)) {
+        expect(service.calculateTotalCost([operation as any])).toBe(cost);
+      }
     });
 
     it('复合操作成本累加', () => {
@@ -996,6 +993,38 @@ describe('CreditService', () => {
 
     it('空操作列表成本为 0', () => {
       expect(service.calculateTotalCost([])).toBe(0);
+    });
+
+    it('passes every configured billable operation cost into the billing RPC', async () => {
+      const billableOperations = Object.entries(CREDITS_COST).filter(([operation, cost]) => (
+        operation !== 'purchase' && cost > 0
+      ));
+
+      for (const [operation, cost] of billableOperations) {
+        mocks.creditsSingle.mockResolvedValue({ data: createCreditsRow({ used: 0, total: 100, version: 3 }), error: null });
+        mocks.purchasedMaybeSingle.mockResolvedValue({ data: createPurchasedRow({ version: 2 }), error: null });
+        mocks.rpc.mockResolvedValue({
+          data: {
+            success: true,
+            consumed: cost,
+            monthly_cost: cost,
+            purchased_cost: 0,
+            monthly_remaining: 100 - cost,
+            purchased_remaining: 50,
+          },
+          error: null,
+        });
+
+        await service.consumeCredits('user-1', [operation as any]);
+
+        expect(mocks.rpc).toHaveBeenLastCalledWith('consume_credits_with_priority', {
+          p_user_id: 'user-1',
+          p_total_cost: cost,
+          p_operation_type: operation,
+          p_credits_version: 3,
+          p_purchased_version: 2,
+        });
+      }
     });
 
     it('uses admin configured operation costs for async billing', async () => {
