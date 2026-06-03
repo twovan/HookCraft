@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { ChangeEvent, CSSProperties, MouseEvent, PointerEvent } from 'react';
 import {
   defaultStemMasterState,
@@ -6955,13 +6956,14 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
             />
           </div>
         </div>
-        {timelineTooltip && (
+        {timelineTooltip && typeof document !== 'undefined' && createPortal(
           <div
             className="stem-timeline-floating-tooltip"
             style={timelineFloatingTooltipStyle(timelineTooltip)}
           >
             {timelineTooltip.label}
-          </div>
+          </div>,
+          document.body,
         )}
         {showShortcutHelp && (
           <div style={timelineShortcutHelpStyle(dawLayoutMetrics, timelineViewportWidth)}>
@@ -9849,21 +9851,22 @@ function timelineFloatingTooltipStyle(tooltip: TimelineTooltipState): CSSPropert
     position: 'fixed',
     left: tooltip.left,
     top: tooltip.top,
-    zIndex: 220,
+    zIndex: 9999,
     transform: 'translate(-50%, -100%)',
     maxWidth: 180,
-    padding: '7px 10px',
-    border: '1px solid rgba(190, 232, 95, 0.34)',
+    padding: '8px 11px',
+    border: '1px solid rgba(206, 255, 53, 0.72)',
     borderRadius: 8,
-    background: 'linear-gradient(180deg, rgba(9, 14, 24, 0.995), rgba(2, 6, 14, 0.995))',
-    color: '#f8fbff',
+    background: '#050913',
+    color: '#ffffff',
     fontSize: 12,
     fontWeight: 900,
     lineHeight: 1,
     letterSpacing: 0,
     whiteSpace: 'nowrap',
-    textShadow: '0 1px 0 rgba(0, 0, 0, 0.55)',
-    boxShadow: '0 14px 32px rgba(0, 0, 0, 0.58), 0 0 0 1px rgba(255, 255, 255, 0.04) inset',
+    opacity: 1,
+    textShadow: '0 1px 0 #000000',
+    boxShadow: '0 16px 34px rgba(0, 0, 0, 0.72), 0 0 0 1px rgba(255, 255, 255, 0.08) inset, 0 0 20px rgba(206, 255, 53, 0.12)',
     pointerEvents: 'none',
   };
 }
