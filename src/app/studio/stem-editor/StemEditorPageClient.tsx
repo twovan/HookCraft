@@ -8,8 +8,9 @@ import type { CSSProperties } from 'react';
 import { useMembershipStore } from '@/store/membershipStore';
 import {
   DEFAULT_STEM_EDITOR_FEATURE_SETTINGS,
+  type EditorPanelAccess,
   normalizeStemEditorFeatureSettings,
-  resolveEditorAccessTier,
+  resolveEditorPanelAccess,
   type StemEditorFeatureSettings,
   type StemSeparationMode,
 } from '@/config/stemEditorFeatures';
@@ -123,10 +124,10 @@ export default function StemEditorPageClient() {
     initialSeparationMode,
   );
 
-  const accessTier = resolveEditorAccessTier(membership?.tier || 'free');
-  const activeFeatureSettings = accessTier === 'pro'
-    ? featureSettings.pro
-    : featureSettings.plus;
+  const editorPanel = resolveEditorPanelAccess(membership?.tier || 'free');
+  const activeFeatureSettings = editorPanel === 'proEditor'
+    ? featureSettings.proEditor
+    : featureSettings.basicEditor;
   const canForceRefresh = activeFeatureSettings.modes.allowForceRefresh;
 
   const redirectToLogin = useCallback(() => {
@@ -419,7 +420,7 @@ export default function StemEditorPageClient() {
             <div style={fallbackTimelineColumnStyle}>
               {!selectedSeparationMode && !initialJobId && (
                 <ModeSelectionPanel
-                  accessTier={accessTier}
+                  editorPanel={editorPanel}
                   featureSettings={featureSettings}
                   onSelect={(mode) => {
                     setSelectedSeparationMode(mode);
@@ -780,24 +781,24 @@ function normalizeSeparationMode(value: unknown): StemSeparationMode | null {
 }
 
 function ModeSelectionPanel({
-  accessTier,
+  editorPanel,
   featureSettings,
   onSelect,
 }: {
-  accessTier: 'free' | 'plus' | 'pro';
+  editorPanel: EditorPanelAccess;
   featureSettings: StemEditorFeatureSettings;
   onSelect: (mode: StemSeparationMode) => void;
 }) {
-  const activeSettings = accessTier === 'pro' ? featureSettings.pro : featureSettings.plus;
-  const canUseBasic = accessTier !== 'free'
+  const activeSettings = editorPanel === 'proEditor' ? featureSettings.proEditor : featureSettings.basicEditor;
+  const canUseBasic = editorPanel !== 'free'
     && activeSettings.modes.basicEditor
     && activeSettings.stems.separateVocal;
-  const canUsePro = accessTier === 'pro'
+  const canUsePro = editorPanel === 'proEditor'
     && activeSettings.modes.proEditor
     && activeSettings.stems.splitStem;
   const showUpgradePrompt = activeSettings.modes.allowUpgradeFromBasic;
   const showCreditConfirm = activeSettings.modes.showCreditConfirm;
-  const tierLabel = accessTier === 'pro' ? 'Pro 完整版' : accessTier === 'plus' ? 'Plus 简版' : '未开通会员';
+  const tierLabel = editorPanel === 'proEditor' ? '专业编辑器' : editorPanel === 'basicEditor' ? '基础编辑器' : '未开通会员';
 
   return (
     <div style={modePanelStyle}>
@@ -807,8 +808,8 @@ function ModeSelectionPanel({
           <div style={modeTitleStyle}>{TEXT.chooseMode}</div>
           <p style={modeIntroStyle}>根据当前会员权限进入对应编辑器，系统会优先读取已保存分轨，避免重复分析。</p>
         </div>
-        <div style={modeTierBadgeStyle(accessTier)}>
-          <span style={modeTierDotStyle(accessTier)} />
+        <div style={modeTierBadgeStyle(editorPanel)}>
+          <span style={modeTierDotStyle(editorPanel)} />
           {tierLabel}
         </div>
       </div>
@@ -1180,39 +1181,39 @@ const modeIntroStyle: CSSProperties = {
   lineHeight: 1.7,
 };
 
-function modeTierBadgeStyle(accessTier: 'free' | 'plus' | 'pro'): CSSProperties {
+function modeTierBadgeStyle(editorPanel: EditorPanelAccess): CSSProperties {
   return {
     display: 'inline-flex',
     alignItems: 'center',
     gap: 8,
     flexShrink: 0,
     borderRadius: 999,
-    border: accessTier === 'pro'
+    border: editorPanel === 'proEditor'
       ? '1px solid rgba(245, 158, 11, 0.45)'
-      : accessTier === 'plus'
+      : editorPanel === 'basicEditor'
         ? '1px solid rgba(96, 165, 250, 0.45)'
         : '1px solid rgba(148, 163, 184, 0.32)',
-    background: accessTier === 'pro'
+    background: editorPanel === 'proEditor'
       ? 'rgba(245, 158, 11, 0.12)'
-      : accessTier === 'plus'
+      : editorPanel === 'basicEditor'
         ? 'rgba(37, 99, 235, 0.16)'
         : 'rgba(15, 23, 42, 0.72)',
-    color: accessTier === 'free' ? '#aeb7ce' : '#f8fafc',
+    color: editorPanel === 'free' ? '#aeb7ce' : '#f8fafc',
     padding: '9px 13px',
     fontSize: 12,
     fontWeight: 900,
   };
 }
 
-function modeTierDotStyle(accessTier: 'free' | 'plus' | 'pro'): CSSProperties {
+function modeTierDotStyle(editorPanel: EditorPanelAccess): CSSProperties {
   return {
     width: 8,
     height: 8,
     borderRadius: '50%',
-    background: accessTier === 'pro' ? '#f59e0b' : accessTier === 'plus' ? '#60a5fa' : '#64748b',
-    boxShadow: accessTier === 'free' ? 'none' : '0 0 16px currentColor',
+    background: editorPanel === 'proEditor' ? '#f59e0b' : editorPanel === 'basicEditor' ? '#60a5fa' : '#64748b',
+    boxShadow: editorPanel === 'free' ? 'none' : '0 0 16px currentColor',
   };
-};
+}
 
 const modeGridStyle: CSSProperties = {
   display: 'grid',

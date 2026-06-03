@@ -1581,7 +1581,7 @@ export default function StemMixerEditor({
   separationMode,
   featureSettings,
 }: StemMixerEditorProps) {
-  const editorFeatures = featureSettings || DEFAULT_STEM_EDITOR_FEATURE_SETTINGS.pro;
+  const editorFeatures = featureSettings || DEFAULT_STEM_EDITOR_FEATURE_SETTINGS.proEditor;
   const canUsePlayback = editorFeatures.editing.playback;
   const canUseTrackVolume = editorFeatures.editing.trackVolume;
   const canUseMuteSolo = editorFeatures.editing.muteSolo;

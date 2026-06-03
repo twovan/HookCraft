@@ -133,7 +133,7 @@ function countEnabledFeatures(settings: StemEditorFeatureSettings[keyof StemEdit
 }
 
 function getEditorPanelLabel(tier: keyof StemEditorFeatureSettings) {
-  return tier === 'plus' ? '基础编辑器' : '专业编辑器';
+  return tier === 'basicEditor' ? '基础编辑器' : '专业编辑器';
 }
 
 export default function AdminSettingsClient({ view = 'system' }: { view?: 'system' | 'editor' }) {
@@ -432,12 +432,12 @@ export default function AdminSettingsClient({ view = 'system' }: { view?: 'syste
             <div style={editorSummaryGridStyle}>
               <div style={editorSummaryCardStyle}>
                 <span style={editorSummaryLabelStyle}>基础编辑器</span>
-                <strong style={editorSummaryValueStyle}>{countEnabledFeatures(stemEditorFeatures.plus)}</strong>
+                <strong style={editorSummaryValueStyle}>{countEnabledFeatures(stemEditorFeatures.basicEditor)}</strong>
                 <span style={editorSummaryMetaStyle}>Plus 用户 / 2 轨编辑 / MP3 导出</span>
               </div>
               <div style={editorSummaryCardStyle}>
                 <span style={editorSummaryLabelStyle}>专业编辑器</span>
-                <strong style={editorSummaryValueStyle}>{countEnabledFeatures(stemEditorFeatures.pro)}</strong>
+                <strong style={editorSummaryValueStyle}>{countEnabledFeatures(stemEditorFeatures.proEditor)}</strong>
                 <span style={editorSummaryMetaStyle}>Pro 用户 / 分析结果分轨 / 完整工具</span>
               </div>
             </div>
@@ -457,16 +457,16 @@ export default function AdminSettingsClient({ view = 'system' }: { view?: 'syste
                     <p style={editorFeatureGroupDescriptionStyle}>{group.description}</p>
                   </div>
                   <div style={editorFeatureGroupCountStyle}>
-                    基础 {group.items.filter(([key]) => Boolean((stemEditorFeatures.plus as any)[group.group][key])).length}
+                    基础 {group.items.filter(([key]) => Boolean((stemEditorFeatures.basicEditor as any)[group.group][key])).length}
                     {' / '}
-                    专业 {group.items.filter(([key]) => Boolean((stemEditorFeatures.pro as any)[group.group][key])).length}
+                    专业 {group.items.filter(([key]) => Boolean((stemEditorFeatures.proEditor as any)[group.group][key])).length}
                   </div>
                 </div>
                 <div style={editorFeatureRowsStyle}>
                   {group.items.map(([key, label]) => (
                     <div key={`${group.group}-${key}`} style={editorFeatureRowStyle}>
                       <span style={editorFeatureLabelStyle}>{label}</span>
-                      {(['plus', 'pro'] as const).map((tier) => {
+                      {(['basicEditor', 'proEditor'] as const).map((tier) => {
                         const enabled = Boolean((stemEditorFeatures[tier] as any)[group.group][key]);
                         return (
                           <button

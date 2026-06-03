@@ -9,7 +9,7 @@ import type { CreditOperationType } from '@/types/credits';
 import type { MembershipTier } from '@/types/membership';
 import {
   normalizeStemEditorFeatureSettings,
-  resolveEditorAccessTier,
+  resolveEditorPanelAccess,
   resolveStemSeparationMode,
   type StemSeparationMode,
 } from '@/config/stemEditorFeatures';
@@ -81,8 +81,8 @@ export async function POST(req: NextRequest) {
       readUserMembershipTier(user.id),
       readStemEditorFeatureSettings(supabaseAdmin).catch(() => normalizeStemEditorFeatureSettings(null)),
     ]);
-    const accessTier = resolveEditorAccessTier(membershipTier);
-    const separationMode = resolveStemSeparationMode(featureSettings, accessTier, requestedSeparationMode);
+    const editorPanel = resolveEditorPanelAccess(membershipTier);
+    const separationMode = resolveStemSeparationMode(featureSettings, editorPanel, requestedSeparationMode);
     if (!separationMode) {
       return NextResponse.json({ error: 'Stem editor is not available for this membership tier' }, { status: 403 });
     }
@@ -169,7 +169,7 @@ export async function POST(req: NextRequest) {
       sourceAudioId: source.sourceAudioId,
       callBackUrl,
       type: separationMode,
-      editorAccessTier: accessTier,
+      editorPanel,
       membershipTier,
     };
 

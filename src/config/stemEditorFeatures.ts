@@ -1,6 +1,6 @@
 import type { MembershipTier } from '@/types/membership';
 
-export type EditorAccessTier = 'free' | 'plus' | 'pro';
+export type EditorPanelAccess = 'free' | 'basicEditor' | 'proEditor';
 export type StemSeparationMode = 'separate_vocal' | 'split_stem';
 export type StemEditorMode = 'basic' | 'pro';
 export type StemResultType = 'two_track_vocal_instrumental' | 'twelve_stem_groups';
@@ -78,12 +78,12 @@ export interface StemEditorTierFeatureSettings {
 }
 
 export interface StemEditorFeatureSettings {
-  plus: StemEditorTierFeatureSettings;
-  pro: StemEditorTierFeatureSettings;
+  basicEditor: StemEditorTierFeatureSettings;
+  proEditor: StemEditorTierFeatureSettings;
 }
 
 export const DEFAULT_STEM_EDITOR_FEATURE_SETTINGS: StemEditorFeatureSettings = {
-  plus: {
+  basicEditor: {
     modes: {
       basicEditor: true,
       proEditor: false,
@@ -144,7 +144,7 @@ export const DEFAULT_STEM_EDITOR_FEATURE_SETTINGS: StemEditorFeatureSettings = {
       exportHistory: false,
     },
   },
-  pro: {
+  proEditor: {
     modes: {
       basicEditor: true,
       proEditor: true,
@@ -272,26 +272,28 @@ function normalizeTierSettings(
 
 export function normalizeStemEditorFeatureSettings(value: unknown): StemEditorFeatureSettings {
   const input = asRecord(value);
+  const basicEditorInput = input.basicEditor ?? input.plus;
+  const proEditorInput = input.proEditor ?? input.pro;
   return {
-    plus: normalizeTierSettings(input.plus, DEFAULT_STEM_EDITOR_FEATURE_SETTINGS.plus),
-    pro: normalizeTierSettings(input.pro, DEFAULT_STEM_EDITOR_FEATURE_SETTINGS.pro),
+    basicEditor: normalizeTierSettings(basicEditorInput, DEFAULT_STEM_EDITOR_FEATURE_SETTINGS.basicEditor),
+    proEditor: normalizeTierSettings(proEditorInput, DEFAULT_STEM_EDITOR_FEATURE_SETTINGS.proEditor),
   };
 }
 
-export function resolveEditorAccessTier(tier: MembershipTier | null | undefined): EditorAccessTier {
-  if (tier === 'business') return 'pro';
-  if (tier === 'pro') return 'plus';
+export function resolveEditorPanelAccess(tier: MembershipTier | null | undefined): EditorPanelAccess {
+  if (tier === 'business') return 'proEditor';
+  if (tier === 'pro') return 'basicEditor';
   return 'free';
 }
 
 export function resolveStemSeparationMode(
   settings: StemEditorFeatureSettings,
-  accessTier: EditorAccessTier,
+  editorPanel: EditorPanelAccess,
   requestedMode: unknown,
 ): StemSeparationMode | null {
-  if (accessTier === 'free') return null;
+  if (editorPanel === 'free') return null;
 
-  const tierSettings = settings[accessTier];
+  const tierSettings = settings[editorPanel];
   const requested = requestedMode === 'split_stem' ? 'split_stem' : 'separate_vocal';
 
   if (requested === 'split_stem' && tierSettings.modes.proEditor && tierSettings.stems.splitStem) {
