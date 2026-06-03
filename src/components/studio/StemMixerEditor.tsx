@@ -7220,12 +7220,12 @@ export default function StemMixerEditor({
               onTooltipChange={setTimelineTooltip}
               onClick={() => setShowShortcutHelp((value) => !value)}
             />}
-            <TimelineIconButton
+            {canUsePlayback && <TimelineIconButton
               icon="locate"
               label="定位播放头"
               onTooltipChange={setTimelineTooltip}
               onClick={() => centerTimelineOnPlaybackPosition()}
-            />
+            />}
             {editorFeatures.editing.followPlayhead && <TimelineIconButton
               icon="follow"
               label="跟随播放头"

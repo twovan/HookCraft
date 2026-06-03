@@ -64,4 +64,8 @@ describe('stem editor feature switch enforcement', () => {
   it.each(enforcedSwitches)('wires %s to editor behavior or API access', (_name, pattern) => {
     expect(source).toMatch(pattern);
   });
+
+  it('hides playback-adjacent timeline controls when playback is disabled', () => {
+    expect(source).toMatch(/\{canUsePlayback && <TimelineIconButton\s+icon="locate"/);
+  });
 });
