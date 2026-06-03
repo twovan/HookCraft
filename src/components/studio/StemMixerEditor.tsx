@@ -1582,6 +1582,30 @@ export default function StemMixerEditor({
   featureSettings,
 }: StemMixerEditorProps) {
   const editorFeatures = featureSettings || DEFAULT_STEM_EDITOR_FEATURE_SETTINGS.pro;
+  const canUseTimelineZoom = editorFeatures.editing.zoom;
+  const canUseSnap = editorFeatures.editing.snap;
+  const canUseTrim = editorFeatures.editing.trim;
+  const canUseFade = editorFeatures.editing.fade;
+  const canUsePan = editorFeatures.editing.pan;
+  const canUseMuteRanges = editorFeatures.editing.muteRanges;
+  const canUseLoopPreview = editorFeatures.editing.loopPreview;
+  const canUseSplitClip = editorFeatures.editing.splitClip;
+  const canUseDeleteClip = editorFeatures.editing.deleteClip;
+  const canUseCopyCutPaste = editorFeatures.editing.copyCutPaste;
+  const canUseClipDrag = editorFeatures.editing.clipDrag;
+  const canUseCrossTrackDrag = editorFeatures.editing.crossTrackDrag;
+  const canUseUndoRedo = editorFeatures.editing.undoRedo;
+  const canUseAutoSave = editorFeatures.editing.autoSave;
+  const canUseLocalDraftRecovery = editorFeatures.editing.localDraftRecovery;
+  const canUseTrackFilter = editorFeatures.advanced.trackViewFilter;
+  const canUseTrackDensity = editorFeatures.advanced.trackDensity;
+  const canUseAdvancedProduction = editorFeatures.advanced.addTrack
+    || editorFeatures.advanced.importAudio
+    || editorFeatures.advanced.recording;
+  const canShowWavExport = editorFeatures.export.wavMix || editorFeatures.export.wavStems;
+  const canUseAdvancedExportModes = editorFeatures.export.advancedExportModes;
+  const canUseSoloOnlyExport = editorFeatures.export.soloOnly;
+  const canUseExportHistory = editorFeatures.export.exportHistory;
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioBuffersRef = useRef<Record<string, AudioBuffer>>({});
   const gainNodesRef = useRef<Record<string, GainNode>>({});
@@ -1779,8 +1803,10 @@ export default function StemMixerEditor({
   );
   const exportStatus = useMemo(() => resolveStemExportStatus(exportStatusInput), [exportStatusInput]);
   const recentExportRecords = useMemo(
-    () => exportRecords.map((record) => ({ ...record, view: formatStemExportRecord(record) })),
-    [exportRecords],
+    () => canUseExportHistory
+      ? exportRecords.map((record) => ({ ...record, view: formatStemExportRecord(record) }))
+      : [],
+    [canUseExportHistory, exportRecords],
   );
   const recordingDeviceOptions = useMemo(() => (
     audioInputDevices.length === 0
@@ -1992,14 +2018,19 @@ export default function StemMixerEditor({
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (!canUseExportHistory) {
+      setExportRecords([]);
+      setExportHistoryLoadedKey(null);
+      return;
+    }
     setExportRecords(parseStemExportRecords(window.localStorage.getItem(exportHistoryStorageKey)));
     setExportHistoryLoadedKey(exportHistoryStorageKey);
-  }, [exportHistoryStorageKey]);
+  }, [canUseExportHistory, exportHistoryStorageKey]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     setLocalDraftState(null);
-    if (!localDraftStorageKey) return;
+    if (!canUseLocalDraftRecovery || !localDraftStorageKey) return;
 
     try {
       const rawDraft = window.localStorage.getItem(localDraftStorageKey);
@@ -2019,17 +2050,18 @@ export default function StemMixerEditor({
     } catch {
       window.localStorage.removeItem(localDraftStorageKey);
     }
-  }, [initialEditState?.savedAt, localDraftStorageKey]);
+  }, [canUseLocalDraftRecovery, initialEditState?.savedAt, localDraftStorageKey]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (!canUseExportHistory) return;
     if (exportHistoryLoadedKey !== exportHistoryStorageKey) return;
     if (exportRecords.length === 0) {
       window.localStorage.removeItem(exportHistoryStorageKey);
       return;
     }
     window.localStorage.setItem(exportHistoryStorageKey, serializeStemExportRecords(exportRecords));
-  }, [exportHistoryLoadedKey, exportHistoryStorageKey, exportRecords]);
+  }, [canUseExportHistory, exportHistoryLoadedKey, exportHistoryStorageKey, exportRecords]);
 
   useEffect(() => {
     failedLoadCountRef.current = failedLoadCount;
@@ -2041,28 +2073,32 @@ export default function StemMixerEditor({
 
   useEffect(() => {
     const preferences = loadEditorPreferences();
-    if (preferences.exportMode === 'current-mix' || preferences.exportMode === 'all-tracks' || preferences.exportMode === 'solo-only') {
+    if (
+      preferences.exportMode === 'current-mix'
+      || (canUseAdvancedExportModes && preferences.exportMode === 'all-tracks')
+      || (canUseAdvancedExportModes && canUseSoloOnlyExport && preferences.exportMode === 'solo-only')
+    ) {
       setExportMode(preferences.exportMode);
     }
     if (preferences.exportReadiness === 'ready-only' || preferences.exportReadiness === 'wait-all') {
       setExportReadiness(preferences.exportReadiness);
     }
-    if (preferences.trackViewMode === 'all' || preferences.trackViewMode === 'active' || preferences.trackViewMode === 'audible') {
+    if (canUseTrackFilter && (preferences.trackViewMode === 'all' || preferences.trackViewMode === 'active' || preferences.trackViewMode === 'audible')) {
       setTrackViewMode(preferences.trackViewMode);
     }
     if (preferences.inspectorTab === 'track' || preferences.inspectorTab === 'mix' || preferences.inspectorTab === 'export') {
       setInspectorTab(preferences.inspectorTab);
     }
-    if (typeof preferences.timelineZoom === 'number' && Number.isFinite(preferences.timelineZoom)) {
+    if (canUseTimelineZoom && typeof preferences.timelineZoom === 'number' && Number.isFinite(preferences.timelineZoom)) {
       setTimelineZoom(clampTimelineZoom(preferences.timelineZoom));
     }
     if (typeof preferences.followPlayhead === 'boolean') {
       setFollowPlayhead(preferences.followPlayhead);
     }
-    if (typeof preferences.magnetSnap === 'boolean') {
+    if (canUseSnap && typeof preferences.magnetSnap === 'boolean') {
       setMagnetSnap(preferences.magnetSnap);
     }
-    if (typeof preferences.snapStepSeconds === 'number') {
+    if (canUseSnap && typeof preferences.snapStepSeconds === 'number') {
       setSnapStepSeconds(normalizeTimelineSnapStep(preferences.snapStepSeconds));
     }
     if (typeof preferences.compactTransport === 'boolean') {
@@ -2071,11 +2107,11 @@ export default function StemMixerEditor({
     if (typeof preferences.inspectorCollapsed === 'boolean') {
       setInspectorCollapsed(preferences.inspectorCollapsed);
     }
-    if (preferences.trackDensity === 'comfortable' || preferences.trackDensity === 'compact') {
+    if (canUseTrackDensity && (preferences.trackDensity === 'comfortable' || preferences.trackDensity === 'compact')) {
       setTrackDensity(preferences.trackDensity);
     }
     setEditorPreferencesLoaded(true);
-  }, []);
+  }, [canUseAdvancedExportModes, canUseSnap, canUseSoloOnlyExport, canUseTimelineZoom, canUseTrackDensity, canUseTrackFilter]);
 
   useEffect(() => {
     if (!editorPreferencesLoaded) return;
@@ -2094,6 +2130,26 @@ export default function StemMixerEditor({
       trackDensity,
     }));
   }, [compactTransport, editorPreferencesLoaded, exportMode, exportReadiness, followPlayhead, inspectorCollapsed, inspectorTab, magnetSnap, snapStepSeconds, snapToGrid, timelineZoom, trackDensity, trackViewMode]);
+
+  useEffect(() => {
+    if ((!canUseAdvancedExportModes && exportMode !== 'current-mix')
+      || (!canUseSoloOnlyExport && exportMode === 'solo-only')) {
+      setExportMode('current-mix');
+    }
+    if (!canUseTrackFilter && trackViewMode !== 'all') {
+      setTrackViewMode('all');
+    }
+    if (!canUseTrackDensity && trackDensity !== 'comfortable') {
+      setTrackDensity('comfortable');
+    }
+    if (!canUseSnap) {
+      if (snapToGrid) setSnapToGrid(false);
+      if (magnetSnap) setMagnetSnap(false);
+    }
+    if (!canUseTimelineZoom && timelineZoom !== 1) {
+      setTimelineZoom(1);
+    }
+  }, [canUseAdvancedExportModes, canUseSnap, canUseSoloOnlyExport, canUseTimelineZoom, canUseTrackDensity, canUseTrackFilter, exportMode, magnetSnap, snapToGrid, timelineZoom, trackDensity, trackViewMode]);
 
   useEffect(() => {
     setSaveStatusDismissing(false);
@@ -2213,11 +2269,12 @@ export default function StemMixerEditor({
   }, [currentTime, duration, showAdvancedControls, timelineLaneWidth, timelineViewportWidth]);
 
   const applyTimelineZoom = useCallback((nextZoom: number) => {
+    if (!canUseTimelineZoom) return;
     const safeZoom = clampTimelineZoom(nextZoom);
     setTimelineZoom(safeZoom);
     const nextLaneWidth = Math.round(resolveTimelineBaseLaneWidth(showAdvancedControls, timelineViewportWidth) * safeZoom);
     centerTimelineOnPlaybackPosition(currentTime, nextLaneWidth);
-  }, [centerTimelineOnPlaybackPosition, currentTime, showAdvancedControls, timelineViewportWidth]);
+  }, [canUseTimelineZoom, centerTimelineOnPlaybackPosition, currentTime, showAdvancedControls, timelineViewportWidth]);
 
   useEffect(() => {
     const viewport = timelineViewportRef.current;
@@ -2225,6 +2282,7 @@ export default function StemMixerEditor({
 
     const handleNativeTimelineWheel = (event: globalThis.WheelEvent) => {
       if (event.ctrlKey || event.metaKey) {
+        if (!canUseTimelineZoom) return;
         event.preventDefault();
         event.stopPropagation();
         const zoomStep = event.deltaY < 0 ? 0.15 : -0.15;
@@ -2243,7 +2301,7 @@ export default function StemMixerEditor({
     return () => {
       viewport.removeEventListener('wheel', handleNativeTimelineWheel);
     };
-  }, [applyTimelineZoom]);
+  }, [applyTimelineZoom, canUseTimelineZoom]);
 
   const shouldStartTimelinePan = useCallback((event: PointerEvent<HTMLDivElement>) => {
     const target = event.target;
@@ -2306,6 +2364,7 @@ export default function StemMixerEditor({
   }, []);
 
   const visibleStems = useMemo(() => stems.filter((stem) => {
+    if (!canUseTrackFilter) return true;
     if (trackViewMode === 'all') return true;
 
     const state = tracks[stem.type] || defaultTrackState();
@@ -2313,7 +2372,7 @@ export default function StemMixerEditor({
     if (trackViewMode === 'audible') return isAudible;
 
     return stemHasDetectedContent(stem, audioBuffersRef.current[stem.type]);
-  }), [bufferVersion, hasSoloTrack, stems, trackViewMode, tracks]);
+  }), [bufferVersion, canUseTrackFilter, hasSoloTrack, stems, trackViewMode, tracks]);
 
   const clipWaveformSources = useMemo<Record<string, StemClipWaveformSource>>(() => {
     const nextSources: Record<string, StemClipWaveformSource> = {};
@@ -3237,6 +3296,7 @@ export default function StemMixerEditor({
   }, [failedStemTypes, getAudioContext, isAudioRetrying, jobId, loadingStemTypes, pauseAll]);
 
   const renameTrack = useCallback((type: string, value: string, historyMode: StemHistoryMode = 'immediate') => {
+    if (!editorFeatures.advanced.trackRename) return;
     const label = sanitizeTrackLabel(value);
     const fallback = stems.find((stem) => stem.type === type);
     if (historyMode === 'deferred') {
@@ -3261,9 +3321,10 @@ export default function StemMixerEditor({
       return next;
     });
     setSaveStatus(label ? `轨道已重命名为“${label}”。` : '轨道名称已恢复默认。');
-  }, [beginDeferredHistory, pushHistorySnapshot, stems]);
+  }, [beginDeferredHistory, editorFeatures.advanced.trackRename, pushHistorySnapshot, stems]);
 
   const setTrackColor = useCallback((type: string, value: string) => {
+    if (!editorFeatures.advanced.trackColor) return;
     const color = sanitizeTrackColor(value);
     if (!color) return;
 
@@ -3281,9 +3342,10 @@ export default function StemMixerEditor({
       return next;
     });
     setSaveStatus(`轨道颜色已更新为 ${color}。`);
-  }, [pushHistorySnapshot]);
+  }, [editorFeatures.advanced.trackColor, pushHistorySnapshot]);
 
   const createEmptyCustomTrack = useCallback(() => {
+    if (!editorFeatures.advanced.addTrack) return null;
     const type = `custom_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
     const displayLabel = `空轨道 ${customStems.length + 1}`;
     const placeholderDuration = Math.max(1, Number(duration.toFixed(3)) || 1);
@@ -3316,7 +3378,7 @@ export default function StemMixerEditor({
     setRecordingStatus(null);
     setSaveStatus(`已添加“${displayLabel}”，可在右侧导入音频或现场录音。`);
     return type;
-  }, [customStems.length, duration, rememberEditorHistory]);
+  }, [customStems.length, duration, editorFeatures.advanced.addTrack, rememberEditorHistory]);
 
   const resolveAudioInputTargetType = useCallback(() => {
     if (selectedTrack && customStems.some((stem) => stem.type === selectedTrack.type)) {
@@ -3435,11 +3497,14 @@ export default function StemMixerEditor({
     const label = file.name.replace(/\.[^/.]+$/, '');
     const targetType = importTargetTypeRef.current || resolveAudioInputTargetType();
     importTargetTypeRef.current = null;
+    if (!targetType) return;
     void addCustomStemFromBlob(file, label, targetType);
   }, [addCustomStemFromBlob, resolveAudioInputTargetType]);
 
   const importAudioToSelectedTrack = useCallback(() => {
-    importTargetTypeRef.current = resolveAudioInputTargetType();
+    const targetType = resolveAudioInputTargetType();
+    if (!targetType) return;
+    importTargetTypeRef.current = targetType;
     setAddTrackMode('import');
     setIsAddTrackPanelOpen(true);
     fileInputRef.current?.click();
@@ -3617,6 +3682,7 @@ export default function StemMixerEditor({
     try {
       stopMonitoringPreview();
       const targetType = resolveAudioInputTargetType();
+      if (!targetType) return;
       setSelectedTrackType(targetType);
       setRecordingTrackType(targetType);
       setRecordingTrackWaveform(Array.from({ length: 220 }, () => 0));
@@ -3787,6 +3853,7 @@ export default function StemMixerEditor({
   }, [clearLoopPreviewTimer, duration, isPlaying, playAll, stopSources]);
 
   const setTrackTrim = useCallback((type: string, edge: 'start' | 'end', value: number, shouldSnap = snapToGrid, historyMode: StemHistoryMode = 'immediate') => {
+    if (!canUseTrim) return;
     commitTrackChange((current) => {
       const state = current[type] || defaultTrackState();
       const currentEnd = state.trimEnd ?? duration;
@@ -3856,7 +3923,7 @@ export default function StemMixerEditor({
         },
       };
     }, historyMode);
-  }, [commitTrackChange, duration, magnetSnap, snapStepSeconds, snapToGrid]);
+  }, [canUseTrim, commitTrackChange, duration, magnetSnap, snapStepSeconds, snapToGrid]);
 
   const setTrackClipTrim = useCallback((
     type: string,
@@ -3866,6 +3933,7 @@ export default function StemMixerEditor({
     shouldSnap = snapToGrid,
     historyMode: StemHistoryMode = 'immediate',
   ) => {
+    if (!canUseTrim) return;
     commitTrackChange((current) => {
       const state = current[type] || defaultTrackState();
       const currentClipState = resolveTrackClipState(state, duration);
@@ -3906,9 +3974,10 @@ export default function StemMixerEditor({
         },
       };
     }, historyMode);
-  }, [commitTrackChange, duration, magnetSnap, snapStepSeconds, snapToGrid]);
+  }, [canUseTrim, commitTrackChange, duration, magnetSnap, snapStepSeconds, snapToGrid]);
 
   const setTrackTrimRange = useCallback((type: string, nextStart: number, shouldSnap = snapToGrid, historyMode: StemHistoryMode = 'immediate') => {
+    if (!canUseTrim) return;
     commitTrackChange((current) => {
       const state = current[type] || defaultTrackState();
       const currentEnd = state.trimEnd ?? duration;
@@ -3939,7 +4008,7 @@ export default function StemMixerEditor({
         },
       };
     }, historyMode);
-  }, [commitTrackChange, duration, snapStepSeconds, snapToGrid]);
+  }, [canUseTrim, commitTrackChange, duration, snapStepSeconds, snapToGrid]);
 
   const setTrackClips = useCallback((type: string, clips: StemClip[]) => {
     commitTrackChange((current) => {
@@ -3981,6 +4050,7 @@ export default function StemMixerEditor({
   }, [commitTrackChange, duration]);
 
   const splitSelectedTrackClipAtPlayhead = useCallback(() => {
+    if (!canUseSplitClip) return;
     if (!selectedTrack || !selectedTrackState || duration <= 0) return;
 
     const clipState = resolveTrackClipState(selectedTrackState, duration);
@@ -3993,9 +4063,10 @@ export default function StemMixerEditor({
     setTrackClips(selectedTrack.type, nextClips);
     setPlaybackError(null);
     setSaveStatus(`已在 ${formatStemTimecode(currentTime)} 切分“${getStemDisplayName(selectedTrack).zh}”。`);
-  }, [currentTime, duration, selectedTrack, selectedTrackState, setTrackClips]);
+  }, [canUseSplitClip, currentTime, duration, selectedTrack, selectedTrackState, setTrackClips]);
 
   const deleteTrackClipById = useCallback((trackType: string, clipId: string) => {
+    if (!canUseDeleteClip) return false;
     const stem = stems.find((candidate) => candidate.type === trackType) || null;
     const state = tracks[trackType] || defaultTrackState();
     const clipState = resolveTrackClipState(state, duration);
@@ -4013,9 +4084,10 @@ export default function StemMixerEditor({
     setPlaybackError(null);
     setSaveStatus(`已删除“${stem ? getStemDisplayName(stem).zh : '轨道'}”片段，可用上一步恢复。`);
     return true;
-  }, [duration, setTrackClips, stems, tracks]);
+  }, [canUseDeleteClip, duration, setTrackClips, stems, tracks]);
 
   const deleteSelectedClipOrActiveTrackClip = useCallback(() => {
+    if (!canUseDeleteClip && !editorFeatures.advanced.addTrack) return;
     if (!selectedTrack || duration <= 0) return;
 
     const state = tracks[selectedTrack.type] || selectedTrackState || defaultTrackState();
@@ -4029,7 +4101,9 @@ export default function StemMixerEditor({
     if (!targetClip) {
       if (clipState.clips.length === 0) {
         setSelectedClipSelection(null);
-        deleteSelectedTrack(selectedTrack.type);
+        if (editorFeatures.advanced.addTrack) {
+          deleteSelectedTrack(selectedTrack.type);
+        }
         return;
       }
       setPlaybackError('请先选中要删除的片段。');
@@ -4037,7 +4111,7 @@ export default function StemMixerEditor({
     }
 
     deleteTrackClipById(selectedTrack.type, targetClip.id);
-  }, [currentTime, deleteSelectedTrack, deleteTrackClipById, duration, selectedClip, selectedClipSelection, selectedTrack, selectedTrackState, tracks]);
+  }, [canUseDeleteClip, currentTime, deleteSelectedTrack, deleteTrackClipById, duration, editorFeatures.advanced.addTrack, selectedClip, selectedClipSelection, selectedTrack, selectedTrackState, tracks]);
 
   const resolveTrackDropTarget = useCallback((clientX?: number, clientY?: number) => {
     if (typeof document === 'undefined' || !Number.isFinite(clientX) || !Number.isFinite(clientY)) return null;
@@ -4056,6 +4130,10 @@ export default function StemMixerEditor({
     clientX?: number,
     clientY?: number,
   ) => {
+    if (!canUseClipDrag) {
+      setClipDragPreview(null);
+      return;
+    }
     const state = tracks[type] || defaultTrackState();
     const clipState = resolveTrackClipState(state, duration);
     const movingClip = clipState.clips.find((clip) => clip.id === clipId);
@@ -4065,7 +4143,7 @@ export default function StemMixerEditor({
     }
 
     const dropTargetType = resolveTrackDropTarget(clientX, clientY);
-    const targetType = dropTargetType && stems.some((stem) => stem.type === dropTargetType)
+    const targetType = canUseCrossTrackDrag && dropTargetType && stems.some((stem) => stem.type === dropTargetType)
       ? dropTargetType
       : type;
     const targetState = tracks[targetType] || defaultTrackState();
@@ -4097,7 +4175,7 @@ export default function StemMixerEditor({
       },
     });
     setSelectedTrackType(targetType);
-  }, [duration, magnetSnap, resolveTrackDropTarget, snapStepSeconds, snapToGrid, stems, tracks]);
+  }, [canUseClipDrag, canUseCrossTrackDrag, duration, magnetSnap, resolveTrackDropTarget, snapStepSeconds, snapToGrid, stems, tracks]);
 
   const moveTrackClip = useCallback((
     type: string,
@@ -4109,11 +4187,12 @@ export default function StemMixerEditor({
     dropClientY?: number,
   ) => {
     setClipDragPreview(null);
+    if (!canUseClipDrag) return;
     const stateBeforeMove = tracks[type] || defaultTrackState();
     const clipStateBeforeMove = resolveTrackClipState(stateBeforeMove, duration);
     const movingClip = clipStateBeforeMove.clips.find((clip) => clip.id === clipId);
     const dropTargetType = resolveTrackDropTarget(dropClientX, dropClientY);
-    const targetType = dropTargetType && stems.some((stem) => stem.type === dropTargetType)
+    const targetType = canUseCrossTrackDrag && dropTargetType && stems.some((stem) => stem.type === dropTargetType)
       ? dropTargetType
       : type;
     const targetStateBeforeMove = tracks[targetType] || defaultTrackState();
@@ -4243,7 +4322,7 @@ export default function StemMixerEditor({
         },
       };
     }, historyMode);
-  }, [commitTrackChange, duration, magnetSnap, resolveTrackDropTarget, snapStepSeconds, snapToGrid, stems, tracks]);
+  }, [canUseClipDrag, canUseCrossTrackDrag, commitTrackChange, duration, magnetSnap, resolveTrackDropTarget, snapStepSeconds, snapToGrid, stems, tracks]);
 
   const resolveTimelineRulerPointer = useCallback((event: PointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -4366,6 +4445,7 @@ export default function StemMixerEditor({
   }, [commitTrackChange]);
 
   const setTrackPan = useCallback((type: string, pan: number, historyMode: StemHistoryMode = 'immediate') => {
+    if (!canUsePan) return;
     commitTrackChange((current) => ({
       ...current,
       [type]: {
@@ -4373,9 +4453,10 @@ export default function StemMixerEditor({
         pan: Math.max(-1, Math.min(1, pan)),
       },
     }), historyMode);
-  }, [commitTrackChange]);
+  }, [canUsePan, commitTrackChange]);
 
   const setTrackFade = useCallback((type: string, edge: 'in' | 'out', value: number, historyMode: StemHistoryMode = 'immediate') => {
+    if (!canUseFade) return;
     commitTrackChange((current) => {
       const state = current[type] || defaultTrackState();
       const trimEnd = state.trimEnd ?? duration;
@@ -4389,9 +4470,10 @@ export default function StemMixerEditor({
         },
       };
     }, historyMode);
-  }, [commitTrackChange, duration]);
+  }, [canUseFade, commitTrackChange, duration]);
 
   const copyTrackClipAtTime = useCallback((type: string, time: number, clipId?: string | null) => {
+    if (!canUseCopyCutPaste) return false;
     const state = tracks[type] || defaultTrackState();
     const clipState = resolveTrackClipState(state, duration);
     const clip = clipId
@@ -4407,9 +4489,10 @@ export default function StemMixerEditor({
     setPlaybackError(null);
     setSaveStatus('片段已复制，可在目标时间点粘贴。');
     return true;
-  }, [duration, tracks]);
+  }, [canUseCopyCutPaste, duration, tracks]);
 
   const cutTrackClipAtTime = useCallback((type: string, time: number, clipId?: string | null) => {
+    if (!canUseCopyCutPaste) return;
     if (!copyTrackClipAtTime(type, time, clipId)) return;
     const state = tracks[type] || defaultTrackState();
     const clipState = resolveTrackClipState(state, duration);
@@ -4418,9 +4501,10 @@ export default function StemMixerEditor({
       : removeStemClipAtTime(clipState.clips, time));
     if (clipId) setSelectedClipSelection(null);
     setSaveStatus('片段已剪切，可在目标时间点粘贴。');
-  }, [copyTrackClipAtTime, duration, setTrackClips, tracks]);
+  }, [canUseCopyCutPaste, copyTrackClipAtTime, duration, setTrackClips, tracks]);
 
   const pasteClipToTrack = useCallback((type: string, time: number) => {
+    if (!canUseCopyCutPaste) return;
     if (!clipClipboard) {
       setPlaybackError('剪贴板里还没有片段。');
       return;
@@ -4458,7 +4542,7 @@ export default function StemMixerEditor({
     });
     setPlaybackError(null);
     setSaveStatus('片段已粘贴到当前轨道。');
-  }, [clipClipboard, commitTrackChange, duration, snapStepSeconds, snapToGrid]);
+  }, [canUseCopyCutPaste, clipClipboard, commitTrackChange, duration, snapStepSeconds, snapToGrid]);
 
   const openTrackContextMenu = useCallback((event: MouseEvent<Element>, type: string, time: number) => {
     event.preventDefault();
@@ -4510,36 +4594,44 @@ export default function StemMixerEditor({
     const { trackType, time } = trackContextMenu;
 
     if (action === 'copy') {
+      if (!canUseCopyCutPaste) return;
       copyTrackClipAtTime(trackType, time);
       closeTrackContextMenu();
       return;
     }
     if (action === 'cut') {
+      if (!canUseCopyCutPaste) return;
       cutTrackClipAtTime(trackType, time);
       closeTrackContextMenu();
       return;
     }
     if (action === 'paste') {
+      if (!canUseCopyCutPaste) return;
       pasteClipToTrack(trackType, time);
       closeTrackContextMenu();
       return;
     }
     if (action === 'rename') {
+      if (!editorFeatures.advanced.trackRename) return;
       renameTrackFromMenu(trackType);
       closeTrackContextMenu();
       return;
     }
     if (action === 'delete') {
+      if (!canUseDeleteClip && !editorFeatures.advanced.addTrack) return;
       if (trackContextMenu.clipId) {
+        if (!canUseDeleteClip) return;
         deleteTrackClipById(trackType, trackContextMenu.clipId);
       } else {
+        if (!editorFeatures.advanced.addTrack) return;
         deleteSelectedTrack(trackType);
       }
       closeTrackContextMenu();
       return;
     }
+    if (!editorFeatures.advanced.trackColor) return;
     setTrackContextMenu((current) => current ? { ...current, colorOpen: !current.colorOpen } : current);
-  }, [closeTrackContextMenu, copyTrackClipAtTime, cutTrackClipAtTime, deleteSelectedTrack, deleteTrackClipById, pasteClipToTrack, renameTrackFromMenu, trackContextMenu]);
+  }, [canUseCopyCutPaste, canUseDeleteClip, closeTrackContextMenu, copyTrackClipAtTime, cutTrackClipAtTime, deleteSelectedTrack, deleteTrackClipById, editorFeatures.advanced.addTrack, editorFeatures.advanced.trackColor, editorFeatures.advanced.trackRename, pasteClipToTrack, renameTrackFromMenu, trackContextMenu]);
 
   useEffect(() => {
     if (!trackContextMenu) return;
@@ -4569,6 +4661,10 @@ export default function StemMixerEditor({
     }
 
     if (editorDialog.kind === 'delete-track') {
+      if (!editorFeatures.advanced.addTrack) {
+        setEditorDialog(null);
+        return;
+      }
       const trackToDelete = stems.find((stem) => stem.type === editorDialog.trackType);
       if (trackToDelete) {
         performDeleteTrack(trackToDelete);
@@ -4577,15 +4673,20 @@ export default function StemMixerEditor({
       return;
     }
 
+    if (!canUseDeleteClip) {
+      setEditorDialog(null);
+      return;
+    }
     const state = tracks[editorDialog.trackType] || defaultTrackState();
     const clipState = resolveTrackClipState(state, duration);
     setTrackClips(editorDialog.trackType, removeStemClipAtTime(clipState.clips, editorDialog.time));
     setPlaybackError(null);
     setSaveStatus(`已删除“${editorDialog.label}”在 ${formatStemTimecode(editorDialog.time)} 的片段。`);
     setEditorDialog(null);
-  }, [duration, editorDialog, performDeleteTrack, renameTrack, setTrackClips, stems, tracks]);
+  }, [canUseDeleteClip, duration, editorDialog, editorFeatures.advanced.addTrack, performDeleteTrack, renameTrack, setTrackClips, stems, tracks]);
 
   const commitSelectedTrimInput = useCallback((edge: 'start' | 'end', value: string) => {
+    if (!canUseTrim) return;
     if (!selectedTrack) return;
 
     const parsed = clampStemTimecodeInput(value, duration);
@@ -4598,9 +4699,10 @@ export default function StemMixerEditor({
     setTrackTrim(selectedTrack.type, edge, parsed.time, false);
     setPlaybackError(null);
     setSelectedTrimInputDraft(null);
-  }, [duration, selectedTrack, setTrackTrim]);
+  }, [canUseTrim, duration, selectedTrack, setTrackTrim]);
 
   const nudgeSelectedTrackTrim = useCallback((edge: 'start' | 'end', delta: number) => {
+    if (!canUseTrim) return;
     if (!selectedTrack || !selectedTrackState) return;
 
     const trimControls = resolveStemTrimControlValues({
@@ -4620,9 +4722,10 @@ export default function StemMixerEditor({
 
     setTrackTrim(selectedTrack.type, edge, nextValue);
     setSaveStatus(`已微调“${getStemDisplayName(selectedTrack).zh}”${edge === 'start' ? '入点' : '出点'}到 ${formatTime(nextValue)}。`);
-  }, [duration, selectedTrack, selectedTrackState, setTrackTrim]);
+  }, [canUseTrim, duration, selectedTrack, selectedTrackState, setTrackTrim]);
 
   const muteSelectedTrackRange = useCallback(() => {
+    if (!canUseMuteRanges) return;
     if (!selectedTrack || !selectedTrackState) return;
     const trimStart = selectedTrackTrimControls?.trimStart ?? selectedTrackState.trimStart;
     const trimEnd = selectedTrackTrimControls?.trimEnd ?? duration;
@@ -4643,9 +4746,10 @@ export default function StemMixerEditor({
     });
     setPlaybackError(null);
     setSaveStatus(`已把“${getStemDisplayName(selectedTrack).zh}”当前选区设为静音。`);
-  }, [commitTrackChange, duration, selectedTrack, selectedTrackState, selectedTrackTrimControls]);
+  }, [canUseMuteRanges, commitTrackChange, duration, selectedTrack, selectedTrackState, selectedTrackTrimControls]);
 
   const restoreSelectedTrackRange = useCallback(() => {
+    if (!canUseMuteRanges) return;
     if (!selectedTrack || !selectedTrackState) return;
     const trimStart = selectedTrackTrimControls?.trimStart ?? selectedTrackState.trimStart;
     const trimEnd = selectedTrackTrimControls?.trimEnd ?? duration;
@@ -4662,9 +4766,10 @@ export default function StemMixerEditor({
     });
     setPlaybackError(null);
     setSaveStatus(`已恢复“${getStemDisplayName(selectedTrack).zh}”当前选区声音。`);
-  }, [commitTrackChange, duration, selectedTrack, selectedTrackState, selectedTrackTrimControls]);
+  }, [canUseMuteRanges, commitTrackChange, duration, selectedTrack, selectedTrackState, selectedTrackTrimControls]);
 
   const restoreSelectedTrackMutedRange = useCallback((index: number) => {
+    if (!canUseMuteRanges) return;
     if (!selectedTrack) return;
 
     commitTrackChange((current) => {
@@ -4679,9 +4784,10 @@ export default function StemMixerEditor({
     });
     setPlaybackError(null);
     setSaveStatus(`已恢复“${getStemDisplayName(selectedTrack).zh}”第 ${index + 1} 个静音片段。`);
-  }, [commitTrackChange, duration, selectedTrack]);
+  }, [canUseMuteRanges, commitTrackChange, duration, selectedTrack]);
 
   const resetTrackEdit = useCallback((type: string) => {
+    if (!canUseTrim && !canUseFade && !canUseMuteRanges) return;
     commitTrackChange((current) => {
       const clipState = normalizeStemClipState({
         clips: null,
@@ -4703,9 +4809,10 @@ export default function StemMixerEditor({
         },
       };
     });
-  }, [commitTrackChange, duration]);
+  }, [canUseFade, canUseMuteRanges, canUseTrim, commitTrackChange, duration]);
 
   const resetSelectedTrackTrimRange = useCallback(() => {
+    if (!canUseTrim) return;
     if (!selectedTrack) return;
 
     commitTrackChange((current) => {
@@ -4730,9 +4837,10 @@ export default function StemMixerEditor({
     });
     setPlaybackError(null);
     setSaveStatus(`已把“${getStemDisplayName(selectedTrack).zh}”选区恢复为全长。`);
-  }, [commitTrackChange, duration, selectedTrack]);
+  }, [canUseTrim, commitTrackChange, duration, selectedTrack]);
 
   const previewSelectedTrackRange = useCallback(() => {
+    if (!editorFeatures.editing.previewSelection) return;
     if (!selectedTrack || !selectedTrackState || !selectedTrackBuffer) {
       setPlaybackError('当前轨道还没有音频，等缓存完成后再预听。');
       return;
@@ -4769,9 +4877,10 @@ export default function StemMixerEditor({
         void playAll();
       }, loopDelayMs);
     }
-  }, [clearLoopPreviewTimer, pauseAll, playAll, selectedTrack, selectedTrackBuffer, selectedTrackState]);
+  }, [clearLoopPreviewTimer, editorFeatures.editing.previewSelection, pauseAll, playAll, selectedTrack, selectedTrackBuffer, selectedTrackState]);
 
   const toggleLoopSelectionPreview = useCallback(() => {
+    if (!canUseLoopPreview) return;
     setLoopSelectionPreview((current) => {
       const next = !current;
       loopSelectionPreviewRef.current = next;
@@ -4780,7 +4889,7 @@ export default function StemMixerEditor({
       }
       return next;
     });
-  }, [clearLoopPreviewTimer]);
+  }, [canUseLoopPreview, clearLoopPreviewTimer]);
 
   const beginContinuousControlEdit = useCallback(() => {
     beginDeferredHistory();
@@ -4918,7 +5027,7 @@ export default function StemMixerEditor({
       }
       autoSaveRetryAttemptRef.current = 0;
       clearAutoSaveRetryTimer();
-      if (localDraftStorageKey) {
+      if (canUseLocalDraftRecovery && localDraftStorageKey) {
         window.localStorage.removeItem(localDraftStorageKey);
       }
       if (source === 'manual') {
@@ -4957,7 +5066,7 @@ export default function StemMixerEditor({
         setIsSaving(false);
       }
     }
-  }, [clearAutoSaveRetryTimer, jobId, localDraftStorageKey]);
+  }, [canUseLocalDraftRecovery, clearAutoSaveRetryTimer, jobId, localDraftStorageKey]);
 
   const saveEditState = useCallback(async () => {
     await persistEditState('manual');
@@ -5008,6 +5117,7 @@ export default function StemMixerEditor({
   }, [visibleStems]);
 
   const seekSelectedTrackTrimEdge = useCallback((edge: 'start' | 'end') => {
+    if (!canUseTrim) return;
     if (!selectedTrack || !selectedTrackTrimControls) return;
 
     const time = edge === 'start'
@@ -5016,7 +5126,7 @@ export default function StemMixerEditor({
     handleSeek(time);
     centerTimelineOnPlaybackPosition(time);
     setSaveStatus(`已定位到“${getStemDisplayName(selectedTrack).zh}”${edge === 'start' ? '入点' : '出点'}。`);
-  }, [centerTimelineOnPlaybackPosition, handleSeek, selectedTrack, selectedTrackTrimControls]);
+  }, [canUseTrim, centerTimelineOnPlaybackPosition, handleSeek, selectedTrack, selectedTrackTrimControls]);
 
   const nudgePlaybackHead = useCallback((direction: -1 | 1, largeStep = false) => {
     const step = largeStep ? 1 : playbackNudgeStepSeconds;
@@ -5028,6 +5138,7 @@ export default function StemMixerEditor({
   }, [centerTimelineOnPlaybackPosition, currentTime, duration, handleSeek, playbackNudgeStepSeconds]);
 
   const setSelectedTrackTrimToCurrentTime = useCallback((edge: 'start' | 'end') => {
+    if (!canUseTrim) return;
     if (!selectedTrack || !selectedTrackState) return;
 
     const proposedTime = snapStemEditorTime(currentTime, duration, snapToGrid, snapStepSeconds);
@@ -5042,9 +5153,10 @@ export default function StemMixerEditor({
     setSaveStatus(wasClamped
       ? `播放头离另一侧边界太近，已把“${getStemDisplayName(selectedTrack).zh}”${edge === 'start' ? '入点' : '出点'}安全设到 ${formatTime(actualTime)}。`
       : `已把“${getStemDisplayName(selectedTrack).zh}”${edge === 'start' ? '入点' : '出点'}设到 ${formatTime(actualTime)}。`);
-  }, [centerTimelineOnPlaybackPosition, currentTime, duration, selectedTrack, selectedTrackState, setTrackTrim, snapStepSeconds, snapToGrid]);
+  }, [canUseTrim, centerTimelineOnPlaybackPosition, currentTime, duration, selectedTrack, selectedTrackState, setTrackTrim, snapStepSeconds, snapToGrid]);
 
   const focusSelectedTrackRange = useCallback(() => {
+    if (!canUseTimelineZoom || !canUseTrim) return;
     if (!selectedTrack || !selectedTrackTrimControls || duration <= 0) return;
 
     const clipDuration = Math.max(0.1, selectedTrackTrimControls.trimEnd - selectedTrackTrimControls.trimStart);
@@ -5054,7 +5166,7 @@ export default function StemMixerEditor({
     setTimelineZoom(nextZoom);
     centerTimelineOnPlaybackPosition(midpoint, nextLaneWidth);
     setSaveStatus(`已聚焦“${getStemDisplayName(selectedTrack).zh}”选区 ${formatStemTimecode(clipDuration)}。`);
-  }, [centerTimelineOnPlaybackPosition, duration, selectedTrack, selectedTrackTrimControls, showAdvancedControls]);
+  }, [canUseTimelineZoom, canUseTrim, centerTimelineOnPlaybackPosition, duration, selectedTrack, selectedTrackTrimControls, showAdvancedControls]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -5079,6 +5191,7 @@ export default function StemMixerEditor({
         return;
       }
       if (action === 'toggle-shortcut-help') {
+        if (!editorFeatures.advanced.shortcutHelp) return;
         setShowShortcutHelp((value) => !value);
         return;
       }
@@ -5087,10 +5200,12 @@ export default function StemMixerEditor({
         return;
       }
       if (action === 'undo') {
+        if (!canUseUndoRedo) return;
         undoTrackChange();
         return;
       }
       if (action === 'redo') {
+        if (!canUseUndoRedo) return;
         redoTrackChange();
         return;
       }
@@ -5127,14 +5242,17 @@ export default function StemMixerEditor({
         return;
       }
       if (action === 'zoom-in') {
+        if (!canUseTimelineZoom) return;
         applyTimelineZoom(timelineZoom + 0.25);
         return;
       }
       if (action === 'zoom-out') {
+        if (!canUseTimelineZoom) return;
         applyTimelineZoom(timelineZoom - 0.25);
         return;
       }
       if (action === 'zoom-reset') {
+        if (!canUseTimelineZoom) return;
         applyTimelineZoom(MIN_TIMELINE_ZOOM);
         return;
       }
@@ -5143,6 +5261,7 @@ export default function StemMixerEditor({
         return;
       }
       if (action === 'toggle-track-density') {
+        if (!canUseTrackDensity) return;
         setTrackDensity((value) => {
           const next = value === 'compact' ? 'comfortable' : 'compact';
           setSaveStatus(next === 'compact' ? '轨道视图已切换为紧凑模式。' : '轨道视图已切换为舒展模式。');
@@ -5152,6 +5271,7 @@ export default function StemMixerEditor({
       }
       if (!selectedTrack) return;
       if (action === 'copy-selected-clip') {
+        if (!canUseCopyCutPaste) return;
         copyTrackClipAtTime(
           selectedTrack.type,
           currentTime,
@@ -5160,6 +5280,7 @@ export default function StemMixerEditor({
         return;
       }
       if (action === 'cut-selected-clip') {
+        if (!canUseCopyCutPaste) return;
         cutTrackClipAtTime(
           selectedTrack.type,
           currentTime,
@@ -5168,10 +5289,12 @@ export default function StemMixerEditor({
         return;
       }
       if (action === 'paste-clip') {
+        if (!canUseCopyCutPaste) return;
         pasteClipToTrack(selectedTrack.type, currentTime);
         return;
       }
       if (action === 'edit-selected-track-color') {
+        if (!editorFeatures.advanced.trackColor) return;
         setTrackContextMenu({
           x: typeof window === 'undefined' ? 24 : Math.max(16, window.innerWidth - 300),
           y: 98,
@@ -5184,18 +5307,22 @@ export default function StemMixerEditor({
         return;
       }
       if (action === 'focus-selected-range') {
+        if (!canUseTimelineZoom || !canUseTrim) return;
         focusSelectedTrackRange();
         return;
       }
       if (action === 'preview-selected-range') {
+        if (!editorFeatures.editing.previewSelection) return;
         previewSelectedTrackRange();
         return;
       }
       if (action === 'split-selected-clip') {
+        if (!canUseSplitClip) return;
         splitSelectedTrackClipAtPlayhead();
         return;
       }
       if (action === 'toggle-loop-preview') {
+        if (!canUseLoopPreview) return;
         toggleLoopSelectionPreview();
         return;
       }
@@ -5208,37 +5335,46 @@ export default function StemMixerEditor({
         return;
       }
       if (action === 'set-selected-trim-start') {
+        if (!canUseTrim) return;
         setSelectedTrackTrimToCurrentTime('start');
         return;
       }
       if (action === 'set-selected-trim-end') {
+        if (!canUseTrim) return;
         setSelectedTrackTrimToCurrentTime('end');
         return;
       }
       if (action === 'nudge-selected-trim-start-back') {
+        if (!canUseTrim) return;
         nudgeSelectedTrackTrim('start', -SELECTED_TRIM_NUDGE_SECONDS);
         return;
       }
       if (action === 'nudge-selected-trim-end-forward') {
+        if (!canUseTrim) return;
         nudgeSelectedTrackTrim('end', SELECTED_TRIM_NUDGE_SECONDS);
         return;
       }
       if (action === 'mute-selected-range') {
+        if (!canUseMuteRanges) return;
         muteSelectedTrackRange();
         return;
       }
       if (action === 'restore-selected-range') {
+        if (!canUseMuteRanges) return;
         restoreSelectedTrackRange();
         return;
       }
       if (action === 'reset-selected-trim-range') {
+        if (!canUseTrim) return;
         resetSelectedTrackTrimRange();
         return;
       }
       if (action === 'delete-selected-clip') {
+        if (!canUseDeleteClip && !editorFeatures.advanced.addTrack) return;
         deleteSelectedClipOrActiveTrackClip();
         return;
       }
+      if (!canUseTrim && !canUseFade && !canUseMuteRanges) return;
       resetTrackEdit(selectedTrack.type);
       setSaveStatus(`已重置“${getStemDisplayName(selectedTrack).zh}”的裁剪和淡入淡出。`);
     };
@@ -5247,6 +5383,16 @@ export default function StemMixerEditor({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [
     applyTimelineZoom,
+    canUseCopyCutPaste,
+    canUseDeleteClip,
+    canUseFade,
+    canUseLoopPreview,
+    canUseMuteRanges,
+    canUseSplitClip,
+    canUseTimelineZoom,
+    canUseTrackDensity,
+    canUseTrim,
+    canUseUndoRedo,
     handleTogglePlayback,
     handleSeek,
     currentTime,
@@ -5256,6 +5402,10 @@ export default function StemMixerEditor({
     deleteTrackClipById,
     duration,
     editorDialog,
+    editorFeatures.advanced.addTrack,
+    editorFeatures.advanced.shortcutHelp,
+    editorFeatures.advanced.trackColor,
+    editorFeatures.editing.previewSelection,
     focusSelectedTrackRange,
     getTrackColor,
     nudgePlaybackHead,
@@ -5299,11 +5449,15 @@ export default function StemMixerEditor({
     clearAutoSaveRetryTimer();
     autoSaveRetryAttemptRef.current = 0;
 
-    if (localDraftStorageKey) {
+    if (canUseLocalDraftRecovery && localDraftStorageKey) {
       window.localStorage.setItem(localDraftStorageKey, JSON.stringify({
         ...currentEditState,
         savedAt: new Date().toISOString(),
       }));
+    }
+
+    if (!canUseAutoSave) {
+      return;
     }
 
     if (isContinuousEditing) {
@@ -5326,7 +5480,7 @@ export default function StemMixerEditor({
         autoSaveTimerRef.current = null;
       }
     };
-  }, [clearAutoSaveRetryTimer, currentEditState, editStateSignature, isContinuousEditing, jobId, localDraftStorageKey, persistEditState, saveRequestVersion]);
+  }, [canUseAutoSave, canUseLocalDraftRecovery, clearAutoSaveRetryTimer, currentEditState, editStateSignature, isContinuousEditing, jobId, localDraftStorageKey, persistEditState, saveRequestVersion]);
 
   const waitForStemLoadingToSettle = useCallback(async () => {
     const startedAt = Date.now();
@@ -5350,6 +5504,9 @@ export default function StemMixerEditor({
   }, [skippedEmptyCount, stems.length]);
 
   const exportMix = useCallback(async () => {
+    const allowedExportMode: ExportMode = canUseAdvancedExportModes
+      ? (exportMode === 'solo-only' && !canUseSoloOnlyExport ? 'current-mix' : exportMode)
+      : 'current-mix';
     setInspectorTab('export');
     setInspectorCollapsed(false);
     setIsExporting(true);
@@ -5359,7 +5516,7 @@ export default function StemMixerEditor({
     setLatestExportDownload(null);
     setExportStatusInput({
       phase: 'preparing',
-      message: `正在准备“${exportModeLabel(exportMode)}”导出。`,
+      message: `正在准备“${exportModeLabel(allowedExportMode)}”导出。`,
     });
 
     try {
@@ -5382,21 +5539,21 @@ export default function StemMixerEditor({
         const audioBuffer = audioBuffersRef.current[stem.type];
         const clipState = resolveTrackClipState(state, Math.max(duration, audioBuffer?.duration || 0));
         const hasClipAudio = (clipState.trimEnd ?? 0) - clipState.trimStart > 0.01;
-        if (exportMode === 'all-tracks') return state.volume > 0 && hasClipAudio;
-        if (exportMode === 'solo-only') return state.solo && state.volume > 0 && hasClipAudio;
+        if (allowedExportMode === 'all-tracks') return state.volume > 0 && hasClipAudio;
+        if (allowedExportMode === 'solo-only') return state.solo && state.volume > 0 && hasClipAudio;
         return !state.muted && (!anySolo || state.solo) && state.volume > 0 && hasClipAudio;
       });
 
       if (exportableStems.length === 0) {
-        throw new Error(exportMode === 'solo-only'
+        throw new Error(allowedExportMode === 'solo-only'
           ? '当前没有独奏轨道，请先选择至少一条独奏后再导出。'
           : '当前没有可导出的有声轨道，请检查静音、独奏和音量设置。');
       }
 
       setPlaybackError(missingCount > 0
-        ? `还有 ${missingCount} 条分轨未加载，本次以“${exportModeLabel(exportMode)}”导出已就绪的 ${exportableStems.length} 条。`
+        ? `还有 ${missingCount} 条分轨未加载，本次以“${exportModeLabel(allowedExportMode)}”导出已就绪的 ${exportableStems.length} 条。`
         : null);
-      setSaveStatus(`正在准备“${exportModeLabel(exportMode)}”导出，共 ${exportableStems.length} 条轨道。`);
+      setSaveStatus(`正在准备“${exportModeLabel(allowedExportMode)}”导出，共 ${exportableStems.length} 条轨道。`);
       setExportStatusInput({
         phase: 'preparing',
         message: `已选中 ${exportableStems.length} 条轨道，正在建立离线渲染。`,
@@ -5454,10 +5611,10 @@ export default function StemMixerEditor({
       setExportStatusInput({ phase: 'encoding', fileType: outputFileType });
       const blob = await encodeRenderedAudio(rendered, outputFileType);
       const extension = outputFileType.toLowerCase();
-      const fileName = `hookcraft-${exportModeFileLabel(exportMode)}-${formatExportTimestamp(new Date())}.${extension}`;
+      const fileName = `hookcraft-${exportModeFileLabel(allowedExportMode)}-${formatExportTimestamp(new Date())}.${extension}`;
       const url = URL.createObjectURL(blob);
       setExportStatusInput({ phase: 'downloading', fileType: outputFileType });
-      setLatestExportDownload({ url, fileName, label: `${exportModeLabel(exportMode)} ${outputFileType}` });
+      setLatestExportDownload({ url, fileName, label: `${exportModeLabel(allowedExportMode)} ${outputFileType}` });
       triggerDownloadUrl(url, fileName);
       setExportStatusInput({
         phase: 'done',
@@ -5467,11 +5624,11 @@ export default function StemMixerEditor({
       });
       setExportRecords((records) => appendStemExportRecord(records, createStemExportRecord({
         scope: 'mix',
-        label: exportModeLabel(exportMode),
+        label: exportModeLabel(allowedExportMode),
         trackCount: exportableStems.length,
         fileType: outputFileType,
       })));
-      setSaveStatus(`“${exportModeLabel(exportMode)}”${outputFileType} 已导出。`);
+      setSaveStatus(`“${exportModeLabel(allowedExportMode)}”${outputFileType} 已导出。`);
     } catch (error) {
       const message = error instanceof Error ? error.message : '导出混音失败，请稍后重试。';
       setExportStatusInput({ phase: 'error', message });
@@ -5479,7 +5636,7 @@ export default function StemMixerEditor({
     } finally {
       setIsExporting(false);
     }
-  }, [duration, editorFeatures.export.wavMix, exportMode, exportReadiness, masterState, savePendingEditsBeforeExport, stems, tracks, waitForStemLoadingToSettle]);
+  }, [canUseAdvancedExportModes, canUseSoloOnlyExport, duration, editorFeatures.export.wavMix, exportMode, exportReadiness, masterState, savePendingEditsBeforeExport, stems, tracks, waitForStemLoadingToSettle]);
 
   const exportSingleStem = useCallback(async (stem: EditableStem) => {
     setInspectorTab('export');
@@ -5712,11 +5869,6 @@ export default function StemMixerEditor({
     compactTransport,
     inspectorCollapsed,
   }), [compactTransport, inspectorCollapsed]);
-  const canUseAdvancedProduction = editorFeatures.advanced.addTrack
-    || editorFeatures.advanced.importAudio
-    || editorFeatures.advanced.recording;
-  const canShowWavExport = editorFeatures.export.wavMix || editorFeatures.export.wavStems;
-
   return (
     <section className="stem-mixer-editor" style={editorStyle(dawLayoutMetrics)}>
       <style dangerouslySetInnerHTML={{ __html: timelineScrollbarCss }} />
@@ -5744,18 +5896,18 @@ export default function StemMixerEditor({
           <button
             type="button"
             onClick={undoTrackChange}
-            disabled={!canUndo}
+            disabled={!canUseUndoRedo || !canUndo}
             title="回到上一步编辑"
-            style={historyButtonStyle(canUndo)}
+            style={historyButtonStyle(canUseUndoRedo && canUndo)}
           >
             上一步
           </button>
           <button
             type="button"
             onClick={redoTrackChange}
-            disabled={!canRedo}
+            disabled={!canUseUndoRedo || !canRedo}
             title="前进到下一步编辑"
-            style={historyButtonStyle(canRedo)}
+            style={historyButtonStyle(canUseUndoRedo && canRedo)}
           >
             下一步
           </button>
@@ -6084,6 +6236,8 @@ export default function StemMixerEditor({
                         type="text"
                         value={getStemDisplayName(selectedTrack).zh}
                         maxLength={40}
+                        readOnly={!editorFeatures.advanced.trackRename}
+                        disabled={!editorFeatures.advanced.trackRename}
                         onFocus={beginContinuousControlEdit}
                         onBlur={finishContinuousControlEdit}
                         onKeyDown={(event) => {
@@ -6091,7 +6245,11 @@ export default function StemMixerEditor({
                             event.currentTarget.blur();
                           }
                         }}
-                        onChange={(event) => renameTrack(selectedTrack.type, event.target.value, 'deferred')}
+                        onChange={(event) => {
+                          if (editorFeatures.advanced.trackRename) {
+                            renameTrack(selectedTrack.type, event.target.value, 'deferred');
+                          }
+                        }}
                         style={selectedTrackNameInputStyle}
                       />
                       <div style={selectedTrackSubStyle}>{getStemDisplayName(selectedTrack).en}</div>
@@ -6112,37 +6270,37 @@ export default function StemMixerEditor({
                     <button type="button" style={presetButtonStyle} onClick={() => soloOnlyTrack(selectedTrack.type)}>
                       只听当前
                     </button>
-                    <button
+                    {editorFeatures.editing.previewSelection && <button
                       type="button"
                       disabled={!selectedTrackBuffer}
                       style={presetButtonStyle}
                       onClick={previewSelectedTrackRange}
                     >
                       预听选区
-                    </button>
-                    <button
+                    </button>}
+                    {canUseSplitClip && <button
                       type="button"
                       disabled={duration <= 0}
                       style={presetButtonStyle}
                       onClick={splitSelectedTrackClipAtPlayhead}
                     >
                       切分片段
-                    </button>
-                    <button
+                    </button>}
+                    {canUseDeleteClip && <button
                       type="button"
                       disabled={duration <= 0 || selectedTrackClipCount === 0}
                       style={presetButtonStyle}
                       onClick={deleteSelectedClipOrActiveTrackClip}
                     >
                       删除片段
-                    </button>
-                    <button
+                    </button>}
+                    {canUseLoopPreview && <button
                       type="button"
                       style={exportModeButtonStyle(loopSelectionPreview)}
                       onClick={toggleLoopSelectionPreview}
                     >
                       循环预听 {loopSelectionPreview ? '开' : '关'}
-                    </button>
+                    </button>}
                     {editorFeatures.export.wavStems && <button
                       type="button"
                       disabled={!selectedTrackBuffer || exportingStemType === selectedTrack.type}
@@ -6151,7 +6309,7 @@ export default function StemMixerEditor({
                     >
                       {exportingStemType === selectedTrack.type ? '导出中' : '导出单轨'}
                     </button>}
-                    {selectedTrack && (
+                    {editorFeatures.advanced.addTrack && selectedTrack && (
                       <button
                         type="button"
                         style={deleteTrackButtonStyle}
@@ -6173,7 +6331,7 @@ export default function StemMixerEditor({
                   <span>静音片段 {selectedTrackMutedRanges.length}</span>
                 </div>
                 <div style={selectedTrackControlsGridStyle}>
-                  <label style={selectedTrackControlStyle}>
+                  {canUseTrim && <label style={selectedTrackControlStyle}>
                     <span>入点 {formatTime(selectedTrackTrimControls?.trimStart ?? 0)}</span>
                     <div style={selectedTrackInlineControlStyle}>
                       <input
@@ -6228,8 +6386,8 @@ export default function StemMixerEditor({
                         style={selectedTrackNumberInputStyle}
                       />
                     </div>
-                  </label>
-                  <label style={selectedTrackControlStyle}>
+                  </label>}
+                  {canUseTrim && <label style={selectedTrackControlStyle}>
                     <span>出点 {formatTime(selectedTrackTrimControls?.trimEnd ?? duration)}</span>
                     <div style={selectedTrackInlineControlStyle}>
                       <input
@@ -6284,7 +6442,7 @@ export default function StemMixerEditor({
                         style={selectedTrackNumberInputStyle}
                       />
                     </div>
-                  </label>
+                  </label>}
                   <label style={selectedTrackControlStyle}>
                     <span>音量 {Math.round(selectedTrackState.volume * 100)}%</span>
                     <input
@@ -6302,7 +6460,7 @@ export default function StemMixerEditor({
                       onChange={(event) => setTrackVolume(selectedTrack.type, Number(event.target.value), 'deferred')}
                     />
                   </label>
-                  <label style={selectedTrackControlStyle}>
+                  {canUsePan && <label style={selectedTrackControlStyle}>
                     <span>声像 {formatPan(selectedTrackState.pan)}</span>
                     <input
                       aria-label={`${getStemDisplayName(selectedTrack).zh} 声像`}
@@ -6318,8 +6476,8 @@ export default function StemMixerEditor({
                       onKeyUp={finishContinuousControlEdit}
                       onChange={(event) => setTrackPan(selectedTrack.type, Number(event.target.value), 'deferred')}
                     />
-                  </label>
-                  <label style={selectedTrackControlStyle}>
+                  </label>}
+                  {canUseFade && <label style={selectedTrackControlStyle}>
                     <span>淡入 {(selectedTrackTrimControls?.fadeIn ?? 0).toFixed(2)}s</span>
                     <input
                       aria-label={`${getStemDisplayName(selectedTrack).zh} 淡入`}
@@ -6335,8 +6493,8 @@ export default function StemMixerEditor({
                       onKeyUp={finishContinuousControlEdit}
                       onChange={(event) => setTrackFade(selectedTrack.type, 'in', Number(event.target.value), 'deferred')}
                     />
-                  </label>
-                  <label style={selectedTrackControlStyle}>
+                  </label>}
+                  {canUseFade && <label style={selectedTrackControlStyle}>
                     <span>淡出 {(selectedTrackTrimControls?.fadeOut ?? 0).toFixed(2)}s</span>
                     <input
                       aria-label={`${getStemDisplayName(selectedTrack).zh} 淡出`}
@@ -6352,9 +6510,9 @@ export default function StemMixerEditor({
                       onKeyUp={finishContinuousControlEdit}
                       onChange={(event) => setTrackFade(selectedTrack.type, 'out', Number(event.target.value), 'deferred')}
                     />
-                  </label>
+                  </label>}
                 </div>
-                <div style={selectedTrackNudgeGridStyle}>
+                {canUseTrim && <div style={selectedTrackNudgeGridStyle}>
                   <button
                     type="button"
                     style={presetButtonStyle}
@@ -6383,26 +6541,26 @@ export default function StemMixerEditor({
                   >
                     出点 +0.1s
                   </button>
-                </div>
+                </div>}
                 <div style={selectedTrackActionsStyle}>
-                  <button type="button" style={presetButtonStyle} onClick={muteSelectedTrackRange}>
+                  {canUseMuteRanges && <button type="button" style={presetButtonStyle} onClick={muteSelectedTrackRange}>
                     静音选区
-                  </button>
-                  <button type="button" style={presetButtonStyle} onClick={restoreSelectedTrackRange}>
+                  </button>}
+                  {canUseMuteRanges && <button type="button" style={presetButtonStyle} onClick={restoreSelectedTrackRange}>
                     恢复选区
-                  </button>
-                  <button type="button" style={presetButtonStyle} onClick={() => setSelectedTrackTrimToCurrentTime('start')}>
+                  </button>}
+                  {canUseTrim && <button type="button" style={presetButtonStyle} onClick={() => setSelectedTrackTrimToCurrentTime('start')}>
                     入点到播放头
-                  </button>
-                  <button type="button" style={presetButtonStyle} onClick={() => setSelectedTrackTrimToCurrentTime('end')}>
+                  </button>}
+                  {canUseTrim && <button type="button" style={presetButtonStyle} onClick={() => setSelectedTrackTrimToCurrentTime('end')}>
                     出点到播放头
-                  </button>
-                  <button type="button" style={presetButtonStyle} onClick={() => resetTrackEdit(selectedTrack.type)}>
+                  </button>}
+                  {(canUseTrim || canUseFade || canUseMuteRanges) && <button type="button" style={presetButtonStyle} onClick={() => resetTrackEdit(selectedTrack.type)}>
                     重置当前轨裁剪
-                  </button>
-                  <span style={selectedTrackShortcutStyle}>快捷键：↑/↓ 选轨，M 静音，S 独奏，C 切分，Ctrl+C/X/V 复制剪切粘贴，Shift+C 改色，Del 删除</span>
+                  </button>}
+                  <span style={selectedTrackShortcutStyle}>快捷键：↑/↓ 选轨，M 静音，S 独奏{canUseSplitClip ? '，C 切分' : ''}{canUseCopyCutPaste ? '，Ctrl+C/X/V 复制剪切粘贴' : ''}{editorFeatures.advanced.trackColor ? '，Shift+C 改色' : ''}{canUseDeleteClip ? '，Del 删除' : ''}</span>
                 </div>
-                {selectedTrackMutedRanges.length > 0 && (
+                {canUseMuteRanges && selectedTrackMutedRanges.length > 0 && (
                   <div style={mutedRangeListStyle} aria-label={`${getStemDisplayName(selectedTrack).zh} 静音片段`}>
                     {selectedTrackMutedRanges.map((range, index) => (
                       <div key={`${range.start}-${range.end}-${index}`} style={mutedRangeItemStyle}>
@@ -6469,7 +6627,7 @@ export default function StemMixerEditor({
             </div>
           </div>
 
-          <div style={controlPanelStyle}>
+          {canUseTrackFilter && <div style={controlPanelStyle}>
             <div style={panelHeadingStyle}>
               <span style={presetLabelStyle}>轨道视图</span>
               <span style={panelHeadingMetaStyle}>View</span>
@@ -6485,7 +6643,7 @@ export default function StemMixerEditor({
                 当前有声 {audibleStemCount}
               </button>
             </div>
-          </div>
+          </div>}
 
           <div style={controlPanelStyle}>
             <div style={panelHeadingStyle}>
@@ -6564,17 +6722,17 @@ export default function StemMixerEditor({
                 已加载 {exportSummary.loadedCount}/{loadableStemCount}，将导出 {exportSummary.selectedCount} 条
               </span>
             </div>
-            <div style={exportModeGridStyle}>
+            {canUseAdvancedExportModes && <div style={exportModeGridStyle}>
               <button type="button" style={exportModeButtonStyle(exportMode === 'current-mix')} onClick={() => setExportMode('current-mix')}>
                 当前混音
               </button>
               <button type="button" style={exportModeButtonStyle(exportMode === 'all-tracks')} onClick={() => setExportMode('all-tracks')}>
                 完整混音
               </button>
-              <button type="button" style={exportModeButtonStyle(exportMode === 'solo-only')} onClick={() => setExportMode('solo-only')}>
+              {canUseSoloOnlyExport && <button type="button" style={exportModeButtonStyle(exportMode === 'solo-only')} onClick={() => setExportMode('solo-only')}>
                 只导出独奏
-              </button>
-            </div>
+              </button>}
+            </div>}
             <div style={exportReadinessGridStyle}>
               <button type="button" style={exportModeButtonStyle(exportReadiness === 'wait-all')} onClick={() => setExportReadiness('wait-all')}>
                 等全部缓存
@@ -6809,26 +6967,26 @@ export default function StemMixerEditor({
           onPointerDown={(event) => event.stopPropagation()}
           onContextMenu={(event) => event.preventDefault()}
         >
-          <button type="button" role="menuitem" disabled={!clipClipboard} style={trackContextMenuItemStyle(!clipClipboard)} onClick={() => performTrackContextMenuAction('paste')}>
+          {canUseCopyCutPaste && <button type="button" role="menuitem" disabled={!clipClipboard} style={trackContextMenuItemStyle(!clipClipboard)} onClick={() => performTrackContextMenuAction('paste')}>
             <span>粘贴</span>
             <kbd>Ctrl V</kbd>
-          </button>
-          <button type="button" role="menuitem" disabled={!trackContextMenu.clipId} style={trackContextMenuItemStyle(!trackContextMenu.clipId)} onClick={() => performTrackContextMenuAction('copy')}>
+          </button>}
+          {canUseCopyCutPaste && <button type="button" role="menuitem" disabled={!trackContextMenu.clipId} style={trackContextMenuItemStyle(!trackContextMenu.clipId)} onClick={() => performTrackContextMenuAction('copy')}>
             <span>复制</span>
             <kbd>Ctrl C</kbd>
-          </button>
-          <button type="button" role="menuitem" disabled={!trackContextMenu.clipId} style={trackContextMenuItemStyle(!trackContextMenu.clipId)} onClick={() => performTrackContextMenuAction('cut')}>
+          </button>}
+          {canUseCopyCutPaste && <button type="button" role="menuitem" disabled={!trackContextMenu.clipId} style={trackContextMenuItemStyle(!trackContextMenu.clipId)} onClick={() => performTrackContextMenuAction('cut')}>
             <span>剪切</span>
             <kbd>Ctrl X</kbd>
-          </button>
-          <div style={trackContextMenuDividerStyle} />
+          </button>}
+          {(canUseCopyCutPaste && (editorFeatures.advanced.trackRename || canUseDeleteClip || editorFeatures.advanced.addTrack || editorFeatures.advanced.trackColor)) && <div style={trackContextMenuDividerStyle} />}
           {editorFeatures.advanced.trackRename && <button type="button" role="menuitem" style={trackContextMenuItemStyle(false)} onClick={() => performTrackContextMenuAction('rename')}>
             <span>重命名轨道</span>
           </button>}
-          <button type="button" role="menuitem" style={trackContextMenuItemStyle(false)} onClick={() => performTrackContextMenuAction('delete')}>
+          {(trackContextMenu.clipId ? canUseDeleteClip : editorFeatures.advanced.addTrack) && <button type="button" role="menuitem" style={trackContextMenuItemStyle(false)} onClick={() => performTrackContextMenuAction('delete')}>
             <span>{trackContextMenu.clipId ? '删除片段' : '删除轨道'}</span>
             <kbd>Del</kbd>
-          </button>
+          </button>}
           {editorFeatures.advanced.trackColor && <button type="button" role="menuitem" style={trackContextMenuItemStyle(false)} onClick={() => performTrackContextMenuAction('color')}>
             <span>编辑轨道颜色</span>
             <kbd>Shift C</kbd>
@@ -6909,7 +7067,7 @@ export default function StemMixerEditor({
             <div style={timelineToolbarEyebrowStyle}>时间线</div>
             <div style={timelineToolbarTitleStyle}>多轨时间线</div>
           </div>
-          <div style={timelineZoomControlsStyle}>
+          {canUseTimelineZoom && <div style={timelineZoomControlsStyle}>
             <button
               type="button"
               disabled={timelineZoom <= MIN_TIMELINE_ZOOM}
@@ -6930,15 +7088,15 @@ export default function StemMixerEditor({
             <button type="button" style={timelineZoomFitButtonStyle} onClick={() => applyTimelineZoom(MIN_TIMELINE_ZOOM)}>
               适合
             </button>
-          </div>
+          </div>}
           <div className="stem-timeline-toolbar-strip" style={timelineToolbarStatsStyle}>
-            <button
+            {editorFeatures.advanced.addTrack && <button
               type="button"
               style={timelineAddTrackButtonStyle}
               onClick={createEmptyCustomTrack}
             >
               添加轨道
-            </button>
+            </button>}
             <span style={timelineToolbarPillStyle}>显示 {visibleStems.length}/{stems.length}</span>
             <span style={timelineToolbarPillStyle}>时长 {formatStemTimecode(duration)}</span>
             <span style={timelineToolbarPillStyle}>{selectedTrack ? `选中 ${getStemDisplayName(selectedTrack).zh}` : '未选轨道'}</span>
@@ -6950,72 +7108,72 @@ export default function StemMixerEditor({
             )}
             {selectedTrack && selectedTrackTrimControls && (
               <span style={timelineSelectionActionsStyle}>
-                <TimelineIconButton
+                {canUseTrim && <TimelineIconButton
                   icon="trimStart"
                   label="入点"
                   onTooltipChange={setTimelineTooltip}
                   onClick={() => seekSelectedTrackTrimEdge('start')}
-                />
-                <TimelineIconButton
+                />}
+                {canUseTrim && <TimelineIconButton
                   icon="setTrimStart"
                   label="设入"
                   onTooltipChange={setTimelineTooltip}
                   onClick={() => setSelectedTrackTrimToCurrentTime('start')}
-                />
-                <TimelineIconButton
+                />}
+                {canUseTrim && <TimelineIconButton
                   icon="trimEnd"
                   label="出点"
                   onTooltipChange={setTimelineTooltip}
                   onClick={() => seekSelectedTrackTrimEdge('end')}
-                />
-                <TimelineIconButton
+                />}
+                {canUseTrim && <TimelineIconButton
                   icon="setTrimEnd"
                   label="设出"
                   onTooltipChange={setTimelineTooltip}
                   onClick={() => setSelectedTrackTrimToCurrentTime('end')}
-                />
-                <TimelineIconButton
+                />}
+                {canUseTrim && <TimelineIconButton
                   icon="fullRange"
                   label="全长"
                   onTooltipChange={setTimelineTooltip}
                   onClick={resetSelectedTrackTrimRange}
-                />
-                <TimelineIconButton
+                />}
+                {canUseTimelineZoom && canUseTrim && <TimelineIconButton
                   icon="focus"
                   label="聚焦"
                   onTooltipChange={setTimelineTooltip}
                   onClick={focusSelectedTrackRange}
-                />
-                <TimelineIconButton
+                />}
+                {editorFeatures.editing.previewSelection && <TimelineIconButton
                   icon="preview"
                   label="预听"
                   disabled={!selectedTrackBuffer}
                   onTooltipChange={setTimelineTooltip}
                   onClick={previewSelectedTrackRange}
-                />
-                <TimelineIconButton
+                />}
+                {canUseSplitClip && <TimelineIconButton
                   icon="split"
                   label="切分"
                   disabled={duration <= 0}
                   onTooltipChange={setTimelineTooltip}
                   onClick={splitSelectedTrackClipAtPlayhead}
-                />
-                <TimelineIconButton
+                />}
+                {(canUseDeleteClip || editorFeatures.advanced.addTrack) && <TimelineIconButton
                   icon="delete"
                   label={selectedTrackClipCount > 0 ? '删除片段' : '删除轨道'}
                   disabled={duration <= 0 || !selectedTrack}
                   tone="danger"
                   onTooltipChange={setTimelineTooltip}
                   onClick={deleteSelectedClipOrActiveTrackClip}
-                />
-                <TimelineIconButton
+                />}
+                {canUseLoopPreview && <TimelineIconButton
                   icon="loop"
                   label={`循环预听 ${loopSelectionPreview ? '开' : '关'}`}
                   active={loopSelectionPreview}
                   tone="success"
                   onTooltipChange={setTimelineTooltip}
                   onClick={toggleLoopSelectionPreview}
-                />
+                />}
               </span>
             )}
             {editorFeatures.advanced.shortcutHelp && <TimelineIconButton
@@ -7040,7 +7198,7 @@ export default function StemMixerEditor({
               onTooltipChange={setTimelineTooltip}
               onClick={() => setFollowPlayhead((value) => !value)}
             />
-            <TimelineIconButton
+            {canUseSnap && <TimelineIconButton
               icon="magnet"
               label={`磁吸 ${magnetSnap ? '开' : '关'}`}
               active={magnetSnap}
@@ -7051,7 +7209,7 @@ export default function StemMixerEditor({
                 setSaveStatus(next ? '片段磁吸已开启。' : '片段磁吸已关闭。');
                 return next;
               })}
-            />
+            />}
           </div>
         </div>
         {timelineTooltip && typeof document !== 'undefined' && createPortal(
@@ -7311,7 +7469,7 @@ export default function StemMixerEditor({
                         onChange={(event) => setTrackVolume(stem.type, Number(event.target.value), 'deferred')}
                       />
                     </label>
-                    <label style={trackHeaderPanStyle}>
+                    {canUsePan && <label style={trackHeaderPanStyle}>
                       <span>L</span>
                       <input
                         className="stem-track-pan-range"
@@ -7333,7 +7491,7 @@ export default function StemMixerEditor({
                         onChange={(event) => setTrackPan(stem.type, Number(event.target.value), 'deferred')}
                       />
                       <span>R</span>
-                    </label>
+                    </label>}
                   </>
                 )}
               </div>
@@ -7350,9 +7508,9 @@ export default function StemMixerEditor({
                 mutedRanges={state.mutedRanges}
                 muted={!isAudible}
                 selected={isSelectedTrack}
-                editable
-                snapEnabled={snapToGrid}
-                magnetSnapEnabled={magnetSnap}
+                editable={canUseTrim || canUseClipDrag}
+                snapEnabled={canUseSnap && snapToGrid}
+                magnetSnapEnabled={canUseSnap && magnetSnap}
                 snapStepSeconds={snapStepSeconds}
                 bufferVersion={bufferVersion}
                 liveSeekOnDrag={!isPlaying}
@@ -7375,6 +7533,7 @@ export default function StemMixerEditor({
                 onTrackContextMenu={(event, time) => openTrackContextMenu(event, stem.type, time)}
                 onSeek={(time, shouldSnap) => handleSeek(snapStemEditorTime(time, duration, shouldSnap, snapStepSeconds))}
                 onTrimChange={(edge, time, shouldSnap, phase, clipId) => {
+                  if (!canUseTrim) return;
                   if (clipId) {
                     setTrackClipTrim(stem.type, clipId, edge, time, shouldSnap, 'deferred');
                   } else {
@@ -7383,10 +7542,12 @@ export default function StemMixerEditor({
                   if (phase === 'commit') commitDeferredHistory();
                 }}
                 onTrimRangeMove={(nextStart, shouldSnap, phase) => {
+                  if (!canUseTrim) return;
                   setTrackTrimRange(stem.type, nextStart, shouldSnap, 'deferred');
                   if (phase === 'commit') commitDeferredHistory();
                 }}
                 onClipMove={(clipId, nextStart, shouldSnap, phase, clientX, clientY) => {
+                  if (!canUseClipDrag) return;
                   if (phase === 'preview') {
                     previewTrackClipMove(stem.type, clipId, nextStart, shouldSnap, clientX, clientY);
                     return;
