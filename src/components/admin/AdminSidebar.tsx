@@ -61,7 +61,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: '系统',
     items: [
       { label: '系统设置', icon: '⚙️', href: '/admin/settings' },
-      { label: '编辑器开关', icon: '🎚️', href: '/admin/settings#stem-editor-features' },
+      { label: '编辑器开关', icon: '🎚️', href: '/admin/editor-features' },
       { label: '操作日志', icon: '📝', href: '/admin/logs' },
       { label: '敏感词检测日志', icon: '🛡️', href: '/admin/sensitivity-logs' },
     ],

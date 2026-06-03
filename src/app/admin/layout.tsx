@@ -21,6 +21,7 @@ const pageTitles: Record<string, { title: string; breadcrumb: string }> = {
   '/admin/credits': { title: 'Credits 管理', breadcrumb: '首页 / AI 管理 / Credits' },
   '/admin/sensitive-words': { title: '敏感词管理', breadcrumb: '首页 / 内容管理 / 敏感词管理' },
   '/admin/settings': { title: '系统设置', breadcrumb: '首页 / 系统 / 系统设置' },
+  '/admin/editor-features': { title: '编辑器开关', breadcrumb: '首页 / 系统 / 编辑器开关' },
   '/admin/logs': { title: '操作日志', breadcrumb: '首页 / 系统 / 操作日志' },
   '/admin/sensitivity-logs': { title: '敏感词检测日志', breadcrumb: '首页 / 系统 / 敏感词检测日志' },
 };
