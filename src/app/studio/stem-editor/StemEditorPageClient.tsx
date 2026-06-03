@@ -797,32 +797,61 @@ function ModeSelectionPanel({
     && activeSettings.stems.splitStem;
   const showUpgradePrompt = activeSettings.modes.allowUpgradeFromBasic;
   const showCreditConfirm = activeSettings.modes.showCreditConfirm;
+  const tierLabel = accessTier === 'pro' ? 'Pro 完整版' : accessTier === 'plus' ? 'Plus 简版' : '未开通会员';
 
   return (
     <div style={modePanelStyle}>
-      <div style={loadingTitleStyle}>{TEXT.chooseMode}</div>
+      <div style={modeHeaderStyle}>
+        <div>
+          <div style={modeEyebrowStyle}>选择工作流</div>
+          <div style={modeTitleStyle}>{TEXT.chooseMode}</div>
+          <p style={modeIntroStyle}>根据当前会员权限进入对应编辑器，系统会优先读取已保存分轨，避免重复分析。</p>
+        </div>
+        <div style={modeTierBadgeStyle(accessTier)}>
+          <span style={modeTierDotStyle(accessTier)} />
+          {tierLabel}
+        </div>
+      </div>
       <div style={modeGridStyle}>
         <button
           type="button"
           disabled={!canUseBasic}
           onClick={() => onSelect('separate_vocal')}
-          style={modeCardStyle(!canUseBasic)}
+          style={modeCardStyle(!canUseBasic, 'basic')}
         >
-          <strong>{TEXT.basicEditor}</strong>
-          <span>{TEXT.basicEditorDesc}</span>
+          <div style={modeCardTopStyle}>
+            <span style={modePlanPillStyle('basic')}>Plus</span>
+            <span style={modeTrackCountStyle}>2 轨</span>
+          </div>
+          <strong style={modeCardTitleStyle}>{TEXT.basicEditor}</strong>
+          <span style={modeCardDescriptionStyle}>{TEXT.basicEditorDesc}</span>
+          <div style={modeFeatureListStyle}>
+            <span>人声 + 伴奏</span>
+            <span>片段剪辑</span>
+            <span>MP3 导出</span>
+          </div>
           {showCreditConfirm && canUseBasic && <small style={modeHintStyle}>开始前会确认积分消耗</small>}
-          <em>{canUseBasic ? TEXT.startBasic : TEXT.freeLocked}</em>
+          <em style={modeActionStyle(!canUseBasic)}>{canUseBasic ? TEXT.startBasic : TEXT.freeLocked}</em>
         </button>
         <button
           type="button"
           disabled={!canUsePro}
           onClick={() => onSelect('split_stem')}
-          style={modeCardStyle(!canUsePro)}
+          style={modeCardStyle(!canUsePro, 'pro')}
         >
-          <strong>{TEXT.proEditor}</strong>
-          <span>{TEXT.proEditorDesc}</span>
+          <div style={modeCardTopStyle}>
+            <span style={modePlanPillStyle('pro')}>Pro</span>
+            <span style={modeTrackCountStyle}>分析结果分轨</span>
+          </div>
+          <strong style={modeCardTitleStyle}>{TEXT.proEditor}</strong>
+          <span style={modeCardDescriptionStyle}>{TEXT.proEditorDesc}</span>
+          <div style={modeFeatureListStyle}>
+            <span>多分轨结果</span>
+            <span>高级制作</span>
+            <span>WAV / 批量导出</span>
+          </div>
           {showCreditConfirm && canUsePro && <small style={modeHintStyle}>开始前会确认积分消耗</small>}
-          <em>{canUsePro ? TEXT.startPro : showUpgradePrompt ? TEXT.proLocked : '当前未开放'}</em>
+          <em style={modeActionStyle(!canUsePro)}>{canUsePro ? TEXT.startPro : showUpgradePrompt ? TEXT.proLocked : '当前未开放'}</em>
         </button>
       </div>
     </div>
@@ -1109,36 +1138,168 @@ const emptyStateStyle: CSSProperties = {
 };
 
 const modePanelStyle: CSSProperties = {
-  border: '1px solid rgba(255, 255, 255, 0.12)',
-  borderRadius: 8,
-  background: 'rgba(10, 14, 28, 0.64)',
-  padding: 18,
+  position: 'relative',
+  width: 'min(1040px, calc(100vw - 48px))',
+  border: '1px solid rgba(255, 255, 255, 0.14)',
+  borderRadius: 18,
+  background: 'linear-gradient(135deg, rgba(12, 18, 34, 0.96), rgba(7, 9, 18, 0.92))',
+  padding: 28,
   boxSizing: 'border-box',
+  boxShadow: '0 28px 90px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255,255,255,0.06)',
+  overflow: 'hidden',
+};
+
+const modeHeaderStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'flex-start',
+  justifyContent: 'space-between',
+  gap: 18,
+  marginBottom: 22,
+};
+
+const modeEyebrowStyle: CSSProperties = {
+  color: 'var(--hc-lime)',
+  fontSize: 12,
+  fontWeight: 900,
+  letterSpacing: 0,
+  marginBottom: 8,
+};
+
+const modeTitleStyle: CSSProperties = {
+  color: '#f7f8ff',
+  fontSize: 26,
+  lineHeight: 1.15,
+  fontWeight: 950,
+};
+
+const modeIntroStyle: CSSProperties = {
+  maxWidth: 560,
+  margin: '10px 0 0',
+  color: '#9ca8c4',
+  fontSize: 14,
+  lineHeight: 1.7,
+};
+
+function modeTierBadgeStyle(accessTier: 'free' | 'plus' | 'pro'): CSSProperties {
+  return {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 8,
+    flexShrink: 0,
+    borderRadius: 999,
+    border: accessTier === 'pro'
+      ? '1px solid rgba(245, 158, 11, 0.45)'
+      : accessTier === 'plus'
+        ? '1px solid rgba(96, 165, 250, 0.45)'
+        : '1px solid rgba(148, 163, 184, 0.32)',
+    background: accessTier === 'pro'
+      ? 'rgba(245, 158, 11, 0.12)'
+      : accessTier === 'plus'
+        ? 'rgba(37, 99, 235, 0.16)'
+        : 'rgba(15, 23, 42, 0.72)',
+    color: accessTier === 'free' ? '#aeb7ce' : '#f8fafc',
+    padding: '9px 13px',
+    fontSize: 12,
+    fontWeight: 900,
+  };
+}
+
+function modeTierDotStyle(accessTier: 'free' | 'plus' | 'pro'): CSSProperties {
+  return {
+    width: 8,
+    height: 8,
+    borderRadius: '50%',
+    background: accessTier === 'pro' ? '#f59e0b' : accessTier === 'plus' ? '#60a5fa' : '#64748b',
+    boxShadow: accessTier === 'free' ? 'none' : '0 0 16px currentColor',
+  };
 };
 
 const modeGridStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-  gap: 12,
-  marginTop: 16,
+  gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))',
+  gap: 16,
 };
 
-function modeCardStyle(disabled: boolean): CSSProperties {
+function modeCardStyle(disabled: boolean, variant: 'basic' | 'pro'): CSSProperties {
   return {
-    minHeight: 154,
+    position: 'relative',
+    minHeight: 248,
     display: 'grid',
-    alignContent: 'start',
-    gap: 10,
-    borderRadius: 8,
-    border: disabled ? '1px solid rgba(75, 85, 99, 0.62)' : '1px solid rgba(206, 255, 53, 0.36)',
-    background: disabled ? 'rgba(17, 24, 39, 0.58)' : 'rgba(206, 255, 53, 0.1)',
-    color: disabled ? '#7f8799' : '#f4f4fb',
-    padding: 16,
+    gridTemplateRows: 'auto auto auto 1fr auto auto',
+    alignContent: 'stretch',
+    gap: 12,
+    borderRadius: 14,
+    border: disabled
+      ? '1px solid rgba(75, 85, 99, 0.58)'
+      : variant === 'pro'
+        ? '1px solid rgba(245, 158, 11, 0.45)'
+        : '1px solid rgba(140, 199, 255, 0.42)',
+    background: disabled
+      ? 'linear-gradient(180deg, rgba(17, 24, 39, 0.68), rgba(9, 12, 23, 0.74))'
+      : variant === 'pro'
+        ? 'linear-gradient(160deg, rgba(69, 40, 9, 0.42), rgba(13, 16, 31, 0.92) 58%)'
+        : 'linear-gradient(160deg, rgba(15, 50, 88, 0.44), rgba(13, 16, 31, 0.92) 58%)',
+    color: disabled ? '#858da1' : '#f7f8ff',
+    padding: 20,
     textAlign: 'left',
     cursor: disabled ? 'not-allowed' : 'pointer',
     fontFamily: 'var(--hc-font)',
+    opacity: disabled ? 0.78 : 1,
+    boxShadow: disabled ? 'none' : variant === 'pro' ? '0 18px 46px rgba(245, 158, 11, 0.12)' : '0 18px 46px rgba(96, 165, 250, 0.12)',
+    overflow: 'hidden',
+    outline: 'none',
   };
 }
+
+const modeCardTopStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 10,
+};
+
+function modePlanPillStyle(variant: 'basic' | 'pro'): CSSProperties {
+  return {
+    display: 'inline-flex',
+    alignItems: 'center',
+    borderRadius: 999,
+    padding: '6px 10px',
+    background: variant === 'pro' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(96, 165, 250, 0.16)',
+    border: variant === 'pro' ? '1px solid rgba(245, 158, 11, 0.38)' : '1px solid rgba(96, 165, 250, 0.36)',
+    color: variant === 'pro' ? '#fcd38a' : '#b9ddff',
+    fontSize: 12,
+    fontWeight: 950,
+  };
+}
+
+const modeTrackCountStyle: CSSProperties = {
+  color: '#dbe5ff',
+  fontSize: 12,
+  fontWeight: 900,
+};
+
+const modeCardTitleStyle: CSSProperties = {
+  color: 'inherit',
+  fontSize: 22,
+  lineHeight: 1.2,
+  fontWeight: 950,
+};
+
+const modeCardDescriptionStyle: CSSProperties = {
+  color: '#a7b2cc',
+  fontSize: 14,
+  lineHeight: 1.65,
+};
+
+const modeFeatureListStyle: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignContent: 'start',
+  gap: 8,
+  color: '#dbe5ff',
+  fontSize: 12,
+  fontWeight: 800,
+};
 
 const modeHintStyle: CSSProperties = {
   color: '#d9f99d',
@@ -1146,6 +1307,23 @@ const modeHintStyle: CSSProperties = {
   fontWeight: 800,
   fontStyle: 'normal',
 };
+
+function modeActionStyle(disabled: boolean): CSSProperties {
+  return {
+    alignSelf: 'end',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 38,
+    borderRadius: 10,
+    background: disabled ? 'rgba(71, 85, 105, 0.24)' : 'var(--hc-lime)',
+    color: disabled ? '#9aa4b8' : '#111827',
+    padding: '0 14px',
+    fontSize: 13,
+    fontWeight: 950,
+    fontStyle: 'normal',
+  };
+}
 
 const fallbackTransportStyle: CSSProperties = {
   display: 'none',
