@@ -5,6 +5,14 @@ import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
+import { useMembershipStore } from '@/store/membershipStore';
+import {
+  DEFAULT_STEM_EDITOR_FEATURE_SETTINGS,
+  normalizeStemEditorFeatureSettings,
+  resolveEditorAccessTier,
+  type StemEditorFeatureSettings,
+  type StemSeparationMode,
+} from '@/config/stemEditorFeatures';
 import StemMixerEditor, {
   type EditableStem,
   type StemEditState,
@@ -28,6 +36,7 @@ interface StemEditorJob {
   analysisSource?: string | null;
   reused?: boolean;
   editState?: StemEditState | null;
+  separationMode?: StemSeparationMode | null;
 }
 
 const TEXT = {
@@ -81,6 +90,15 @@ const TEXT = {
   apiStateless: 'API \u4e34\u65f6\u7ed3\u679c',
   savedResult: '\u5df2\u4fdd\u5b58\u7ed3\u679c',
   authExpired: '\u767b\u5f55\u5df2\u8fc7\u671f\uff0c\u6b63\u5728\u8df3\u8f6c\u767b\u5f55\u9875\u3002',
+  chooseMode: '\u9009\u62e9\u6b4c\u66f2\u7f16\u8f91\u6a21\u5f0f',
+  basicEditor: '\u57fa\u7840\u7f16\u8f91',
+  proEditor: '\u4e13\u4e1a\u7f16\u8f91',
+  basicEditorDesc: '2 \u8f68\uff1a\u4eba\u58f0 + \u4f34\u594f\uff0c\u652f\u6301\u5b8c\u6574\u7247\u6bb5\u7f16\u8f91\uff0c\u5bfc\u51fa MP3\u3002',
+  proEditorDesc: '12 \u7c7b\u4e13\u4e1a\u5206\u8f68\u7ed3\u679c\uff0c\u89e3\u9501 WAV \u548c\u9ad8\u7ea7\u5236\u4f5c\u529f\u80fd\u3002',
+  startBasic: '\u5f00\u59cb\u57fa\u7840\u7f16\u8f91',
+  startPro: '\u5f00\u59cb\u4e13\u4e1a\u7f16\u8f91',
+  proLocked: '\u5347\u7ea7 Pro \u89e3\u9501',
+  freeLocked: '\u8bf7\u5347\u7ea7\u4f1a\u5458\u540e\u4f7f\u7528\u6b4c\u66f2\u7f16\u8f91',
 };
 
 function isAuthRequiredResponse(status: number, data: any) {
@@ -91,12 +109,24 @@ function isAuthRequiredResponse(status: number, data: any) {
 export default function StemEditorPageClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const membership = useMembershipStore((s) => s.membership);
+  const fetchMembership = useMembershipStore((s) => s.fetchMembership);
   const generationTaskId = searchParams.get('generationTaskId')?.trim() || '';
   const initialJobId = searchParams.get('jobId')?.trim() || '';
+  const initialSeparationMode = normalizeSeparationMode(searchParams.get('separationMode'));
   const requestedRef = useRef(false);
   const [job, setJob] = useState<StemEditorJob | null>(null);
   const [phase, setPhase] = useState<LoadingPhase>('checking-cache');
   const [error, setError] = useState<string | null>(null);
+  const [featureSettings, setFeatureSettings] = useState<StemEditorFeatureSettings>(DEFAULT_STEM_EDITOR_FEATURE_SETTINGS);
+  const [selectedSeparationMode, setSelectedSeparationMode] = useState<StemSeparationMode | null>(
+    initialSeparationMode,
+  );
+
+  const accessTier = resolveEditorAccessTier(membership?.tier || 'free');
+  const activeFeatureSettings = accessTier === 'pro'
+    ? featureSettings.pro
+    : featureSettings.plus;
 
   const redirectToLogin = useCallback(() => {
     setError(TEXT.authExpired);
@@ -118,7 +148,10 @@ export default function StemEditorPageClient() {
       analysisSource: data.analysisSource || null,
       reused: data.reused === true,
       editState: data.editState || null,
+      separationMode: normalizeSeparationMode(data.separationMode),
     });
+    const nextMode = normalizeSeparationMode(data.separationMode);
+    if (nextMode) setSelectedSeparationMode(nextMode);
 
     if (data.status === 'completed' && stems.length > 0) {
       setError(null);
@@ -166,6 +199,10 @@ export default function StemEditorPageClient() {
       setPhase('failed');
       return;
     }
+    if (!selectedSeparationMode) {
+      setPhase('checking-cache');
+      return;
+    }
 
     setError(null);
     setPhase(force ? 'starting-api' : 'checking-cache');
@@ -178,7 +215,7 @@ export default function StemEditorPageClient() {
     const res = await fetch('/api/stems/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ generationTaskId, force }),
+      body: JSON.stringify({ generationTaskId, force, separationMode: selectedSeparationMode }),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -207,7 +244,19 @@ export default function StemEditorPageClient() {
     if (data.status !== 'failed') {
       await refreshJob(data.jobId);
     }
-  }, [applyJobData, generationTaskId, redirectToLogin, refreshJob]);
+  }, [applyJobData, generationTaskId, redirectToLogin, refreshJob, selectedSeparationMode]);
+
+  useEffect(() => {
+    void fetchMembership();
+    void fetch('/api/studio/settings', { cache: 'no-store' })
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        setFeatureSettings(normalizeStemEditorFeatureSettings(data?.stemEditorFeatures));
+      })
+      .catch(() => {
+        setFeatureSettings(DEFAULT_STEM_EDITOR_FEATURE_SETTINGS);
+      });
+  }, [fetchMembership]);
 
   useEffect(() => {
     if (requestedRef.current) return;
@@ -219,13 +268,14 @@ export default function StemEditorPageClient() {
           await refreshJob(initialJobId);
           return;
         }
+        if (!selectedSeparationMode) return;
         await createJob();
       } catch (err) {
         setError(err instanceof Error ? err.message : TEXT.loadEditorFailed);
         setPhase('failed');
       }
     })();
-  }, [createJob, initialJobId, refreshJob]);
+  }, [createJob, initialJobId, refreshJob, selectedSeparationMode]);
 
   useEffect(() => {
     if (!job?.jobId || (job.status !== 'queued' && job.status !== 'processing')) return;
@@ -366,6 +416,17 @@ export default function StemEditorPageClient() {
         {!hasLoadedStems && (
           <div className="stem-editor-workspace" style={fallbackWorkspaceStyle}>
             <div style={fallbackTimelineColumnStyle}>
+              {!selectedSeparationMode && !initialJobId && (
+                <ModeSelectionPanel
+                  accessTier={accessTier}
+                  onSelect={(mode) => {
+                    setSelectedSeparationMode(mode);
+                    requestedRef.current = false;
+                  }}
+                />
+              )}
+              {selectedSeparationMode && (
+              <>
               <div className="stem-editor-status" style={statusHeaderStyle}>
                 <div>
                   <div style={statusTitleRowStyle}>
@@ -397,6 +458,8 @@ export default function StemEditorPageClient() {
 
               {(job?.status === 'failed' || error) && (
                 <div style={emptyStateStyle}>{TEXT.noCache}</div>
+              )}
+              </>
               )}
             </div>
 
@@ -449,6 +512,8 @@ export default function StemEditorPageClient() {
             versionLabel={TEXT.editorProject}
             jobId={job.jobId}
             initialEditState={job.editState || null}
+            separationMode={job.separationMode || selectedSeparationMode}
+            featureSettings={activeFeatureSettings}
           />
         ) : null}
       </section>
@@ -704,6 +769,51 @@ function stageStyle(loaded: boolean): CSSProperties {
     display: loaded ? 'block' : 'grid',
     placeItems: loaded ? undefined : 'center',
   };
+}
+
+function normalizeSeparationMode(value: unknown): StemSeparationMode | null {
+  return value === 'separate_vocal' || value === 'split_stem'
+    ? value
+    : null;
+}
+
+function ModeSelectionPanel({
+  accessTier,
+  onSelect,
+}: {
+  accessTier: 'free' | 'plus' | 'pro';
+  onSelect: (mode: StemSeparationMode) => void;
+}) {
+  const canUseBasic = accessTier === 'plus' || accessTier === 'pro';
+  const canUsePro = accessTier === 'pro';
+
+  return (
+    <div style={modePanelStyle}>
+      <div style={loadingTitleStyle}>{TEXT.chooseMode}</div>
+      <div style={modeGridStyle}>
+        <button
+          type="button"
+          disabled={!canUseBasic}
+          onClick={() => onSelect('separate_vocal')}
+          style={modeCardStyle(!canUseBasic)}
+        >
+          <strong>{TEXT.basicEditor}</strong>
+          <span>{TEXT.basicEditorDesc}</span>
+          <em>{canUseBasic ? TEXT.startBasic : TEXT.freeLocked}</em>
+        </button>
+        <button
+          type="button"
+          disabled={!canUsePro}
+          onClick={() => onSelect('split_stem')}
+          style={modeCardStyle(!canUsePro)}
+        >
+          <strong>{TEXT.proEditor}</strong>
+          <span>{TEXT.proEditorDesc}</span>
+          <em>{canUsePro ? TEXT.startPro : TEXT.proLocked}</em>
+        </button>
+      </div>
+    </div>
+  );
 }
 
 const fallbackWorkspaceStyle: CSSProperties = {
@@ -984,6 +1094,38 @@ const emptyStateStyle: CSSProperties = {
   padding: 20,
   textAlign: 'center',
 };
+
+const modePanelStyle: CSSProperties = {
+  border: '1px solid rgba(255, 255, 255, 0.12)',
+  borderRadius: 8,
+  background: 'rgba(10, 14, 28, 0.64)',
+  padding: 18,
+  boxSizing: 'border-box',
+};
+
+const modeGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  gap: 12,
+  marginTop: 16,
+};
+
+function modeCardStyle(disabled: boolean): CSSProperties {
+  return {
+    minHeight: 154,
+    display: 'grid',
+    alignContent: 'start',
+    gap: 10,
+    borderRadius: 8,
+    border: disabled ? '1px solid rgba(75, 85, 99, 0.62)' : '1px solid rgba(206, 255, 53, 0.36)',
+    background: disabled ? 'rgba(17, 24, 39, 0.58)' : 'rgba(206, 255, 53, 0.1)',
+    color: disabled ? '#7f8799' : '#f4f4fb',
+    padding: 16,
+    textAlign: 'left',
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    fontFamily: 'var(--hc-font)',
+  };
+}
 
 const fallbackTransportStyle: CSSProperties = {
   display: 'none',

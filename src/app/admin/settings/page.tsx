@@ -7,6 +7,11 @@ import {
   type StudioTab,
   type StudioTabSettings,
 } from '@/config/studioTabs';
+import {
+  DEFAULT_STEM_EDITOR_FEATURE_SETTINGS,
+  normalizeStemEditorFeatureSettings,
+  type StemEditorFeatureSettings,
+} from '@/config/stemEditorFeatures';
 
 interface BasicSettings {
   platformName: string;
@@ -36,12 +41,85 @@ interface ReviewSettings {
   notificationMethods: string[];
 }
 
+const STEM_EDITOR_FEATURE_GROUPS = [
+  {
+    group: 'modes',
+    title: 'Entry and modes',
+    items: [
+      ['basicEditor', 'Basic editor'],
+      ['proEditor', 'Pro editor'],
+      ['showCreditConfirm', 'Credit confirmation'],
+      ['allowUpgradeFromBasic', 'Upgrade from basic'],
+      ['allowForceRefresh', 'Allow re-analysis'],
+    ],
+  },
+  {
+    group: 'stems',
+    title: 'Stem separation',
+    items: [
+      ['separateVocal', '2 tracks: vocal + instrumental'],
+      ['splitStem', '12 stem groups result'],
+    ],
+  },
+  {
+    group: 'editing',
+    title: 'Editing tools',
+    items: [
+      ['splitClip', 'Split clip'],
+      ['deleteClip', 'Delete clip'],
+      ['copyCutPaste', 'Copy / cut / paste'],
+      ['clipDrag', 'Clip drag'],
+      ['crossTrackDrag', 'Cross-track drag'],
+      ['snap', 'Snap'],
+      ['zoom', 'Timeline zoom'],
+      ['trim', 'Trim in / out'],
+      ['fade', 'Fade in / out'],
+      ['pan', 'Pan'],
+      ['muteRanges', 'Mute selection'],
+      ['loopPreview', 'Loop preview'],
+    ],
+  },
+  {
+    group: 'advanced',
+    title: 'Advanced production',
+    items: [
+      ['addTrack', 'Add empty track'],
+      ['importAudio', 'Import custom audio'],
+      ['recording', 'Live recording'],
+      ['recordingDeviceSelect', 'Recording device'],
+      ['recordingChannelSelect', 'Recording channel'],
+      ['recordingInputLevel', 'Input level'],
+      ['recordingMonitoring', 'Monitoring'],
+      ['trackRename', 'Track rename'],
+      ['trackColor', 'Track color'],
+      ['trackReorder', 'Track reorder'],
+      ['trackViewFilter', 'Track filter'],
+      ['trackDensity', 'Track density'],
+      ['shortcutHelp', 'Shortcut help'],
+    ],
+  },
+  {
+    group: 'export',
+    title: 'Export permissions',
+    items: [
+      ['mp3Mix', 'Export mix MP3'],
+      ['mp3Stems', 'Export stems MP3'],
+      ['wavMix', 'Export mix WAV'],
+      ['wavStems', 'Export stems WAV'],
+      ['soloOnly', 'Solo-only export'],
+      ['advancedExportModes', 'Advanced export modes'],
+      ['exportHistory', 'Export history'],
+    ],
+  },
+] as const;
+
 export default function AdminSettingsPage() {
   const [basic, setBasic] = useState<BasicSettings>({ platformName: '', platformDescription: '', contactEmail: '', icpNumber: '' });
   const [transaction, setTransaction] = useState<TransactionSettings>({ commissionRate: 30, minWithdrawalAmount: 100, settlementCycleDays: 30, enabledPaymentMethods: [] });
   const [ai, setAI] = useState<AISettings>({ modelVersion: '', maxConcurrentGenerations: 10, generationTimeoutSeconds: 300, creditsResetSchedule: '' });
   const [review, setReview] = useState<ReviewSettings>({ trustedProducerAutoApprove: false, aiContentSafetyPreCheck: true, reviewTimeoutReminderHours: 24, notificationMethods: [] });
   const [studioTabs, setStudioTabs] = useState<StudioTabSettings>(DEFAULT_STUDIO_TAB_SETTINGS);
+  const [stemEditorFeatures, setStemEditorFeatures] = useState<StemEditorFeatureSettings>(DEFAULT_STEM_EDITOR_FEATURE_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [toast, setToast] = useState('');
@@ -59,6 +137,7 @@ export default function AdminSettingsPage() {
       setAI(data.aiGeneration);
       setReview(data.review);
       setStudioTabs(data.studioTabs || DEFAULT_STUDIO_TAB_SETTINGS);
+      setStemEditorFeatures(normalizeStemEditorFeatureSettings(data.stemEditorFeatures));
     } catch {
       // ignore
     } finally {
@@ -115,6 +194,26 @@ export default function AdminSettingsPage() {
         : visibleTabs[0] || prev.defaultTab;
 
       return { visibleTabs, defaultTab };
+    });
+  }
+
+  function toggleStemEditorFeature(
+    tier: keyof StemEditorFeatureSettings,
+    group: 'modes' | 'stems' | 'editing' | 'advanced' | 'export',
+    key: string,
+  ) {
+    setStemEditorFeatures((prev) => {
+      const tierSettings = prev[tier] as any;
+      return normalizeStemEditorFeatureSettings({
+        ...prev,
+        [tier]: {
+          ...tierSettings,
+          [group]: {
+            ...tierSettings[group],
+            [key]: !tierSettings[group][key],
+          },
+        },
+      });
     });
   }
 
@@ -293,6 +392,49 @@ export default function AdminSettingsPage() {
             {saving === 'studio_tabs' ? '保存中...' : '保存设置'}
           </button>
         </div>
+        <div style={{ ...cardStyle, gridColumn: '1 / -1' }}>
+          <h3 style={cardTitleStyle}>Stem Editor Feature Switches</h3>
+          <div style={editorMatrixStyle}>
+            <div style={editorMatrixHeaderStyle}>Feature</div>
+            <div style={editorMatrixHeaderStyle}>Plus / Basic</div>
+            <div style={editorMatrixHeaderStyle}>Pro / Professional</div>
+            {STEM_EDITOR_FEATURE_GROUPS.map((group) => (
+              <div key={group.group} style={editorMatrixGroupStyle}>
+                <div style={editorMatrixGroupTitleStyle}>{group.title}</div>
+                {group.items.map(([key, label]) => (
+                  <div key={`${group.group}-${key}`} style={editorMatrixRowStyle}>
+                    <div>{label}</div>
+                    {(['plus', 'pro'] as const).map((tier) => (
+                      <label key={tier} style={editorMatrixCheckboxStyle}>
+                        <input
+                          type="checkbox"
+                          checked={Boolean((stemEditorFeatures[tier] as any)[group.group][key])}
+                          onChange={() => toggleStemEditorFeature(tier, group.group, key)}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+          <div style={editorMatrixActionsStyle}>
+            <button
+              onClick={() => setStemEditorFeatures(DEFAULT_STEM_EDITOR_FEATURE_SETTINGS)}
+              disabled={saving === 'stem_editor_features'}
+              style={secondaryBtnStyle}
+            >
+              Reset defaults
+            </button>
+            <button
+              onClick={() => saveSection('stem_editor_features', stemEditorFeatures)}
+              disabled={saving === 'stem_editor_features'}
+              style={saveBtnStyle}
+            >
+              {saving === 'stem_editor_features' ? 'Saving...' : 'Save editor switches'}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -356,6 +498,69 @@ const saveBtnStyle: React.CSSProperties = {
   fontWeight: 600,
   cursor: 'pointer',
   fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+};
+
+const secondaryBtnStyle: React.CSSProperties = {
+  ...saveBtnStyle,
+  background: '#f3f4f6',
+  color: '#374151',
+  border: '1px solid #e5e7eb',
+};
+
+const editorMatrixStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'minmax(220px, 1fr) 160px 160px',
+  border: '1px solid #e5e7eb',
+  borderRadius: 8,
+  overflow: 'hidden',
+};
+
+const editorMatrixHeaderStyle: React.CSSProperties = {
+  padding: '10px 12px',
+  background: '#f9fafb',
+  color: '#374151',
+  fontSize: 13,
+  fontWeight: 700,
+  borderBottom: '1px solid #e5e7eb',
+};
+
+const editorMatrixGroupStyle: React.CSSProperties = {
+  display: 'contents',
+};
+
+const editorMatrixGroupTitleStyle: React.CSSProperties = {
+  gridColumn: '1 / -1',
+  padding: '9px 12px',
+  background: '#fff7ed',
+  color: '#92400e',
+  fontSize: 13,
+  fontWeight: 700,
+  borderTop: '1px solid #e5e7eb',
+  borderBottom: '1px solid #e5e7eb',
+};
+
+const editorMatrixRowStyle: React.CSSProperties = {
+  display: 'grid',
+  gridColumn: '1 / -1',
+  gridTemplateColumns: 'minmax(220px, 1fr) 160px 160px',
+  alignItems: 'center',
+  minHeight: 38,
+  padding: '0 12px',
+  borderBottom: '1px solid #f3f4f6',
+  color: '#374151',
+  fontSize: 13,
+};
+
+const editorMatrixCheckboxStyle: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'center',
+};
+
+const editorMatrixActionsStyle: React.CSSProperties = {
+  marginTop: 14,
+  display: 'flex',
+  gap: 10,
+  justifyContent: 'flex-end',
 };
 
 const toastStyle: React.CSSProperties = {

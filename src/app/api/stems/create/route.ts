@@ -5,6 +5,15 @@ import { supabaseAdmin } from '@/lib/supabase/server';
 import { readNormalizedStems } from '@/lib/stems/kieStemResult';
 import { resolveKieStemSource } from '@/lib/stems/kieStemSource';
 import { CreditService } from '@/lib/credits/CreditService';
+import type { CreditOperationType } from '@/types/credits';
+import type { MembershipTier } from '@/types/membership';
+import {
+  normalizeStemEditorFeatureSettings,
+  resolveEditorAccessTier,
+  resolveStemSeparationMode,
+  type StemSeparationMode,
+} from '@/config/stemEditorFeatures';
+import { readStemEditorFeatureSettings } from '@/lib/studio/StemEditorFeatureSettingsStore';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +35,30 @@ function isMissingStemJobsTableError(error: unknown) {
   return code === 'PGRST205' || message.includes('audio_stem_jobs');
 }
 
+function readSeparationMode(payload: unknown): StemSeparationMode {
+  const value = payload && typeof payload === 'object'
+    ? payload as Record<string, unknown>
+    : {};
+  return value.type === 'separate_vocal' ? 'separate_vocal' : 'split_stem';
+}
+
+function creditOperationsForMode(mode: StemSeparationMode): CreditOperationType[] {
+  return mode === 'separate_vocal'
+    ? ['stem_split']
+    : ['stem_split', 'stem_split', 'stem_split', 'stem_split', 'stem_split'];
+}
+
+async function readUserMembershipTier(userId: string): Promise<MembershipTier> {
+  const { data, error } = await supabaseAdmin
+    .from('memberships')
+    .select('tier')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return (data?.tier || 'free') as MembershipTier;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const user = await getAuthUser();
@@ -38,14 +71,25 @@ export async function POST(req: NextRequest) {
       ? body.generationTaskId.trim()
       : '';
     const force = body?.force === true;
+    const requestedSeparationMode = body?.separationMode;
 
     if (!generationTaskId) {
       return NextResponse.json({ error: 'Missing generationTaskId' }, { status: 400 });
     }
 
+    const [membershipTier, featureSettings] = await Promise.all([
+      readUserMembershipTier(user.id),
+      readStemEditorFeatureSettings(supabaseAdmin).catch(() => normalizeStemEditorFeatureSettings(null)),
+    ]);
+    const accessTier = resolveEditorAccessTier(membershipTier);
+    const separationMode = resolveStemSeparationMode(featureSettings, accessTier, requestedSeparationMode);
+    if (!separationMode) {
+      return NextResponse.json({ error: 'Stem editor is not available for this membership tier' }, { status: 403 });
+    }
+
     const { data: existingJobs, error: existingError } = await supabaseAdmin
       .from('audio_stem_jobs')
-      .select('id,status,provider_task_id,result_payload,error_message')
+      .select('id,status,provider_task_id,request_payload,result_payload,error_message')
       .eq('source_generation_task_id', generationTaskId)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
@@ -53,11 +97,14 @@ export async function POST(req: NextRequest) {
 
     const canPersistStemJobs = !isMissingStemJobsTableError(existingError);
     if (existingError && canPersistStemJobs) throw existingError;
-    const existing = Array.isArray(existingJobs)
-      ? existingJobs.find((job) => job.status === 'completed' && readNormalizedStems(job.result_payload).length > 0)
-        || existingJobs.find((job) => job.status === 'queued' || job.status === 'processing')
-        || existingJobs.find((job) => job.status === 'completed')
-        || existingJobs[0]
+    const modeJobs = Array.isArray(existingJobs)
+      ? existingJobs.filter((job) => readSeparationMode((job as any).request_payload) === separationMode)
+      : [];
+    const existing = modeJobs.length > 0
+      ? modeJobs.find((job) => job.status === 'completed' && readNormalizedStems(job.result_payload).length > 0)
+        || modeJobs.find((job) => job.status === 'queued' || job.status === 'processing')
+        || modeJobs.find((job) => job.status === 'completed')
+        || modeJobs[0]
       : null;
 
     if (existing && !force) {
@@ -85,6 +132,7 @@ export async function POST(req: NextRequest) {
         reused: true,
         analysisSource: isCachedCompleted ? 'cache' : 'existing-job',
         cachedStemCount: recoveredStems.length,
+        separationMode,
       });
     }
 
@@ -108,7 +156,8 @@ export async function POST(req: NextRequest) {
     }
 
     const creditService = new CreditService(supabaseAdmin);
-    if (!(await creditService.hasEnoughCredits(user.id, ['stem_split']))) {
+    const creditOperations = creditOperationsForMode(separationMode);
+    if (!(await creditService.hasEnoughCredits(user.id, creditOperations))) {
       return NextResponse.json({ error: 'Credits balance is not enough' }, { status: 402 });
     }
 
@@ -119,7 +168,9 @@ export async function POST(req: NextRequest) {
       sourceTaskId: source.sourceTaskId,
       sourceAudioId: source.sourceAudioId,
       callBackUrl,
-      type: 'split_stem',
+      type: separationMode,
+      editorAccessTier: accessTier,
+      membershipTier,
     };
 
     const { error: insertError } = await supabaseAdmin
@@ -141,6 +192,7 @@ export async function POST(req: NextRequest) {
       const created = await provider.splitStems({
         sourceTaskId: source.sourceTaskId,
         sourceAudioId: source.sourceAudioId,
+        type: separationMode,
         callBackUrl,
       });
 
@@ -156,7 +208,7 @@ export async function POST(req: NextRequest) {
 
       if (updateError) throw updateError;
 
-      const consumeResult = await creditService.consumeCredits(user.id, ['stem_split']);
+      const consumeResult = await creditService.consumeCredits(user.id, creditOperations);
       if (!consumeResult.success) {
         await supabaseAdmin
           .from('audio_stem_jobs')
@@ -183,6 +235,7 @@ export async function POST(req: NextRequest) {
         status: 'processing',
         reused: false,
         analysisSource: 'api-created',
+        separationMode,
       }, { status: 202 });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'KIE stem split request failed';

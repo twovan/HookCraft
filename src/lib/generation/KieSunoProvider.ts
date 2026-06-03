@@ -187,7 +187,7 @@ export class KieSunoProvider {
     const requestBody: Record<string, unknown> = {
       taskId: input.sourceTaskId,
       audioId: input.sourceAudioId,
-      type: 'split_stem',
+      type: input.type || 'split_stem',
     };
 
     if (input.callBackUrl) {

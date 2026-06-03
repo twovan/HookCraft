@@ -3,6 +3,7 @@ import { getAuthUser } from '@/lib/supabase/auth-helpers';
 import { KieSunoProvider } from '@/lib/generation/KieSunoProvider';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { readNormalizedStems } from '@/lib/stems/kieStemResult';
+import type { StemSeparationMode } from '@/config/stemEditorFeatures';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,6 +53,13 @@ function proxiedStems(req: NextRequest, jobId: string, resultPayload: unknown) {
     url: `/api/stems/audio?jobId=${encodeURIComponent(jobId)}&stemType=${encodeURIComponent(stem.type)}&url=${encodeURIComponent(stem.url)}`,
     waveform: waveformPeaks[stem.type] || null,
   }));
+}
+
+function readSeparationMode(payload: unknown): StemSeparationMode {
+  const value = payload && typeof payload === 'object'
+    ? payload as Record<string, unknown>
+    : {};
+  return value.type === 'separate_vocal' ? 'separate_vocal' : 'split_stem';
 }
 
 async function refreshPersistedKieJob(job: {
@@ -149,7 +157,7 @@ export async function GET(
 
     const { data, error } = await supabaseAdmin
       .from('audio_stem_jobs')
-      .select('id,status,provider,provider_task_id,source_generation_task_id,result_payload,error_message,created_at,updated_at')
+      .select('id,status,provider,provider_task_id,source_generation_task_id,request_payload,result_payload,error_message,created_at,updated_at')
       .eq('id', params.jobId)
       .eq('user_id', user.id)
       .maybeSingle();
@@ -170,6 +178,7 @@ export async function GET(
       provider: data.provider,
       providerTaskId: refreshedData.provider_task_id,
       sourceGenerationTaskId: data.source_generation_task_id,
+      separationMode: readSeparationMode((data as any).request_payload),
       stems,
       editState,
       errorMessage: refreshedData.error_message,

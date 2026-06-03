@@ -8,6 +8,10 @@ import {
   readStudioTabSettings,
   writeStudioTabSettings,
 } from '../../../../lib/studio/StudioTabSettingsStore';
+import {
+  readStemEditorFeatureSettings,
+  writeStemEditorFeatureSettings,
+} from '../../../../lib/studio/StemEditorFeatureSettingsStore';
 
 /**
  * GET /api/admin/settings
@@ -57,6 +61,7 @@ export async function GET(req: NextRequest) {
         notificationMethods: ['in_app', 'email'],
       },
       studioTabs: await readStudioTabSettings(supabaseAdmin),
+      stemEditorFeatures: await readStemEditorFeatureSettings(supabaseAdmin),
     };
 
     return NextResponse.json(result);
@@ -82,7 +87,7 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: '参数不完整' }, { status: 400 });
     }
 
-    const validSections = ['basic', 'transaction', 'ai_generation', 'review', 'studio_tabs'];
+    const validSections = ['basic', 'transaction', 'ai_generation', 'review', 'studio_tabs', 'stem_editor_features'];
     if (!validSections.includes(section)) {
       return NextResponse.json({ error: '无效的设置分类' }, { status: 400 });
     }
@@ -94,6 +99,19 @@ export async function PUT(req: NextRequest) {
       });
 
       revalidatePath('/studio');
+      revalidatePath('/api/studio/settings');
+
+      return NextResponse.json({ success: true, settingValue });
+    }
+
+    if (section === 'stem_editor_features') {
+      const settingValue = await writeStemEditorFeatureSettings(supabaseAdmin, value, {
+        id: admin.adminId,
+        name: admin.displayName || admin.username,
+      });
+
+      revalidatePath('/studio');
+      revalidatePath('/studio/stem-editor');
       revalidatePath('/api/studio/settings');
 
       return NextResponse.json({ success: true, settingValue });

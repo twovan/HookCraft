@@ -86,6 +86,11 @@ import {
   splitStemClipAtTime,
   type StemClip,
 } from '@/lib/stems/stemClips';
+import {
+  DEFAULT_STEM_EDITOR_FEATURE_SETTINGS,
+  type StemEditorTierFeatureSettings,
+  type StemSeparationMode,
+} from '@/config/stemEditorFeatures';
 
 export interface EditableStem {
   type: string;
@@ -548,6 +553,8 @@ interface StemMixerEditorProps {
   versionLabel: string;
   jobId?: string;
   initialEditState?: StemEditState | null;
+  separationMode?: StemSeparationMode | null;
+  featureSettings?: StemEditorTierFeatureSettings;
 }
 
 function defaultTrackState(): StemTrackState {
@@ -1345,6 +1352,43 @@ function encodeWav(audioBuffer: AudioBuffer) {
   return new Blob([buffer], { type: 'audio/wav' });
 }
 
+function floatTo16BitPcm(samples: Float32Array) {
+  const pcm = new Int16Array(samples.length);
+  for (let index = 0; index < samples.length; index += 1) {
+    const sample = Math.max(-1, Math.min(1, samples[index] || 0));
+    pcm[index] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+  }
+  return pcm;
+}
+
+async function encodeMp3(audioBuffer: AudioBuffer, kbps = 320) {
+  const lamejs = await import('lamejs');
+  const channelCount = Math.min(2, audioBuffer.numberOfChannels || 1);
+  const encoder = new lamejs.default.Mp3Encoder(channelCount, audioBuffer.sampleRate, kbps);
+  const left = floatTo16BitPcm(audioBuffer.getChannelData(0));
+  const right = channelCount > 1
+    ? floatTo16BitPcm(audioBuffer.getChannelData(1))
+    : undefined;
+  const chunks: Int8Array[] = [];
+  const blockSize = 1152;
+
+  for (let offset = 0; offset < left.length; offset += blockSize) {
+    const encoded = channelCount > 1 && right
+      ? encoder.encodeBuffer(left.subarray(offset, offset + blockSize), right.subarray(offset, offset + blockSize))
+      : encoder.encodeBuffer(left.subarray(offset, offset + blockSize));
+    if (encoded.length > 0) chunks.push(encoded);
+  }
+
+  const tail = encoder.flush();
+  if (tail.length > 0) chunks.push(tail);
+
+  return new Blob(chunks.map((chunk) => chunk.slice().buffer as ArrayBuffer), { type: 'audio/mpeg' });
+}
+
+async function encodeRenderedAudio(audioBuffer: AudioBuffer, fileType: 'MP3' | 'WAV') {
+  return fileType === 'MP3' ? encodeMp3(audioBuffer) : encodeWav(audioBuffer);
+}
+
 function getInitialWaveformDuration(stems: EditableStem[]) {
   return stems.reduce((maxDuration, stem) => (
     Math.max(maxDuration, stem.waveform?.duration || 0)
@@ -1529,7 +1573,15 @@ function createMasterOutputChain(context: BaseAudioContext, masterState: StemMas
   };
 }
 
-export default function StemMixerEditor({ stems: initialStems, versionLabel, jobId, initialEditState }: StemMixerEditorProps) {
+export default function StemMixerEditor({
+  stems: initialStems,
+  versionLabel,
+  jobId,
+  initialEditState,
+  separationMode,
+  featureSettings,
+}: StemMixerEditorProps) {
+  const editorFeatures = featureSettings || DEFAULT_STEM_EDITOR_FEATURE_SETTINGS.pro;
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioBuffersRef = useRef<Record<string, AudioBuffer>>({});
   const gainNodesRef = useRef<Record<string, GainNode>>({});
@@ -1718,12 +1770,12 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
   const loadableStemCount = Math.max(0, stems.length - skippedEmptyCount);
   const readyStemCount = Math.max(0, loadableStemCount - loadingCount - failedLoadCount);
   const exportHistoryStorageKey = useMemo(
-    () => buildStemExportHistoryStorageKey(jobId || versionLabel),
-    [jobId, versionLabel],
+    () => buildStemExportHistoryStorageKey(`${jobId || versionLabel}:${separationMode || 'split_stem'}`),
+    [jobId, separationMode, versionLabel],
   );
   const localDraftStorageKey = useMemo(
-    () => (jobId ? buildStemEditLocalDraftKey(jobId) : null),
-    [jobId],
+    () => (jobId ? buildStemEditLocalDraftKey(`${jobId}:${separationMode || 'split_stem'}`) : null),
+    [jobId, separationMode],
   );
   const exportStatus = useMemo(() => resolveStemExportStatus(exportStatusInput), [exportStatusInput]);
   const recentExportRecords = useMemo(
@@ -5301,6 +5353,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     setInspectorTab('export');
     setInspectorCollapsed(false);
     setIsExporting(true);
+    const outputFileType = editorFeatures.export.wavMix ? 'WAV' : 'MP3';
     setPlaybackError(null);
     setSaveStatus(null);
     setLatestExportDownload(null);
@@ -5398,26 +5451,27 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         message: `正在渲染 ${exportableStems.length} 条轨道。`,
       });
       const rendered = await offlineContext.startRendering();
-      setExportStatusInput({ phase: 'encoding', fileType: 'WAV' });
-      const blob = encodeWav(rendered);
-      const fileName = `hookcraft-${exportModeFileLabel(exportMode)}-${formatExportTimestamp(new Date())}.wav`;
+      setExportStatusInput({ phase: 'encoding', fileType: outputFileType });
+      const blob = await encodeRenderedAudio(rendered, outputFileType);
+      const extension = outputFileType.toLowerCase();
+      const fileName = `hookcraft-${exportModeFileLabel(exportMode)}-${formatExportTimestamp(new Date())}.${extension}`;
       const url = URL.createObjectURL(blob);
-      setExportStatusInput({ phase: 'downloading', fileType: 'WAV' });
-      setLatestExportDownload({ url, fileName, label: `${exportModeLabel(exportMode)} WAV` });
+      setExportStatusInput({ phase: 'downloading', fileType: outputFileType });
+      setLatestExportDownload({ url, fileName, label: `${exportModeLabel(exportMode)} ${outputFileType}` });
       triggerDownloadUrl(url, fileName);
       setExportStatusInput({
         phase: 'done',
-        fileType: 'WAV',
+        fileType: outputFileType,
         exportedCount: exportableStems.length,
-        message: 'WAV 已生成。如果浏览器没有自动下载，请点击下方下载链接。',
+        message: `${outputFileType} 已生成。如果浏览器没有自动下载，请点击下方下载链接。`,
       });
       setExportRecords((records) => appendStemExportRecord(records, createStemExportRecord({
         scope: 'mix',
         label: exportModeLabel(exportMode),
         trackCount: exportableStems.length,
-        fileType: 'WAV',
+        fileType: outputFileType,
       })));
-      setSaveStatus(`“${exportModeLabel(exportMode)}”WAV 已导出。`);
+      setSaveStatus(`“${exportModeLabel(exportMode)}”${outputFileType} 已导出。`);
     } catch (error) {
       const message = error instanceof Error ? error.message : '导出混音失败，请稍后重试。';
       setExportStatusInput({ phase: 'error', message });
@@ -5425,12 +5479,13 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     } finally {
       setIsExporting(false);
     }
-  }, [duration, exportMode, exportReadiness, masterState, savePendingEditsBeforeExport, stems, tracks, waitForStemLoadingToSettle]);
+  }, [duration, editorFeatures.export.wavMix, exportMode, exportReadiness, masterState, savePendingEditsBeforeExport, stems, tracks, waitForStemLoadingToSettle]);
 
   const exportSingleStem = useCallback(async (stem: EditableStem) => {
     setInspectorTab('export');
     setInspectorCollapsed(false);
     setExportingStemType(stem.type);
+    const outputFileType = editorFeatures.export.wavStems ? 'WAV' : 'MP3';
     setPlaybackError(null);
     setSaveStatus(null);
     setLatestExportDownload(null);
@@ -5494,26 +5549,27 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       });
 
       const rendered = await offlineContext.startRendering();
-      setExportStatusInput({ phase: 'encoding', fileType: 'WAV' });
-      const blob = encodeWav(rendered);
-      const fileName = `hookcraft-${normalizeStemType(stem.type)}-${formatExportTimestamp(new Date())}.wav`;
+      setExportStatusInput({ phase: 'encoding', fileType: outputFileType });
+      const blob = await encodeRenderedAudio(rendered, outputFileType);
+      const extension = outputFileType.toLowerCase();
+      const fileName = `hookcraft-${normalizeStemType(stem.type)}-${formatExportTimestamp(new Date())}.${extension}`;
       const url = URL.createObjectURL(blob);
-      setExportStatusInput({ phase: 'downloading', fileType: 'WAV' });
-      setLatestExportDownload({ url, fileName, label: `${getStemDisplayName(stem).zh} 单轨 WAV` });
+      setExportStatusInput({ phase: 'downloading', fileType: outputFileType });
+      setLatestExportDownload({ url, fileName, label: `${getStemDisplayName(stem).zh} 单轨 ${outputFileType}` });
       triggerDownloadUrl(url, fileName);
       setExportStatusInput({
         phase: 'done',
-        fileType: 'WAV',
+        fileType: outputFileType,
         exportedCount: 1,
-        message: '单轨 WAV 已生成。如果浏览器没有自动下载，请点击下方下载链接。',
+        message: `单轨 ${outputFileType} 已生成。如果浏览器没有自动下载，请点击下方下载链接。`,
       });
       setExportRecords((records) => appendStemExportRecord(records, createStemExportRecord({
         scope: 'stem',
         label: getStemDisplayName(stem).zh,
         trackCount: 1,
-        fileType: 'WAV',
+        fileType: outputFileType,
       })));
-      setSaveStatus(`“${getStemDisplayName(stem).zh}”单轨 WAV 已导出。`);
+      setSaveStatus(`“${getStemDisplayName(stem).zh}”单轨 ${outputFileType} 已导出。`);
     } catch (error) {
       const message = error instanceof Error ? error.message : '导出单轨失败，请稍后重试。';
       setExportStatusInput({ phase: 'error', message });
@@ -5521,13 +5577,14 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     } finally {
       setExportingStemType(null);
     }
-  }, [duration, savePendingEditsBeforeExport, tracks]);
+  }, [duration, editorFeatures.export.wavStems, savePendingEditsBeforeExport, tracks]);
 
   const exportAllReadyStems = useCallback(async () => {
     setInspectorTab('export');
     setInspectorCollapsed(false);
     setIsExporting(true);
     setExportingStemType(null);
+    const outputFileType = editorFeatures.export.wavStems ? 'WAV' : 'MP3';
     setPlaybackError(null);
     setSaveStatus(null);
     setLatestExportDownload(null);
@@ -5609,12 +5666,12 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         const rendered = await offlineContext.startRendering();
         setExportStatusInput({
           phase: 'encoding',
-          fileType: 'WAV',
+          fileType: outputFileType,
           message: `正在编码 ${index + 1}/${readyStems.length}：“${getStemDisplayName(stem).zh}”。`,
         });
         downloadBlob(
-          encodeWav(rendered),
-          `hookcraft-stems-${timestamp}-${String(index + 1).padStart(2, '0')}-${normalizeStemType(stem.type)}.wav`,
+          await encodeRenderedAudio(rendered, outputFileType),
+          `hookcraft-stems-${timestamp}-${String(index + 1).padStart(2, '0')}-${normalizeStemType(stem.type)}.${outputFileType.toLowerCase()}`,
           4000,
         );
 
@@ -5623,14 +5680,14 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         }
       }
 
-      setExportStatusInput({ phase: 'done', fileType: 'WAV', exportedCount: readyStems.length });
+      setExportStatusInput({ phase: 'done', fileType: outputFileType, exportedCount: readyStems.length });
       setExportRecords((records) => appendStemExportRecord(records, createStemExportRecord({
         scope: 'stem',
         label: '全部单轨',
         trackCount: readyStems.length,
-        fileType: 'WAV',
+        fileType: outputFileType,
       })));
-      setSaveStatus(`已批量导出 ${readyStems.length} 条单轨 WAV。`);
+      setSaveStatus(`已批量导出 ${readyStems.length} 条单轨 ${outputFileType}。`);
     } catch (error) {
       const message = error instanceof Error ? error.message : '批量导出单轨失败，请稍后重试。';
       setExportStatusInput({ phase: 'error', message });
@@ -5639,7 +5696,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
       setExportingStemType(null);
       setIsExporting(false);
     }
-  }, [duration, exportReadiness, savePendingEditsBeforeExport, stems, tracks, waitForStemLoadingToSettle]);
+  }, [duration, editorFeatures.export.wavStems, exportReadiness, savePendingEditsBeforeExport, stems, tracks, waitForStemLoadingToSettle]);
 
   const selectInspectorTab = useCallback((tab: InspectorTab) => {
     setInspectorTab(tab);
@@ -5655,6 +5712,10 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
     compactTransport,
     inspectorCollapsed,
   }), [compactTransport, inspectorCollapsed]);
+  const canUseAdvancedProduction = editorFeatures.advanced.addTrack
+    || editorFeatures.advanced.importAudio
+    || editorFeatures.advanced.recording;
+  const canShowWavExport = editorFeatures.export.wavMix || editorFeatures.export.wavStems;
 
   return (
     <section className="stem-mixer-editor" style={editorStyle(dawLayoutMetrics)}>
@@ -5851,7 +5912,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
           </div>}
           {!inspectorCollapsed && inspectorTab === 'track' && (
           <>
-          <div style={addTrackPanelStyle(isAddTrackPanelOpen)}>
+          {canUseAdvancedProduction && <div style={addTrackPanelStyle(isAddTrackPanelOpen)}>
             <div style={panelHeadingStyle}>
               <span style={presetLabelStyle}>轨道素材</span>
               <span style={panelHeadingMetaStyle}>导入 / 录音</span>
@@ -5866,22 +5927,22 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                 : '先点击时间线下方 + 创建一条空轨。'}
             </div>
             <div style={addTrackModeGridStyle}>
-              <button
+              {editorFeatures.advanced.importAudio && <button
                 type="button"
                 aria-pressed={addTrackMode === 'import'}
                 style={exportModeButtonStyle(addTrackMode === 'import')}
                 onClick={importAudioToSelectedTrack}
               >
                 导入音频
-              </button>
-              <button
+              </button>}
+              {editorFeatures.advanced.recording && <button
                 type="button"
                 aria-pressed={addTrackMode === 'record'}
                 style={exportModeButtonStyle(addTrackMode === 'record')}
                 onClick={() => openAddTrackPanel('record')}
               >
                 现场录音
-              </button>
+              </button>}
             </div>
             {isAddTrackPanelOpen && addTrackMode === 'import' && (
               <div style={addTrackHintStyle}>
@@ -6010,7 +6071,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                 </div>
               </>
             )}
-          </div>
+          </div>}
           <div style={selectedTrackPanelStyle}>
             {selectedTrack && selectedTrackState ? (
               <>
@@ -6082,14 +6143,14 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                     >
                       循环预听 {loopSelectionPreview ? '开' : '关'}
                     </button>
-                    <button
+                    {editorFeatures.export.wavStems && <button
                       type="button"
                       disabled={!selectedTrackBuffer || exportingStemType === selectedTrack.type}
                       style={presetButtonStyle}
                       onClick={() => void exportSingleStem(selectedTrack)}
                     >
                       {exportingStemType === selectedTrack.type ? '导出中' : '导出单轨'}
-                    </button>
+                    </button>}
                     {selectedTrack && (
                       <button
                         type="button"
@@ -6459,6 +6520,41 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
 
           {!inspectorCollapsed && inspectorTab === 'export' && (
           <div style={exportPanelStyle}>
+            {!canShowWavExport && (
+              <>
+                <div style={exportHintStyle}>
+                  当前等级仅开放 MP3 导出；WAV 混音、单轨 WAV 和高级导出模式需在专业编辑器中使用。
+                </div>
+                <div style={exportActionGridStyle}>
+                  <button
+                    type="button"
+                    disabled={!editorFeatures.export.mp3Mix || !exportSummary.canExport}
+                    style={exportPrimaryActionStyle(!editorFeatures.export.mp3Mix || !exportSummary.canExport)}
+                    title={mixExportDisabledReason || '导出混音 MP3'}
+                    onClick={() => void exportMix()}
+                  >
+                    <span>导出混音 MP3</span>
+                    {!exportSummary.canExport && mixExportDisabledReason && (
+                      <small style={exportActionReasonStyle}>{mixExportDisabledReason}</small>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!editorFeatures.export.mp3Stems || Boolean(batchExportDisabledReason)}
+                    style={exportPrimaryActionStyle(!editorFeatures.export.mp3Stems || Boolean(batchExportDisabledReason))}
+                    title={batchExportDisabledReason || '批量导出 MP3 分轨'}
+                    onClick={() => void exportAllReadyStems()}
+                  >
+                    <span>批量导出 MP3 分轨</span>
+                    {batchExportDisabledReason && (
+                      <small style={exportActionReasonStyle}>{batchExportDisabledReason}</small>
+                    )}
+                  </button>
+                </div>
+              </>
+            )}
+            {canShowWavExport && (
+            <>
             <div style={exportPanelHeaderStyle}>
               <div style={panelHeadingStyle}>
                 <span style={presetLabelStyle}>导出设置</span>
@@ -6589,6 +6685,8 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                   ))}
                 </div>
               </div>
+            )}
+            </>
             )}
           </div>
           )}
@@ -6724,18 +6822,18 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
             <kbd>Ctrl X</kbd>
           </button>
           <div style={trackContextMenuDividerStyle} />
-          <button type="button" role="menuitem" style={trackContextMenuItemStyle(false)} onClick={() => performTrackContextMenuAction('rename')}>
+          {editorFeatures.advanced.trackRename && <button type="button" role="menuitem" style={trackContextMenuItemStyle(false)} onClick={() => performTrackContextMenuAction('rename')}>
             <span>重命名轨道</span>
-          </button>
+          </button>}
           <button type="button" role="menuitem" style={trackContextMenuItemStyle(false)} onClick={() => performTrackContextMenuAction('delete')}>
             <span>{trackContextMenu.clipId ? '删除片段' : '删除轨道'}</span>
             <kbd>Del</kbd>
           </button>
-          <button type="button" role="menuitem" style={trackContextMenuItemStyle(false)} onClick={() => performTrackContextMenuAction('color')}>
+          {editorFeatures.advanced.trackColor && <button type="button" role="menuitem" style={trackContextMenuItemStyle(false)} onClick={() => performTrackContextMenuAction('color')}>
             <span>编辑轨道颜色</span>
             <kbd>Shift C</kbd>
-          </button>
-          {trackContextMenu.colorOpen && (
+          </button>}
+          {editorFeatures.advanced.trackColor && trackContextMenu.colorOpen && (
             <div style={trackColorEditorStyle}>
               <div style={trackColorPaletteStyle}>
                 {TRACK_COLOR_PALETTE.map((color) => (
@@ -6920,14 +7018,14 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                 />
               </span>
             )}
-            <TimelineIconButton
+            {editorFeatures.advanced.shortcutHelp && <TimelineIconButton
               icon="keyboard"
               label="快捷键"
               active={showShortcutHelp}
               tone="purple"
               onTooltipChange={setTimelineTooltip}
               onClick={() => setShowShortcutHelp((value) => !value)}
-            />
+            />}
             <TimelineIconButton
               icon="locate"
               label="定位播放头"
@@ -6965,7 +7063,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
           </div>,
           document.body,
         )}
-        {showShortcutHelp && (
+        {editorFeatures.advanced.shortcutHelp && showShortcutHelp && (
           <div style={timelineShortcutHelpStyle(dawLayoutMetrics, timelineViewportWidth)}>
             <span><strong>播放</strong> 空格 / Esc / P / L</span>
             <span><strong>选轨</strong> ↑ ↓ / M / S / R / Del</span>
@@ -6977,13 +7075,13 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
         )}
         <div className="stem-timeline-ruler" style={timelineRulerStyle(timelineGridColumns, timelineMinWidth, dawLayoutMetrics)} data-timeline-pan-zone="true">
           <div style={timelineRulerLabelStyle} data-timeline-pan-zone="true">
-            <button
+            {editorFeatures.advanced.addTrack && <button
               type="button"
               style={timelineRulerAddTrackButtonStyle}
               onClick={createEmptyCustomTrack}
             >
               + 添加轨道
-            </button>
+            </button>}
           </div>
           <div
             style={timelineRulerMarksStyle}
@@ -7171,7 +7269,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                       +Fx
                     </button>
                     <div style={trackMiniActionsStyle}>
-                      <button
+                      {editorFeatures.export.wavStems && <button
                         type="button"
                         title="导出单轨 WAV"
                         disabled={!audioBuffer || exportingStemType === stem.type}
@@ -7179,7 +7277,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
                         style={trackMiniActionStyle(Boolean(!audioBuffer || exportingStemType === stem.type))}
                       >
                         {exportingStemType === stem.type ? '...' : 'WAV'}
-                      </button>
+                      </button>}
                       {(audioStatus === 'failed' || audioStatus === 'pending') && (
                         <button
                           type="button"
@@ -7301,7 +7399,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
             </div>
           );
           })}
-          <div style={timelineAddTrackRowStyle}>
+          {editorFeatures.advanced.addTrack && <div style={timelineAddTrackRowStyle}>
             <button
               type="button"
               className="stem-add-track-dropzone"
@@ -7313,7 +7411,7 @@ export default function StemMixerEditor({ stems: initialStems, versionLabel, job
               <span style={trackAddDropzoneIconStyle}>+♫</span>
               <span style={trackAddDropzoneTextStyle}>点击添加空轨道</span>
             </button>
-          </div>
+          </div>}
           {visibleStems.length === 0 && (
             <div style={emptyTrackNoticeStyle}>
               当前筛选下没有可显示的轨道，可以切回“全部”查看完整分轨列表。

@@ -36,6 +36,7 @@ export interface KieUploadCoverStartResult {
 export interface KieStemSplitRequest {
   sourceTaskId: string;
   sourceAudioId: string;
+  type?: 'separate_vocal' | 'split_stem';
   callBackUrl?: string;
 }
 
