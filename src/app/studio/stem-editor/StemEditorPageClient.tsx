@@ -156,7 +156,8 @@ export default function StemEditorPageClient() {
   }, [router]);
 
   const applyJobData = useCallback((data: any) => {
-    const stems = Array.isArray(data.stems) ? data.stems : [];
+    const hasStemList = Array.isArray(data.stems);
+    const stems = hasStemList ? data.stems : [];
     setJob({
       jobId: data.jobId,
       status: data.status,
@@ -176,6 +177,14 @@ export default function StemEditorPageClient() {
     if (data.status === 'completed' && stems.length > 0) {
       setError(null);
       setPhase(data.analysisSource === 'cache' ? 'cache-ready' : 'hydrating-cache');
+      return;
+    }
+
+    if (data.status === 'completed' && !hasStemList) {
+      setError(null);
+      setPhase(data.analysisSource === 'cache' || data.analysisSource === 'existing-job'
+        ? 'reading-cache'
+        : 'hydrating-cache');
       return;
     }
 
@@ -256,10 +265,7 @@ export default function StemEditorPageClient() {
       throw new Error(data.error || TEXT.createJobFailed);
     }
 
-    applyJobData({
-      ...data,
-      stems: [],
-    });
+    applyJobData(data);
 
     if (data.status !== 'failed') {
       await refreshJob(data.jobId);
