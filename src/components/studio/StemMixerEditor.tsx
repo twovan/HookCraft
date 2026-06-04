@@ -10137,7 +10137,7 @@ function timelineToolbarStyle(metrics: DawEditorLayoutMetrics, viewportWidth: nu
   const visibleWidth = viewportWidth > 0 ? Math.max(320, viewportWidth - 14) : undefined;
 
   return {
-    position: 'relative',
+    position: 'sticky',
     top: 0,
     left: 0,
     zIndex: 58,
@@ -10349,7 +10349,7 @@ function timelineShortcutHelpStyle(metrics: DawEditorLayoutMetrics, viewportWidt
   const visibleWidth = viewportWidth > 0 ? Math.max(320, viewportWidth - 14) : undefined;
 
   return {
-    position: 'relative',
+    position: 'sticky',
     top: 0,
     left: 0,
     zIndex: 57,
