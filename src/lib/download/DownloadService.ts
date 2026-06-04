@@ -74,12 +74,23 @@ export class DownloadService {
     }
 
     // 4. 从 Storage 获取音频文件
-    const { data: fileData, error: downloadError } = await this.supabase.storage
-      .from('generations')
-      .download(task.audio_path);
+    let fileData: Blob;
+    if (this.isHttpUrl(task.audio_path)) {
+      const response = await fetch(task.audio_path);
+      if (!response.ok) {
+        return { success: false, error: '音频文件下载失败，请重试' };
+      }
+      fileData = await response.blob();
+    } else {
+      const { data, error: downloadError } = await this.supabase.storage
+        .from('generations')
+        .download(task.audio_path);
 
-    if (downloadError || !fileData) {
-      return { success: false, error: '音频文件下载失败，请重试' };
+      if (downloadError || !data) {
+        return { success: false, error: '音频文件下载失败，请重试' };
+      }
+
+      fileData = data;
     }
 
     // 转换为 Buffer
@@ -280,5 +291,9 @@ export class DownloadService {
       periodStart: periodStart.toISOString(),
       periodEnd: periodEnd.toISOString(),
     };
+  }
+
+  private isHttpUrl(value: string): boolean {
+    return value.startsWith('http://') || value.startsWith('https://');
   }
 }
