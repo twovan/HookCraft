@@ -309,6 +309,9 @@ const TIMELINE_ADVANCED_VOLUME_WIDTH = 126;
 const TIMELINE_TRIM_WIDTH = 240;
 const TIMELINE_GRID_GAP = 7;
 const TIMELINE_ROW_PADDING_X = 18;
+const TIMELINE_EDIT_TAIL_MIN_SECONDS = 8;
+const TIMELINE_EDIT_TAIL_MAX_SECONDS = 30;
+const TIMELINE_EDIT_TAIL_RATIO = 0.15;
 
 type TimelineChromeWidths = {
   label: number;
@@ -340,6 +343,23 @@ function snapStemEditorTime(value: number, duration: number, enabled: boolean, s
   const safeStep = normalizeTimelineSnapStep(stepSeconds);
   const snapped = Math.round(value / safeStep) * safeStep;
   return Math.max(0, Math.min(duration || snapped, Number(snapped.toFixed(3))));
+}
+
+function snapStemEditorOpenEndedTime(value: number, enabled: boolean, stepSeconds: number) {
+  if (!Number.isFinite(value)) return 0;
+  const safeValue = Math.max(0, value);
+  if (!enabled) return safeValue;
+  const safeStep = normalizeTimelineSnapStep(stepSeconds);
+  return Math.max(0, Number((Math.round(safeValue / safeStep) * safeStep).toFixed(3)));
+}
+
+function resolveTimelineEditDuration(duration: number) {
+  if (!Number.isFinite(duration) || duration <= 0) return 0;
+  const tailSeconds = Math.max(
+    TIMELINE_EDIT_TAIL_MIN_SECONDS,
+    Math.min(TIMELINE_EDIT_TAIL_MAX_SECONDS, duration * TIMELINE_EDIT_TAIL_RATIO),
+  );
+  return Number((duration + tailSeconds).toFixed(3));
 }
 
 function resolveStemClipMagnetThreshold(duration: number, stepSeconds: number) {
@@ -2028,6 +2048,10 @@ export default function StemMixerEditor({
   const timelineLabelWidth = useMemo(
     () => resolveTimelineChromeWidths(showAdvancedControls, timelineViewportWidth).label,
     [showAdvancedControls, timelineViewportWidth],
+  );
+  const timelineEditDuration = useMemo(
+    () => resolveTimelineEditDuration(duration),
+    [duration],
   );
   const timelineMinWidth = useMemo(
     () => buildTimelineMinWidth(showAdvancedControls, timelineLaneWidth, timelineViewportWidth),
@@ -4255,14 +4279,17 @@ export default function StemMixerEditor({
     const targetClipState = targetType === type
       ? clipState
       : resolveTrackClipState(targetState, duration);
+    const movingClipDuration = getStemClipDuration(movingClip);
+    const snappedMoveStart = snapStemEditorOpenEndedTime(nextStart, shouldSnap, snapStepSeconds);
+    const moveHorizonDuration = Math.max(duration, snappedMoveStart + movingClipDuration);
     const snappedStart = snapStemClipStartToNeighborEdges(
       targetClipState.clips,
       clipId,
-      snapStemEditorTime(nextStart, duration, shouldSnap, snapStepSeconds),
+      snappedMoveStart,
       nextStart,
       movingClip.start,
-      getStemClipDuration(movingClip),
-      duration,
+      movingClipDuration,
+      moveHorizonDuration,
       magnetSnap,
       snapStepSeconds,
     );
@@ -4304,21 +4331,26 @@ export default function StemMixerEditor({
     const targetClipStateBeforeMove = targetType === type
       ? clipStateBeforeMove
       : resolveTrackClipState(targetStateBeforeMove, duration);
+    const movingClipDuration = movingClip ? getStemClipDuration(movingClip) : 0;
+    const snappedMoveStart = snapStemEditorOpenEndedTime(nextStart, shouldSnap, snapStepSeconds);
+    const moveHorizonDuration = movingClip
+      ? Math.max(duration, snappedMoveStart + movingClipDuration)
+      : duration;
     const snappedStart = movingClip
       ? snapStemClipStartToNeighborEdges(
         targetClipStateBeforeMove.clips,
         clipId,
-        snapStemEditorTime(nextStart, duration, shouldSnap, snapStepSeconds),
+        snappedMoveStart,
         nextStart,
         movingClip.start,
-        getStemClipDuration(movingClip),
-        duration,
+        movingClipDuration,
+        moveHorizonDuration,
         magnetSnap,
         snapStepSeconds,
       )
       : snapStemEditorTime(nextStart, duration, shouldSnap, snapStepSeconds);
     const nextDuration = movingClip
-      ? Math.max(duration, snappedStart + getStemClipDuration(movingClip))
+      ? Math.max(duration, snappedStart + movingClipDuration)
       : duration;
     if (nextDuration > duration) {
       setDuration(Number(nextDuration.toFixed(3)));
@@ -7183,12 +7215,12 @@ export default function StemMixerEditor({
         <div
           className="stem-timeline-playhead"
           aria-hidden="true"
-          style={timelineGlobalPlayheadStyle(currentTime, duration, timelineLaneWidth, timelineLabelWidth)}
+          style={timelineGlobalPlayheadStyle(currentTime, timelineEditDuration || duration, timelineLaneWidth, timelineLabelWidth)}
         />
         <div
           className="stem-timeline-playhead-badge"
           aria-hidden="true"
-          style={timelineGlobalPlayheadBadgeStyle(currentTime, duration, timelineLaneWidth, timelineLabelWidth)}
+          style={timelineGlobalPlayheadBadgeStyle(currentTime, timelineEditDuration || duration, timelineLaneWidth, timelineLabelWidth)}
         >
           {formatStemTimecode(currentTime)}
         </div>
@@ -7387,16 +7419,16 @@ export default function StemMixerEditor({
                   style={timelineSelectedRangeStyle(
                     selectedTrackTrimControls.trimStart,
                     selectedTrackTrimControls.trimEnd,
-                    duration,
+                    timelineEditDuration || duration,
                   )}
                 />
                 <span
                   aria-hidden="true"
-                  style={timelineSelectedRangeEdgeStyle(selectedTrackTrimControls.trimStart, duration, 'start')}
+                  style={timelineSelectedRangeEdgeStyle(selectedTrackTrimControls.trimStart, timelineEditDuration || duration, 'start')}
                 />
                 <span
                   aria-hidden="true"
-                  style={timelineSelectedRangeEdgeStyle(selectedTrackTrimControls.trimEnd, duration, 'end')}
+                  style={timelineSelectedRangeEdgeStyle(selectedTrackTrimControls.trimEnd, timelineEditDuration || duration, 'end')}
                 />
               </>
             )}
@@ -7410,7 +7442,7 @@ export default function StemMixerEditor({
               </>
             )}
             {timelineRulerMarks.map((ratio) => {
-              const time = Math.max(0, duration * ratio);
+              const time = Math.max(0, (timelineEditDuration || duration) * ratio);
               return (
                 <span key={ratio} style={timelineRulerMarkStyle(ratio)}>
                   {formatStemTimecode(time)}
@@ -7635,6 +7667,7 @@ export default function StemMixerEditor({
                 color={trackColor}
                 currentTime={currentTime}
                 duration={duration}
+                timelineDuration={timelineEditDuration || duration}
                 trimStart={state.trimStart}
                 trimEnd={trimEnd}
                 clips={displayedClips}
@@ -11021,6 +11054,7 @@ function WaveformTrackCanvas({
   color,
   currentTime,
   duration,
+  timelineDuration,
   trimStart,
   trimEnd,
   clips,
@@ -11054,6 +11088,7 @@ function WaveformTrackCanvas({
   color: string;
   currentTime: number;
   duration: number;
+  timelineDuration: number;
   trimStart: number;
   trimEnd: number;
   clips: StemClip[];
@@ -11104,20 +11139,25 @@ function WaveformTrackCanvas({
     if (!buffer) return [];
     return buildWaveformPeaksFromSamples(buffer.getChannelData(0), 720);
   }, [buffer, bufferVersion, waveform?.peaks]);
+  const displayDuration = Math.max(duration, timelineDuration || duration);
 
   const timeFromPointer = useCallback((event: PointerEvent<HTMLCanvasElement> | MouseEvent<HTMLCanvasElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
-    const ratio = rect.width > 0
-      ? Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width))
-      : 0;
-    return ratio * duration;
-  }, [duration]);
+    const rawRatio = rect.width > 0 ? (event.clientX - rect.left) / rect.width : 0;
+    const ratio = clipDragRef.current
+      ? Math.max(0, rawRatio)
+      : Math.max(0, Math.min(1, rawRatio));
+    return ratio * displayDuration;
+  }, [displayDuration]);
 
   const interactionTimeFromPointer = useCallback((event: PointerEvent<HTMLCanvasElement>) => {
     const shouldSnap = snapEnabled && !event.altKey;
-    const time = snapStemEditorTime(timeFromPointer(event), duration, shouldSnap, snapStepSeconds);
+    const rawTime = timeFromPointer(event);
+    const time = clipDragRef.current
+      ? snapStemEditorOpenEndedTime(rawTime, shouldSnap, snapStepSeconds)
+      : snapStemEditorTime(rawTime, displayDuration, shouldSnap, snapStepSeconds);
     return { time, shouldSnap };
-  }, [duration, snapEnabled, snapStepSeconds, timeFromPointer]);
+  }, [displayDuration, snapEnabled, snapStepSeconds, timeFromPointer]);
 
   const resolveMagnetGuide = useCallback((time: number): { time: number; distance: number } | null => {
     if (!magnetSnapEnabled) return null;
@@ -11126,7 +11166,7 @@ function WaveformTrackCanvas({
     const draggedClip = clips.find((clip) => clip.id === draggedClipId) || null;
     if (!draggedClip) return null;
 
-    const threshold = resolveStemClipMagnetThreshold(duration, snapStepSeconds);
+    const threshold = resolveStemClipMagnetThreshold(displayDuration, snapStepSeconds);
     const clipDuration = getStemClipDuration(draggedClip);
     const candidateEdges = trimDragRef.current
       ? [time]
@@ -11151,7 +11191,7 @@ function WaveformTrackCanvas({
     });
 
     return best;
-  }, [clips, duration, magnetSnapEnabled, snapStepSeconds]);
+  }, [clips, displayDuration, magnetSnapEnabled, snapStepSeconds]);
 
   const updatePointerGuide = useCallback((
     event: PointerEvent<HTMLCanvasElement>,
@@ -11255,8 +11295,8 @@ function WaveformTrackCanvas({
       context.fillStyle = backgroundColor;
       context.fillRect(0, 0, width, height);
 
-      const gridStep = snapEnabled && duration > 0
-        ? Math.max((normalizeTimelineSnapStep(snapStepSeconds) / duration) * width, 18 * ratio)
+      const gridStep = snapEnabled && displayDuration > 0
+        ? Math.max((normalizeTimelineSnapStep(snapStepSeconds) / displayDuration) * width, 18 * ratio)
         : Math.max(24 * ratio, width / 10);
       const gridOpacity = selected ? 0.09 : snapEnabled ? 0.064 : 0.04;
       context.strokeStyle = `rgba(255,255,255,${gridOpacity})`;
@@ -11267,7 +11307,7 @@ function WaveformTrackCanvas({
         context.lineTo(x, height);
       }
       context.stroke();
-      if (snapEnabled && duration > 0) {
+      if (snapEnabled && displayDuration > 0) {
         const majorGridStep = gridStep * 4;
         context.strokeStyle = 'rgba(251,191,36,0.12)';
         context.beginPath();
@@ -11300,8 +11340,8 @@ function WaveformTrackCanvas({
         return;
       }
 
-      const startX = (Math.max(0, trimStart) / duration) * width;
-      const endX = (Math.min(duration, trimEnd) / duration) * width;
+      const startX = (Math.max(0, trimStart) / displayDuration) * width;
+      const endX = (Math.min(displayDuration, trimEnd) / displayDuration) * width;
       context.fillStyle = 'rgba(5, 7, 14, 0.22)';
       context.fillRect(0, 0, startX, height);
       context.fillRect(endX, 0, Math.max(0, width - endX), height);
@@ -11314,8 +11354,8 @@ function WaveformTrackCanvas({
       const takeBarHeight = selected ? 15 * ratio : 13 * ratio;
       const renderClipWaveform = (clip: StemClip) => {
         const isSelectedClip = selected && clip.id === selectedClipId;
-        const clipStartX = (Math.max(0, Math.min(duration, clip.start)) / duration) * width;
-        const clipEndX = (Math.max(0, Math.min(duration, clip.start + getStemClipDuration(clip))) / duration) * width;
+        const clipStartX = (Math.max(0, Math.min(displayDuration, clip.start)) / displayDuration) * width;
+        const clipEndX = (Math.max(0, Math.min(displayDuration, clip.start + getStemClipDuration(clip))) / displayDuration) * width;
         const clipWidth = Math.max(0, clipEndX - clipStartX);
         if (clipWidth <= 1) return;
 
@@ -11416,7 +11456,7 @@ function WaveformTrackCanvas({
         renderClipWaveform(clip);
       });
 
-      const mutedRects = mapStemMutedRangesToPixels({ mutedRanges, duration, width });
+      const mutedRects = mapStemMutedRangesToPixels({ mutedRanges, duration: displayDuration, width });
       mutedRects.forEach((rect) => {
         context.fillStyle = selected ? 'rgba(244, 63, 94, 0.34)' : 'rgba(244, 63, 94, 0.22)';
         context.fillRect(rect.x, 0, rect.width, height);
@@ -11449,7 +11489,7 @@ function WaveformTrackCanvas({
     const observer = new ResizeObserver(draw);
     observer.observe(canvas);
     return () => observer.disconnect();
-  }, [buffer, clipWaveformSources, clips, color, displayPeaks, duration, muted, mutedRanges, recording, selected, selectedClipId, snapEnabled, snapStepSeconds, trackLabel, trackType, trimEnd, trimStart, waveform?.duration]);
+  }, [buffer, clipWaveformSources, clips, color, displayDuration, displayPeaks, duration, muted, mutedRanges, recording, selected, selectedClipId, snapEnabled, snapStepSeconds, trackLabel, trackType, trimEnd, trimStart, waveform?.duration]);
 
   const handlePointerDown = useCallback((event: PointerEvent<HTMLCanvasElement>) => {
     if (duration <= 0) return;
@@ -11469,7 +11509,7 @@ function WaveformTrackCanvas({
       editable,
       pointerX,
       width: rect.width,
-      duration,
+      duration: displayDuration,
       trimStart: intentTrimStart,
       trimEnd: intentTrimEnd,
       currentTime,
@@ -11545,7 +11585,7 @@ function WaveformTrackCanvas({
       }
     }
     safelySetPointerCapture(event.currentTarget, event.pointerId);
-  }, [clips, currentTime, duration, editable, interactionTimeFromPointer, onClipSelect, onSelect, selected, selectedClipId, trimEnd, trimStart, updatePointerGuide]);
+  }, [clips, currentTime, displayDuration, duration, editable, interactionTimeFromPointer, onClipSelect, onSelect, selected, selectedClipId, trimEnd, trimStart, updatePointerGuide]);
 
   const handlePointerMove = useCallback((event: PointerEvent<HTMLCanvasElement>) => {
     if (trimDragRef.current) {
@@ -11694,15 +11734,15 @@ function WaveformTrackCanvas({
         <>
           <span
             aria-hidden="true"
-            style={waveformSelectedClipOverlayStyle(selectedClipForOverlay, duration, color)}
+            style={waveformSelectedClipOverlayStyle(selectedClipForOverlay, displayDuration, color)}
           />
           <span
             aria-hidden="true"
-            style={waveformClipHandleStyle(selectedClipForOverlay.start, duration, 'start')}
+            style={waveformClipHandleStyle(selectedClipForOverlay.start, displayDuration, 'start')}
           />
           <span
             aria-hidden="true"
-            style={waveformClipHandleStyle(selectedClipForOverlay.start + getStemClipDuration(selectedClipForOverlay), duration, 'end')}
+            style={waveformClipHandleStyle(selectedClipForOverlay.start + getStemClipDuration(selectedClipForOverlay), displayDuration, 'end')}
           />
         </>
       )}
@@ -11710,11 +11750,11 @@ function WaveformTrackCanvas({
         <>
           <span
             aria-hidden="true"
-            style={waveformTrimHandleStyle(trimStart, duration, selected, 'start')}
+            style={waveformTrimHandleStyle(trimStart, displayDuration, selected, 'start')}
           />
           <span
             aria-hidden="true"
-            style={waveformTrimHandleStyle(trimEnd, duration, selected, 'end')}
+            style={waveformTrimHandleStyle(trimEnd, displayDuration, selected, 'end')}
           />
         </>
       )}
