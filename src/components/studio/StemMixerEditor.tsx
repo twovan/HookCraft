@@ -796,6 +796,30 @@ function resolveTrackClipState(state: StemTrackState, duration: number) {
   });
 }
 
+function resolveTrackClipStateForTimelineEdit(
+  state: StemTrackState,
+  duration: number,
+  sourceDuration = duration,
+) {
+  if (Array.isArray(state.clips)) {
+    return resolveTrackClipState(state, duration);
+  }
+
+  const materializedState = normalizeStemClipState({
+    clips: null,
+    duration: sourceDuration,
+    trimStart: state.trimStart,
+    trimEnd: state.trimEnd,
+  });
+
+  return normalizeStemClipState({
+    clips: materializedState.clips,
+    duration,
+    trimStart: materializedState.trimStart,
+    trimEnd: materializedState.trimEnd,
+  });
+}
+
 function areTrackStatesEqual(left: Record<string, StemTrackState>, right: Record<string, StemTrackState>) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
@@ -4368,8 +4392,8 @@ export default function StemMixerEditor({
       commitTrackChange((current) => {
         const sourceState = current[type] || defaultTrackState();
         const targetState = current[targetType] || defaultTrackState();
-        const sourceClipState = resolveTrackClipState(sourceState, nextDuration);
-        const targetClipState = resolveTrackClipState(targetState, nextDuration);
+        const sourceClipState = resolveTrackClipStateForTimelineEdit(sourceState, nextDuration, duration);
+        const targetClipState = resolveTrackClipStateForTimelineEdit(targetState, nextDuration, duration);
         const nextSourceClips = sourceClipState.clips.filter((clip) => clip.id !== clipId);
         const nextTargetClips = [
           ...targetClipState.clips.filter((clip) => clip.id !== movedClipId),
@@ -4432,7 +4456,7 @@ export default function StemMixerEditor({
 
     commitTrackChange((current) => {
       const state = current[type] || defaultTrackState();
-      const clipState = resolveTrackClipState(state, nextDuration);
+      const clipState = resolveTrackClipStateForTimelineEdit(state, nextDuration, duration);
       const movedClips = moveStemClip(
         clipState.clips,
         clipId,
@@ -4659,7 +4683,7 @@ export default function StemMixerEditor({
 
     commitTrackChange((current) => {
       const state = current[type] || defaultTrackState();
-      const clipState = resolveTrackClipState(state, nextDuration);
+      const clipState = resolveTrackClipStateForTimelineEdit(state, nextDuration, duration);
       const nextClipState = normalizeStemClipState({
         clips: [...clipState.clips, clonedClip],
         duration: nextDuration,
