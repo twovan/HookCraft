@@ -942,8 +942,13 @@ function ModeSelectionPanel({
             <span>片段剪辑</span>
             <span>MP3 导出</span>
           </div>
-          {showBasicCreditConfirm && canUseBasic && !hasBasicCache && <small style={modeHintStyle}>开始前会确认积分消耗</small>}
-          {hasProCache && !hasBasicCache && canUseBasic && <small style={modeHintStyle}>已有高级缓存，基础编辑需单独分析</small>}
+          <div style={modeHintSlotStyle}>
+            {hasProCache && !hasBasicCache && canUseBasic
+              ? <small style={modeHintStyle}>已有高级缓存，基础编辑需单独分析</small>
+              : showBasicCreditConfirm && canUseBasic && !hasBasicCache
+                ? <small style={modeHintStyle}>开始前会确认积分消耗</small>
+                : <span aria-hidden="true" />}
+          </div>
           <em style={modeActionStyle(!canUseBasic || modeCacheLoading)}>
             {modeCacheLoading ? TEXT.checkingModeCache : canUseBasic ? hasBasicCache ? TEXT.enterBasic : TEXT.analyzeBasic : TEXT.freeLocked}
           </em>
@@ -968,8 +973,13 @@ function ModeSelectionPanel({
             <span>高级制作</span>
             <span>WAV / 批量导出</span>
           </div>
-          {showProCreditConfirm && canUsePro && !hasProCache && <small style={modeHintStyle}>开始前会确认积分消耗</small>}
-          {hasBasicCache && !hasProCache && canUsePro && <small style={modeHintStyle}>已有基础缓存，高级编辑需单独分析</small>}
+          <div style={modeHintSlotStyle}>
+            {hasBasicCache && !hasProCache && canUsePro
+              ? <small style={modeHintStyle}>已有基础缓存，高级编辑需单独分析</small>
+              : showProCreditConfirm && canUsePro && !hasProCache
+                ? <small style={modeHintStyle}>开始前会确认积分消耗</small>
+                : <span aria-hidden="true" />}
+          </div>
           <em style={modeActionStyle(!canUsePro || modeCacheLoading)}>
             {modeCacheLoading ? TEXT.checkingModeCache : canUsePro ? hasProCache ? TEXT.enterPro : TEXT.analyzePro : showUpgradePrompt ? TEXT.proLocked : '当前未开放'}
           </em>
@@ -1346,7 +1356,7 @@ function modeCardStyle(disabled: boolean, variant: 'basic' | 'pro'): CSSProperti
     position: 'relative',
     minHeight: 276,
     display: 'grid',
-    gridTemplateRows: 'auto auto auto auto 1fr auto auto',
+    gridTemplateRows: 'auto auto auto auto minmax(44px, 1fr) 34px 40px',
     alignContent: 'stretch',
     gap: 12,
     borderRadius: 14,
@@ -1452,8 +1462,15 @@ const modeFeatureListStyle: CSSProperties = {
 const modeHintStyle: CSSProperties = {
   color: '#d9f99d',
   fontSize: 12,
+  lineHeight: 1.35,
   fontWeight: 800,
   fontStyle: 'normal',
+};
+
+const modeHintSlotStyle: CSSProperties = {
+  minHeight: 34,
+  display: 'flex',
+  alignItems: 'end',
 };
 
 function modeActionStyle(disabled: boolean): CSSProperties {
