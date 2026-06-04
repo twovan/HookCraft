@@ -116,6 +116,8 @@ const TEXT = {
   enterPro: '\u8fdb\u5165\u4e13\u4e1a\u7f16\u8f91',
   analyzeBasic: '\u5206\u6790\u5e76\u8fdb\u5165\u57fa\u7840\u7f16\u8f91',
   analyzePro: '\u5206\u6790\u5e76\u8fdb\u5165\u4e13\u4e1a\u7f16\u8f91',
+  upgradeMembership: '\u5347\u7ea7\u4f1a\u5458',
+  upgradeToPro: '\u5347\u7ea7 Pro \u89e3\u9501',
   basicCacheReady: '\u57fa\u7840\u7f13\u5b58\u53ef\u7528',
   proCacheReady: '\u9ad8\u7ea7\u7f13\u5b58\u53ef\u7528',
   needsAnalysis: '\u9700\u8981\u5206\u6790',
@@ -525,6 +527,7 @@ export default function StemEditorPageClient() {
                   modeCacheStatus={modeCacheStatus}
                   modeCacheLoading={modeCacheLoading}
                   onSelect={handleModeSelect}
+                  onUpgrade={() => router.push('/pricing')}
                 />
               )}
               {selectedSeparationMode && (
@@ -886,12 +889,14 @@ function ModeSelectionPanel({
   modeCacheStatus,
   modeCacheLoading,
   onSelect,
+  onUpgrade,
 }: {
   editorPanel: EditorPanelAccess;
   featureSettings: StemEditorFeatureSettings;
   modeCacheStatus: StemModeCacheStatus;
   modeCacheLoading: boolean;
   onSelect: (mode: StemSeparationMode) => void;
+  onUpgrade: () => void;
 }) {
   const basicSettings = featureSettings.basicEditor;
   const proSettings = featureSettings.proEditor;
@@ -924,9 +929,9 @@ function ModeSelectionPanel({
       <div style={modeGridStyle}>
         <button
           type="button"
-          disabled={!canUseBasic || modeCacheLoading}
-          onClick={() => onSelect('separate_vocal')}
-          style={modeCardStyle(!canUseBasic || modeCacheLoading, 'basic')}
+          disabled={modeCacheLoading}
+          onClick={() => canUseBasic ? onSelect('separate_vocal') : onUpgrade()}
+          style={modeCardStyle(modeCacheLoading, 'basic', !canUseBasic)}
         >
           <div style={modeCardTopStyle}>
             <span style={modePlanPillStyle('basic')}>Plus</span>
@@ -949,15 +954,15 @@ function ModeSelectionPanel({
                 ? <small style={modeHintStyle}>开始前会确认积分消耗</small>
                 : <span aria-hidden="true" />}
           </div>
-          <em style={modeActionStyle(!canUseBasic || modeCacheLoading)}>
-            {modeCacheLoading ? TEXT.checkingModeCache : canUseBasic ? hasBasicCache ? TEXT.enterBasic : TEXT.analyzeBasic : TEXT.freeLocked}
+          <em style={modeActionStyle(modeCacheLoading, !canUseBasic)}>
+            {modeCacheLoading ? TEXT.checkingModeCache : canUseBasic ? hasBasicCache ? TEXT.enterBasic : TEXT.analyzeBasic : TEXT.upgradeMembership}
           </em>
         </button>
         <button
           type="button"
-          disabled={!canUsePro || modeCacheLoading}
-          onClick={() => onSelect('split_stem')}
-          style={modeCardStyle(!canUsePro || modeCacheLoading, 'pro')}
+          disabled={modeCacheLoading}
+          onClick={() => canUsePro ? onSelect('split_stem') : onUpgrade()}
+          style={modeCardStyle(modeCacheLoading, 'pro', !canUsePro)}
         >
           <div style={modeCardTopStyle}>
             <span style={modePlanPillStyle('pro')}>Pro</span>
@@ -980,8 +985,8 @@ function ModeSelectionPanel({
                 ? <small style={modeHintStyle}>开始前会确认积分消耗</small>
                 : <span aria-hidden="true" />}
           </div>
-          <em style={modeActionStyle(!canUsePro || modeCacheLoading)}>
-            {modeCacheLoading ? TEXT.checkingModeCache : canUsePro ? hasProCache ? TEXT.enterPro : TEXT.analyzePro : showUpgradePrompt ? TEXT.proLocked : '当前未开放'}
+          <em style={modeActionStyle(modeCacheLoading, !canUsePro)}>
+            {modeCacheLoading ? TEXT.checkingModeCache : canUsePro ? hasProCache ? TEXT.enterPro : TEXT.analyzePro : showUpgradePrompt ? TEXT.upgradeToPro : TEXT.upgradeMembership}
           </em>
         </button>
       </div>
@@ -1351,7 +1356,8 @@ const modeGridStyle: CSSProperties = {
   gap: 16,
 };
 
-function modeCardStyle(disabled: boolean, variant: 'basic' | 'pro'): CSSProperties {
+function modeCardStyle(disabled: boolean, variant: 'basic' | 'pro', locked = false): CSSProperties {
+  const muted = disabled || locked;
   return {
     position: 'relative',
     minHeight: 276,
@@ -1360,23 +1366,23 @@ function modeCardStyle(disabled: boolean, variant: 'basic' | 'pro'): CSSProperti
     alignContent: 'stretch',
     gap: 12,
     borderRadius: 14,
-    border: disabled
+    border: muted
       ? '1px solid rgba(75, 85, 99, 0.58)'
       : variant === 'pro'
         ? '1px solid rgba(245, 158, 11, 0.45)'
         : '1px solid rgba(140, 199, 255, 0.42)',
-    background: disabled
+    background: muted
       ? 'linear-gradient(180deg, rgba(17, 24, 39, 0.68), rgba(9, 12, 23, 0.74))'
       : variant === 'pro'
         ? 'linear-gradient(160deg, rgba(69, 40, 9, 0.42), rgba(13, 16, 31, 0.92) 58%)'
         : 'linear-gradient(160deg, rgba(15, 50, 88, 0.44), rgba(13, 16, 31, 0.92) 58%)',
-    color: disabled ? '#858da1' : '#f7f8ff',
+    color: muted ? '#858da1' : '#f7f8ff',
     padding: 20,
     textAlign: 'left',
     cursor: disabled ? 'not-allowed' : 'pointer',
     fontFamily: 'var(--hc-font)',
-    opacity: disabled ? 0.78 : 1,
-    boxShadow: disabled ? 'none' : variant === 'pro' ? '0 18px 46px rgba(245, 158, 11, 0.12)' : '0 18px 46px rgba(96, 165, 250, 0.12)',
+    opacity: disabled ? 0.78 : locked ? 0.86 : 1,
+    boxShadow: muted ? 'none' : variant === 'pro' ? '0 18px 46px rgba(245, 158, 11, 0.12)' : '0 18px 46px rgba(96, 165, 250, 0.12)',
     overflow: 'hidden',
     outline: 'none',
   };
@@ -1473,7 +1479,7 @@ const modeHintSlotStyle: CSSProperties = {
   alignItems: 'end',
 };
 
-function modeActionStyle(disabled: boolean): CSSProperties {
+function modeActionStyle(disabled: boolean, locked = false): CSSProperties {
   return {
     alignSelf: 'end',
     display: 'inline-flex',
@@ -1481,7 +1487,11 @@ function modeActionStyle(disabled: boolean): CSSProperties {
     justifyContent: 'center',
     minHeight: 38,
     borderRadius: 10,
-    background: disabled ? 'rgba(71, 85, 105, 0.24)' : 'var(--hc-lime)',
+    background: disabled
+      ? 'rgba(71, 85, 105, 0.24)'
+      : locked
+        ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.98), rgba(206, 255, 53, 0.95))'
+        : 'var(--hc-lime)',
     color: disabled ? '#9aa4b8' : '#111827',
     padding: '0 14px',
     fontSize: 13,
