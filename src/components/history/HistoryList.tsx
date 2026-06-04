@@ -25,7 +25,10 @@ interface BatchSummary {
   styleTags?: string[];
   canEditSong?: boolean;
   hasStemCache?: boolean;
+  stemCacheModes?: string[];
   stemJobId?: string | null;
+  basicStemJobId?: string | null;
+  proStemJobId?: string | null;
   stemEditSavedAt?: string | null;
 }
 
@@ -44,7 +47,10 @@ interface VersionDetail {
   styleTags?: string[];
   canEditSong?: boolean;
   hasStemCache?: boolean;
+  stemCacheModes?: string[];
   stemJobId?: string | null;
+  basicStemJobId?: string | null;
+  proStemJobId?: string | null;
   stemEditSavedAt?: string | null;
 }
 
@@ -278,7 +284,9 @@ export default function HistoryList({
                   )}
                   {batch.canEditSong && batch.taskId && (
                     <>
-                      {batch.hasStemCache && <span style={stemCacheBadgeStyle}>分轨已缓存</span>}
+                      {batch.hasStemCache && (
+                        <span style={stemCacheBadgeStyle}>{formatStemCacheBadge(batch.stemCacheModes)}</span>
+                      )}
                       {batch.stemEditSavedAt && (
                         <span style={stemEditSavedBadgeStyle}>
                           最近保存 {formatEditSavedAt(batch.stemEditSavedAt)}
@@ -356,7 +364,9 @@ export default function HistoryList({
                         {(version.styleTags || []).slice(0, 3).map((tag) => (
                           <span key={tag} style={tagStyle}>{tag}</span>
                         ))}
-                        {version.hasStemCache && <span style={stemCacheBadgeStyle}>分轨已缓存</span>}
+                        {version.hasStemCache && (
+                          <span style={stemCacheBadgeStyle}>{formatStemCacheBadge(version.stemCacheModes)}</span>
+                        )}
                         {version.stemEditSavedAt && (
                           <span style={stemEditSavedBadgeStyle}>
                             最近保存 {formatEditSavedAt(version.stemEditSavedAt)}
@@ -425,6 +435,16 @@ function buildStemEditorHref(taskId: string, stemJobId?: string | null) {
   const params = new URLSearchParams({ generationTaskId: taskId });
   if (stemJobId) params.set('jobId', stemJobId);
   return `/studio/stem-editor?${params.toString()}`;
+}
+
+function formatStemCacheBadge(modes?: string[]) {
+  const hasBasic = modes?.includes('basic') === true;
+  const hasPro = modes?.includes('pro') === true;
+
+  if (hasBasic && hasPro) return '基础+高级已缓存';
+  if (hasBasic) return '基础分轨已缓存';
+  if (hasPro) return '高级分轨已缓存';
+  return '分轨已缓存';
 }
 
 const gridStyle = (showDetail: boolean): CSSProperties => ({

@@ -105,7 +105,10 @@ export async function GET(
         canEditSong: canEditSong(task),
         hasStemCache: Boolean(stemCache),
         hasReadableStemCache: stemCache?.hasStemCache === true,
+        stemCacheModes: stemCache?.stemCacheModes ?? [],
         stemJobId: stemCache?.jobId ?? null,
+        basicStemJobId: stemCache?.basicJobId ?? null,
+        proStemJobId: stemCache?.proJobId ?? null,
         stemEditSavedAt: stemCache?.editSavedAt ?? null,
       };
     }));

@@ -23,7 +23,10 @@ interface BatchSummary {
   styleTags?: string[];
   canEditSong?: boolean;
   hasStemCache?: boolean;
+  stemCacheModes?: string[];
   stemJobId?: string | null;
+  basicStemJobId?: string | null;
+  proStemJobId?: string | null;
   stemEditSavedAt?: string | null;
 }
 
@@ -38,7 +41,10 @@ interface VersionDetail {
   createdAt: string;
   canEditSong?: boolean;
   hasStemCache?: boolean;
+  stemCacheModes?: string[];
   stemJobId?: string | null;
+  basicStemJobId?: string | null;
+  proStemJobId?: string | null;
   stemEditSavedAt?: string | null;
 }
 
