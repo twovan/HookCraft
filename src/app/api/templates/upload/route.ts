@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '../../../../lib/supabase/server';
 import { uploadTemplateAsset } from '../../../../lib/supabase/storage';
+import { resolveActiveProducerId } from '../../../../lib/producer/resolveActiveProducerId';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
@@ -29,6 +30,11 @@ export async function POST(req: NextRequest) {
     const user = await getUser();
     if (!user) {
       return NextResponse.json({ error: '请先登录' }, { status: 401 });
+    }
+
+    const producerId = await resolveActiveProducerId(supabaseAdmin, user.id);
+    if (!producerId) {
+      return NextResponse.json({ error: '请先完成制作人认证后再上传模板' }, { status: 403 });
     }
 
     const formData = await req.formData();
@@ -69,7 +75,7 @@ export async function POST(req: NextRequest) {
         genre: genre || '',
         price,
         status: 'pending',
-        producer_id: user.id,
+        producer_id: producerId,
         sales_count: 0,
       } as any)
       .select()
