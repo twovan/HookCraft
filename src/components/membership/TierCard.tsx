@@ -175,7 +175,7 @@ const cardStyle: React.CSSProperties = {
 
 const recommendStyle: React.CSSProperties = {
   position: 'absolute',
-  top: -18,
+  top: -42,
   left: '50%',
   transform: 'translateX(-50%)',
   zIndex: 2,
