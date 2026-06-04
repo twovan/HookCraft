@@ -37,6 +37,30 @@ export function getStemClipDuration(clip: StemClip) {
   return Math.max(0, clip.sourceEnd - clip.sourceStart);
 }
 
+export function resolveStemClipSourceRange(clip: StemClip, sourceDuration: number): StemClip {
+  const safeSourceDuration = Math.max(0, Number.isFinite(sourceDuration) ? sourceDuration : 0);
+  if (safeSourceDuration <= 0) return clip;
+
+  const clipDuration = getStemClipDuration(clip);
+  const sourceStart = clampNumber(clip.sourceStart, 0, safeSourceDuration);
+  const sourceEnd = clampNumber(Math.max(sourceStart, clip.sourceEnd), 0, safeSourceDuration);
+  if (sourceEnd - sourceStart > 0.001) {
+    return {
+      ...clip,
+      sourceStart: roundTime(sourceStart),
+      sourceEnd: roundTime(sourceEnd),
+    };
+  }
+
+  if (clipDuration <= 0.001 || clip.sourceStart < safeSourceDuration) return clip;
+
+  return {
+    ...clip,
+    sourceStart: 0,
+    sourceEnd: roundTime(Math.min(safeSourceDuration, clipDuration)),
+  };
+}
+
 export function normalizeStemClips(
   clips: StemClip[] | undefined | null,
   duration: number,

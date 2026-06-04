@@ -8,6 +8,7 @@ import {
   removeStemClipAtTime,
   resizeStemClipEdge,
   resolveStemClipDragTarget,
+  resolveStemClipSourceRange,
   sliceStemClipPeaks,
   splitStemClipAtTime,
 } from './stemClips';
@@ -155,6 +156,32 @@ describe('stem clips', () => {
       start: 30,
       sourceStart: 0,
       sourceEnd: 120,
+    });
+  });
+
+  it('repairs legacy moved clips whose source range was saved as timeline time', () => {
+    expect(resolveStemClipSourceRange({
+      id: 'clip-1',
+      start: 1176,
+      sourceStart: 1176,
+      sourceEnd: 1329,
+    }, 153)).toMatchObject({
+      start: 1176,
+      sourceStart: 0,
+      sourceEnd: 153,
+    });
+  });
+
+  it('keeps valid copied clip source ranges intact', () => {
+    expect(resolveStemClipSourceRange({
+      id: 'clip-1',
+      start: 1176,
+      sourceStart: 10,
+      sourceEnd: 70,
+    }, 153)).toMatchObject({
+      start: 1176,
+      sourceStart: 10,
+      sourceEnd: 70,
     });
   });
 

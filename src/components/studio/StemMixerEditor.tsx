@@ -82,6 +82,7 @@ import {
   removeStemClipAtTime,
   resizeStemClipEdge,
   resolveStemClipDragTarget,
+  resolveStemClipSourceRange,
   sliceStemClipPeaks,
   splitStemClipAtTime,
   type StemClip,
@@ -1608,13 +1609,14 @@ function buildTrackClipAudioSegments(
     const audioDuration = typeof audioDurationByTrack === 'number'
       ? audioDurationByTrack
       : audioDurationByTrack[sourceTrackType] || fallbackAudioDuration;
-    const timelineStart = clip.start;
-    const timelineEnd = clip.start + getStemClipDuration(clip);
+    const sourceClip = resolveStemClipSourceRange(clip, audioDuration);
+    const timelineStart = sourceClip.start;
+    const timelineEnd = sourceClip.start + getStemClipDuration(sourceClip);
     if (timelineEnd <= cursor) return [];
 
     const cursorSourceOffset = Math.max(0, cursor - timelineStart);
-    const sourceStart = Math.max(clip.sourceStart, Math.min(audioDuration, clip.sourceStart + cursorSourceOffset));
-    const sourceEnd = Math.max(sourceStart, Math.min(audioDuration, clip.sourceEnd));
+    const sourceStart = Math.max(sourceClip.sourceStart, Math.min(audioDuration, sourceClip.sourceStart + cursorSourceOffset));
+    const sourceEnd = Math.max(sourceStart, Math.min(audioDuration, sourceClip.sourceEnd));
     if (sourceEnd - sourceStart <= 0.001) return [];
 
     return buildAudibleStemSegments({
@@ -1625,8 +1627,8 @@ function buildTrackClipAudioSegments(
       sourceTrackType,
       sourceStart: segment.start,
       sourceEnd: segment.end,
-      timelineStart: clip.start + (segment.start - clip.sourceStart),
-      timelineEnd: clip.start + (segment.end - clip.sourceStart),
+      timelineStart: sourceClip.start + (segment.start - sourceClip.sourceStart),
+      timelineEnd: sourceClip.start + (segment.end - sourceClip.sourceStart),
     }));
   });
 }
@@ -2529,7 +2531,7 @@ export default function StemMixerEditor({
           ? buildWaveformPeaksFromSamples(buffer.getChannelData(0), 720)
           : [];
       nextSources[stem.type] = {
-        duration: Math.max(waveform?.duration || 0, buffer?.duration || 0, duration),
+        duration: Math.max(waveform?.duration || 0, buffer?.duration || 0),
         peaks,
         label: getStemDisplayName(stem).zh,
       };
@@ -11379,14 +11381,20 @@ function WaveformTrackCanvas({
       const renderClipWaveform = (clip: StemClip) => {
         const isSelectedClip = selected && clip.id === selectedClipId;
         const clipStartX = (Math.max(0, Math.min(displayDuration, clip.start)) / displayDuration) * width;
-        const clipEndX = (Math.max(0, Math.min(displayDuration, clip.start + getStemClipDuration(clip))) / displayDuration) * width;
+        const clipSourceDuration = Math.max(
+          clipWaveformSources[clip.sourceTrackType || trackType]?.duration || 0,
+          waveform?.duration || 0,
+          buffer?.duration || 0,
+        ) || duration;
+        const sourceClip = resolveStemClipSourceRange(clip, clipSourceDuration);
+        const clipEndX = (Math.max(0, Math.min(displayDuration, sourceClip.start + getStemClipDuration(sourceClip))) / displayDuration) * width;
         const clipWidth = Math.max(0, clipEndX - clipStartX);
         if (clipWidth <= 1) return;
 
-        const sourceType = clip.sourceTrackType || trackType;
+        const sourceType = sourceClip.sourceTrackType || trackType;
         const clipSource = clipWaveformSources[sourceType];
         const sourcePeaks = clipSource?.peaks?.length ? clipSource.peaks : displayPeaks;
-        const sourceDuration = Math.max(clipSource?.duration || 0, waveform?.duration || 0, buffer?.duration || 0, duration);
+        const sourceDuration = Math.max(clipSource?.duration || 0, waveform?.duration || 0, buffer?.duration || 0) || duration;
         const clipTrackLabel = clipSource?.label || trackLabel;
         const clipBaseColor = baseColor;
         const clipWaveformColor = recording
@@ -11394,7 +11402,7 @@ function WaveformTrackCanvas({
           : muted
             ? colorWithAlpha(clipBaseColor, 0.42)
             : clipBaseColor;
-        const clipPeaks = sliceStemClipPeaks(clip, sourceDuration, sourcePeaks);
+        const clipPeaks = sliceStemClipPeaks(sourceClip, sourceDuration, sourcePeaks);
         const clipGradient = context.createLinearGradient(clipStartX, 0, clipEndX, 0);
         clipGradient.addColorStop(0, colorWithAlpha(clipBaseColor, recording ? 0.42 : isSelectedClip ? 0.48 : selected ? 0.36 : 0.24));
         clipGradient.addColorStop(0.55, colorWithAlpha(clipBaseColor, recording ? 0.34 : isSelectedClip ? 0.36 : selected ? 0.28 : 0.18));
