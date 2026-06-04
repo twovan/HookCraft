@@ -15,7 +15,6 @@ const ALLOWED_EXTENSIONS = ['mp3', 'wav'];
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
 const DEFAULT_MODEL: KieSunoModel = 'V5_5';
 const MODELS: KieSunoModel[] = ['V5_5', 'V5', 'V4_5PLUS', 'V4_5', 'V4'];
-const TEMP_BYPASS_GENERATION_CREDITS = true;
 
 function parseBoolean(value: FormDataEntryValue | null, fallback = false): boolean {
   if (value === null) return fallback;
@@ -109,9 +108,9 @@ export async function POST(req: NextRequest) {
     }
 
     const creditOperations: CreditOperationType[] = ['cover_generation'];
-    const creditService = TEMP_BYPASS_GENERATION_CREDITS ? null : new CreditService(supabaseAdmin);
+    const creditService = new CreditService(supabaseAdmin);
     let creditsConsumed = 0;
-    if (creditService && !(await creditService.hasEnoughCredits(user.id, creditOperations))) {
+    if (!(await creditService.hasEnoughCredits(user.id, creditOperations))) {
       return NextResponse.json({ error: 'Credits 余额不足，请先充值或升级套餐' }, { status: 402 });
     }
 
@@ -210,39 +209,37 @@ export async function POST(req: NextRequest) {
       throw error;
     }
 
-    if (creditService) {
-      const consumeResult = await creditService.consumeCredits(user.id, creditOperations);
-      if (!consumeResult.success) {
-        const errorMessage = getConsumeCreditsErrorMessage(consumeResult.error);
-        console.error('[kie/upload-cover] Credits consume failed:', {
-          userId: user.id,
-          operations: creditOperations,
-          error: consumeResult.error,
-          remaining: consumeResult.remaining,
-        });
+    const consumeResult = await creditService.consumeCredits(user.id, creditOperations);
+    if (!consumeResult.success) {
+      const errorMessage = getConsumeCreditsErrorMessage(consumeResult.error);
+      console.error('[kie/upload-cover] Credits consume failed:', {
+        userId: user.id,
+        operations: creditOperations,
+        error: consumeResult.error,
+        remaining: consumeResult.remaining,
+      });
 
-        await supabaseAdmin
-          .from('generation_tasks')
-          .update({
-            status: 'failed',
-            error_code: 'CREDITS_NOT_ENOUGH',
-            error_message: errorMessage,
-            credits_consumed: 0,
-            updated_at: new Date().toISOString(),
-          } as any)
-          .eq('id', localTaskId)
-          .eq('user_id', user.id);
+      await supabaseAdmin
+        .from('generation_tasks')
+        .update({
+          status: 'failed',
+          error_code: 'CREDITS_NOT_ENOUGH',
+          error_message: errorMessage,
+          credits_consumed: 0,
+          updated_at: new Date().toISOString(),
+        } as any)
+        .eq('id', localTaskId)
+        .eq('user_id', user.id);
 
-        await supabaseAdmin
-          .from('generation_batches')
-          .update({ status: 'failed', updated_at: new Date().toISOString() } as any)
-          .eq('id', batchId)
-          .eq('user_id', user.id);
+      await supabaseAdmin
+        .from('generation_batches')
+        .update({ status: 'failed', updated_at: new Date().toISOString() } as any)
+        .eq('id', batchId)
+        .eq('user_id', user.id);
 
-        return NextResponse.json({ error: errorMessage, code: consumeResult.error }, { status: 402 });
-      }
-      creditsConsumed = consumeResult.consumed;
+      return NextResponse.json({ error: errorMessage, code: consumeResult.error }, { status: 402 });
     }
+    creditsConsumed = consumeResult.consumed;
 
     await supabaseAdmin
       .from('generation_tasks')

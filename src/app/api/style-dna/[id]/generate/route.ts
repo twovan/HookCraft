@@ -3,6 +3,7 @@ import { getAuthUser } from '@/lib/supabase/auth-helpers';
 import { supabaseAdmin } from '@/lib/supabase/server';
 import { KieSunoProvider } from '@/lib/generation/KieSunoProvider';
 import { CreditService } from '@/lib/credits/CreditService';
+import { getConsumeCreditsErrorMessage } from '@/lib/credits/consumeError';
 import { StyleDnaRepository } from '@/lib/style-dna/StyleDnaRepository';
 import type { CreditOperationType } from '@/types/credits';
 import type { SunoProviderPayload } from '@/types/style-dna';
@@ -93,7 +94,19 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     const consumeResult = await creditService.consumeCredits(user.id, creditOperations);
     if (!consumeResult.success) {
-      throw new Error(consumeResult.error || 'Credits deduction failed');
+      const errorMessage = getConsumeCreditsErrorMessage(consumeResult.error);
+      await supabaseAdmin.from('generation_tasks').update({
+        status: 'failed',
+        error_code: 'CREDITS_NOT_ENOUGH',
+        error_message: errorMessage,
+        credits_consumed: 0,
+        updated_at: new Date().toISOString(),
+      } as any).eq('id', localTaskId).eq('user_id', user.id);
+      await supabaseAdmin.from('generation_batches').update({ status: 'failed', updated_at: new Date().toISOString() } as any)
+        .eq('id', batchId)
+        .eq('user_id', user.id);
+
+      return NextResponse.json({ error: errorMessage, code: consumeResult.error }, { status: 402 });
     }
 
     await supabaseAdmin.from('generation_tasks').update({

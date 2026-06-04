@@ -44,7 +44,7 @@ export async function persistCompletedCoverTracks({
 
   let taskQuery = supabaseAdmin
     .from('generation_tasks')
-    .select('id,user_id,batch_id,prompt,title,raw_audio_path,model_id,generation_type,template_id,credits_consumed')
+    .select('id,user_id,batch_id,prompt,title,raw_audio_path,model_id,generation_type,template_id,credits_consumed,status,error_code')
     .eq('id', localTaskId) as any;
 
   if (userId) {
@@ -56,6 +56,10 @@ export async function persistCompletedCoverTracks({
   if (baseTaskError || !baseTask) {
     console.error('[kie/upload-cover] Base task lookup failed:', baseTaskError);
     return { batchId: null, savedCount: 0 };
+  }
+
+  if (baseTask.status === 'failed' && baseTask.error_code === 'CREDITS_NOT_ENOUGH') {
+    return { batchId: baseTask.batch_id || null, savedCount: 0 };
   }
 
   const now = new Date().toISOString();
