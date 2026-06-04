@@ -286,7 +286,6 @@ export default function PricingContent({ tiers, initialCreditsPacks }: PricingCo
           height: 3px;
           background: linear-gradient(90deg, var(--hc-cyan), var(--hc-lime), var(--hc-coral));
           opacity: .58;
-          border-radius: var(--hc-radius-lg) var(--hc-radius-lg) 0 0;
           pointer-events: none;
         }
 
