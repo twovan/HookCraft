@@ -427,7 +427,27 @@ function snapStemClipEdgeToNeighborEdges(
   return Number(Math.max(0, Math.min(duration, bestTime)).toFixed(3));
 }
 
-type TransportIconName = 'skipStart' | 'skipEnd' | 'back' | 'forward' | 'play' | 'pause' | 'stop' | 'collapse' | 'expand' | 'chevronRight' | 'chevronDown';
+type TransportIconName =
+  | 'skipStart'
+  | 'skipEnd'
+  | 'back'
+  | 'forward'
+  | 'play'
+  | 'pause'
+  | 'stop'
+  | 'collapse'
+  | 'expand'
+  | 'chevronRight'
+  | 'chevronDown'
+  | 'undo'
+  | 'redo'
+  | 'return'
+  | 'save'
+  | 'export'
+  | 'panel'
+  | 'fx'
+  | 'download'
+  | 'retry';
 
 function TransportIcon({ name }: { name: TransportIconName }) {
   const common = {
@@ -476,6 +496,68 @@ function TransportIcon({ name }: { name: TransportIconName }) {
       {name === 'expand' && <path {...common} d="M7 9l5 5 5-5" />}
       {name === 'chevronRight' && <path {...common} d="M9 6l6 6-6 6" />}
       {name === 'chevronDown' && <path {...common} d="M6 9l6 6 6-6" />}
+      {name === 'undo' && (
+        <>
+          <path {...common} d="M9 7H4v5" />
+          <path {...common} d="M4 12a8 8 0 1 0 2.34-5.66L4 8.7" />
+        </>
+      )}
+      {name === 'redo' && (
+        <>
+          <path {...common} d="M15 7h5v5" />
+          <path {...common} d="M20 12a8 8 0 1 1-2.34-5.66L20 8.7" />
+        </>
+      )}
+      {name === 'return' && (
+        <>
+          <path {...common} d="M15 18l-6-6 6-6" />
+          <path {...common} d="M9 12h11" />
+          <path {...common} d="M4 5v14" />
+        </>
+      )}
+      {name === 'save' && (
+        <>
+          <path {...common} d="M5 4h12l2 2v14H5z" />
+          <path {...common} d="M8 4v6h8V4" />
+          <path {...common} d="M8 16h8" />
+        </>
+      )}
+      {name === 'export' && (
+        <>
+          <path {...common} d="M12 4v10" />
+          <path {...common} d="M8 8l4-4 4 4" />
+          <path {...common} d="M5 14v5h14v-5" />
+        </>
+      )}
+      {name === 'panel' && (
+        <>
+          <path {...common} d="M4 5h16v14H4z" />
+          <path {...common} d="M15 5v14" />
+          <path {...common} d="M8 9h3" />
+          <path {...common} d="M8 13h3" />
+        </>
+      )}
+      {name === 'fx' && (
+        <>
+          <path {...common} d="M4 18l6-12" />
+          <path {...common} d="M6 8h8" />
+          <path {...common} d="M14 14l6 6" />
+          <path {...common} d="M20 14l-6 6" />
+        </>
+      )}
+      {name === 'download' && (
+        <>
+          <path {...common} d="M12 4v10" />
+          <path {...common} d="M8 10l4 4 4-4" />
+          <path {...common} d="M5 18h14" />
+        </>
+      )}
+      {name === 'retry' && (
+        <>
+          <path {...common} d="M20 12a8 8 0 1 1-2.34-5.66" />
+          <path {...common} d="M20 4v6h-6" />
+        </>
+      )}
     </svg>
   );
 }
@@ -5942,7 +6024,8 @@ export default function StemMixerEditor({
             title="回到上一步编辑"
             style={historyButtonStyle(canUseUndoRedo && canUndo)}
           >
-            上一步
+            <TransportIcon name="undo" />
+            <span>上一步</span>
           </button>
           <button
             type="button"
@@ -5951,7 +6034,8 @@ export default function StemMixerEditor({
             title="前进到下一步编辑"
             style={historyButtonStyle(canUseUndoRedo && canRedo)}
           >
-            下一步
+            <TransportIcon name="redo" />
+            <span>下一步</span>
           </button>
           <button
             type="button"
@@ -5960,10 +6044,12 @@ export default function StemMixerEditor({
             title="自动保存当前项目后返回我的作品"
             style={ghostButtonStyle}
           >
-            返回
+            <TransportIcon name="return" />
+            <span>返回</span>
           </button>
           <button type="button" onClick={saveEditState} disabled={isSaving} style={primarySmallButtonStyle}>
-            {isSaving ? '保存中' : '保存'}
+            <TransportIcon name="save" />
+            <span>{isSaving ? '保存中' : '保存'}</span>
           </button>
           {inspectorCollapsed && (
             <button
@@ -5975,7 +6061,8 @@ export default function StemMixerEditor({
               }}
               style={ghostButtonStyle}
             >
-              导出
+              <TransportIcon name="export" />
+              <span>导出</span>
             </button>
           )}
         </div>
@@ -6090,7 +6177,8 @@ export default function StemMixerEditor({
               onClick={() => setInspectorCollapsed((value) => !value)}
               style={inspectorCollapseButtonStyle(inspectorCollapsed)}
             >
-              {inspectorCollapsed ? '展开' : '收起'}
+              <TransportIcon name="panel" />
+              <span>{inspectorCollapsed ? '展开' : '收起'}</span>
             </button>
           </div>
           {!inspectorCollapsed && <div style={inspectorTabsStyle}>
@@ -7466,7 +7554,8 @@ export default function StemMixerEditor({
                         setSaveStatus(`已打开“${displayName.zh}”的混音控制。`);
                       }}
                     >
-                      +Fx
+                      <TransportIcon name="fx" />
+                      <span>FX</span>
                     </button>
                     <div style={trackMiniActionsStyle}>
                       {editorFeatures.export.wavStems && <button
@@ -7476,7 +7565,8 @@ export default function StemMixerEditor({
                         onClick={() => void exportSingleStem(stem)}
                         style={trackMiniActionStyle(Boolean(!audioBuffer || exportingStemType === stem.type))}
                       >
-                        {exportingStemType === stem.type ? '...' : 'WAV'}
+                        <TransportIcon name="download" />
+                        <span>{exportingStemType === stem.type ? '...' : 'WAV'}</span>
                       </button>}
                       {(audioStatus === 'failed' || audioStatus === 'pending') && (
                         <button
@@ -7485,7 +7575,8 @@ export default function StemMixerEditor({
                           onClick={() => void retrySingleStemAudio(stem)}
                           style={trackMiniActionStyle(isAudioRetrying || loadingCount > 0)}
                         >
-                          重试
+                          <TransportIcon name="retry" />
+                          <span>重试</span>
                         </button>
                       )}
                     </div>
@@ -8038,6 +8129,10 @@ function editorButtonChromeStyle({
   const colors = palette[tone];
 
   return {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: compact ? 4 : 6,
     minHeight: compact ? 24 : 32,
     borderRadius: round ? 999 : 8,
     border: `1px solid ${disabled ? 'rgba(48, 52, 76, 0.72)' : colors.border}`,
@@ -8186,6 +8281,7 @@ const editorActionStyle: CSSProperties = {
 
 const primarySmallButtonStyle: CSSProperties = {
   ...editorButtonChromeStyle({ tone: 'primary' }),
+  minWidth: 76,
   minHeight: 32,
   padding: '6px 11px',
   fontSize: 12,
@@ -8302,6 +8398,7 @@ const editorProjectMetaStyle: CSSProperties = {
 
 const ghostButtonStyle: CSSProperties = {
   ...editorButtonChromeStyle({ tone: 'neutral' }),
+  minWidth: 70,
   minHeight: 32,
   padding: '6px 11px',
   fontSize: 12,
@@ -8311,6 +8408,7 @@ const ghostButtonStyle: CSSProperties = {
 function historyButtonStyle(enabled: boolean): CSSProperties {
   return {
     ...ghostButtonStyle,
+    minWidth: 82,
     opacity: enabled ? 1 : 0.45,
     cursor: enabled ? 'pointer' : 'not-allowed',
   };
@@ -8676,6 +8774,7 @@ function inspectorCollapseButtonStyle(collapsed: boolean): CSSProperties {
     ...editorButtonChromeStyle({ tone: 'purple', compact: true, round: collapsed, active: collapsed }),
     borderRadius: collapsed ? 999 : 7,
     minHeight: collapsed ? 28 : 26,
+    minWidth: collapsed ? 72 : 68,
     padding: collapsed ? '0 8px' : '0 9px',
     fontSize: 11,
     fontWeight: 900,
@@ -10761,6 +10860,7 @@ const trackFxButtonStyle: CSSProperties = {
   gridRow: '2',
   justifySelf: 'start',
   ...editorButtonChromeStyle({ tone: 'neutral', compact: true, round: true }),
+  minWidth: 52,
   minHeight: 20,
   padding: '0 7px',
   color: '#f8fafc',
@@ -10780,6 +10880,7 @@ const trackMiniActionsStyle: CSSProperties = {
 function trackMiniActionStyle(disabled: boolean): CSSProperties {
   return {
     ...editorButtonChromeStyle({ tone: 'purple', compact: true, round: true, disabled }),
+    minWidth: 58,
     minHeight: 20,
     padding: '0 7px',
     fontSize: 10,
