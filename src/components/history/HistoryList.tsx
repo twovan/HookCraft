@@ -285,7 +285,9 @@ export default function HistoryList({
                   {batch.canEditSong && batch.taskId && (
                     <>
                       {batch.hasStemCache && (
-                        <span style={stemCacheBadgeStyle}>{formatStemCacheBadge(batch.stemCacheModes)}</span>
+                        <span style={stemCacheBadgeStyle(resolveStemCacheBadgeTone(batch.stemCacheModes))}>
+                          {formatStemCacheBadge(batch.stemCacheModes)}
+                        </span>
                       )}
                       {batch.stemEditSavedAt && (
                         <span style={stemEditSavedBadgeStyle}>
@@ -365,7 +367,9 @@ export default function HistoryList({
                           <span key={tag} style={tagStyle}>{tag}</span>
                         ))}
                         {version.hasStemCache && (
-                          <span style={stemCacheBadgeStyle}>{formatStemCacheBadge(version.stemCacheModes)}</span>
+                          <span style={stemCacheBadgeStyle(resolveStemCacheBadgeTone(version.stemCacheModes))}>
+                            {formatStemCacheBadge(version.stemCacheModes)}
+                          </span>
                         )}
                         {version.stemEditSavedAt && (
                           <span style={stemEditSavedBadgeStyle}>
@@ -445,6 +449,16 @@ function formatStemCacheBadge(modes?: string[]) {
   if (hasBasic) return '基础分轨已缓存';
   if (hasPro) return '高级分轨已缓存';
   return '分轨已缓存';
+}
+
+function resolveStemCacheBadgeTone(modes?: string[]): 'basic' | 'pro' | 'both' | 'legacy' {
+  const hasBasic = modes?.includes('basic') === true;
+  const hasPro = modes?.includes('pro') === true;
+
+  if (hasBasic && hasPro) return 'both';
+  if (hasBasic) return 'basic';
+  if (hasPro) return 'pro';
+  return 'legacy';
 }
 
 const gridStyle = (showDetail: boolean): CSSProperties => ({
@@ -609,16 +623,51 @@ const editSongLinkStyle: CSSProperties = {
   whiteSpace: 'nowrap',
 };
 
-const stemCacheBadgeStyle: CSSProperties = {
-  border: '1px solid rgba(82, 214, 198, 0.34)',
-  background: 'rgba(82, 214, 198, 0.10)',
-  color: 'var(--hc-cyan)',
-  borderRadius: 999,
-  padding: '4px 8px',
-  fontSize: 11,
-  fontWeight: 900,
-  whiteSpace: 'nowrap',
-};
+function stemCacheBadgeStyle(tone: 'basic' | 'pro' | 'both' | 'legacy'): CSSProperties {
+  const palette = {
+    basic: {
+      border: 'rgba(72, 201, 255, 0.46)',
+      background: 'linear-gradient(135deg, rgba(47, 129, 247, 0.16), rgba(82, 214, 198, 0.11))',
+      color: '#8bdcff',
+      shadow: '0 0 18px rgba(72, 201, 255, 0.12)',
+    },
+    pro: {
+      border: 'rgba(206, 255, 53, 0.44)',
+      background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.18), rgba(206, 255, 53, 0.12))',
+      color: '#e7ff72',
+      shadow: '0 0 18px rgba(206, 255, 53, 0.14)',
+    },
+    both: {
+      border: 'rgba(142, 211, 255, 0.48)',
+      background: 'linear-gradient(90deg, rgba(47, 129, 247, 0.18), rgba(82, 214, 198, 0.10) 46%, rgba(206, 255, 53, 0.16))',
+      color: '#f0ffad',
+      shadow: '0 0 20px rgba(82, 214, 198, 0.12), 0 0 18px rgba(206, 255, 53, 0.10)',
+    },
+    legacy: {
+      border: 'rgba(82, 214, 198, 0.34)',
+      background: 'rgba(82, 214, 198, 0.10)',
+      color: 'var(--hc-cyan)',
+      shadow: 'none',
+    },
+  }[tone];
+
+  return {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 5,
+    border: `1px solid ${palette.border}`,
+    background: palette.background,
+    color: palette.color,
+    borderRadius: 999,
+    padding: '4px 9px',
+    fontSize: 11,
+    fontWeight: 950,
+    lineHeight: 1,
+    letterSpacing: 0,
+    whiteSpace: 'nowrap',
+    boxShadow: palette.shadow,
+  };
+}
 
 const stemEditSavedBadgeStyle: CSSProperties = {
   border: '1px solid rgba(206, 255, 53, 0.28)',
