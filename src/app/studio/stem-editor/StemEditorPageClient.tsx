@@ -42,6 +42,18 @@ interface StemEditorJob {
   separationMode?: StemSeparationMode | null;
 }
 
+interface StemModeCacheEntry {
+  jobId: string;
+  cachedStemCount: number;
+  editSavedAt?: string | null;
+  updatedAt?: string | null;
+}
+
+interface StemModeCacheStatus {
+  basic?: StemModeCacheEntry | null;
+  pro?: StemModeCacheEntry | null;
+}
+
 const TEXT = {
   emptyResult: '\u5206\u8f68\u7ed3\u679c\u4e3a\u7a7a\uff0c\u8bf7\u91cd\u65b0\u8bf7\u6c42 API \u5206\u6790\u3002',
   loadStemFailed: '\u52a0\u8f7d\u5206\u8f68\u5931\u8d25',
@@ -100,6 +112,16 @@ const TEXT = {
   proEditorDesc: '12 \u7c7b\u4e13\u4e1a\u5206\u8f68\u7ed3\u679c\uff0c\u89e3\u9501 WAV \u548c\u9ad8\u7ea7\u5236\u4f5c\u529f\u80fd\u3002',
   startBasic: '\u5f00\u59cb\u57fa\u7840\u7f16\u8f91',
   startPro: '\u5f00\u59cb\u4e13\u4e1a\u7f16\u8f91',
+  enterBasic: '\u8fdb\u5165\u57fa\u7840\u7f16\u8f91',
+  enterPro: '\u8fdb\u5165\u4e13\u4e1a\u7f16\u8f91',
+  analyzeBasic: '\u5206\u6790\u5e76\u8fdb\u5165\u57fa\u7840\u7f16\u8f91',
+  analyzePro: '\u5206\u6790\u5e76\u8fdb\u5165\u4e13\u4e1a\u7f16\u8f91',
+  basicCacheReady: '\u57fa\u7840\u7f13\u5b58\u53ef\u7528',
+  proCacheReady: '\u9ad8\u7ea7\u7f13\u5b58\u53ef\u7528',
+  needsAnalysis: '\u9700\u8981\u5206\u6790',
+  checkingModeCache: '\u68c0\u67e5\u7f13\u5b58\u4e2d',
+  confirmBasicAnalysis: '\u5f53\u524d\u6b4c\u66f2\u5df2\u6709\u9ad8\u7ea7\u7f13\u5b58\uff0c\u57fa\u7840\u7f16\u8f91\u9700\u8981\u5355\u72ec\u521b\u5efa 2 \u8f68\u5206\u6790\u7ed3\u679c\u3002\u786e\u8ba4\u8981\u5206\u6790\u5e76\u6263\u9664\u57fa\u7840\u5206\u8f68\u79ef\u5206\u5417\uff1f',
+  confirmProAnalysis: '\u5f53\u524d\u6b4c\u66f2\u5df2\u6709\u57fa\u7840\u7f13\u5b58\uff0c\u4e13\u4e1a\u7f16\u8f91\u9700\u8981\u5355\u72ec\u521b\u5efa\u9ad8\u7ea7\u5206\u6790\u7ed3\u679c\u3002\u786e\u8ba4\u8981\u5206\u6790\u5e76\u6263\u9664\u9ad8\u7ea7\u5206\u8f68\u79ef\u5206\u5417\uff1f',
   proLocked: '\u5347\u7ea7 Pro \u89e3\u9501',
   freeLocked: '\u8bf7\u5347\u7ea7\u4f1a\u5458\u540e\u4f7f\u7528\u6b4c\u66f2\u7f16\u8f91',
 };
@@ -122,6 +144,8 @@ export default function StemEditorPageClient() {
   const [phase, setPhase] = useState<LoadingPhase>('checking-cache');
   const [error, setError] = useState<string | null>(null);
   const [featureSettings, setFeatureSettings] = useState<StemEditorFeatureSettings>(DEFAULT_STEM_EDITOR_FEATURE_SETTINGS);
+  const [modeCacheStatus, setModeCacheStatus] = useState<StemModeCacheStatus>({});
+  const [modeCacheLoading, setModeCacheLoading] = useState(false);
   const [selectedSeparationMode, setSelectedSeparationMode] = useState<StemSeparationMode | null>(
     initialSeparationMode,
   );
@@ -222,13 +246,14 @@ export default function StemEditorPageClient() {
     applyJobData(data);
   }, [applyJobData, redirectToLogin]);
 
-  const createJob = useCallback(async (force = false) => {
+  const createJob = useCallback(async (force = false, modeOverride?: StemSeparationMode) => {
     if (!generationTaskId) {
       setError(TEXT.missingTaskId);
       setPhase('failed');
       return;
     }
-    if (!selectedSeparationMode) {
+    const requestedMode = modeOverride || selectedSeparationMode;
+    if (!requestedMode) {
       setPhase('checking-cache');
       return;
     }
@@ -244,7 +269,7 @@ export default function StemEditorPageClient() {
     const res = await fetch('/api/stems/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ generationTaskId, force, separationMode: selectedSeparationMode }),
+      body: JSON.stringify({ generationTaskId, force, separationMode: requestedMode }),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -272,6 +297,37 @@ export default function StemEditorPageClient() {
     }
   }, [applyJobData, generationTaskId, redirectToLogin, refreshJob, selectedSeparationMode]);
 
+  const handleModeSelect = useCallback((mode: StemSeparationMode) => {
+    const cacheKey = mode === 'split_stem' ? 'pro' : 'basic';
+    const otherCacheKey = mode === 'split_stem' ? 'basic' : 'pro';
+    const cacheEntry = modeCacheStatus[cacheKey];
+    const hasOtherCache = Boolean(modeCacheStatus[otherCacheKey]);
+
+    if (!cacheEntry?.jobId && hasOtherCache) {
+      const message = mode === 'split_stem' ? TEXT.confirmProAnalysis : TEXT.confirmBasicAnalysis;
+      if (!window.confirm(message)) return;
+    }
+
+    persistSeparationModeInUrl(mode);
+    setSelectedSeparationMode(mode);
+    setError(null);
+
+    if (cacheEntry?.jobId) {
+      requestedRef.current = true;
+      void refreshJob(cacheEntry.jobId).catch((err) => {
+        setError(err instanceof Error ? err.message : TEXT.loadEditorFailed);
+        setPhase('failed');
+      });
+      return;
+    }
+
+    requestedRef.current = true;
+    void createJob(false, mode).catch((err) => {
+      setError(err instanceof Error ? err.message : TEXT.loadEditorFailed);
+      setPhase('failed');
+    });
+  }, [createJob, modeCacheStatus, persistSeparationModeInUrl, refreshJob]);
+
   useEffect(() => {
     void fetchMembership();
     void fetch('/api/studio/settings', { cache: 'no-store' })
@@ -283,6 +339,26 @@ export default function StemEditorPageClient() {
         setFeatureSettings(DEFAULT_STEM_EDITOR_FEATURE_SETTINGS);
       });
   }, [fetchMembership]);
+
+  useEffect(() => {
+    if (!generationTaskId) return;
+
+    setModeCacheLoading(true);
+    void fetch(`/api/stems/cache-status?generationTaskId=${encodeURIComponent(generationTaskId)}`, { cache: 'no-store' })
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        setModeCacheStatus({
+          basic: data?.modes?.basic ?? null,
+          pro: data?.modes?.pro ?? null,
+        });
+      })
+      .catch(() => {
+        setModeCacheStatus({});
+      })
+      .finally(() => {
+        setModeCacheLoading(false);
+      });
+  }, [generationTaskId]);
 
   useEffect(() => {
     if (requestedRef.current) return;
@@ -446,11 +522,9 @@ export default function StemEditorPageClient() {
                 <ModeSelectionPanel
                   editorPanel={editorPanel}
                   featureSettings={featureSettings}
-                  onSelect={(mode) => {
-                    persistSeparationModeInUrl(mode);
-                    setSelectedSeparationMode(mode);
-                    requestedRef.current = false;
-                  }}
+                  modeCacheStatus={modeCacheStatus}
+                  modeCacheLoading={modeCacheLoading}
+                  onSelect={handleModeSelect}
                 />
               )}
               {selectedSeparationMode && (
@@ -809,10 +883,14 @@ function normalizeSeparationMode(value: unknown): StemSeparationMode | null {
 function ModeSelectionPanel({
   editorPanel,
   featureSettings,
+  modeCacheStatus,
+  modeCacheLoading,
   onSelect,
 }: {
   editorPanel: EditorPanelAccess;
   featureSettings: StemEditorFeatureSettings;
+  modeCacheStatus: StemModeCacheStatus;
+  modeCacheLoading: boolean;
   onSelect: (mode: StemSeparationMode) => void;
 }) {
   const basicSettings = featureSettings.basicEditor;
@@ -827,6 +905,8 @@ function ModeSelectionPanel({
   const showBasicCreditConfirm = basicSettings.modes.showCreditConfirm;
   const showProCreditConfirm = proSettings.modes.showCreditConfirm;
   const tierLabel = editorPanel === 'proEditor' ? '专业编辑器' : editorPanel === 'basicEditor' ? '基础编辑器' : '未开通会员';
+  const hasBasicCache = Boolean(modeCacheStatus.basic?.jobId);
+  const hasProCache = Boolean(modeCacheStatus.pro?.jobId);
 
   return (
     <div style={modePanelStyle}>
@@ -844,14 +924,17 @@ function ModeSelectionPanel({
       <div style={modeGridStyle}>
         <button
           type="button"
-          disabled={!canUseBasic}
+          disabled={!canUseBasic || modeCacheLoading}
           onClick={() => onSelect('separate_vocal')}
-          style={modeCardStyle(!canUseBasic, 'basic')}
+          style={modeCardStyle(!canUseBasic || modeCacheLoading, 'basic')}
         >
           <div style={modeCardTopStyle}>
             <span style={modePlanPillStyle('basic')}>Plus</span>
             <span style={modeTrackCountStyle}>2 轨</span>
           </div>
+          <span style={modeCachePillStyle(hasBasicCache ? 'basic' : 'empty')}>
+            {modeCacheLoading ? TEXT.checkingModeCache : hasBasicCache ? TEXT.basicCacheReady : TEXT.needsAnalysis}
+          </span>
           <strong style={modeCardTitleStyle}>{TEXT.basicEditor}</strong>
           <span style={modeCardDescriptionStyle}>{TEXT.basicEditorDesc}</span>
           <div style={modeFeatureListStyle}>
@@ -859,19 +942,25 @@ function ModeSelectionPanel({
             <span>片段剪辑</span>
             <span>MP3 导出</span>
           </div>
-          {showBasicCreditConfirm && canUseBasic && <small style={modeHintStyle}>开始前会确认积分消耗</small>}
-          <em style={modeActionStyle(!canUseBasic)}>{canUseBasic ? TEXT.startBasic : TEXT.freeLocked}</em>
+          {showBasicCreditConfirm && canUseBasic && !hasBasicCache && <small style={modeHintStyle}>开始前会确认积分消耗</small>}
+          {hasProCache && !hasBasicCache && canUseBasic && <small style={modeHintStyle}>已有高级缓存，基础编辑需单独分析</small>}
+          <em style={modeActionStyle(!canUseBasic || modeCacheLoading)}>
+            {modeCacheLoading ? TEXT.checkingModeCache : canUseBasic ? hasBasicCache ? TEXT.enterBasic : TEXT.analyzeBasic : TEXT.freeLocked}
+          </em>
         </button>
         <button
           type="button"
-          disabled={!canUsePro}
+          disabled={!canUsePro || modeCacheLoading}
           onClick={() => onSelect('split_stem')}
-          style={modeCardStyle(!canUsePro, 'pro')}
+          style={modeCardStyle(!canUsePro || modeCacheLoading, 'pro')}
         >
           <div style={modeCardTopStyle}>
             <span style={modePlanPillStyle('pro')}>Pro</span>
             <span style={modeTrackCountStyle}>分析结果分轨</span>
           </div>
+          <span style={modeCachePillStyle(hasProCache ? 'pro' : 'empty')}>
+            {modeCacheLoading ? TEXT.checkingModeCache : hasProCache ? TEXT.proCacheReady : TEXT.needsAnalysis}
+          </span>
           <strong style={modeCardTitleStyle}>{TEXT.proEditor}</strong>
           <span style={modeCardDescriptionStyle}>{TEXT.proEditorDesc}</span>
           <div style={modeFeatureListStyle}>
@@ -879,8 +968,11 @@ function ModeSelectionPanel({
             <span>高级制作</span>
             <span>WAV / 批量导出</span>
           </div>
-          {showProCreditConfirm && canUsePro && <small style={modeHintStyle}>开始前会确认积分消耗</small>}
-          <em style={modeActionStyle(!canUsePro)}>{canUsePro ? TEXT.startPro : showUpgradePrompt ? TEXT.proLocked : '当前未开放'}</em>
+          {showProCreditConfirm && canUsePro && !hasProCache && <small style={modeHintStyle}>开始前会确认积分消耗</small>}
+          {hasBasicCache && !hasProCache && canUsePro && <small style={modeHintStyle}>已有基础缓存，高级编辑需单独分析</small>}
+          <em style={modeActionStyle(!canUsePro || modeCacheLoading)}>
+            {modeCacheLoading ? TEXT.checkingModeCache : canUsePro ? hasProCache ? TEXT.enterPro : TEXT.analyzePro : showUpgradePrompt ? TEXT.proLocked : '当前未开放'}
+          </em>
         </button>
       </div>
     </div>
@@ -1252,9 +1344,9 @@ const modeGridStyle: CSSProperties = {
 function modeCardStyle(disabled: boolean, variant: 'basic' | 'pro'): CSSProperties {
   return {
     position: 'relative',
-    minHeight: 248,
+    minHeight: 276,
     display: 'grid',
-    gridTemplateRows: 'auto auto auto 1fr auto auto',
+    gridTemplateRows: 'auto auto auto auto 1fr auto auto',
     alignContent: 'stretch',
     gap: 12,
     borderRadius: 14,
@@ -1306,6 +1398,33 @@ const modeTrackCountStyle: CSSProperties = {
   fontSize: 12,
   fontWeight: 900,
 };
+
+function modeCachePillStyle(tone: 'basic' | 'pro' | 'empty'): CSSProperties {
+  return {
+    justifySelf: 'start',
+    display: 'inline-flex',
+    alignItems: 'center',
+    minHeight: 24,
+    borderRadius: 999,
+    border: tone === 'empty'
+      ? '1px solid rgba(148, 163, 184, 0.28)'
+      : tone === 'pro'
+        ? '1px solid rgba(206, 255, 53, 0.42)'
+        : '1px solid rgba(82, 214, 198, 0.42)',
+    background: tone === 'empty'
+      ? 'rgba(15, 23, 42, 0.72)'
+      : tone === 'pro'
+        ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.17), rgba(206, 255, 53, 0.11))'
+        : 'linear-gradient(135deg, rgba(47, 129, 247, 0.16), rgba(82, 214, 198, 0.11))',
+    color: tone === 'empty' ? '#a7b2cc' : tone === 'pro' ? '#e7ff72' : '#8bdcff',
+    padding: '4px 9px',
+    fontSize: 11,
+    lineHeight: 1,
+    fontWeight: 950,
+    letterSpacing: 0,
+    boxShadow: tone === 'empty' ? 'none' : '0 0 18px rgba(82, 214, 198, 0.09)',
+  };
+}
 
 const modeCardTitleStyle: CSSProperties = {
   color: 'inherit',

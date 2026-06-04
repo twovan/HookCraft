@@ -294,7 +294,7 @@ export default function HistoryList({
                           最近保存 {formatEditSavedAt(batch.stemEditSavedAt)}
                         </span>
                       )}
-                      <Link href={buildStemEditorHref(batch.taskId, batch.stemJobId)} style={editSongLinkStyle}>
+                      <Link href={buildStemEditorHref(batch.taskId)} style={editSongLinkStyle}>
                         编辑歌曲
                       </Link>
                     </>
@@ -435,9 +435,8 @@ export default function HistoryList({
   );
 }
 
-function buildStemEditorHref(taskId: string, stemJobId?: string | null) {
+function buildStemEditorHref(taskId: string) {
   const params = new URLSearchParams({ generationTaskId: taskId });
-  if (stemJobId) params.set('jobId', stemJobId);
   return `/studio/stem-editor?${params.toString()}`;
 }
 
