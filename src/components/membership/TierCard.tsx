@@ -103,9 +103,7 @@ export default function TierCard({
       style={{
         ...cardStyle,
         borderColor: hovered || isRecommended ? 'rgba(206, 255, 53, 0.52)' : 'var(--hc-line)',
-        transform: hovered
-          ? isRecommended ? 'translateY(-14px)' : 'translateY(-6px)'
-          : isRecommended ? 'translateY(-10px)' : 'none',
+        transform: hovered ? 'translateY(-6px)' : 'none',
         boxShadow: hovered ? '0 24px 70px rgba(0, 0, 0, 0.36)' : 'var(--hc-shadow)',
       }}
     >
