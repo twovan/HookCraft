@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeEditState } from './route';
+import { normalizeEditState } from '@/lib/stems/stemEditStatePayload';
 
 describe('stem edit-state route normalization', () => {
   it('persists an explicit empty clip list so deleted clips stay deleted', () => {
