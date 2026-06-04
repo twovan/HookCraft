@@ -19,6 +19,7 @@ import StemMixerEditor, {
   type EditableStem,
   type StemEditState,
 } from '@/components/studio/StemMixerEditor';
+import { buildStemEditorUrlWithMode } from '@/lib/stems/stemEditorUrl';
 
 type StemEditorStatus = 'creating' | 'queued' | 'processing' | 'completed' | 'failed';
 type LoadingPhase =
@@ -135,6 +136,15 @@ export default function StemEditorPageClient() {
     : featureSettings.basicEditor;
   const canForceRefresh = activeFeatureSettings.modes.allowForceRefresh;
 
+  const persistSeparationModeInUrl = useCallback((mode: StemSeparationMode) => {
+    if (typeof window === 'undefined') return;
+    window.history.replaceState(
+      window.history.state,
+      '',
+      buildStemEditorUrlWithMode(window.location.href, mode),
+    );
+  }, []);
+
   const redirectToLogin = useCallback(() => {
     setError(TEXT.authExpired);
     setPhase('failed');
@@ -158,7 +168,10 @@ export default function StemEditorPageClient() {
       separationMode: normalizeSeparationMode(data.separationMode),
     });
     const nextMode = normalizeSeparationMode(data.separationMode);
-    if (nextMode) setSelectedSeparationMode(nextMode);
+    if (nextMode) {
+      setSelectedSeparationMode(nextMode);
+      persistSeparationModeInUrl(nextMode);
+    }
 
     if (data.status === 'completed' && stems.length > 0) {
       setError(null);
@@ -183,7 +196,7 @@ export default function StemEditorPageClient() {
     if (data.status === 'failed') {
       setPhase('failed');
     }
-  }, []);
+  }, [persistSeparationModeInUrl]);
 
   const refreshJob = useCallback(async (jobId: string) => {
     setPhase((current) => current === 'api-processing' ? 'api-processing' : 'reading-cache');
@@ -428,6 +441,7 @@ export default function StemEditorPageClient() {
                   editorPanel={editorPanel}
                   featureSettings={featureSettings}
                   onSelect={(mode) => {
+                    persistSeparationModeInUrl(mode);
                     setSelectedSeparationMode(mode);
                     requestedRef.current = false;
                   }}
