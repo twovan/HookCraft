@@ -72,6 +72,7 @@ function normalizeMutedRanges(value: unknown) {
 
 function normalizeTrackClips(value: unknown) {
   if (!Array.isArray(value)) return undefined;
+  if (value.length === 0) return [];
 
   const clips = value
     .map((clip, index) => {
@@ -250,7 +251,7 @@ function normalizeDeletedTrackTypes(value: unknown) {
     .slice(0, 64);
 }
 
-function normalizeEditState(value: unknown) {
+export function normalizeEditState(value: unknown) {
   const editState = value && typeof value === 'object'
     ? value as Record<string, unknown>
     : null;
