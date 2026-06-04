@@ -37,6 +37,28 @@ export function getStemClipDuration(clip: StemClip) {
   return Math.max(0, clip.sourceEnd - clip.sourceStart);
 }
 
+export function getStemClipTimelineEnd(clip: StemClip) {
+  return Math.max(0, clip.start) + getStemClipDuration(clip);
+}
+
+export function resolveStemClipTimelineDuration(
+  value: {
+    clips?: StemClip[] | null;
+    trimEnd?: number | null;
+  } | undefined | null,
+  fallbackDuration = 0,
+) {
+  const safeFallbackDuration = Number.isFinite(fallbackDuration) ? Math.max(0, fallbackDuration) : 0;
+  const clipTimelineEnd = Array.isArray(value?.clips)
+    ? value.clips.reduce((maxEnd, clip) => Math.max(maxEnd, getStemClipTimelineEnd(clip)), 0)
+    : 0;
+  const trimEnd = typeof value?.trimEnd === 'number' && Number.isFinite(value.trimEnd)
+    ? Math.max(0, value.trimEnd)
+    : 0;
+
+  return Math.max(safeFallbackDuration, clipTimelineEnd, trimEnd);
+}
+
 export function resolveStemClipSourceRange(clip: StemClip, sourceDuration: number): StemClip {
   const safeSourceDuration = Math.max(0, Number.isFinite(sourceDuration) ? sourceDuration : 0);
   if (safeSourceDuration <= 0) return clip;

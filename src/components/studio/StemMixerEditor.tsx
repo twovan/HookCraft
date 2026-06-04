@@ -83,6 +83,7 @@ import {
   resizeStemClipEdge,
   resolveStemClipDragTarget,
   resolveStemClipSourceRange,
+  resolveStemClipTimelineDuration,
   sliceStemClipPeaks,
   splitStemClipAtTime,
   type StemClip,
@@ -781,9 +782,10 @@ function createTrackState(stems: EditableStem[], editState?: StemEditState | nul
   return Object.fromEntries(stems.map((stem) => {
     const savedState = editState?.tracks?.[stem.type];
     const stemDuration = stem.waveform?.duration || fallbackDuration;
+    const trackDuration = resolveStemClipTimelineDuration(savedState, stemDuration);
     return [
       stem.type,
-      savedState ? normalizeTrackState(savedState, stemDuration) : defaultTrackState(),
+      savedState ? normalizeTrackState(savedState, trackDuration) : defaultTrackState(),
     ];
   })) as Record<string, StemTrackState>;
 }
@@ -1524,6 +1526,15 @@ function getInitialWaveformDuration(stems: EditableStem[]) {
   ), 0);
 }
 
+function getInitialTimelineDuration(stems: EditableStem[], editState?: StemEditState | null) {
+  const waveformDuration = getInitialWaveformDuration(stems);
+  if (!editState?.tracks) return waveformDuration;
+
+  return Object.values(editState.tracks).reduce((maxDuration, state) => (
+    Math.max(maxDuration, resolveStemClipTimelineDuration(state, waveformDuration))
+  ), waveformDuration);
+}
+
 function clampTrimEdge(
   edge: 'start' | 'end',
   value: number,
@@ -1776,6 +1787,7 @@ export default function StemMixerEditor({
   const autoSaveRetryAttemptRef = useRef(0);
   const skipNextAutoSaveRef = useRef(true);
   const lastAutoSaveSignatureRef = useRef<string | null>(null);
+  const lastHandledSaveRequestVersionRef = useRef(0);
   const currentEditStateRef = useRef<StemEditState | null>(null);
   const undoStackRef = useRef<StemEditorHistorySnapshot[]>([]);
   const redoStackRef = useRef<StemEditorHistorySnapshot[]>([]);
@@ -1833,7 +1845,7 @@ export default function StemMixerEditor({
   const [masterState, setMasterState] = useState<StemMasterState>(() => normalizeStemMasterState(initialEditState?.master));
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(() => getInitialWaveformDuration(initialAllStems));
+  const [duration, setDuration] = useState(() => getInitialTimelineDuration(initialAllStems, initialEditState));
   const [loadingCount, setLoadingCount] = useState(initialAllStems.filter((stem) => !stemHasKnownEmptyWaveform(stem)).length);
   const [failedLoadCount, setFailedLoadCount] = useState(0);
   const [cachedLoadCount, setCachedLoadCount] = useState(0);
@@ -2682,7 +2694,7 @@ export default function StemMixerEditor({
     };
 
     restoreEditorHistorySnapshot(nextSnapshot);
-    setDuration(getInitialWaveformDuration(activeDraftStems.length > 0 ? activeDraftStems : draftAllStems));
+    setDuration(getInitialTimelineDuration(activeDraftStems.length > 0 ? activeDraftStems : draftAllStems, draft));
     setSaveStatus('已恢复本地未同步编辑，正在等待自动保存。');
     setLocalDraftState(null);
     setHasPendingEditChanges(true);
@@ -2969,7 +2981,7 @@ export default function StemMixerEditor({
     setIsPlaying(false);
     setCurrentTime(0);
     const activeInitialStems = filterDeletedStems(initialAllStems, nextDeletedTrackTypes);
-    setDuration(getInitialWaveformDuration(activeInitialStems.length > 0 ? activeInitialStems : initialAllStems));
+    setDuration(getInitialTimelineDuration(activeInitialStems.length > 0 ? activeInitialStems : initialAllStems, initialEditState));
     const stemsToLoad = activeInitialStems.filter((stem) => !stemHasKnownEmptyWaveform(stem));
     const knownEmptyCount = activeInitialStems.length - stemsToLoad.length;
     setLoadingCount(stemsToLoad.length);
@@ -5158,7 +5170,7 @@ export default function StemMixerEditor({
     autoSaveRetryTimerRef.current = null;
   }, []);
 
-  const persistEditState = useCallback(async (source: 'manual' | 'auto' | 'export') => {
+  const persistEditState = useCallback(async (source: 'manual' | 'auto' | 'export', savedSignature?: string) => {
     if (!jobId) {
       if (source === 'manual') {
         setSaveStatus('当前分轨任务还没有缓存 ID，暂时不能保存编辑状态。');
@@ -5174,12 +5186,14 @@ export default function StemMixerEditor({
     }
 
     try {
+      const editStateToSave = currentEditStateRef.current;
+      const signatureToSave = savedSignature ?? JSON.stringify(editStateToSave);
       const response = await fetch('/api/stems/edit-state', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           jobId,
-          editState: currentEditStateRef.current,
+          editState: editStateToSave,
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -5192,6 +5206,7 @@ export default function StemMixerEditor({
         throw new Error(message);
       }
       autoSaveRetryAttemptRef.current = 0;
+      lastAutoSaveSignatureRef.current = signatureToSave;
       clearAutoSaveRetryTimer();
       if (canUseLocalDraftRecovery && localDraftStorageKey) {
         window.localStorage.removeItem(localDraftStorageKey);
@@ -5622,6 +5637,7 @@ export default function StemMixerEditor({
       lastAutoSaveSignatureRef.current = editStateSignature;
       return;
     }
+    const hasExplicitSaveRequest = saveRequestVersion !== lastHandledSaveRequestVersionRef.current;
     if (lastAutoSaveSignatureRef.current === editStateSignature) return;
 
     setHasPendingEditChanges(true);
@@ -5639,7 +5655,7 @@ export default function StemMixerEditor({
       return;
     }
 
-    if (isContinuousEditing) {
+    if (isContinuousEditing && !hasExplicitSaveRequest) {
       return;
     }
 
@@ -5647,11 +5663,14 @@ export default function StemMixerEditor({
       window.clearTimeout(autoSaveTimerRef.current);
     }
 
+    if (hasExplicitSaveRequest) {
+      lastHandledSaveRequestVersionRef.current = saveRequestVersion;
+    }
+
     autoSaveTimerRef.current = window.setTimeout(() => {
       autoSaveTimerRef.current = null;
-      lastAutoSaveSignatureRef.current = editStateSignature;
-      void persistEditState('auto');
-    }, AUTO_SAVE_IDLE_DELAY_MS);
+      void persistEditState('auto', editStateSignature);
+    }, hasExplicitSaveRequest ? 0 : AUTO_SAVE_IDLE_DELAY_MS);
 
     return () => {
       if (autoSaveTimerRef.current !== null) {
@@ -5660,6 +5679,34 @@ export default function StemMixerEditor({
       }
     };
   }, [canUseAutoSave, canUseLocalDraftRecovery, clearAutoSaveRetryTimer, currentEditState, editStateSignature, isContinuousEditing, jobId, localDraftStorageKey, persistEditState, saveRequestVersion]);
+
+  useEffect(() => {
+    if (!jobId) return;
+
+    const flushPendingEditState = () => {
+      if (!hasPendingEditChanges) return;
+      const editState = currentEditStateRef.current;
+      if (!editState) return;
+
+      const body = JSON.stringify({ jobId, editState });
+      const blob = new Blob([body], { type: 'application/json' });
+      if (navigator.sendBeacon?.('/api/stems/edit-state', blob)) return;
+
+      void fetch('/api/stems/edit-state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        keepalive: true,
+      }).catch(() => undefined);
+    };
+
+    window.addEventListener('pagehide', flushPendingEditState);
+    window.addEventListener('beforeunload', flushPendingEditState);
+    return () => {
+      window.removeEventListener('pagehide', flushPendingEditState);
+      window.removeEventListener('beforeunload', flushPendingEditState);
+    };
+  }, [hasPendingEditChanges, jobId]);
 
   const waitForStemLoadingToSettle = useCallback(async () => {
     const startedAt = Date.now();

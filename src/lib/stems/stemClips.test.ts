@@ -9,6 +9,7 @@ import {
   resizeStemClipEdge,
   resolveStemClipDragTarget,
   resolveStemClipSourceRange,
+  resolveStemClipTimelineDuration,
   sliceStemClipPeaks,
   splitStemClipAtTime,
 } from './stemClips';
@@ -157,6 +158,18 @@ describe('stem clips', () => {
       sourceStart: 0,
       sourceEnd: 120,
     });
+  });
+
+  it('derives saved timeline duration from moved clips beyond source duration', () => {
+    expect(resolveStemClipTimelineDuration({
+      clips: [{
+        id: 'clip-1',
+        start: 1176.33,
+        sourceStart: 0,
+        sourceEnd: 153,
+      }],
+      trimEnd: 1329.33,
+    }, 153)).toBe(1329.33);
   });
 
   it('repairs legacy moved clips whose source range was saved as timeline time', () => {
