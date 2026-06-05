@@ -246,27 +246,30 @@ export class MusicGenerationService {
    * - customLyrics：追加自定义歌词
    */
   async buildPrompt(input: MusicGenerationInput): Promise<string> {
-    let cachedLyriaPrompt: string | null = null;
+    let cachedTemplatePrompt: string | null = null;
 
     if (input.templateId) {
       const cached = await this.templateAdminService.getCachedAnalysis(input.templateId);
 
-      if (cached && cached.status === 'completed' && cached.lyriaPrompt) {
-        cachedLyriaPrompt = cached.lyriaPrompt;
+      const advancedPrompt = cached?.advancedStatus === 'completed' ? cached.advancedPrompt?.trim() : '';
+      const regularPrompt = cached?.status === 'completed' ? cached.lyriaPrompt?.trim() : '';
+
+      if (advancedPrompt || regularPrompt) {
+        cachedTemplatePrompt = advancedPrompt || regularPrompt || null;
       } else {
         // 缓存缺失/损坏 → 降级为默认描述
-        cachedLyriaPrompt = DEFAULT_TEMPLATE_DESCRIPTION;
+        cachedTemplatePrompt = DEFAULT_TEMPLATE_DESCRIPTION;
       }
     }
 
     let basePrompt: string;
 
-    if (cachedLyriaPrompt && input.userPrompt) {
+    if (cachedTemplatePrompt && input.userPrompt) {
       // 模板 + 用户 Prompt
-      basePrompt = `Based on this reference style: ${cachedLyriaPrompt}\n\nUser's additional instructions: ${input.userPrompt}`;
-    } else if (cachedLyriaPrompt) {
+      basePrompt = `Based on this reference style: ${cachedTemplatePrompt}\n\nUser's additional instructions: ${input.userPrompt}`;
+    } else if (cachedTemplatePrompt) {
       // 仅模板
-      basePrompt = cachedLyriaPrompt;
+      basePrompt = cachedTemplatePrompt;
     } else if (input.userPrompt) {
       // 仅用户 Prompt
       basePrompt = input.userPrompt;

@@ -180,7 +180,7 @@ export class TemplateAdminService {
   ): Promise<CachedTemplateAnalysis | null> {
     const { data, error } = await this.supabase
       .from('templates')
-      .select('id, analysis_result, lyria_prompt, analyzed_at, analysis_status')
+      .select('id, analysis_result, lyria_prompt, analyzed_at, analysis_status, suno_prompt, suno_analysis_status')
       .eq('id', templateId)
       .single();
 
@@ -197,6 +197,8 @@ export class TemplateAdminService {
       templateId: data.id,
       analysisResult: data.analysis_result ?? '',
       lyriaPrompt: data.lyria_prompt ?? '',
+      advancedPrompt: data.suno_prompt ?? '',
+      advancedStatus: data.suno_analysis_status ?? undefined,
       analyzedAt: data.analyzed_at ? new Date(data.analyzed_at) : new Date(),
       status: data.analysis_status,
     };

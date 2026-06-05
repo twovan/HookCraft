@@ -46,6 +46,10 @@ export interface CachedTemplateAnalysis {
   analysisResult: string;
   /** 英文 Lyria Prompt（直接传给 Lyria 3） */
   lyriaPrompt: string;
+  /** Advanced style prompt for template-based generation. */
+  advancedPrompt?: string;
+  /** Advanced style analysis status. */
+  advancedStatus?: TemplateAnalysisStatus;
   /** 分析时间 */
   analyzedAt: Date;
   /** 分析状态 */
