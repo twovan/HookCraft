@@ -308,7 +308,7 @@ const homeStyles = `
   .home-hero-bg {
     position: absolute;
     inset: 0;
-    background-image: url('/home-hero-studio.png');
+    background-image: url('/home-hero-studio.webp');
     background-size: cover;
     background-position: center center;
     transform: scale(1.01);
