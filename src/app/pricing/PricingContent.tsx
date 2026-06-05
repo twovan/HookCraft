@@ -435,7 +435,7 @@ export default function PricingContent({ tiers, initialCreditsPacks }: PricingCo
 
         .tier-card {
           backdrop-filter: blur(18px);
-          overflow: visible;
+          overflow: hidden;
         }
 
         .tier-card::before {
