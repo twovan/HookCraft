@@ -4,8 +4,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import AudioUploader from './AudioUploader';
 import WaveformVisualizer from './WaveformVisualizer';
-import type { KieSunoTrack } from '@/types/kie';
 import type { Template } from '@/types/template';
+import { createAdvancedArrangementTask, fetchAdvancedArrangementStatus } from '@/lib/studio/advancedArrangementClient';
+import { getTemplateAdvancedAnalysis, getTemplateAdvancedPrompt } from '@/lib/template/advancedTemplateFields';
 
 type UploadStatus = 'idle' | 'validating' | 'ready' | 'error';
 type GenerateStatus = 'idle' | 'uploading' | 'queued' | 'generating' | 'completed' | 'error';
@@ -33,8 +34,21 @@ interface StatusResponse {
   title?: string | null;
   tags?: string | null;
   duration?: number | null;
-  tracks?: KieSunoTrack[];
+  tracks?: GeneratedTrack[];
   errorMessage?: string | null;
+}
+
+interface GeneratedTrack {
+  id?: string;
+  audioUrl?: string;
+  streamAudioUrl?: string;
+  imageUrl?: string;
+  prompt?: string;
+  modelName?: string;
+  title?: string;
+  tags?: string;
+  createTime?: string;
+  duration?: number;
 }
 
 interface AdvancedArrangementTabProps {
@@ -50,7 +64,7 @@ export default function AdvancedArrangementTab({
   const isTemplateInstrumentalVariant = variant === 'templateInstrumental';
   const usesSelectedTemplate = isTemplateVariant || isTemplateInstrumentalVariant;
   const templateStyle = getTemplateStyle(selectedTemplate);
-  const templateSunoTags = getTemplateSunoTags(selectedTemplate);
+  const templateAdvancedTags = getTemplateAdvancedTags(selectedTemplate);
   const lockedStyle = isTemplateVariant ? templateStyle : null;
   const templateTitle = selectedTemplate?.name?.trim() || '';
 
@@ -82,7 +96,7 @@ export default function AdvancedArrangementTab({
   const [copiedLyrics, setCopiedLyrics] = useState(false);
   const effectiveCustomMode = usesSelectedTemplate ? true : customMode;
   const effectiveStyle = lockedStyle ?? style;
-  const effectiveTags = templateSunoTags;
+  const effectiveTags = templateAdvancedTags;
   const showTemplateInstrumentalTagsField = false;
 
   useEffect(() => {
@@ -217,7 +231,7 @@ export default function AdvancedArrangementTab({
       try {
         const params = new URLSearchParams({ taskId: id });
         if (localId) params.set('localTaskId', localId);
-        const res = await fetch(`/api/kie/upload-cover/status?${params.toString()}`);
+        const res = await fetchAdvancedArrangementStatus(params);
         const data = await res.json();
 
         if (!res.ok) {
@@ -298,10 +312,7 @@ export default function AdvancedArrangementTab({
         formData.append('vocalGender', vocalGender);
       }
 
-      const res = await fetch(isTemplateInstrumentalVariant ? '/api/kie/add-instrumental' : '/api/kie/upload-cover', {
-        method: 'POST',
-        body: formData,
-      });
+      const res = await createAdvancedArrangementTask(formData, isTemplateInstrumentalVariant);
       const data = await res.json();
 
       if (!res.ok) {
@@ -774,7 +785,7 @@ export default function AdvancedArrangementTab({
   );
 }
 
-function collectLyricsText(primaryLyrics: string | null, tracks: KieSunoTrack[]) {
+function collectLyricsText(primaryLyrics: string | null, tracks: GeneratedTrack[]) {
   const trackLyrics = tracks
     .map((track, index) => {
       const lyrics = formatTrackLyrics(track.prompt);
@@ -790,7 +801,7 @@ function collectLyricsText(primaryLyrics: string | null, tracks: KieSunoTrack[])
   return formatTrackLyrics(primaryLyrics);
 }
 
-function hasTrackAudio(track: KieSunoTrack) {
+function hasTrackAudio(track: GeneratedTrack) {
   return Boolean(track.audioUrl || track.streamAudioUrl);
 }
 
@@ -802,7 +813,7 @@ function getResultGenerationTaskId(baseTaskId: string | null, index: number) {
 function getTemplateStyle(template?: Template | null) {
   if (!template) return '';
   return (
-    template.sunoPrompt?.trim() ||
+    getTemplateAdvancedPrompt(template) ||
     template.lyriaPrompt?.trim() ||
     template.genre?.trim() ||
     template.description?.trim() ||
@@ -811,11 +822,11 @@ function getTemplateStyle(template?: Template | null) {
   );
 }
 
-function getTemplateSunoTags(template?: Template | null) {
+function getTemplateAdvancedTags(template?: Template | null) {
   if (!template) return '';
   return (
-    template.sunoPrompt?.trim() ||
-    template.sunoAnalysisResult?.trim() ||
+    getTemplateAdvancedPrompt(template) ||
+    getTemplateAdvancedAnalysis(template) ||
     template.genre?.trim() ||
     template.description?.trim() ||
     ''

@@ -64,7 +64,7 @@ export const useCreditStore = create<CreditStore>((set, get) => ({
         throw new Error(`Failed to fetch credits: ${res.statusText}`);
       }
       const data = await res.json();
-      // Parse enhanced API response into CreditInfoEnhanced
+      // Parse enhanced server response into CreditInfoEnhanced
       const credits: CreditInfoEnhanced = {
         userId: data.userId ?? '',
         tier: data.tier ?? 'free',

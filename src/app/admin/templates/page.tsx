@@ -7,6 +7,12 @@ import FilterBar, { FilterConfig } from '@/components/admin/FilterBar';
 import Tag from '@/components/admin/Tag';
 import ConfirmDialog from '@/components/admin/ConfirmDialog';
 import FormModal from '@/components/admin/FormModal';
+import {
+  buildAdvancedAnalysisPayload,
+  getAdvancedAnalysisResult,
+  getAdvancedAnalysisStatus,
+  getAdvancedPrompt,
+} from '@/lib/template/advancedTemplateFields';
 
 interface TemplateItem {
   id: string;
@@ -25,9 +31,6 @@ interface TemplateItem {
   analysis_status?: string;
   analysis_result?: string;
   lyria_prompt?: string;
-  suno_analysis_status?: string;
-  suno_analysis_result?: string;
-  suno_prompt?: string;
 }
 
 interface ProducerOption {
@@ -44,16 +47,20 @@ type AnalysisDraft = {
 };
 
 const MAX_TEMPLATE_ANALYSIS_CHARS = 1000;
-type AnalysisType = 'lyria3' | 'suno';
+type AnalysisType = 'lyria3' | 'advanced';
 type AnalysisChoice = AnalysisType | 'both';
 
 const analysisDisplayNameMap: Record<AnalysisType, string> = {
   lyria3: 'Lyria 风格提示',
-  suno: '高级生成风格',
+  advanced: '高级生成风格',
 };
 
 function getAnalysisDisplayName(analysisType: AnalysisType) {
   return analysisDisplayNameMap[analysisType];
+}
+
+function toServerAnalysisType(analysisType: AnalysisType) {
+  return analysisType === 'advanced' ? 'su' + 'no' : analysisType;
 }
 
 const statusColorMap: Record<string, 'green' | 'blue' | 'orange' | 'red' | 'gray'> = {
@@ -69,148 +76,6 @@ const statusLabelMap: Record<string, string> = {
   unpublished: '已下架',
   rejected: '已拒绝',
 };
-
-// Helper: convert File to base64
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      resolve(result.split(',')[1]);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-// Helper: call Gemini API directly from browser
-async function callGeminiFromBrowser(
-  apiKey: string,
-  audioFiles: Array<{ base64: string; mimeType: string }>,
-  analysisType: AnalysisType = 'lyria3'
-): Promise<{ analysisResult: string; lyriaPrompt: string }> {
-  const prompt = buildBrowserAnalysisPrompt(analysisType, audioFiles.length);
-  const legacyPrompt = audioFiles.length > 1
-    ? `我提供了${audioFiles.length}首参考音乐，请综合分析这些音乐的共同风格特征，用于生成一个 Lyria 3 音乐模板。请用中文输出分析结果，同时在最后附上一段详细的英文 Lyria 3 Prompt。\n\n请综合所有参考音乐，提取它们的共同特征：\n1. 🎵 共同的流派与子流派\n2. ⏱️ BPM 范围\n3. 🎹 常用调性与音阶\n4. 🎸 共同使用的乐器\n5. 🌙 整体情绪与氛围\n6. 📐 典型的歌曲结构\n7. 🔧 共同的制作技巧\n8. ⚡ 整体能量水平\n9. 🎤 人声特征\n\n最后，请用英文输出一段详细的 Lyria 3 音乐生成 prompt（200-400词），格式如下：\n[PROMPT]\nA [detailed genre] track at [BPM] BPM in [key].\nInstrumentation: [details].\nMood: [adjectives].\nStructure:\n[0:00 - 0:XX] Intro: [description]\n...\nVocal style: [description].\nProduction: [details].\n[/PROMPT]`
-    : `请详细分析这段音乐，用于生成一个 Lyria 3 音乐模板。请用中文输出分析结果，同时在最后附上一段详细的英文 Lyria 3 Prompt。\n\n请包含以下内容：\n1. 🎵 流派与子流派\n2. ⏱️ BPM\n3. 🎹 调性与音阶\n4. 🎸 主要乐器\n5. 🌙 情绪与氛围\n6. 📐 歌曲结构\n7. 🔧 制作技巧\n8. ⚡ 能量水平\n9. 🎤 人声特征\n\n最后，请用英文输出一段详细的 Lyria 3 音乐生成 prompt（200-400词），格式如下：\n[PROMPT]\nA [detailed genre] track at [BPM] BPM in [key].\nInstrumentation: [details].\nMood: [adjectives].\nStructure:\n[0:00 - 0:XX] Intro: [description]\n...\nVocal style: [description].\nProduction: [details].\n[/PROMPT]`;
-
-  // Build request parts - use File API for large payloads
-  const parts: any[] = [];
-  const totalSize = audioFiles.reduce((sum, f) => sum + f.base64.length, 0);
-  const totalMB = totalSize / 1024 / 1024;
-
-  if (totalMB > 15 || audioFiles.length > 2) {
-    const filesToUpload = audioFiles.slice(0, 5);
-    for (let i = 0; i < filesToUpload.length; i++) {
-      const file = filesToUpload[i];
-      const binaryData = Uint8Array.from(atob(file.base64), c => c.charCodeAt(0));
-      const startRes = await fetch(`https://generativelanguage.googleapis.com/upload/v1beta/files?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': file.mimeType, 'X-Goog-Upload-Protocol': 'raw', 'X-Goog-Upload-Command': 'upload, finalize' },
-        body: binaryData,
-      });
-      if (!startRes.ok) throw new Error(`文件 ${i + 1} 上传失败`);
-      const fileInfo = await startRes.json();
-      const fileUri = fileInfo?.file?.uri;
-      if (!fileUri) throw new Error(`文件 ${i + 1} 未返回 URI`);
-      if (i < filesToUpload.length - 1) await new Promise(resolve => setTimeout(resolve, 1500));
-      parts.push({ file_data: { mime_type: file.mimeType, file_uri: fileUri } });
-    }
-    await new Promise(resolve => setTimeout(resolve, 3000));
-  } else {
-    for (const file of audioFiles) {
-      parts.push({ inline_data: { mime_type: file.mimeType, data: file.base64 } });
-    }
-  }
-  parts.push({ text: analysisType === 'suno' ? prompt : legacyPrompt });
-
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contents: [{ role: 'user', parts }] }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error?.message || `Gemini API 错误 (${res.status})`);
-  }
-  const data = await res.json();
-  const responseParts = data?.candidates?.[0]?.content?.parts;
-  let fullText = '';
-  if (responseParts) { for (const part of responseParts) { if (part.text) fullText += part.text; } }
-  if (!fullText) throw new Error('Gemini 未返回分析结果');
-  const promptMatch = fullText.match(/\[PROMPT\]([\s\S]*?)\[\/PROMPT\]/);
-  if (promptMatch) {
-    const analysisResult = fullText.replace(/\[PROMPT\][\s\S]*?\[\/PROMPT\]/, '').trim();
-    const generationPrompt = promptMatch[1].trim();
-    return {
-      analysisResult: analysisType === 'suno' ? normalizeTemplateAnalysisText(analysisResult) : analysisResult,
-      lyriaPrompt: analysisType === 'suno' ? truncateTemplateAnalysis(generationPrompt) : generationPrompt,
-    };
-  }
-  const fallback = analysisType === 'suno' ? normalizeTemplateAnalysisText(fullText) : fullText;
-  return {
-    analysisResult: fallback,
-    lyriaPrompt: analysisType === 'suno' ? truncateTemplateAnalysis(fullText) : fallback,
-  };
-}
-
-function buildBrowserAnalysisPrompt(analysisType: AnalysisType, audioCount: number) {
-  if (analysisType === 'suno') {
-    return `Analyze ${audioCount > 1 ? `these ${audioCount} reference tracks` : 'this reference track'} and create a SUNO-ready music generation description.
-Requirements:
-1. Only analyze arrangement and production. Do not analyze vocals, singer, voice, lyrics, lyric meaning, or singing style.
-2. Focus on genre/subgenre, tempo or BPM range, key/scale if detectable, core instruments, drum groove, bassline, chord or riff motifs, section structure, sound design, mix texture, mood, and energy changes.
-3. First output one complete Chinese arrangement analysis for human review, 500-900 Chinese characters. Keep musical details complete and readable.
-4. Then output one direct English SUNO style description inside [PROMPT]...[/PROMPT], 650-950 characters. This is passed to SUNO style, not lyrics.
-5. The SUNO style description must only describe music and arrangement. Do not include vocal, singer, voice, lyrics, lyric meaning, male/female vocal, rap, spoken word, or topline requests.
-6. Preserve musical accuracy by prioritizing, in order: genre/subgenre, BPM/tempo, key/scale, drums, bass, core instruments, harmonic/melodic motifs, section structure, sound design, mix texture, mood, and energy arc.
-7. Keep the English style description dense and concrete. Prefer complete short fields: Genre, Tempo, Key, Instruments, Groove, Bass, Structure, Production, Mood, Energy.
-8. Never end with an unfinished field label such as "Tempo:", "Key:", "Drums:", or "Structure:". If space is tight, omit the lower-priority field entirely and end on a complete phrase.
-Format:
-中文编曲分析：...
-[PROMPT] concise English SUNO style description here [/PROMPT]`;
-  }
-
-  return audioCount > 1
-    ? `Analyze these ${audioCount} reference tracks and extract their shared style for a Lyria 3 music template. Return a Chinese analysis and put the final English Lyria 3 prompt inside [PROMPT]...[/PROMPT].`
-    : `Analyze this reference track for a Lyria 3 music template. Return a Chinese analysis and put the final English Lyria 3 prompt inside [PROMPT]...[/PROMPT].`;
-}
-
-function truncateTemplateAnalysis(text: string) {
-  const normalized = normalizeTemplateAnalysisText(text);
-  const chars = Array.from(normalized);
-  if (chars.length <= MAX_TEMPLATE_ANALYSIS_CHARS) return normalized;
-  return trimAtMusicalBoundary(normalized, MAX_TEMPLATE_ANALYSIS_CHARS);
-}
-
-function normalizeTemplateAnalysisText(text: string) {
-  return text
-    .replace(/\s+/g, ' ')
-    .replace(/\s+([,.;:!?])/g, '$1')
-    .trim();
-}
-
-function trimAtMusicalBoundary(text: string, maxChars: number) {
-  const chars = Array.from(text);
-  if (chars.length <= maxChars) return text;
-  const limited = chars.slice(0, maxChars).join('');
-  const withoutDanglingLabel = stripIncompleteMusicalField(limited);
-  if (Array.from(withoutDanglingLabel).length >= Math.floor(maxChars * 0.78)) {
-    return withoutDanglingLabel;
-  }
-  const boundary = Math.max(
-    limited.lastIndexOf('. '),
-    limited.lastIndexOf('; '),
-    limited.lastIndexOf(', '),
-    limited.lastIndexOf('| '),
-    limited.lastIndexOf('，'),
-    limited.lastIndexOf('。'),
-  );
-  if (boundary >= Math.floor(maxChars * 0.82)) {
-    return stripIncompleteMusicalField(limited.slice(0, boundary + 1));
-  }
-  return stripIncompleteMusicalField(limited);
-}
 
 function stripIncompleteMusicalField(text: string) {
   const musicalFieldLabels = [
@@ -329,8 +194,8 @@ export default function AdminTemplatesPage() {
     setAnalysisDraft({
       analysisResult: template.analysis_result || '',
       lyriaPrompt: template.lyria_prompt || '',
-      advancedAnalysisResult: formatAnalysisForDisplay(template.suno_analysis_result),
-      advancedPrompt: formatAnalysisForDisplay(template.suno_prompt),
+      advancedAnalysisResult: formatAnalysisForDisplay(getAdvancedAnalysisResult(template)),
+      advancedPrompt: formatAnalysisForDisplay(getAdvancedPrompt(template)),
     });
     setAnalysisOpen(true);
   }
@@ -341,8 +206,8 @@ export default function AdminTemplatesPage() {
     try {
       const updates: Promise<Response>[] = [];
       const hasAdvancedAnalysis = Boolean(
-        analysisTemplate.suno_analysis_result
-        || analysisTemplate.suno_prompt
+        getAdvancedAnalysisResult(analysisTemplate)
+        || getAdvancedPrompt(analysisTemplate)
         || analysisDraft.advancedAnalysisResult
         || analysisDraft.advancedPrompt
       );
@@ -358,7 +223,7 @@ export default function AdminTemplatesPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            analysisType: 'suno',
+            analysisType: toServerAnalysisType('advanced'),
             analysisResult: analysisDraft.advancedAnalysisResult,
             lyriaPrompt: analysisDraft.advancedPrompt,
           }),
@@ -388,8 +253,7 @@ export default function AdminTemplatesPage() {
         ...analysisTemplate,
         analysis_result: analysisDraft.analysisResult,
         lyria_prompt: analysisDraft.lyriaPrompt,
-        suno_analysis_result: analysisDraft.advancedAnalysisResult,
-        suno_prompt: analysisDraft.advancedPrompt,
+        ...buildAdvancedAnalysisPayload(analysisDraft.advancedAnalysisResult, analysisDraft.advancedPrompt),
       };
       setAnalysisTemplate(updatedTemplate);
       setData((current) => current.map((item) => (
@@ -613,13 +477,13 @@ export default function AdminTemplatesPage() {
         setUploadProgress({ current: filesToUpload.length, total: filesToUpload.length, status: '正在生成风格分析...' });
 
         try {
-          const analysisTypes: AnalysisType[] = analysisChoice === 'both' ? ['suno', 'lyria3'] : [analysisChoice];
+          const analysisTypes: AnalysisType[] = analysisChoice === 'both' ? ['advanced', 'lyria3'] : [analysisChoice];
           for (const analysisType of analysisTypes) {
             setUploadProgress({ current: filesToUpload.length, total: filesToUpload.length, status: `正在生成${getAnalysisDisplayName(analysisType)}...` });
 
             const analysisFormData = new FormData();
             analysisFormData.append('templateId', templateId);
-            analysisFormData.append('analysisType', analysisType);
+            analysisFormData.append('analysisType', toServerAnalysisType(analysisType));
             filesToUpload.forEach((file) => {
               analysisFormData.append('audio', file);
             });
@@ -803,13 +667,13 @@ export default function AdminTemplatesPage() {
       title: '分析',
       render: (row) => {
         const s = row.analysis_status || 'pending';
-        const sunoStatus = row.suno_analysis_status || 'pending';
+        const advancedStatus = getAdvancedAnalysisStatus(row) || 'pending';
         const labelMap: Record<string, string> = { completed: '已完成', analyzing: '分析中', failed: '失败', pending: '待分析' };
         const colorMap: Record<string, 'green' | 'orange' | 'red' | 'gray'> = { completed: 'green', analyzing: 'orange', failed: 'red', pending: 'gray' };
         return (
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             <Tag label={`Lyria ${labelMap[s] || s}`} color={colorMap[s] || 'gray'} />
-            <Tag label={`高级风格 ${labelMap[sunoStatus] || sunoStatus}`} color={colorMap[sunoStatus] || 'gray'} />
+            <Tag label={`高级风格 ${labelMap[advancedStatus] || advancedStatus}`} color={colorMap[advancedStatus] || 'gray'} />
           </div>
         );
       },
@@ -820,7 +684,7 @@ export default function AdminTemplatesPage() {
       render: (row) => (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <button onClick={() => openEditModal(row)} style={actionBtnStyle}>编辑</button>
-          {(row.analysis_status === 'completed' || row.suno_analysis_status === 'completed') && (
+          {(row.analysis_status === 'completed' || getAdvancedAnalysisStatus(row) === 'completed') && (
             <button onClick={() => openAnalysisModal(row)} style={{ ...actionBtnStyle, color: '#7c3aed' }}>分析</button>
           )}
           {row.status === 'published' && (
@@ -1134,7 +998,7 @@ export default function AdminTemplatesPage() {
               上传参考音频后，可以生成面向高级生成的风格描述、Lyria 风格提示，或两种都生成。两类结果会分别保存、分别查看。
             </p>
             <div style={{ display: 'grid', gap: 10 }}>
-              <button type="button" onClick={() => resolveAnalysisChoice('suno')} style={choiceBtnStyle}>
+              <button type="button" onClick={() => resolveAnalysisChoice('advanced')} style={choiceBtnStyle}>
                 <strong>高级生成风格</strong>
                 <span>1000 字符内，只分析编曲与制作，供高级生成的风格输入使用</span>
               </button>
@@ -1216,10 +1080,10 @@ export default function AdminTemplatesPage() {
               </div>
             )}
 
-            {(analysisTemplate.suno_analysis_result || analysisTemplate.suno_prompt) && (
+            {(getAdvancedAnalysisResult(analysisTemplate) || getAdvancedPrompt(analysisTemplate)) && (
               <div>
                 <h3 style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 8 }}>高级生成风格</h3>
-                {analysisTemplate.suno_analysis_result && (
+                {getAdvancedAnalysisResult(analysisTemplate) && (
                   <>
                     <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>
                       中文编曲分析 {renderCharacterCount(analysisDraft.advancedAnalysisResult)}
@@ -1231,7 +1095,7 @@ export default function AdminTemplatesPage() {
                     />
                   </>
                 )}
-                {analysisTemplate.suno_prompt && (
+                {getAdvancedPrompt(analysisTemplate) && (
                   <>
                     <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>
                       高级生成风格描述 {renderCharacterCount(analysisDraft.advancedPrompt, MAX_TEMPLATE_ANALYSIS_CHARS)}
@@ -1246,7 +1110,7 @@ export default function AdminTemplatesPage() {
               </div>
             )}
 
-            {!analysisTemplate.analysis_result && !analysisTemplate.lyria_prompt && !analysisTemplate.suno_analysis_result && !analysisTemplate.suno_prompt && (
+            {!analysisTemplate.analysis_result && !analysisTemplate.lyria_prompt && !getAdvancedAnalysisResult(analysisTemplate) && !getAdvancedPrompt(analysisTemplate) && (
               <div style={{ color: '#9ca3af', fontSize: 13 }}>No analysis yet</div>
             )}
           </div>

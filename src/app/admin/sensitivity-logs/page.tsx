@@ -30,7 +30,7 @@ export default function SensitivityLogsPage() {
       const result = await res.json();
       const logs = result.data || [];
       setData(logs);
-      // API 不返回 total，根据返回数据量估算
+      // 服务端不返回 total，根据返回数据量估算
       // 如果返回的数据量等于 pageSize，说明可能还有更多数据
       if (logs.length === pageSize) {
         setTotal(page * pageSize + 1); // 至少还有下一页

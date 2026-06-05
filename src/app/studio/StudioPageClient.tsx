@@ -302,7 +302,7 @@ export default function StudioPageClient({
   // Generation error state
   const [generationError, setGenerationError] = useState<string | null>(null);
 
-  /** Proceed with the actual generation API call */
+  /** Proceed with the actual generation request */
   const proceedWithGeneration = async (userPrompt: string | undefined, displayPrompt?: string) => {
     setIsGenerating(true);
     setGenerationError(null);
@@ -364,7 +364,7 @@ export default function StudioPageClient({
         router.push(`/account/creations?expand=${data.batchId}`);
         return;
       } else {
-        // API returned error status
+        // Server returned error status
         const errorData = await res.json().catch(() => ({ error: '生成失败，请重试' }));
         setGenerationError(errorData.error || '生成失败，请重试');
       }

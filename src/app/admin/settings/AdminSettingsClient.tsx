@@ -57,7 +57,7 @@ const STEM_EDITOR_FEATURE_GROUPS = [
   {
     group: 'stems',
     title: '分轨能力',
-    description: '控制调用 KIE 分轨时的能力边界：基础编辑器为人声 + 伴奏，专业编辑器使用分析结果中的多分轨组。',
+    description: '控制云端分轨时的能力边界：基础编辑器为人声 + 伴奏，专业编辑器使用分析结果中的多分轨组。',
     items: [
       ['separateVocal', '2 轨分离：人声 + 伴奏'],
       ['splitStem', '多分轨分析结果'],

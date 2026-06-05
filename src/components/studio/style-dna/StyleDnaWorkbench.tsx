@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import type { ChangeEvent } from 'react';
-import type { StyleDNA, StyleDnaTemplate, SunoPromptPackage, TrackAnalysis } from '@/types/style-dna';
+import type { StyleDNA, TrackAnalysis } from '@/types/style-dna';
 
 type GenerationInfo = {
   taskId?: string;
@@ -10,6 +10,39 @@ type GenerationInfo = {
   batchId?: string;
   statusUrl?: string;
   creationUrl?: string;
+};
+
+type PromptPackage = {
+  id: string;
+  styleDnaId: string;
+  title: string;
+  stylePromptShort: string;
+  stylePromptMedium: string;
+  stylePromptLong: string;
+  stylePrompt: string;
+  lyricPrompt: string;
+  instrumentalPrompt: string;
+  structurePrompt: string;
+  negativePrompt: string;
+  customMode: boolean;
+  instrumental: boolean;
+  providerPayload: unknown;
+  promptVersion: number;
+  changeSummary?: string;
+  createdAt: string;
+};
+
+type StyleTemplate = {
+  id: string;
+  userId: string;
+  styleDnaId: string;
+  name: string;
+  description: string;
+  styleDnaSnapshot: StyleDNA;
+  promptPackageSnapshot?: PromptPackage | null;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
 };
 
 type FeedbackState = {
@@ -60,14 +93,14 @@ export default function StyleDnaWorkbench({ variant = 'studio' }: { variant?: 's
   const [jobId, setJobId] = useState<string | null>(null);
   const [analyses, setAnalyses] = useState<TrackAnalysis[]>([]);
   const [styleDna, setStyleDna] = useState<StyleDNA | null>(null);
-  const [promptPackage, setPromptPackage] = useState<SunoPromptPackage | null>(null);
-  const [promptHistory, setPromptHistory] = useState<SunoPromptPackage[]>([]);
+  const [promptPackage, setPromptPackage] = useState<PromptPackage | null>(null);
+  const [promptHistory, setPromptHistory] = useState<PromptPackage[]>([]);
   const [generationInfo, setGenerationInfo] = useState<GenerationInfo | null>(null);
   const [feedback, setFeedback] = useState<FeedbackState>(EMPTY_FEEDBACK);
   const [busy, setBusy] = useState<'analyzing' | 'saving' | 'composing' | 'generating' | 'refining' | 'templating' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [templateMessage, setTemplateMessage] = useState<string | null>(null);
-  const [savedTemplates, setSavedTemplates] = useState<StyleDnaTemplate[]>([]);
+  const [savedTemplates, setSavedTemplates] = useState<StyleTemplate[]>([]);
   const [copied, setCopied] = useState<string | null>(null);
 
   const canAnalyze = files.length > 0 && !busy;
@@ -102,7 +135,7 @@ export default function StyleDnaWorkbench({ variant = 'studio' }: { variant?: 's
     }
   }
 
-  function applySavedTemplate(template: StyleDnaTemplate) {
+  function applySavedTemplate(template: StyleTemplate) {
     setStyleDna(template.styleDnaSnapshot);
     if (template.promptPackageSnapshot) {
       setPromptPackage(template.promptPackageSnapshot);
@@ -415,7 +448,7 @@ export default function StyleDnaWorkbench({ variant = 'studio' }: { variant?: 's
               </button>
               {generationInfo && (
                 <div className="generation-box">
-                  <strong>Kie 任务已排队</strong>
+                  <strong>生成任务已排队</strong>
                   <span>{generationInfo.taskId}</span>
                   {generationInfo.creationUrl && <a href={generationInfo.creationUrl}>打开生成历史</a>}
                 </div>
@@ -927,7 +960,7 @@ function PromptBlock({
   );
 }
 
-function mapTemplateRow(row: any): StyleDnaTemplate | null {
+function mapTemplateRow(row: any): StyleTemplate | null {
   if (!row?.id || !row?.style_dna_snapshot) return null;
   return {
     id: String(row.id),
@@ -936,7 +969,7 @@ function mapTemplateRow(row: any): StyleDnaTemplate | null {
     name: String(row.name || 'Style DNA Template'),
     description: String(row.description || ''),
     styleDnaSnapshot: row.style_dna_snapshot as StyleDNA,
-    promptPackageSnapshot: row.prompt_package_snapshot as SunoPromptPackage | null,
+    promptPackageSnapshot: row.prompt_package_snapshot as PromptPackage | null,
     tags: Array.isArray(row.tags) ? row.tags.map(String) : [],
     createdAt: String(row.created_at || ''),
     updatedAt: String(row.updated_at || ''),

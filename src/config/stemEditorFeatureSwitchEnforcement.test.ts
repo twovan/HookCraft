@@ -61,7 +61,7 @@ const enforcedSwitches: Array<[string, RegExp]> = [
 ];
 
 describe('stem editor feature switch enforcement', () => {
-  it.each(enforcedSwitches)('wires %s to editor behavior or API access', (_name, pattern) => {
+  it.each(enforcedSwitches)('wires %s to editor behavior or service access', (_name, pattern) => {
     expect(source).toMatch(pattern);
   });
 

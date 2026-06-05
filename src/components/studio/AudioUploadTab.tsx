@@ -168,7 +168,7 @@ export default function AudioUploadTab() {
 
       const { audioUrl } = await uploadRes.json();
 
-      // Step 2: 调用预处理 API（传 URL 而不是 Base64，避免 payload 过大）
+      // Step 2: 调用预处理服务（传 URL 而不是 Base64，避免 payload 过大）
       const res = await fetch('/api/minimax/preprocess', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -302,7 +302,7 @@ export default function AudioUploadTab() {
       let requestBody: Record<string, unknown>;
 
       if (coverMode === 'one-step') {
-        // 一步模式：上传音频获取 URL，直接传 audio_url 给 generation API
+        // 一步模式：上传音频获取 URL，直接传 audio_url 给生成服务
         // audio_url 和 cover_feature_id 互斥
         const formData = new FormData();
         formData.append('file', audioFile!);
