@@ -6557,14 +6557,14 @@ export default function StemMixerEditor({
                   </div>
                 </div>
                 <div style={selectedTrackStatsStyle}>
-                  <span>范围 {formatTime(selectedTrackState.trimStart)} - {formatTime(selectedTrackTrimEnd)}</span>
-                  <span>片段 {formatTime(selectedTrackClipDuration)}</span>
-                  <span>剪辑 {selectedTrackClipCount}</span>
-                  <span>音量 {Math.round(selectedTrackState.volume * 100)}%</span>
-                  <span>声像 {formatPan(selectedTrackState.pan)}</span>
-                  <span>淡入 {selectedTrackState.fadeIn.toFixed(2)}s</span>
-                  <span>淡出 {selectedTrackState.fadeOut.toFixed(2)}s</span>
-                  <span>静音片段 {selectedTrackMutedRanges.length}</span>
+                  <span style={selectedTrackStatChipBaseStyle}>范围 {formatTime(selectedTrackState.trimStart)} - {formatTime(selectedTrackTrimEnd)}</span>
+                  <span style={selectedTrackStatChipBaseStyle}>片段 {formatTime(selectedTrackClipDuration)}</span>
+                  <span style={selectedTrackStatChipBaseStyle}>剪辑 {selectedTrackClipCount}</span>
+                  <span style={selectedTrackStatChipBaseStyle}>音量 {Math.round(selectedTrackState.volume * 100)}%</span>
+                  <span style={selectedTrackStatChipBaseStyle}>声像 {formatPan(selectedTrackState.pan)}</span>
+                  <span style={selectedTrackStatChipBaseStyle}>淡入 {selectedTrackState.fadeIn.toFixed(2)}s</span>
+                  <span style={selectedTrackStatChipBaseStyle}>淡出 {selectedTrackState.fadeOut.toFixed(2)}s</span>
+                  <span style={selectedTrackStatChipBaseStyle}>静音片段 {selectedTrackMutedRanges.length}</span>
                 </div>
                 <div style={selectedTrackControlsGridStyle}>
                   {canUseTrim && <label style={selectedTrackControlStyle}>
@@ -8892,18 +8892,16 @@ const selectedTrackPanelStyle: CSSProperties = {
   gridColumn: 'auto',
   gridRow: 'auto',
   borderRadius: 8,
-  border: '1px solid rgba(48, 52, 76, 0.58)',
-  background: 'rgba(9, 13, 23, 0.78)',
-  padding: 12,
+  border: '1px solid rgba(48, 52, 76, 0.38)',
+  background: 'rgba(7, 11, 19, 0.48)',
+  padding: '10px 10px 12px',
   minWidth: 0,
 };
 
 const selectedTrackHeaderStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 10,
-  flexWrap: 'wrap',
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr)',
+  gap: 8,
 };
 
 const selectedTrackTitleGroupStyle: CSSProperties = {
@@ -8917,14 +8915,14 @@ const selectedTrackNameInputStyle: CSSProperties = {
   width: '100%',
   minWidth: 120,
   maxWidth: 220,
-  minHeight: 28,
+  minHeight: 26,
   borderRadius: 7,
-  border: '1px solid rgba(206, 255, 53, 0.26)',
-  background: 'rgba(7, 10, 18, 0.82)',
+  border: '1px solid rgba(190, 232, 95, 0.18)',
+  background: 'rgba(5, 8, 15, 0.58)',
   color: '#f5f3ff',
-  padding: '4px 8px',
-  fontSize: 14,
-  fontWeight: 900,
+  padding: '3px 7px',
+  fontSize: 13,
+  fontWeight: 860,
   outline: 'none',
   userSelect: 'text',
   WebkitUserSelect: 'text',
@@ -8939,7 +8937,7 @@ const selectedTrackSubStyle: CSSProperties = {
 const selectedTrackActionsStyle: CSSProperties = {
   display: 'flex',
   flexWrap: 'wrap',
-  gap: 7,
+  gap: 5,
   alignItems: 'center',
   minWidth: 0,
 };
@@ -8983,26 +8981,34 @@ const mutedRangeRestoreButtonStyle: CSSProperties = {
 };
 
 const selectedTrackStatsStyle: CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-  gap: 7,
-  marginTop: 10,
-  color: '#d8d9e6',
-  fontSize: 11,
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 5,
+  marginTop: 9,
+  color: '#9ca6bb',
+  fontSize: 10,
+  lineHeight: 1.25,
   fontVariantNumeric: 'tabular-nums',
+};
+
+const selectedTrackStatChipBaseStyle: CSSProperties = {
+  borderRadius: 999,
+  border: '1px solid rgba(107, 119, 149, 0.18)',
+  background: 'rgba(15, 22, 34, 0.34)',
+  padding: '2px 6px',
 };
 
 const selectedTrackControlsGridStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-  gap: 10,
+  gridTemplateColumns: 'minmax(0, 1fr)',
+  gap: 8,
   marginTop: 10,
 };
 
 const selectedTrackControlStyle: CSSProperties = {
   display: 'grid',
-  gap: 4,
-  color: '#cfd0dc',
+  gap: 3,
+  color: '#b4bdd0',
   fontSize: 11,
   fontVariantNumeric: 'tabular-nums',
 };
@@ -9016,11 +9022,11 @@ const selectedTrackInlineControlStyle: CSSProperties = {
 
 const selectedTrackNumberInputStyle: CSSProperties = {
   width: '100%',
-  minHeight: 26,
+  minHeight: 24,
   borderRadius: 6,
-  border: '1px solid #30344c',
-  background: '#0f1220',
-  color: '#cfd0dc',
+  border: '1px solid rgba(64, 74, 99, 0.58)',
+  background: 'rgba(8, 12, 20, 0.72)',
+  color: '#cbd5e1',
   padding: '2px 5px',
   fontSize: 11,
   fontVariantNumeric: 'tabular-nums',
@@ -9029,9 +9035,9 @@ const selectedTrackNumberInputStyle: CSSProperties = {
 
 const selectedTrackNudgeGridStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(86px, 1fr))',
-  gap: 7,
-  marginTop: 10,
+  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+  gap: 5,
+  marginTop: 8,
 };
 
 const selectedTrackShortcutStyle: CSSProperties = {
@@ -9043,17 +9049,17 @@ const selectedTrackShortcutStyle: CSSProperties = {
 const controlPanelStyle: CSSProperties = {
   minWidth: 0,
   borderRadius: 8,
-  border: '1px solid rgba(48, 52, 76, 0.56)',
-  background: 'rgba(9, 13, 23, 0.76)',
-  padding: '10px 12px',
+  border: '1px solid rgba(48, 52, 76, 0.36)',
+  background: 'rgba(7, 11, 19, 0.46)',
+  padding: '9px 10px',
 };
 
 function addTrackPanelStyle(open: boolean): CSSProperties {
   return {
     ...controlPanelStyle,
-    borderColor: open ? 'rgba(206, 255, 53, 0.42)' : 'rgba(48, 52, 76, 0.82)',
+    borderColor: open ? 'rgba(190, 232, 95, 0.34)' : 'rgba(48, 52, 76, 0.36)',
     background: open
-      ? 'linear-gradient(180deg, rgba(35, 45, 25, 0.58), rgba(10, 14, 24, 0.94))'
+      ? 'linear-gradient(180deg, rgba(35, 45, 25, 0.38), rgba(7, 11, 19, 0.58))'
       : controlPanelStyle.background,
   };
 }
@@ -9386,22 +9392,27 @@ const panelHeadingMetaStyle: CSSProperties = {
 };
 
 const presetButtonStyle: CSSProperties = {
-  ...editorButtonChromeStyle({ tone: 'purple', compact: true }),
-  minHeight: 30,
+  ...editorButtonChromeStyle({ tone: 'neutral', compact: true }),
+  minHeight: 27,
   borderRadius: 7,
-  padding: '5px 10px',
-  fontSize: 12,
-  fontWeight: 900,
+  padding: '4px 8px',
+  borderColor: 'rgba(102, 114, 145, 0.28)',
+  background: 'rgba(16, 22, 34, 0.52)',
+  color: '#c3ccdc',
+  fontSize: 11,
+  fontWeight: 780,
   minWidth: 0,
 };
 
 const deleteTrackButtonStyle: CSSProperties = {
   ...editorButtonChromeStyle({ tone: 'danger', compact: true }),
-  minHeight: 30,
+  minHeight: 27,
   borderRadius: 7,
-  padding: '5px 10px',
-  fontSize: 12,
-  fontWeight: 900,
+  padding: '4px 8px',
+  borderColor: 'rgba(255, 107, 122, 0.34)',
+  background: 'rgba(82, 36, 46, 0.42)',
+  fontSize: 11,
+  fontWeight: 820,
   minWidth: 0,
 };
 
