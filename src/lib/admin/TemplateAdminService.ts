@@ -43,16 +43,19 @@ Arrangement analysis: ...
 const ANALYSIS_PROMPT = LYRIA_ANALYSIS_PROMPT;
 
 interface StoredAudio {
-  audioBase64: string;
-  mimeType: string;
+  audioFiles: TemplateAudioInput[];
   analysisKind: TemplateAnalysisKind;
 }
 
 export type GeminiAnalyzeFn = (
-  audioBase64: string,
-  mimeType: string,
+  audioFiles: TemplateAudioInput[],
   prompt: string,
 ) => Promise<string>;
+
+export interface TemplateAudioInput {
+  audioBase64: string;
+  mimeType: string;
+}
 
 export class TemplateAdminService {
   private supabase: SupabaseClient<Database>;
@@ -70,7 +73,24 @@ export class TemplateAdminService {
     mimeType: string,
     analysisKind: TemplateAnalysisKind = 'lyria3',
   ): Promise<TemplateAnalysisResult> {
-    this.audioStore.set(templateId, { audioBase64, mimeType, analysisKind });
+    return this.analyzeTemplateFiles(
+      templateId,
+      [{ audioBase64, mimeType }],
+      analysisKind,
+    );
+  }
+
+  async analyzeTemplateFiles(
+    templateId: string,
+    audioFiles: TemplateAudioInput[],
+    analysisKind: TemplateAnalysisKind = 'lyria3',
+  ): Promise<TemplateAnalysisResult> {
+    const validAudioFiles = audioFiles.filter((file) => file.audioBase64 && file.mimeType);
+    if (validAudioFiles.length === 0) {
+      throw new Error('至少需要一首参考音频用于模板分析');
+    }
+
+    this.audioStore.set(templateId, { audioFiles: validAudioFiles, analysisKind });
 
     const statusPatch = getStatusPatch(analysisKind, 'analyzing');
     const { error: statusError } = await this.supabase
@@ -85,9 +105,8 @@ export class TemplateAdminService {
 
     try {
       const fullAnalysis = await this.geminiAnalyze(
-        audioBase64,
-        mimeType,
-        getAnalysisPrompt(analysisKind),
+        validAudioFiles,
+        getAnalysisPrompt(analysisKind, validAudioFiles.length),
       );
 
       const result = parseAnalysisResponse(
@@ -129,10 +148,9 @@ export class TemplateAdminService {
       throw new Error(`模板 ${templateId} 的音频数据不存在，无法重新分析`);
     }
 
-    return this.analyzeTemplate(
+    return this.analyzeTemplateFiles(
       templateId,
-      stored.audioBase64,
-      stored.mimeType,
+      stored.audioFiles,
       analysisKind ?? stored.analysisKind,
     );
   }
@@ -185,8 +203,11 @@ export class TemplateAdminService {
   }
 }
 
-function getAnalysisPrompt(analysisKind: TemplateAnalysisKind) {
-  return analysisKind === 'suno' ? SUNO_ANALYSIS_PROMPT : LYRIA_ANALYSIS_PROMPT;
+function getAnalysisPrompt(analysisKind: TemplateAnalysisKind, audioCount = 1) {
+  const prefix = audioCount > 1
+    ? `You are analyzing ${audioCount} reference tracks for one reusable music template. Extract the common shared style, not isolated details from only one track.\n\n`
+    : '';
+  return prefix + (analysisKind === 'suno' ? SUNO_ANALYSIS_PROMPT : LYRIA_ANALYSIS_PROMPT);
 }
 
 function getStatusPatch(analysisKind: TemplateAnalysisKind, status: 'analyzing' | 'completed' | 'failed') {
@@ -275,8 +296,7 @@ function trimAtMusicalBoundary(text: string, maxChars: number) {
 }
 
 const defaultGeminiAnalyze: GeminiAnalyzeFn = async (
-  audioBase64,
-  mimeType,
+  audioFiles,
   prompt,
 ) => {
   const { GoogleGenAI } = await import('@google/genai');
@@ -294,7 +314,9 @@ const defaultGeminiAnalyze: GeminiAnalyzeFn = async (
       {
         role: 'user',
         parts: [
-          { inlineData: { mimeType, data: audioBase64 } },
+          ...audioFiles.map((file) => ({
+            inlineData: { mimeType: file.mimeType, data: file.audioBase64 },
+          })),
           { text: prompt },
         ],
       },

@@ -614,15 +614,15 @@ export default function AdminTemplatesPage() {
 
         try {
           const analysisTypes: AnalysisType[] = analysisChoice === 'both' ? ['suno', 'lyria3'] : [analysisChoice];
-          const analysisFile = filesToUpload[0];
-
           for (const analysisType of analysisTypes) {
             setUploadProgress({ current: filesToUpload.length, total: filesToUpload.length, status: `正在生成${getAnalysisDisplayName(analysisType)}...` });
 
             const analysisFormData = new FormData();
             analysisFormData.append('templateId', templateId);
             analysisFormData.append('analysisType', analysisType);
-            analysisFormData.append('audio', analysisFile);
+            filesToUpload.forEach((file) => {
+              analysisFormData.append('audio', file);
+            });
 
             const analysisRes = await fetch('/api/admin/templates/analyze', {
               method: 'POST',

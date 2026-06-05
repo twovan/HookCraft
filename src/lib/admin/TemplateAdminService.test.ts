@@ -91,8 +91,7 @@ describe('TemplateAdminService', () => {
       // Gemini 被正确调用
       expect(mockGemini).toHaveBeenCalledOnce();
       expect(mockGemini).toHaveBeenCalledWith(
-        'base64audio',
-        'audio/mp3',
+        [{ audioBase64: 'base64audio', mimeType: 'audio/mp3' }],
         expect.any(String),
       );
 
@@ -336,6 +335,23 @@ describe('TemplateAdminService', () => {
       const result = parseAnalysisResponse(plain);
       expect(result.lyriaPrompt).toBe(plain);
       expect(result.analysisDisplay).toBe(plain);
+    });
+
+    it('多首参考音频会一起传给 Gemini 做综合分析', async () => {
+      await service.analyzeTemplateFiles('tpl-multi', [
+        { audioBase64: 'audio-1', mimeType: 'audio/mp3' },
+        { audioBase64: 'audio-2', mimeType: 'audio/wav' },
+        { audioBase64: 'audio-3', mimeType: 'audio/mpeg' },
+      ], 'suno');
+
+      expect(mockGemini).toHaveBeenCalledWith(
+        [
+          { audioBase64: 'audio-1', mimeType: 'audio/mp3' },
+          { audioBase64: 'audio-2', mimeType: 'audio/wav' },
+          { audioBase64: 'audio-3', mimeType: 'audio/mpeg' },
+        ],
+        expect.stringContaining('analyzing 3 reference tracks'),
+      );
     });
 
     it('限制分析和 SUNO 描述在 1000 字符内', () => {

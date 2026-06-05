@@ -13,7 +13,7 @@ export const maxDuration = 300;
  *
  * FormData 参数：
  * - templateId: string（必填）
- * - audio: File（必填，参考音频文件；多文件流程当前由前端传入主参考音频）
+ * - audio: File[]（必填，参考音频文件，可多首综合分析）
  *
  * 返回：TemplateAnalysisResult
  */
@@ -24,7 +24,9 @@ export async function POST(req: NextRequest) {
 
     const formData = await req.formData();
     const templateId = formData.get("templateId") as string | null;
-    const audioFile = formData.get("audio") as File | null;
+    const audioFiles = formData
+      .getAll("audio")
+      .filter((item): item is File => item instanceof File && item.size > 0);
     const analysisTypeValue = formData.get("analysisType");
     const analysisType = analysisTypeValue === "suno" ? "suno" : "lyria3";
 
@@ -35,20 +37,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!audioFile || audioFile.size === 0) {
+    if (audioFiles.length === 0) {
       return NextResponse.json(
         { error: "请上传参考音频文件" },
         { status: 400 }
       );
     }
 
-    const audioBuffer = await audioFile.arrayBuffer();
-    const audioBase64 = Buffer.from(audioBuffer).toString("base64");
-    const fileName = audioFile.name.toLowerCase();
-    const mimeType = fileName.endsWith(".wav") ? "audio/wav" : "audio/mp3";
+    const audioInputs = await Promise.all(audioFiles.map(async (audioFile) => {
+      const audioBuffer = await audioFile.arrayBuffer();
+      const fileName = audioFile.name.toLowerCase();
+      return {
+        audioBase64: Buffer.from(audioBuffer).toString("base64"),
+        mimeType: audioFile.type || (fileName.endsWith(".wav") ? "audio/wav" : "audio/mp3"),
+      };
+    }));
 
     const service = new TemplateAdminService(supabaseAdmin);
-    const result = await service.analyzeTemplate(templateId, audioBase64, mimeType, analysisType);
+    const result = await service.analyzeTemplateFiles(templateId, audioInputs, analysisType);
 
     return NextResponse.json(result);
   } catch (error: any) {
