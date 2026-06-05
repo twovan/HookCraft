@@ -117,6 +117,37 @@ export default function Navbar() {
         display: none !important;
       }
 
+      .hc-nav-home {
+        height: 68px !important;
+        background: linear-gradient(180deg, rgba(5, 8, 14, .72), rgba(5, 8, 14, .42)) !important;
+        border-bottom-color: rgba(206, 255, 53, .12) !important;
+        box-shadow: none !important;
+      }
+
+      .hc-nav-home::after {
+        background: linear-gradient(90deg, transparent, rgba(206,255,53,.2), rgba(82,214,198,.12), transparent);
+      }
+
+      .hc-nav-home .hc-nav-links {
+        gap: 22px !important;
+      }
+
+      .hc-nav-home .hc-nav-links > a:not([href="/login"]) {
+        color: #e8edf7 !important;
+        background: transparent !important;
+        padding: 8px 2px !important;
+        font-weight: 760 !important;
+      }
+
+      .hc-nav-home .hc-nav-links > a:last-child {
+        min-height: 36px !important;
+        padding: 0 22px !important;
+        background: #ceff35 !important;
+        color: #08090c !important;
+        border-radius: 7px !important;
+        font-weight: 900 !important;
+      }
+
       .hc-nav-home a[href="/login"] {
         padding: 8px 8px !important;
         background: transparent !important;
