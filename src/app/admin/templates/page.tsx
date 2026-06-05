@@ -36,6 +36,13 @@ interface ProducerOption {
   email: string;
 }
 
+type AnalysisDraft = {
+  analysisResult: string;
+  lyriaPrompt: string;
+  advancedAnalysisResult: string;
+  advancedPrompt: string;
+};
+
 const MAX_TEMPLATE_ANALYSIS_CHARS = 1000;
 type AnalysisType = 'lyria3' | 'suno';
 type AnalysisChoice = AnalysisType | 'both';
@@ -296,6 +303,13 @@ export default function AdminTemplatesPage() {
   // Analysis modal
   const [analysisOpen, setAnalysisOpen] = useState(false);
   const [analysisTemplate, setAnalysisTemplate] = useState<TemplateItem | null>(null);
+  const [analysisDraft, setAnalysisDraft] = useState<AnalysisDraft>({
+    analysisResult: '',
+    lyriaPrompt: '',
+    advancedAnalysisResult: '',
+    advancedPrompt: '',
+  });
+  const [savingAnalysis, setSavingAnalysis] = useState(false);
 
   function requestAnalysisChoice(): Promise<AnalysisChoice | null> {
     setAnalysisChoiceOpen(true);
@@ -308,6 +322,86 @@ export default function AdminTemplatesPage() {
     analysisChoiceResolver.current?.(choice);
     analysisChoiceResolver.current = null;
     setAnalysisChoiceOpen(false);
+  }
+
+  function openAnalysisModal(template: TemplateItem) {
+    setAnalysisTemplate(template);
+    setAnalysisDraft({
+      analysisResult: template.analysis_result || '',
+      lyriaPrompt: template.lyria_prompt || '',
+      advancedAnalysisResult: formatAnalysisForDisplay(template.suno_analysis_result),
+      advancedPrompt: formatAnalysisForDisplay(template.suno_prompt),
+    });
+    setAnalysisOpen(true);
+  }
+
+  async function saveAnalysisDraft() {
+    if (!analysisTemplate) return;
+    setSavingAnalysis(true);
+    try {
+      const updates: Promise<Response>[] = [];
+      const hasAdvancedAnalysis = Boolean(
+        analysisTemplate.suno_analysis_result
+        || analysisTemplate.suno_prompt
+        || analysisDraft.advancedAnalysisResult
+        || analysisDraft.advancedPrompt
+      );
+      const hasLyriaAnalysis = Boolean(
+        analysisTemplate.analysis_result
+        || analysisTemplate.lyria_prompt
+        || analysisDraft.analysisResult
+        || analysisDraft.lyriaPrompt
+      );
+
+      if (hasAdvancedAnalysis) {
+        updates.push(fetch(`/api/admin/templates/${analysisTemplate.id}/save-analysis`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            analysisType: 'suno',
+            analysisResult: analysisDraft.advancedAnalysisResult,
+            lyriaPrompt: analysisDraft.advancedPrompt,
+          }),
+        }));
+      }
+
+      if (hasLyriaAnalysis) {
+        updates.push(fetch(`/api/admin/templates/${analysisTemplate.id}/save-analysis`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            analysisType: 'lyria3',
+            analysisResult: analysisDraft.analysisResult,
+            lyriaPrompt: analysisDraft.lyriaPrompt,
+          }),
+        }));
+      }
+
+      const responses = await Promise.all(updates);
+      const failed = responses.find((res) => !res.ok);
+      if (failed) {
+        const err = await failed.json().catch(() => ({ error: '保存失败' }));
+        throw new Error(err.error || '保存失败');
+      }
+
+      const updatedTemplate = {
+        ...analysisTemplate,
+        analysis_result: analysisDraft.analysisResult,
+        lyria_prompt: analysisDraft.lyriaPrompt,
+        suno_analysis_result: analysisDraft.advancedAnalysisResult,
+        suno_prompt: analysisDraft.advancedPrompt,
+      };
+      setAnalysisTemplate(updatedTemplate);
+      setData((current) => current.map((item) => (
+        item.id === updatedTemplate.id ? updatedTemplate : item
+      )));
+      await fetchData();
+      alert('风格分析已保存');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '保存失败');
+    } finally {
+      setSavingAnalysis(false);
+    }
   }
 
   const fetchData = useCallback(async () => {
@@ -727,7 +821,7 @@ export default function AdminTemplatesPage() {
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <button onClick={() => openEditModal(row)} style={actionBtnStyle}>编辑</button>
           {(row.analysis_status === 'completed' || row.suno_analysis_status === 'completed') && (
-            <button onClick={() => { setAnalysisTemplate(row); setAnalysisOpen(true); }} style={{ ...actionBtnStyle, color: '#7c3aed' }}>分析</button>
+            <button onClick={() => openAnalysisModal(row)} style={{ ...actionBtnStyle, color: '#7c3aed' }}>分析</button>
           )}
           {row.status === 'published' && (
             <button onClick={() => openStatusConfirm(row.id, 'unpublished', row.name)} style={actionBtnStyle}>下架</button>
@@ -1085,36 +1179,40 @@ export default function AdminTemplatesPage() {
             maxHeight: '80vh', overflow: 'auto', padding: 32,
             boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
           }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, gap: 12 }}>
               <h2 style={{ fontSize: 18, fontWeight: 700, color: '#1f2937', margin: 0 }}>
                 模板风格分析 - {analysisTemplate.name}
               </h2>
-              <button onClick={() => setAnalysisOpen(false)} style={{
-                border: 'none', background: '#f3f4f6', borderRadius: 8,
-                width: 32, height: 32, cursor: 'pointer', fontSize: 16,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>x</button>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <button onClick={saveAnalysisDraft} disabled={savingAnalysis} style={primaryBtnStyle}>
+                  {savingAnalysis ? '保存中...' : '保存确认'}
+                </button>
+                <button onClick={() => setAnalysisOpen(false)} style={{
+                  border: 'none', background: '#f3f4f6', borderRadius: 8,
+                  width: 32, height: 32, cursor: 'pointer', fontSize: 16,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>x</button>
+              </div>
             </div>
 
-            {analysisTemplate.analysis_result && (
+            {(analysisTemplate.analysis_result || analysisTemplate.lyria_prompt) && (
               <div style={{ marginBottom: 24 }}>
                 <h3 style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
-                  Lyria 风格分析 {renderCharacterCount(analysisTemplate.analysis_result)}
+                  Lyria 风格分析 {renderCharacterCount(analysisDraft.analysisResult)}
                 </h3>
-                <div style={{ background: '#f9fafb', borderRadius: 10, padding: 16, fontSize: 13, lineHeight: 1.8, color: '#374151', whiteSpace: 'pre-wrap', border: '1px solid #e5e7eb' }}>
-                  {analysisTemplate.analysis_result}
-                </div>
-              </div>
-            )}
-
-            {analysisTemplate.lyria_prompt && (
-              <div style={{ marginBottom: 24 }}>
+                <textarea
+                  value={analysisDraft.analysisResult}
+                  onChange={(e) => setAnalysisDraft((current) => ({ ...current, analysisResult: e.target.value }))}
+                  style={{ ...analysisTextAreaStyle, background: '#f9fafb', color: '#374151', borderColor: '#e5e7eb' }}
+                />
                 <h3 style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
-                  Lyria 风格提示 {renderCharacterCount(analysisTemplate.lyria_prompt)}
+                  Lyria 风格提示 {renderCharacterCount(analysisDraft.lyriaPrompt)}
                 </h3>
-                <div style={{ background: '#f0fdf4', borderRadius: 10, padding: 16, fontSize: 13, lineHeight: 1.6, color: '#166534', fontFamily: 'monospace', border: '1px solid #bbf7d0', whiteSpace: 'pre-wrap' }}>
-                  {analysisTemplate.lyria_prompt}
-                </div>
+                <textarea
+                  value={analysisDraft.lyriaPrompt}
+                  onChange={(e) => setAnalysisDraft((current) => ({ ...current, lyriaPrompt: e.target.value }))}
+                  style={{ ...analysisTextAreaStyle, background: '#f0fdf4', color: '#166534', borderColor: '#bbf7d0', fontFamily: 'monospace' }}
+                />
               </div>
             )}
 
@@ -1124,21 +1222,25 @@ export default function AdminTemplatesPage() {
                 {analysisTemplate.suno_analysis_result && (
                   <>
                     <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>
-                      中文编曲分析 {renderCharacterCount(formatAnalysisForDisplay(analysisTemplate.suno_analysis_result))}
+                      中文编曲分析 {renderCharacterCount(analysisDraft.advancedAnalysisResult)}
                     </div>
-                    <div style={{ background: '#fff7ed', borderRadius: 10, padding: 16, fontSize: 13, lineHeight: 1.8, color: '#9a3412', whiteSpace: 'pre-wrap', border: '1px solid #fed7aa', marginBottom: 12 }}>
-                      {formatAnalysisForDisplay(analysisTemplate.suno_analysis_result)}
-                    </div>
+                    <textarea
+                      value={analysisDraft.advancedAnalysisResult}
+                      onChange={(e) => setAnalysisDraft((current) => ({ ...current, advancedAnalysisResult: e.target.value }))}
+                      style={{ ...analysisTextAreaStyle, background: '#fff7ed', color: '#9a3412', borderColor: '#fed7aa', marginBottom: 12 }}
+                    />
                   </>
                 )}
                 {analysisTemplate.suno_prompt && (
                   <>
                     <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>
-                      高级生成风格描述 {renderCharacterCount(formatAnalysisForDisplay(analysisTemplate.suno_prompt), MAX_TEMPLATE_ANALYSIS_CHARS)}
+                      高级生成风格描述 {renderCharacterCount(analysisDraft.advancedPrompt, MAX_TEMPLATE_ANALYSIS_CHARS)}
                     </div>
-                    <div style={{ background: '#fefce8', borderRadius: 10, padding: 16, fontSize: 13, lineHeight: 1.6, color: '#713f12', fontFamily: 'monospace', border: '1px solid #fde68a', whiteSpace: 'pre-wrap' }}>
-                      {formatAnalysisForDisplay(analysisTemplate.suno_prompt)}
-                    </div>
+                    <textarea
+                      value={analysisDraft.advancedPrompt}
+                      onChange={(e) => setAnalysisDraft((current) => ({ ...current, advancedPrompt: e.target.value }))}
+                      style={{ ...analysisTextAreaStyle, background: '#fefce8', color: '#713f12', borderColor: '#fde68a', fontFamily: 'monospace' }}
+                    />
                   </>
                 )}
               </div>
@@ -1184,6 +1286,19 @@ const actionBtnStyle: React.CSSProperties = {
   cursor: 'pointer',
   fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
   whiteSpace: 'nowrap',
+};
+
+const analysisTextAreaStyle: React.CSSProperties = {
+  width: '100%',
+  minHeight: 140,
+  borderRadius: 10,
+  padding: 16,
+  fontSize: 13,
+  lineHeight: 1.7,
+  resize: 'vertical',
+  outline: 'none',
+  boxSizing: 'border-box',
+  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
 };
 
 const choiceBtnStyle: React.CSSProperties = {
