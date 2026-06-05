@@ -6255,13 +6255,17 @@ export default function StemMixerEditor({
             />
             <input
               aria-label="分轨播放进度"
+              className="stem-transport-time-range"
               type="range"
               min={0}
               max={Math.max(duration, 0.1)}
               step={0.05}
               value={Math.min(currentTime, duration || currentTime)}
               onChange={(event) => handleSeek(Number(event.target.value))}
-              style={timelineStyle}
+              style={{
+                ...timelineStyle,
+                '--stem-transport-progress': `${duration > 0 ? Math.max(0, Math.min(100, (currentTime / duration) * 100)) : 0}%`,
+              } as CSSProperties}
             />
             <span style={timeStyle}>{formatStemTimecode(duration)}</span>
           </div>
@@ -8105,6 +8109,55 @@ const timelineScrollbarCss = `
     transform: none;
   }
 
+  #stem-editor-timeline .stem-transport-time-range {
+    height: 14px;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+  }
+
+  #stem-editor-timeline .stem-transport-time-range::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(138, 124, 255, 0.82), rgba(138, 124, 255, 0.82) var(--stem-transport-progress, 0%), rgba(166, 174, 191, 0.54) var(--stem-transport-progress, 0%), rgba(166, 174, 191, 0.54) 100%);
+    box-shadow: inset 0 0 0 1px rgba(6, 12, 24, 0.32);
+  }
+
+  #stem-editor-timeline .stem-transport-time-range::-webkit-slider-thumb {
+    width: 12px;
+    height: 12px;
+    margin-top: -4px;
+    border: 0;
+    border-radius: 999px;
+    background: #8a7cff;
+    box-shadow: 0 0 0 2px rgba(7, 11, 19, 0.88), 0 0 10px rgba(138, 124, 255, 0.34);
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  #stem-editor-timeline .stem-transport-time-range::-moz-range-track {
+    height: 4px;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(166, 174, 191, 0.54);
+  }
+
+  #stem-editor-timeline .stem-transport-time-range::-moz-range-progress {
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(138, 124, 255, 0.82);
+  }
+
+  #stem-editor-timeline .stem-transport-time-range::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border: 0;
+    border-radius: 999px;
+    background: #8a7cff;
+    box-shadow: 0 0 0 2px rgba(7, 11, 19, 0.88), 0 0 10px rgba(138, 124, 255, 0.34);
+  }
+
   #stem-editor-timeline .stem-track-volume-range,
   #stem-editor-timeline .stem-track-pan-range {
     height: 12px;
@@ -8569,10 +8622,10 @@ function transportPanelStyle(compactTransport: boolean): CSSProperties {
     zIndex: 40,
     borderRadius: 0,
     border: 'none',
-    borderTop: '1px solid rgba(48, 52, 76, 0.56)',
-    background: 'linear-gradient(180deg, rgba(12, 16, 24, 0.94), rgba(6, 9, 15, 0.98))',
-    boxShadow: '0 -10px 28px rgba(0, 0, 0, 0.34)',
-    padding: compactTransport ? '9px 18px' : '10px 20px 12px',
+    borderTop: '1px solid rgba(82, 91, 119, 0.26)',
+    background: 'linear-gradient(180deg, rgba(9, 13, 21, 0.86), rgba(5, 8, 14, 0.96))',
+    boxShadow: '0 -8px 24px rgba(0, 0, 0, 0.22)',
+    padding: compactTransport ? '8px 18px' : '9px 20px 11px',
     minWidth: 0,
     maxWidth: '100vw',
     boxSizing: 'border-box',
@@ -8583,8 +8636,8 @@ function transportPanelStyle(compactTransport: boolean): CSSProperties {
 
 const transportStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'minmax(220px, 300px) 104px minmax(220px, 1fr) 76px',
-  gap: 12,
+  gridTemplateColumns: 'minmax(196px, 268px) 86px minmax(220px, 1fr) 58px',
+  gap: 11,
   alignItems: 'center',
 };
 
@@ -8594,19 +8647,19 @@ const transportButtonGroupStyle: CSSProperties = {
   flexWrap: 'nowrap',
   gap: 4,
   minWidth: 0,
-  padding: 3,
-  borderRadius: 10,
-  border: '1px solid rgba(48, 52, 76, 0.46)',
-  background: 'rgba(11, 15, 24, 0.46)',
+  padding: 2,
+  borderRadius: 8,
+  border: '1px solid rgba(91, 103, 132, 0.22)',
+  background: 'rgba(9, 13, 21, 0.28)',
   boxShadow: 'none',
 };
 
 const playButtonStyle: CSSProperties = {
   ...editorButtonChromeStyle({ tone: 'primary', round: true, active: true }),
-  minHeight: 34,
-  minWidth: 42,
-  border: '1px solid rgba(190, 232, 95, 0.66)',
-  background: '#bee85f',
+  minHeight: 31,
+  minWidth: 37,
+  border: '1px solid rgba(190, 232, 95, 0.48)',
+  background: 'linear-gradient(180deg, #c7f06a, #aee14f)',
   color: '#08100c',
   padding: 0,
   display: 'inline-flex',
@@ -8614,7 +8667,7 @@ const playButtonStyle: CSSProperties = {
   justifyContent: 'center',
   fontSize: 13,
   fontWeight: 900,
-  boxShadow: 'none',
+  boxShadow: '0 0 0 1px rgba(255, 255, 255, 0.18) inset',
   textShadow: 'none',
 };
 
@@ -8622,8 +8675,8 @@ function transportIconButtonStyle(disabled: boolean): CSSProperties {
   return {
     ...editorButtonChromeStyle({ tone: 'neutral', compact: false, disabled }),
     position: 'relative',
-    minWidth: 31,
-    minHeight: 31,
+    minWidth: 27,
+    minHeight: 27,
     padding: 0,
     display: 'inline-flex',
     alignItems: 'center',
@@ -8632,6 +8685,11 @@ function transportIconButtonStyle(disabled: boolean): CSSProperties {
     fontWeight: 900,
     fontVariantNumeric: 'tabular-nums',
     whiteSpace: 'nowrap',
+    borderRadius: 7,
+    borderColor: disabled ? 'rgba(48, 52, 76, 0.3)' : 'rgba(100, 113, 143, 0.2)',
+    background: disabled ? 'rgba(12, 16, 25, 0.24)' : 'rgba(14, 19, 30, 0.28)',
+    color: disabled ? 'rgba(119, 130, 153, 0.38)' : '#8f9ab2',
+    boxShadow: 'none',
   };
 }
 
@@ -8639,9 +8697,9 @@ const transportNudgeBadgeStyle: CSSProperties = {
   position: 'absolute',
   right: 3,
   bottom: 2,
-  color: '#aeb4c8',
-  fontSize: 8,
-  fontWeight: 900,
+  color: '#8e98ad',
+  fontSize: 7,
+  fontWeight: 800,
   lineHeight: 1,
   pointerEvents: 'none',
 };
@@ -8705,29 +8763,34 @@ function transportOptionButtonStyle(active: boolean, disabled: boolean): CSSProp
 }
 
 const timeStyle: CSSProperties = {
-  color: '#99a2b6',
-  fontSize: 11,
+  color: '#7f8aa0',
+  fontSize: 10,
+  fontWeight: 760,
   fontVariantNumeric: 'tabular-nums',
-  textAlign: 'center',
+  textAlign: 'right',
 };
 
 const timeInputStyle: CSSProperties = {
   width: '100%',
-  minHeight: 28,
+  minHeight: 27,
   borderRadius: 7,
-  border: '1px solid rgba(48, 52, 76, 0.58)',
-  background: 'rgba(10, 14, 24, 0.58)',
-  color: '#dce4f2',
-  padding: '4px 6px',
-  fontSize: 12,
-  fontWeight: 800,
+  border: '1px solid rgba(81, 93, 124, 0.24)',
+  background: 'rgba(10, 14, 24, 0.34)',
+  color: '#cfd8e8',
+  padding: '3px 6px',
+  fontSize: 11,
+  fontWeight: 820,
   fontVariantNumeric: 'tabular-nums',
   textAlign: 'center',
+  boxShadow: 'none',
 };
 
 const timelineStyle: CSSProperties = {
   width: '100%',
+  height: 14,
   accentColor: '#8a7cff',
+  cursor: 'pointer',
+  background: 'transparent',
 };
 
 const mixerSummaryStyle: CSSProperties = {
