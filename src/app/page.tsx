@@ -21,6 +21,7 @@ interface TemplateItem {
 }
 
 const GENRE_CHANNELS = ['Chinese Pop', 'EDM', 'Hip-Hop', 'Lo-Fi', 'Rock', 'Jazz'];
+const TEMPLATE_FILTERS = ['全部', '流行', 'R&B', '说唱', '摇滚', '电子', '国风', '...'];
 const WORKFLOW_STEPS = ['选择模板', '生成双版本', '分轨编辑', '导出交付'];
 const HERO_FEATURES = [
   { title: '一站式创作', detail: '词曲编录混导出' },
@@ -28,6 +29,15 @@ const HERO_FEATURES = [
   { title: '可商用发布', detail: '版权清晰更安心' },
 ];
 const WAVE_COLORS = ['#c084fc', '#ef4444', '#84cc16', '#2dd4bf', '#f472b6', '#f97316'];
+const PRODUCER_PLACEHOLDERS = [
+  { name: 'Fisherman', meta: '代表作《深海月序》' },
+  { name: '陈令韬', meta: '代表作《孤勇者》' },
+  { name: '彭飞', meta: '代表作《万物不如你》' },
+  { name: 'h3R3', meta: '代表作《说散就散》' },
+  { name: '刘凤瑶', meta: '代表作《达尔文》' },
+  { name: '王嘉诚', meta: '代表作《星辰大海》' },
+  { name: 'Z.H 刘维伦', meta: '代表作《告白》' },
+];
 
 async function fetchWithTimeout(url: string, timeoutMs = 8000) {
   const controller = new AbortController();
@@ -81,6 +91,23 @@ export default function HomePage() {
   const featuredTemplates = useMemo(() => templates.slice(0, 6), [templates]);
   const newTemplates = useMemo(() => templates.slice(6, 10), [templates]);
   const heroTemplate = featuredTemplates[0];
+  const producerShowcase = useMemo(() => {
+    const realProducers = featuredProducers.slice(0, 8).map((producer) => ({
+      id: producer.id,
+      name: producer.displayName,
+      meta: producer.styleTags.slice(0, 2).join(' / ') || `${producer.templateCount} 个模板`,
+      avatarUrl: producer.avatarUrl,
+      href: `/producers/${producer.id}`,
+    }));
+    const filler = PRODUCER_PLACEHOLDERS.slice(0, Math.max(0, 8 - realProducers.length)).map((producer, index) => ({
+      id: `placeholder-${index}`,
+      name: producer.name,
+      meta: producer.meta,
+      avatarUrl: '',
+      href: '/templates',
+    }));
+    return [...realProducers, ...filler].slice(0, 8);
+  }, [featuredProducers]);
 
   return (
     <main className="hc-shell home-page">
@@ -93,7 +120,7 @@ export default function HomePage() {
           <div className="home-hero-copy">
             <span className="home-eyebrow">新一代 AI 音乐工作站</span>
             <h1>
-              <span>HookCraft</span> AI 音乐创作
+              <span className="home-brand-line"><span>HookCraft</span> AI 音乐创作</span>
               <small>从一个 Hook 开始<br />生成可发布的<span>华语成品 Demo</span></small>
             </h1>
             <p>
@@ -133,6 +160,17 @@ export default function HomePage() {
           </div>
           <Link href="/templates" className="home-text-link">查看全部</Link>
         </div>
+        <div className="home-filter-row" aria-label="模板分类">
+          {TEMPLATE_FILTERS.map((filter, index) => (
+            <Link
+              key={filter}
+              href={index === 0 ? '/templates' : `/templates?genre=${encodeURIComponent(filter)}`}
+              className={index === 0 ? 'active' : ''}
+            >
+              {filter}
+            </Link>
+          ))}
+        </div>
 
         {loading ? (
           <div className="home-template-grid home-template-strip" aria-label="模板加载中">
@@ -151,22 +189,20 @@ export default function HomePage() {
         )}
       </section>
 
-      {featuredProducers.length > 0 && (
-        <section className="hc-container home-section home-producer-section">
-          <div className="home-section-head">
-            <div>
-              <h2 className="hc-section-title">知名制作人</h2>
-              <p className="hc-section-kicker">他们正在使用 HookCraft 创作。</p>
-            </div>
-            <Link href="/templates" className="home-text-link">查看全部</Link>
+      <section className="hc-container home-section home-producer-section">
+        <div className="home-section-head">
+          <div>
+            <h2 className="hc-section-title">知名制作人</h2>
+            <p className="hc-section-kicker">他们正在使用 HookCraft 创作。</p>
           </div>
-          <div className="home-producer-strip">
-            {featuredProducers.slice(0, 8).map((producer) => (
-              <ProducerPill key={producer.id} producer={producer} />
-            ))}
-          </div>
-        </section>
-      )}
+          <Link href="/templates" className="home-text-link">查看全部</Link>
+        </div>
+        <div className="home-producer-strip">
+          {producerShowcase.map((producer) => (
+            <ProducerPill key={producer.id} producer={producer} />
+          ))}
+        </div>
+      </section>
 
       <section className="hc-container home-section">
         <div className="home-channel-band">
@@ -266,19 +302,19 @@ function TemplateCard({ template }: { template: TemplateItem }) {
   );
 }
 
-function ProducerPill({ producer }: { producer: ProducerSummary }) {
+function ProducerPill({ producer }: { producer: { name: string; meta: string; avatarUrl?: string; href: string } }) {
   return (
-    <Link href={`/producers/${producer.id}`} className="home-producer-pill">
+    <Link href={producer.href} className="home-producer-pill">
       <span className="home-producer-avatar">
         {producer.avatarUrl ? (
-          <Image src={producer.avatarUrl} alt={producer.displayName} fill sizes="56px" />
+          <Image src={producer.avatarUrl} alt={producer.name} fill sizes="56px" />
         ) : (
-          producer.displayName.slice(0, 1).toUpperCase()
+          producer.name.slice(0, 1).toUpperCase()
         )}
       </span>
       <span>
-        <strong>{producer.displayName}</strong>
-        <em>{producer.styleTags.slice(0, 2).join(' / ') || `${producer.templateCount} 个模板`}</em>
+        <strong>{producer.name}</strong>
+        <em>{producer.meta}</em>
       </span>
     </Link>
   );
@@ -307,19 +343,19 @@ const homeStyles = `
 
   .home-hero-bg {
     position: absolute;
-    inset: 0;
+    inset: -14px -24px -10px 0;
     background-image: url('/home-hero-studio.webp');
     background-size: cover;
-    background-position: center center;
-    transform: scale(1.01);
+    background-position: 66% 44%;
+    transform: scale(1.035);
   }
 
   .home-hero-shade {
     position: absolute;
     inset: 0;
     background:
-      linear-gradient(90deg, rgba(5, 8, 14, .96) 0%, rgba(5, 8, 14, .72) 34%, rgba(5, 8, 14, .18) 65%, rgba(5, 8, 14, .38) 100%),
-      linear-gradient(180deg, rgba(5, 8, 14, .08), rgba(5, 8, 14, .7) 72%, rgba(5, 8, 14, .94));
+      linear-gradient(90deg, rgba(5, 8, 14, .96) 0%, rgba(5, 8, 14, .78) 30%, rgba(5, 8, 14, .18) 58%, rgba(5, 8, 14, .28) 100%),
+      linear-gradient(180deg, rgba(5, 8, 14, .02), rgba(5, 8, 14, .55) 74%, rgba(5, 8, 14, .92));
   }
 
   .home-hero-content {
@@ -354,9 +390,9 @@ const homeStyles = `
 
   .home-hero-copy h1 {
     margin: 14px 0 0;
-    max-width: 700px;
+    max-width: 780px;
     font-family: var(--hc-font-display);
-    font-size: clamp(32px, 3.45vw, 54px);
+    font-size: clamp(31px, 3.25vw, 50px);
     line-height: 1.08;
     font-weight: 950;
     letter-spacing: 0;
@@ -364,9 +400,14 @@ const homeStyles = `
     text-wrap: balance;
   }
 
-  .home-hero-copy h1 span {
+  .home-brand-line {
+    display: block;
+    white-space: nowrap;
+  }
+
+  .home-brand-line span {
     color: var(--hc-lime);
-    font-size: clamp(52px, 5.7vw, 88px);
+    font-size: clamp(52px, 5.25vw, 80px);
     line-height: .95;
   }
 
@@ -490,7 +531,35 @@ const homeStyles = `
     align-items: end;
     justify-content: space-between;
     gap: 24px;
+    margin-bottom: 14px;
+  }
+
+  .home-filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
     margin-bottom: 16px;
+  }
+
+  .home-filter-row a {
+    min-height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    border: 1px solid rgba(100, 113, 143, .28);
+    background: rgba(8, 12, 20, .66);
+    color: #b8c2d5;
+    padding: 0 14px;
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: 820;
+  }
+
+  .home-filter-row a.active {
+    border-color: rgba(206, 255, 53, .5);
+    background: var(--hc-lime);
+    color: #08090c;
   }
 
   .home-text-link {
@@ -542,7 +611,7 @@ const homeStyles = `
   }
 
   .template-skeleton-wave {
-    height: 58px;
+    height: 52px;
     display: flex;
     align-items: center;
     gap: 2px;
@@ -584,7 +653,7 @@ const homeStyles = `
   }
 
   .template-wave {
-    height: 58px;
+    height: 52px;
     display: flex;
     align-items: center;
     gap: 2px;
@@ -601,7 +670,7 @@ const homeStyles = `
   }
 
   .template-card-body {
-    padding: 9px 11px 10px;
+    padding: 8px 10px 9px;
   }
 
   .template-title-row {
@@ -639,7 +708,7 @@ const homeStyles = `
 
   .template-producer {
     display: inline-block;
-    margin-top: 4px;
+    margin-top: 3px;
     color: #8f9ab2;
     text-decoration: none;
     font-size: 12px;
@@ -650,7 +719,7 @@ const homeStyles = `
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
-    margin-top: 6px;
+    margin-top: 5px;
   }
 
   .template-tags span {
@@ -691,20 +760,20 @@ const homeStyles = `
   }
 
   .home-producer-section {
-    padding-top: 24px;
+    padding-top: 22px;
   }
 
   .home-producer-strip {
     display: grid;
     grid-template-columns: repeat(8, minmax(0, 1fr));
-    gap: 18px;
+    gap: 20px;
   }
 
   .home-producer-pill {
     min-width: 0;
     display: grid;
-    grid-template-columns: 48px minmax(0, 1fr);
-    gap: 10px;
+    grid-template-columns: 50px minmax(0, 1fr);
+    gap: 11px;
     align-items: center;
     color: #f8fafc;
     text-decoration: none;
@@ -712,8 +781,8 @@ const homeStyles = `
 
   .home-producer-avatar {
     position: relative;
-    width: 48px;
-    height: 48px;
+    width: 50px;
+    height: 50px;
     border-radius: 999px;
     overflow: hidden;
     display: inline-flex;
@@ -736,7 +805,7 @@ const homeStyles = `
     text-overflow: ellipsis;
     white-space: nowrap;
     color: #f4f7ff;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 860;
   }
 
@@ -748,7 +817,7 @@ const homeStyles = `
     white-space: nowrap;
     color: #7f8aa0;
     font-style: normal;
-    font-size: 11px;
+    font-size: 10px;
   }
 
   .home-channel-band,
