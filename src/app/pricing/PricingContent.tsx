@@ -27,6 +27,12 @@ export default function PricingContent({ tiers, initialCreditsPacks }: PricingCo
   const [upgrading, setUpgrading] = useState(false);
   const [upgradeResult, setUpgradeResult] = useState<{ tier: string; tier_name: string; monthly_credits: number } | null>(null);
   const [upgradeError, setUpgradeError] = useState<string | null>(null);
+  const [creditsDialog, setCreditsDialog] = useState<{
+    type: 'success' | 'error';
+    title: string;
+    message: string;
+    detail?: string;
+  } | null>(null);
   const [creditsPacks, setCreditsPacks] = useState(initialCreditsPacks);
   const router = useRouter();
   const { user } = useAuth();
@@ -110,12 +116,27 @@ export default function PricingContent({ tiers, initialCreditsPacks }: PricingCo
       const data = await res.json();
       if (res.ok && data.success) {
         fetchCredits({ force: true });
-        alert(`充值成功，已增加 ${data.credits_added} 点额度，当前剩余 ${data.remaining} 点额度`);
+        setCreditsDialog({
+          type: 'success',
+          title: '额度已到账',
+          message: `已为账户增加 ${data.credits_added} 点额度。`,
+          detail: `当前可用额度 ${data.remaining} 点，可继续用于高级生成和模板创作。`,
+        });
       } else {
-        alert(data.error || '充值失败');
+        setCreditsDialog({
+          type: 'error',
+          title: '充值未完成',
+          message: data.error || '这次额度充值没有成功。',
+          detail: '请稍后重试；如果额度已扣款但未到账，请联系支持处理。',
+        });
       }
     } catch {
-      alert('网络错误，请重试');
+      setCreditsDialog({
+        type: 'error',
+        title: '网络连接异常',
+        message: '暂时无法完成充值请求。',
+        detail: '请检查网络后重试，页面不会重复扣除额度。',
+      });
     }
   };
 
@@ -146,6 +167,33 @@ export default function PricingContent({ tiers, initialCreditsPacks }: PricingCo
       )}
       {upgradeError && <div className="notice error">{upgradeError}</div>}
       {upgrading && <div className="notice loading">正在升级中...</div>}
+      {creditsDialog && (
+        <div className="result-modal-backdrop" role="presentation" onClick={() => setCreditsDialog(null)}>
+          <div
+            className={`result-modal ${creditsDialog.type}`}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="credits-result-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button className="result-close" type="button" onClick={() => setCreditsDialog(null)} aria-label="关闭">
+              x
+            </button>
+            <div className="result-mark" aria-hidden="true">
+              {creditsDialog.type === 'success' ? '✓' : '!'}
+            </div>
+            <div>
+              <span className="result-kicker">{creditsDialog.type === 'success' ? 'Purchase complete' : 'Action needed'}</span>
+              <h3 id="credits-result-title">{creditsDialog.title}</h3>
+              <p>{creditsDialog.message}</p>
+              {creditsDialog.detail && <small>{creditsDialog.detail}</small>}
+            </div>
+            <button className="result-primary" type="button" onClick={() => setCreditsDialog(null)}>
+              知道了
+            </button>
+          </div>
+        </div>
+      )}
 
       <section className="tier-grid" aria-label="会员方案">
         {tiers.map((tierConfig) => (
@@ -263,6 +311,117 @@ export default function PricingContent({ tiers, initialCreditsPacks }: PricingCo
           border: 1px solid rgba(255,90,61,.34);
           background: rgba(255,90,61,.1);
           color: #ff8b76;
+        }
+
+        .result-modal-backdrop {
+          position: fixed;
+          inset: 0;
+          z-index: 80;
+          display: grid;
+          place-items: center;
+          padding: 24px;
+          background:
+            radial-gradient(circle at 50% 42%, rgba(206,255,53,.12), transparent 30%),
+            rgba(3, 5, 8, .74);
+          backdrop-filter: blur(16px);
+        }
+
+        .result-modal {
+          position: relative;
+          width: min(480px, 100%);
+          border: 1px solid rgba(255,255,255,.14);
+          border-radius: 18px;
+          padding: 28px;
+          display: grid;
+          grid-template-columns: 48px 1fr;
+          gap: 16px;
+          background:
+            linear-gradient(180deg, rgba(24,26,34,.96), rgba(8,9,12,.98)),
+            #08090c;
+          box-shadow: 0 32px 100px rgba(0,0,0,.56), inset 0 1px 0 rgba(255,255,255,.08);
+          color: var(--hc-text);
+        }
+
+        .result-modal.success {
+          border-color: rgba(206,255,53,.34);
+        }
+
+        .result-modal.error {
+          border-color: rgba(255,90,61,.38);
+        }
+
+        .result-mark {
+          width: 48px;
+          height: 48px;
+          border-radius: 50%;
+          display: grid;
+          place-items: center;
+          background: linear-gradient(135deg, var(--hc-lime), var(--hc-cyan));
+          color: #08090c;
+          font-size: 22px;
+          font-weight: 950;
+          box-shadow: 0 14px 36px rgba(206,255,53,.18);
+        }
+
+        .result-modal.error .result-mark {
+          background: linear-gradient(135deg, #ff8b76, #ffd166);
+        }
+
+        .result-kicker {
+          display: block;
+          margin-bottom: 6px;
+          color: var(--hc-lime);
+          font-size: 11px;
+          font-weight: 950;
+          letter-spacing: .12em;
+          text-transform: uppercase;
+        }
+
+        .result-modal h3 {
+          margin: 0 34px 8px 0;
+          font-size: 22px;
+          line-height: 1.2;
+        }
+
+        .result-modal p {
+          margin: 0;
+          color: var(--hc-text);
+          font-size: 15px;
+          line-height: 1.65;
+        }
+
+        .result-modal small {
+          display: block;
+          margin-top: 10px;
+          color: var(--hc-muted);
+          font-size: 13px;
+          line-height: 1.6;
+        }
+
+        .result-close {
+          position: absolute;
+          top: 16px;
+          right: 16px;
+          width: 30px;
+          height: 30px;
+          border: 1px solid rgba(255,255,255,.1);
+          border-radius: 999px;
+          background: rgba(255,255,255,.06);
+          color: var(--hc-muted);
+          cursor: pointer;
+        }
+
+        .result-primary {
+          grid-column: 1 / -1;
+          margin-top: 6px;
+          border: none;
+          border-radius: 999px;
+          padding: 13px 18px;
+          background: linear-gradient(135deg, var(--hc-lime), var(--hc-cyan));
+          color: #08090c;
+          font-size: 14px;
+          font-weight: 950;
+          cursor: pointer;
         }
 
         .tier-grid {
@@ -426,6 +585,11 @@ export default function PricingContent({ tiers, initialCreditsPacks }: PricingCo
 
           .credits-grid {
             grid-template-columns: 1fr;
+          }
+
+          .result-modal {
+            grid-template-columns: 1fr;
+            padding: 24px;
           }
         }
       ` }} />
