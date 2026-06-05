@@ -130,6 +130,9 @@ export default function Navbar() {
 
       .hc-nav-home .hc-nav-links {
         gap: 22px !important;
+        flex: 1 1 auto !important;
+        justify-content: flex-start !important;
+        margin-left: 74px !important;
       }
 
       .hc-nav-home .hc-nav-links > a:not([href="/login"]) {
@@ -149,6 +152,7 @@ export default function Navbar() {
       }
 
       .hc-nav-home a[href="/login"] {
+        margin-left: auto !important;
         padding: 8px 8px !important;
         background: transparent !important;
         color: #d7dce8 !important;
@@ -188,10 +192,10 @@ export default function Navbar() {
     }} className={`hc-nav ${isHome ? 'hc-nav-home' : ''}`}>
       <Link href="/" className="hc-nav-logo" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none', flex: '0 0 auto' }}>
         <Image
-          src="/logo-nav.svg"
+          src={isHome ? "/logo-nav-lime.svg" : "/logo-nav.svg"}
           alt="HookCraft"
-          width={140}
-          height={36}
+          width={isHome ? 170 : 140}
+          height={isHome ? 44 : 36}
           priority
         />
       </Link>
