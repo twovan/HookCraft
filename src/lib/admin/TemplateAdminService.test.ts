@@ -346,5 +346,15 @@ describe('TemplateAdminService', () => {
       expect(result.analysisDisplay.length).toBeLessThanOrEqual(1000);
       expect(result.lyriaPrompt.length).toBeLessThanOrEqual(1000);
     });
+
+    it('清理模型返回的 Markdown 强调标记', () => {
+      const result = parseAnalysisResponse(
+        '编曲分析：**节奏与速度**：72 BPM。**配器架构**：钢琴与弦乐。\n[PROMPT]Orchestral Pop, **72 BPM**, cinematic strings.[/PROMPT]',
+        1000,
+      );
+
+      expect(result.analysisDisplay).toBe('编曲分析：节奏与速度：72 BPM。配器架构：钢琴与弦乐。');
+      expect(result.lyriaPrompt).toBe('Orchestral Pop, 72 BPM, cinematic strings.');
+    });
   });
 });

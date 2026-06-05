@@ -230,21 +230,28 @@ function parseAnalysisResponse(
     const rawPrompt = promptMatch[1].trim();
     const rawAnalysis = fullAnalysis.replace(/\[PROMPT\][\s\S]*?\[\/PROMPT\]/, '').trim();
     return {
-      analysisDisplay: maxChars ? truncateText(rawAnalysis, maxChars) : rawAnalysis,
-      lyriaPrompt: maxChars ? truncateText(rawPrompt, maxChars) : rawPrompt,
+      analysisDisplay: maxChars ? truncateText(rawAnalysis, maxChars) : normalizeAnalysisText(rawAnalysis),
+      lyriaPrompt: maxChars ? truncateText(rawPrompt, maxChars) : normalizeAnalysisText(rawPrompt),
     };
   }
 
   const trimmed = fullAnalysis.trim();
-  const value = maxChars ? truncateText(trimmed, maxChars) : trimmed;
+  const value = maxChars ? truncateText(trimmed, maxChars) : normalizeAnalysisText(trimmed);
   return { analysisDisplay: value, lyriaPrompt: value };
 }
 
-function truncateText(text: string, maxChars: number) {
-  const normalized = text
+function normalizeAnalysisText(text: string) {
+  return text
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
     .replace(/\s+/g, ' ')
     .replace(/\s+([,.;:!?])/g, '$1')
     .trim();
+}
+
+function truncateText(text: string, maxChars: number) {
+  const normalized = normalizeAnalysisText(text);
   const chars = Array.from(normalized);
   if (chars.length <= maxChars) return normalized;
   return trimAtMusicalBoundary(normalized, maxChars);
