@@ -1,5 +1,5 @@
 // CreditService 单元测试（Supabase 版）
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { CreditService } from './CreditService';
 import { CREDITS_COST } from '../../config/creditsCost';
 import { TIER_CONFIGS } from '../../config/tierConfig';
@@ -265,8 +265,14 @@ describe('CreditService', () => {
   let mocks: ReturnType<typeof createMockSupabase>;
 
   beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2025-01-15T00:00:00Z'));
     mocks = createMockSupabase();
     service = new CreditService(mocks.supabase);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   // ─── getCredits ─────────────────────────────────────────
@@ -916,6 +922,40 @@ describe('CreditService', () => {
       expect(info.totalAvailable).toBe(90);
     });
 
+    it('额度周期过期时先重置再返回新周期余额', async () => {
+      vi.setSystemTime(new Date('2025-02-02T00:00:00Z'));
+      const expiredRow = createCreditsRow({ used: 80, total: 100, version: 2 });
+      const refreshedRow = createCreditsRow({
+        used: 0,
+        total: 100,
+        version: 3,
+        period_start: '2025-02-02T00:00:00.000Z',
+        period_end: '2025-03-02T00:00:00.000Z',
+      });
+      mocks.creditsSingle
+        .mockResolvedValueOnce({ data: expiredRow, error: null })
+        .mockResolvedValueOnce({ data: expiredRow, error: null })
+        .mockResolvedValueOnce({ data: refreshedRow, error: null });
+      mocks.txNeq.mockResolvedValue({ data: [], error: null });
+      mocks.historyInsert.mockResolvedValue({ data: null, error: null });
+      mocks.creditsSimpleUpdateEq.mockResolvedValue({ data: null, error: null });
+      mocks.purchasedMaybeSingle.mockResolvedValue({ data: null, error: null });
+
+      const info = await service.getCreditsEnhanced('user-1');
+
+      expect(info.monthlyUsed).toBe(0);
+      expect(info.monthlyRemaining).toBe(100);
+      expect(mocks.historyInsert).toHaveBeenCalledWith(expect.objectContaining({
+        user_id: 'user-1',
+        month: '2025-01',
+        used: 80,
+      }));
+      expect(mocks.creditsSimpleUpdate).toHaveBeenCalledWith(expect.objectContaining({
+        used: 0,
+        version: 3,
+      }));
+    });
+
     it('credits 查询错误时抛出 AppError', async () => {
       mocks.creditsSingle.mockResolvedValue({
         data: null,
@@ -947,6 +987,12 @@ describe('CreditService', () => {
       expect(result.success).toBe(true);
       expect(result.purchasedBalance).toBe(50);
       expect(result.totalAvailable).toBe(120); // 70 monthly remaining + 50 purchased
+      expect(mocks.txInsert).toHaveBeenCalledWith(expect.objectContaining({
+        operation_type: 'purchase',
+        total_cost: -50,
+        monthly_cost: 0,
+        purchased_cost: -50,
+      }));
     });
 
     it('已有记录时累加 balance', async () => {

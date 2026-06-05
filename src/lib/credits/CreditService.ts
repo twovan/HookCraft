@@ -21,6 +21,7 @@ import { toCreditInfo, toCreditHistory, toCreditInfoEnhanced, toCreditHistoryEnh
 import { toAppError } from '../supabase/errors';
 
 type PurchasedCreditsRow = Database['public']['Tables']['purchased_credits']['Row'];
+type CreditsRow = Database['public']['Tables']['credits']['Row'];
 
 /**
  * CreditService - AI 创作额度管理服务
@@ -88,6 +89,26 @@ export class CreditService {
     return this.recoverPurchasedCreditsFromCompletedPayments(userId);
   }
 
+  private isCreditsPeriodExpired(row: Pick<CreditsRow, 'period_end'>): boolean {
+    return new Date(row.period_end).getTime() <= Date.now();
+  }
+
+  private async refreshExpiredCreditsRow(userId: string, row: CreditsRow): Promise<CreditsRow> {
+    if (!this.isCreditsPeriodExpired(row)) return row;
+
+    await this.resetMonthlyCredits(userId);
+
+    const { data, error } = await this.supabase
+      .from('credits')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (error) throw toAppError(error, 'credits', 'select');
+    if (!data) throw new Error('Credits record not found after monthly reset');
+    return data;
+  }
+
   /**
    * 获取用户当前 Credits 信息
    * 从 credits 表查询指定 user_id 的记录
@@ -139,7 +160,8 @@ export class CreditService {
       return toCreditInfo(newData);
     }
     
-    return toCreditInfo(data);
+    const currentData = await this.refreshExpiredCreditsRow(userId, data);
+    return toCreditInfo(currentData);
   }
 
   /**
@@ -159,14 +181,15 @@ export class CreditService {
     const totalCost = await this.calculateTotalCostAsync(operations);
 
     // 1. 读取当前 credits 及 version
-    const { data: currentCredits, error: creditsReadError } = await this.supabase
+    const { data: creditsData, error: creditsReadError } = await this.supabase
       .from('credits')
       .select('*')
       .eq('user_id', userId)
       .maybeSingle();
 
     if (creditsReadError) throw toAppError(creditsReadError, 'credits', 'select');
-    if (!currentCredits) throw new Error('Credits record not found');
+    if (!creditsData) throw new Error('Credits record not found');
+    const currentCredits = await this.refreshExpiredCreditsRow(userId, creditsData);
 
     // 2. 读取当前 purchased_credits 及 version（可能不存在）
     const currentPurchased = await this.readPurchasedCreditsRow(userId);
@@ -322,6 +345,8 @@ export class CreditService {
         finalCreditsRow = newCredits;
       }
     }
+
+    finalCreditsRow = await this.refreshExpiredCreditsRow(userId, finalCreditsRow);
 
     const purchasedRow = await this.readPurchasedCreditsRow(userId);
 
@@ -533,7 +558,7 @@ export class CreditService {
       .insert({
         user_id: userId,
         operation_type: 'purchase',
-        total_cost: amount,
+        total_cost: -amount,
         monthly_cost: 0,
         purchased_cost: -amount,
         monthly_remaining_after: monthlyRemaining,

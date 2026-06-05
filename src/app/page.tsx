@@ -143,7 +143,7 @@ export default function HomePage() {
         <div className="home-section-head">
           <div>
             <h2 className="hc-section-title">精选模板</h2>
-            <p className="hc-section-kicker">从可试听的风格模板开始，比空白提示词更快接近成品。</p>
+            <p className="hc-section-kicker">从可套用的风格模板开始，比空白提示词更快接近成品。</p>
           </div>
           <Link href="/templates" className="home-text-link">查看全部</Link>
         </div>
@@ -249,7 +249,6 @@ function TemplateCard({ template }: { template: TemplateItem }) {
     <article className="template-card">
       <Link href={`/templates/${template.id}`} className="template-card-cover" aria-label={`查看模板 ${template.name}`}>
         <TemplateCover template={template} />
-        <span className="template-play">试听</span>
       </Link>
       <div className="template-card-body">
         <Link href={`/templates/${template.id}`} className="template-title">{template.name}</Link>
@@ -367,8 +366,6 @@ const homeStyles = `
   }
   .template-card:hover { transform: translateY(-4px); border-color: rgba(206,255,53,.34); box-shadow: 0 20px 52px rgba(0,0,0,.32); }
   .template-card-cover { position: relative; display: block; color: inherit; text-decoration: none; }
-  .template-play { position: absolute; right: 12px; bottom: 12px; min-height: 32px; display: inline-flex; align-items: center; border-radius: 999px; background: var(--hc-lime); color: #08090c; padding: 0 12px; font-size: 12px; font-weight: 900; opacity: 0; transform: translateY(4px); transition: opacity 160ms ease, transform 160ms ease; }
-  .template-card:hover .template-play { opacity: 1; transform: translateY(0); }
   .template-card-body { padding: 14px; }
   .template-title { display: block; color: var(--hc-text); text-decoration: none; font-size: 16px; line-height: 1.35; font-weight: 800; }
   .template-producer { display: inline-block; margin-top: 7px; color: var(--hc-text-muted); text-decoration: none; font-size: 12px; font-weight: 700; }

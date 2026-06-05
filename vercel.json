@@ -1,4 +1,10 @@
 {
+  "crons": [
+    {
+      "path": "/api/credits/monthly-reset",
+      "schedule": "5 16 * * *"
+    }
+  ],
   "functions": {
     "src/app/api/minimax/generate/route.ts": {
       "maxDuration": 300

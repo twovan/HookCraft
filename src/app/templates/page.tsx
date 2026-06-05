@@ -348,7 +348,6 @@ function TemplateMarketCard({
             </div>
           </div>
         )}
-        <span className="template-audition">试听</span>
       </Link>
 
       <div className="template-market-body">
@@ -601,29 +600,6 @@ const templatesStyles = `
   .template-generated-cover i:nth-child(4n+2) { height: 78%; }
   .template-generated-cover i:nth-child(4n+3) { height: 54%; }
   .template-generated-cover i:nth-child(4n) { height: 92%; }
-
-  .template-audition {
-    position: absolute;
-    right: 12px;
-    bottom: 12px;
-    min-height: 32px;
-    display: inline-flex;
-    align-items: center;
-    border-radius: 999px;
-    background: var(--hc-lime);
-    color: #08090c;
-    padding: 0 12px;
-    font-size: 12px;
-    font-weight: 900;
-    opacity: 0;
-    transform: translateY(4px);
-    transition: opacity 160ms ease, transform 160ms ease;
-  }
-
-  .template-market-card:hover .template-audition {
-    opacity: 1;
-    transform: translateY(0);
-  }
 
   .template-market-body {
     padding: 15px;

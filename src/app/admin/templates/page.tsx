@@ -854,7 +854,7 @@ export default function AdminTemplatesPage() {
           </div>
           {/* Audio Upload - multi-file with progress */}
           <div>
-            <label style={labelStyle}>试听音频（可多选）</label>
+            <label style={labelStyle}>参考音频（可多选）</label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <input
                 type="file"

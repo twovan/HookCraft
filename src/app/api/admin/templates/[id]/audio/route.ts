@@ -10,7 +10,7 @@ export const maxDuration = 60;
 
 /**
  * POST /api/admin/templates/[id]/audio
- * 上传模板参考音频 / 试听音频
+ * 上传模板参考音频
  */
 export async function POST(
   req: NextRequest,
