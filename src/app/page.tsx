@@ -4,7 +4,6 @@ import Image from 'next/image';
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
 import { useEffect, useMemo, useState } from 'react';
-import ProducerCard from '@/components/producer/ProducerCard';
 import type { ProducerSummary } from '@/types/producer';
 
 interface TemplateItem {
@@ -21,14 +20,6 @@ interface TemplateItem {
   producerName?: string;
 }
 
-const COVER_GRADIENTS = [
-  'linear-gradient(135deg, #ceff35 0%, #52d6c6 48%, #15181f 100%)',
-  'linear-gradient(135deg, #ff5a3d 0%, #f5c542 42%, #15181f 100%)',
-  'linear-gradient(135deg, #52d6c6 0%, #8b5cf6 50%, #15181f 100%)',
-  'linear-gradient(135deg, #f5c542 0%, #ceff35 38%, #15181f 100%)',
-  'linear-gradient(135deg, #ff5a3d 0%, #8b5cf6 52%, #15181f 100%)',
-];
-
 const GENRE_CHANNELS = ['Chinese Pop', 'EDM', 'Hip-Hop', 'Lo-Fi', 'Rock', 'Jazz'];
 const WORKFLOW_STEPS = ['选择模板', '生成双版本', '分轨编辑', '导出交付'];
 const HERO_FEATURES = [
@@ -36,12 +27,7 @@ const HERO_FEATURES = [
   { title: 'AI 加速创作', detail: '灵感到成品更快' },
   { title: '可商用发布', detail: '版权清晰更安心' },
 ];
-
-function getGradient(name: string): string {
-  let hash = 0;
-  for (let i = 0; i < name.length; i += 1) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  return COVER_GRADIENTS[Math.abs(hash) % COVER_GRADIENTS.length];
-}
+const WAVE_COLORS = ['#c084fc', '#ef4444', '#84cc16', '#2dd4bf', '#f472b6', '#f97316'];
 
 async function fetchWithTimeout(url: string, timeoutMs = 8000) {
   const controller = new AbortController();
@@ -92,8 +78,8 @@ export default function HomePage() {
     void fetchProducers();
   }, []);
 
-  const featuredTemplates = useMemo(() => templates.slice(0, 8), [templates]);
-  const newTemplates = useMemo(() => templates.slice(8, 12), [templates]);
+  const featuredTemplates = useMemo(() => templates.slice(0, 6), [templates]);
+  const newTemplates = useMemo(() => templates.slice(6, 10), [templates]);
   const heroTemplate = featuredTemplates[0];
 
   return (
@@ -165,6 +151,23 @@ export default function HomePage() {
         )}
       </section>
 
+      {featuredProducers.length > 0 && (
+        <section className="hc-container home-section home-producer-section">
+          <div className="home-section-head">
+            <div>
+              <h2 className="hc-section-title">知名制作人</h2>
+              <p className="hc-section-kicker">他们正在使用 HookCraft 创作。</p>
+            </div>
+            <Link href="/templates" className="home-text-link">查看全部</Link>
+          </div>
+          <div className="home-producer-strip">
+            {featuredProducers.slice(0, 8).map((producer) => (
+              <ProducerPill key={producer.id} producer={producer} />
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="hc-container home-section">
         <div className="home-channel-band">
           <div>
@@ -197,22 +200,6 @@ export default function HomePage() {
         </section>
       )}
 
-      {featuredProducers.length > 0 && (
-        <section className="hc-container home-section">
-          <div className="home-section-head">
-            <div>
-              <h2 className="hc-section-title">推荐创作者</h2>
-              <p className="hc-section-kicker">从制作人出发发现模板，沿用现有制作人详情与模板交易功能。</p>
-            </div>
-          </div>
-          <div className="home-producer-grid">
-            {featuredProducers.slice(0, 4).map((producer) => (
-              <ProducerCard key={producer.id} producer={producer} />
-            ))}
-          </div>
-        </section>
-      )}
-
       <section className="hc-container home-section home-safe-band">
         <div>
           <h2 className="hc-section-title">商业创作需要可控流程</h2>
@@ -228,10 +215,9 @@ export default function HomePage() {
 }
 
 function TemplateSkeleton({ index }: { index: number }) {
-  const colors = ['#c084fc', '#ef4444', '#84cc16', '#2dd4bf', '#f472b6', '#f97316'];
   return (
     <article className="template-card template-card-skeleton">
-      <div className="template-skeleton-wave" style={{ '--wave-color': colors[index % colors.length] } as CSSProperties}>
+      <div className="template-skeleton-wave" style={{ '--wave-color': WAVE_COLORS[index % WAVE_COLORS.length] } as CSSProperties}>
         {Array.from({ length: 28 }).map((_, bar) => (
           <i key={bar} style={{ height: `${28 + ((bar + index * 4) % 9) * 6}%` }} />
         ))}
@@ -244,35 +230,25 @@ function TemplateSkeleton({ index }: { index: number }) {
   );
 }
 
-function TemplateCover({ template, size = 'normal' }: { template?: TemplateItem; size?: 'normal' | 'large' }) {
-  const label = template?.genre || 'Hook';
-  return (
-    <div className={`template-cover ${size}`} style={{ background: getGradient(template?.name || label) }}>
-      {template?.coverUrl ? (
-        <Image src={template.coverUrl} alt={template.name} fill style={{ objectFit: 'cover' }} sizes={size === 'large' ? '320px' : '25vw'} />
-      ) : (
-        <>
-          <span>{label}</span>
-          <div className="cover-bars">
-            {Array.from({ length: 14 }).map((_, index) => <i key={index} />)}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
 function TemplateCard({ template }: { template: TemplateItem }) {
   const tags = [template.genre, template.category === 'free_template' ? '免费' : '付费'].filter(Boolean);
   const price = template.price ? Math.round(template.price / 100) : 0;
+  const waveColor = WAVE_COLORS[Math.abs(template.name.length + template.id.length) % WAVE_COLORS.length];
 
   return (
-    <article className="template-card">
-      <Link href={`/templates/${template.id}`} className="template-card-cover" aria-label={`查看模板 ${template.name}`}>
-        <TemplateCover template={template} />
+    <article className="template-card" style={{ '--wave-color': waveColor } as CSSProperties}>
+      <Link href={`/templates/${template.id}`} className="template-wave-link" aria-label={`查看模板 ${template.name}`}>
+        <div className="template-wave">
+          {Array.from({ length: 34 }).map((_, index) => (
+            <i key={index} style={{ height: `${24 + ((index * 7 + template.name.length) % 10) * 6}%` }} />
+          ))}
+        </div>
       </Link>
       <div className="template-card-body">
-        <Link href={`/templates/${template.id}`} className="template-title">{template.name}</Link>
+        <div className="template-title-row">
+          <Link href={`/templates/${template.id}`} className="template-play" aria-label={`播放预览 ${template.name}`}>▶</Link>
+          <Link href={`/templates/${template.id}`} className="template-title">{template.name}</Link>
+        </div>
         {template.producerName && template.producerId && (
           <Link href={`/producers/${template.producerId}`} className="template-producer">
             by {template.producerName}
@@ -287,6 +263,24 @@ function TemplateCard({ template }: { template: TemplateItem }) {
         </div>
       </div>
     </article>
+  );
+}
+
+function ProducerPill({ producer }: { producer: ProducerSummary }) {
+  return (
+    <Link href={`/producers/${producer.id}`} className="home-producer-pill">
+      <span className="home-producer-avatar">
+        {producer.avatarUrl ? (
+          <Image src={producer.avatarUrl} alt={producer.displayName} fill sizes="56px" />
+        ) : (
+          producer.displayName.slice(0, 1).toUpperCase()
+        )}
+      </span>
+      <span>
+        <strong>{producer.displayName}</strong>
+        <em>{producer.styleTags.slice(0, 2).join(' / ') || `${producer.templateCount} 个模板`}</em>
+      </span>
+    </Link>
   );
 }
 
@@ -305,7 +299,7 @@ const homeStyles = `
 
   .home-hero {
     position: relative;
-    min-height: 660px;
+    min-height: 540px;
     display: flex;
     align-items: stretch;
     overflow: hidden;
@@ -335,9 +329,9 @@ const homeStyles = `
     grid-template-columns: minmax(0, 650px) minmax(360px, 1fr);
     align-items: center;
     gap: 56px;
-    min-height: 660px;
-    padding-top: 34px;
-    padding-bottom: 42px;
+    min-height: 540px;
+    padding-top: 22px;
+    padding-bottom: 26px;
   }
 
   .home-hero-copy {
@@ -359,10 +353,10 @@ const homeStyles = `
   }
 
   .home-hero-copy h1 {
-    margin: 18px 0 0;
+    margin: 14px 0 0;
     max-width: 700px;
     font-family: var(--hc-font-display);
-    font-size: clamp(34px, 3.7vw, 58px);
+    font-size: clamp(32px, 3.45vw, 54px);
     line-height: 1.08;
     font-weight: 950;
     letter-spacing: 0;
@@ -372,15 +366,15 @@ const homeStyles = `
 
   .home-hero-copy h1 span {
     color: var(--hc-lime);
-    font-size: clamp(56px, 6vw, 94px);
+    font-size: clamp(52px, 5.7vw, 88px);
     line-height: .95;
   }
 
   .home-hero-copy h1 small {
     display: block;
-    margin-top: 14px;
+    margin-top: 10px;
     color: #f8fafc;
-    font-size: clamp(32px, 3.4vw, 52px);
+    font-size: clamp(30px, 3.15vw, 48px);
     line-height: 1.12;
     font-weight: 940;
   }
@@ -393,7 +387,7 @@ const homeStyles = `
 
   .home-hero-copy p {
     max-width: 640px;
-    margin: 18px 0 0;
+    margin: 14px 0 0;
     color: #b9c3d4;
     font-size: 17px;
     line-height: 1.55;
@@ -404,7 +398,7 @@ const homeStyles = `
     display: flex;
     flex-wrap: wrap;
     gap: 12px;
-    margin-top: 24px;
+    margin-top: 20px;
   }
 
   .home-feature-row {
@@ -412,7 +406,7 @@ const homeStyles = `
     align-items: center;
     flex-wrap: wrap;
     gap: 26px;
-    margin-top: 28px;
+    margin-top: 22px;
     color: #9ca8ba;
     font-size: 12px;
     font-weight: 760;
@@ -454,7 +448,7 @@ const homeStyles = `
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0;
-    transform: translateY(-18px);
+    transform: translateY(-14px);
     border: 1px solid rgba(100, 113, 143, .22);
     border-radius: 8px;
     background: rgba(7, 10, 18, .84);
@@ -463,8 +457,8 @@ const homeStyles = `
   }
 
   .home-workflow-step {
-    min-height: 74px;
-    padding: 17px 20px;
+    min-height: 58px;
+    padding: 13px 20px;
     border-right: 1px solid rgba(100, 113, 143, .18);
   }
 
@@ -481,14 +475,14 @@ const homeStyles = `
 
   .home-workflow-step strong {
     display: block;
-    margin-top: 7px;
+    margin-top: 4px;
     color: #f1f5f9;
     font-size: 15px;
     font-weight: 900;
   }
 
   .home-section {
-    padding-top: 44px;
+    padding-top: 28px;
   }
 
   .home-section-head {
@@ -496,7 +490,7 @@ const homeStyles = `
     align-items: end;
     justify-content: space-between;
     gap: 24px;
-    margin-bottom: 22px;
+    margin-bottom: 16px;
   }
 
   .home-text-link {
@@ -516,8 +510,7 @@ const homeStyles = `
     text-align: center;
   }
 
-  .home-template-grid,
-  .home-producer-grid {
+  .home-template-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 16px;
@@ -549,11 +542,11 @@ const homeStyles = `
   }
 
   .template-skeleton-wave {
-    height: 72px;
+    height: 58px;
     display: flex;
     align-items: center;
     gap: 2px;
-    padding: 12px;
+    padding: 10px;
     border-bottom: 1px solid rgba(100, 113, 143, .18);
     background: color-mix(in srgb, var(--wave-color, #8b5cf6) 20%, rgba(8, 12, 20, .9));
   }
@@ -583,58 +576,53 @@ const homeStyles = `
     margin-top: 10px;
   }
 
-  .template-card-cover {
+  .template-wave-link {
     position: relative;
     display: block;
     color: inherit;
     text-decoration: none;
   }
 
-  .template-cover {
-    position: relative;
-    aspect-ratio: 2.65;
-    overflow: hidden;
-    border-radius: 0;
+  .template-wave {
+    height: 58px;
     display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    padding: 8px;
-    color: #08090c;
+    align-items: center;
+    gap: 2px;
+    padding: 10px;
+    border-bottom: 1px solid rgba(100, 113, 143, .18);
+    background: color-mix(in srgb, var(--wave-color, #8b5cf6) 19%, rgba(8, 12, 20, .92));
   }
 
-  .template-cover span {
-    position: relative;
-    z-index: 1;
-    width: fit-content;
-    border-radius: 999px;
-    background: rgba(8, 9, 12, .76);
-    color: #f8fafc;
-    padding: 5px 9px;
-    font-size: 11px;
-    font-weight: 820;
-  }
-
-  .cover-bars {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    align-items: end;
-    gap: 4px;
-    height: 34px;
-  }
-
-  .cover-bars i {
+  .template-wave i {
     flex: 1;
     border-radius: 999px;
-    background: rgba(8, 9, 12, .72);
+    background: var(--wave-color, #8b5cf6);
+    opacity: .82;
   }
 
-  .cover-bars i:nth-child(3n+1) { height: 44%; }
-  .cover-bars i:nth-child(3n+2) { height: 76%; }
-  .cover-bars i:nth-child(3n) { height: 58%; }
-
   .template-card-body {
-    padding: 10px 11px 11px;
+    padding: 9px 11px 10px;
+  }
+
+  .template-title-row {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr);
+    gap: 8px;
+    align-items: center;
+  }
+
+  .template-play {
+    width: 22px;
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    border: 1px solid rgba(203, 213, 225, .58);
+    color: #f8fafc;
+    font-size: 9px;
+    text-decoration: none;
+    line-height: 1;
   }
 
   .template-title {
@@ -644,6 +632,9 @@ const homeStyles = `
     font-size: 13px;
     line-height: 1.35;
     font-weight: 900;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .template-producer {
@@ -659,7 +650,7 @@ const homeStyles = `
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
-    margin-top: 8px;
+    margin-top: 6px;
   }
 
   .template-tags span {
@@ -672,7 +663,7 @@ const homeStyles = `
   }
 
   .template-card-bottom {
-    display: flex;
+    display: none;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
@@ -697,6 +688,67 @@ const homeStyles = `
     font-size: 11px;
     font-weight: 900;
     white-space: nowrap;
+  }
+
+  .home-producer-section {
+    padding-top: 24px;
+  }
+
+  .home-producer-strip {
+    display: grid;
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    gap: 18px;
+  }
+
+  .home-producer-pill {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr);
+    gap: 10px;
+    align-items: center;
+    color: #f8fafc;
+    text-decoration: none;
+  }
+
+  .home-producer-avatar {
+    position: relative;
+    width: 48px;
+    height: 48px;
+    border-radius: 999px;
+    overflow: hidden;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, rgba(206,255,53,.26), rgba(82,214,198,.16));
+    border: 1px solid rgba(151, 165, 196, .22);
+    color: var(--hc-lime);
+    font-size: 18px;
+    font-weight: 900;
+  }
+
+  .home-producer-avatar img {
+    object-fit: cover;
+  }
+
+  .home-producer-pill strong {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #f4f7ff;
+    font-size: 13px;
+    font-weight: 860;
+  }
+
+  .home-producer-pill em {
+    display: block;
+    margin-top: 3px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #7f8aa0;
+    font-style: normal;
+    font-size: 11px;
   }
 
   .home-channel-band,
@@ -753,9 +805,16 @@ const homeStyles = `
       max-width: 560px;
     }
 
-    .home-template-grid,
-    .home-producer-grid {
+    .home-template-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .home-template-strip {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .home-producer-strip {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
     }
   }
 
@@ -788,9 +847,12 @@ const homeStyles = `
 
     .home-workflow,
     .home-template-grid,
-    .home-producer-grid,
     .home-channel-list {
       grid-template-columns: 1fr;
+    }
+
+    .home-producer-strip {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .home-workflow {
