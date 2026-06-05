@@ -103,6 +103,7 @@ export default function HomePage() {
       name: producer.name,
       meta: producer.meta,
       avatarUrl: '',
+      avatarIndex: index,
       href: '/templates',
     }));
     return [...realProducers, ...filler].slice(0, 8);
@@ -292,15 +293,16 @@ function TemplateCard({ template }: { template: TemplateItem }) {
   );
 }
 
-function ProducerPill({ producer }: { producer: { name: string; meta: string; avatarUrl?: string; href: string } }) {
+function ProducerPill({ producer }: { producer: { name: string; meta: string; avatarUrl?: string; avatarIndex?: number; href: string } }) {
   return (
     <Link href={producer.href} className="home-producer-pill">
-      <span className="home-producer-avatar">
+      <span
+        className={`home-producer-avatar ${producer.avatarUrl ? '' : 'is-faux'}`}
+        style={!producer.avatarUrl ? { backgroundPosition: `-${(producer.avatarIndex ?? 0) * 50}px center` } : undefined}
+      >
         {producer.avatarUrl ? (
           <Image src={producer.avatarUrl} alt={producer.name} fill sizes="56px" />
-        ) : (
-          producer.name.slice(0, 1).toUpperCase()
-        )}
+        ) : null}
       </span>
       <span>
         <strong>{producer.name}</strong>
@@ -747,6 +749,14 @@ const homeStyles = `
     color: var(--hc-lime);
     font-size: 18px;
     font-weight: 900;
+  }
+
+  .home-producer-avatar.is-faux {
+    background-image: url('/home-producer-avatars.webp');
+    background-repeat: no-repeat;
+    background-size: auto 50px;
+    border-color: rgba(206, 255, 53, .18);
+    box-shadow: inset 0 -12px 22px rgba(0, 0, 0, .22);
   }
 
   .home-producer-avatar img {
