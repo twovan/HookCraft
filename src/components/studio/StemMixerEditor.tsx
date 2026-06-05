@@ -475,13 +475,13 @@ function TransportIcon({ name }: { name: TransportIconName }) {
   const common = {
     fill: 'none',
     stroke: 'currentColor',
-    strokeWidth: 2,
+    strokeWidth: 1.8,
     strokeLinecap: 'round' as const,
     strokeLinejoin: 'round' as const,
   };
 
   return (
-    <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" focusable="false" style={{ display: 'block' }}>
+    <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" focusable="false" style={{ display: 'block' }}>
       {name === 'skipStart' && (
         <>
           <path {...common} d="M6 5v14" />
@@ -6935,7 +6935,7 @@ export default function StemMixerEditor({
                   <button
                     type="button"
                     disabled={!editorFeatures.export.mp3Stems || Boolean(batchExportDisabledReason)}
-                    style={exportPrimaryActionStyle(!editorFeatures.export.mp3Stems || Boolean(batchExportDisabledReason))}
+                    style={exportSecondaryActionStyle(!editorFeatures.export.mp3Stems || Boolean(batchExportDisabledReason))}
                     title={batchExportDisabledReason || '批量导出 MP3 分轨'}
                     onClick={() => void exportAllReadyStems()}
                   >
@@ -6954,7 +6954,7 @@ export default function StemMixerEditor({
                 <span style={presetLabelStyle}>导出设置</span>
                 <span style={panelHeadingMetaStyle}>Export</span>
               </div>
-              <span>
+              <span style={exportSummaryStatusStyle}>
                 已加载 {exportSummary.loadedCount}/{loadableStemCount}，将导出 {exportSummary.selectedCount} 条
               </span>
             </div>
@@ -6993,7 +6993,7 @@ export default function StemMixerEditor({
               <button
                 type="button"
                 disabled={Boolean(batchExportDisabledReason)}
-                style={exportPrimaryActionStyle(Boolean(batchExportDisabledReason))}
+                style={exportSecondaryActionStyle(Boolean(batchExportDisabledReason))}
                 title={batchExportDisabledReason || '批量导出所有已缓存单轨 WAV'}
                 onClick={() => void exportAllReadyStems()}
               >
@@ -8791,13 +8791,13 @@ function controlGridStyle(collapsed: boolean, metrics: DawEditorLayoutMetrics): 
     display: 'grid',
     gridTemplateColumns: 'minmax(0, 1fr)',
     alignContent: 'start',
-    gap: 10,
+    gap: 8,
     minWidth: 0,
     maxWidth: `calc(100vw - ${metrics.sideRailWidth + 28}px)`,
     boxSizing: 'border-box',
     overflowY: 'auto',
     overflowX: 'hidden',
-    paddingRight: collapsed ? 0 : 3,
+    paddingRight: collapsed ? 0 : 2,
     paddingBottom: 8,
   };
 }
@@ -8809,11 +8809,12 @@ function inspectorHeaderStyle(collapsed: boolean): CSSProperties {
     justifyContent: collapsed ? 'center' : 'space-between',
     flexDirection: collapsed ? 'column' : 'row',
     gap: collapsed ? 6 : 10,
-    minHeight: collapsed ? 104 : 46,
-    padding: collapsed ? '9px 6px' : '8px 10px',
+    minHeight: collapsed ? 98 : 42,
+    padding: collapsed ? '9px 6px' : '6px 4px 8px',
     borderRadius: 8,
-    border: '1px solid rgba(48, 52, 76, 0.74)',
-    background: 'linear-gradient(180deg, rgba(15, 18, 32, 0.9), rgba(9, 11, 21, 0.88))',
+    border: collapsed ? '1px solid rgba(48, 52, 76, 0.62)' : '0',
+    borderBottom: collapsed ? undefined : '1px solid rgba(55, 65, 88, 0.5)',
+    background: collapsed ? 'rgba(12, 16, 27, 0.72)' : 'transparent',
     textAlign: collapsed ? 'center' : 'left',
   };
 }
@@ -8839,41 +8840,38 @@ const inspectorBadgeStyle: CSSProperties = {
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
   borderRadius: 999,
-  border: '1px solid rgba(125, 211, 252, 0.34)',
-  background: 'rgba(14, 165, 233, 0.12)',
-  color: '#bae6fd',
-  padding: '3px 8px',
+  border: '1px solid rgba(125, 211, 252, 0.18)',
+  background: 'rgba(15, 23, 42, 0.42)',
+  color: '#9cc8df',
+  padding: '2px 7px',
   fontSize: 11,
-  fontWeight: 900,
+  fontWeight: 800,
 };
 
 const inspectorTabsStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-  gap: 6,
+  gap: 4,
   minWidth: 0,
-  padding: 5,
-  borderRadius: 8,
-  border: '1px solid rgba(125, 211, 252, 0.28)',
-  background: 'linear-gradient(180deg, rgba(9, 14, 25, 0.98), rgba(4, 7, 13, 0.98))',
-  boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 10px 26px rgba(0, 0, 0, 0.28)',
+  padding: '2px 0 6px',
+  borderRadius: 0,
+  borderBottom: '1px solid rgba(55, 65, 88, 0.46)',
+  background: 'transparent',
+  boxShadow: 'none',
 };
 
 function inspectorTabButtonStyle(active: boolean): CSSProperties {
   return {
-    border: active ? '1px solid rgba(206, 255, 53, 0.74)' : '1px solid rgba(71, 85, 105, 0.64)',
-    background: active
-      ? 'linear-gradient(180deg, rgba(206, 255, 53, 0.24), rgba(71, 97, 13, 0.34))'
-      : 'linear-gradient(180deg, rgba(30, 41, 59, 0.72), rgba(15, 23, 42, 0.72))',
-    minHeight: 34,
-    borderRadius: 7,
-    color: active ? '#f7ffcf' : '#cbd5e1',
+    border: 0,
+    borderBottom: active ? '2px solid #c8f35f' : '2px solid transparent',
+    background: active ? 'rgba(190, 232, 95, 0.08)' : 'transparent',
+    minHeight: 31,
+    borderRadius: 6,
+    color: active ? '#efffc0' : '#97a0b8',
     fontSize: 12,
-    fontWeight: 950,
+    fontWeight: active ? 900 : 760,
     letterSpacing: 0,
-    boxShadow: active
-      ? '0 0 0 1px rgba(206, 255, 53, 0.12), 0 10px 24px rgba(206, 255, 53, 0.12)'
-      : 'none',
+    boxShadow: 'none',
     cursor: 'pointer',
   };
 }
@@ -8894,9 +8892,9 @@ const selectedTrackPanelStyle: CSSProperties = {
   gridColumn: 'auto',
   gridRow: 'auto',
   borderRadius: 8,
-  border: '1px solid rgba(48, 52, 76, 0.82)',
-  background: 'linear-gradient(180deg, rgba(13, 18, 29, 0.94), rgba(7, 11, 20, 0.92))',
-  padding: 14,
+  border: '1px solid rgba(48, 52, 76, 0.58)',
+  background: 'rgba(9, 13, 23, 0.78)',
+  padding: 12,
   minWidth: 0,
 };
 
@@ -9045,8 +9043,8 @@ const selectedTrackShortcutStyle: CSSProperties = {
 const controlPanelStyle: CSSProperties = {
   minWidth: 0,
   borderRadius: 8,
-  border: '1px solid rgba(48, 52, 76, 0.82)',
-  background: 'rgba(10, 14, 24, 0.92)',
+  border: '1px solid rgba(48, 52, 76, 0.56)',
+  background: 'rgba(9, 13, 23, 0.76)',
   padding: '10px 12px',
 };
 
@@ -9422,10 +9420,10 @@ function viewModeButtonStyle(active: boolean): CSSProperties {
 const exportPanelStyle: CSSProperties = {
   gridColumn: 'auto',
   minWidth: 0,
-  padding: '10px 12px',
+  padding: '9px 10px 10px',
   borderRadius: 8,
-  border: '1px solid rgba(48, 52, 76, 0.82)',
-  background: 'rgba(10, 14, 24, 0.94)',
+  border: '1px solid rgba(48, 52, 76, 0.5)',
+  background: 'rgba(8, 12, 21, 0.72)',
 };
 
 const exportPanelHeaderStyle: CSSProperties = {
@@ -9433,9 +9431,22 @@ const exportPanelHeaderStyle: CSSProperties = {
   alignItems: 'center',
   justifyContent: 'space-between',
   gap: 10,
-  color: '#9ca3af',
-  fontSize: 12,
-  fontWeight: 700,
+  color: '#a6adbe',
+  fontSize: 11,
+  fontWeight: 760,
+};
+
+const exportSummaryStatusStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'flex-end',
+  minWidth: 0,
+  color: '#94a3b8',
+  fontSize: 11,
+  fontWeight: 760,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
 };
 
 const exportModeGridStyle: CSSProperties = {
@@ -9462,7 +9473,7 @@ const exportActionGridStyle: CSSProperties = {
 function exportPrimaryActionStyle(disabled: boolean): CSSProperties {
   return {
     ...editorButtonChromeStyle({ tone: 'primary', disabled }),
-    minHeight: disabled ? 44 : 34,
+    minHeight: disabled ? 43 : 36,
     display: 'inline-flex',
     flexDirection: 'column',
     alignItems: 'center',
@@ -9471,6 +9482,25 @@ function exportPrimaryActionStyle(disabled: boolean): CSSProperties {
     padding: '6px 10px',
     fontSize: 12,
     fontWeight: 900,
+    lineHeight: 1.15,
+  };
+}
+
+function exportSecondaryActionStyle(disabled: boolean): CSSProperties {
+  return {
+    ...editorButtonChromeStyle({ tone: 'neutral', disabled }),
+    minHeight: disabled ? 43 : 36,
+    display: 'inline-flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+    padding: '6px 10px',
+    borderColor: disabled ? 'rgba(48, 52, 76, 0.72)' : 'rgba(105, 115, 143, 0.38)',
+    background: disabled ? 'rgba(20, 24, 34, 0.62)' : 'rgba(18, 24, 36, 0.7)',
+    color: disabled ? '#62687c' : '#d7dcec',
+    fontSize: 12,
+    fontWeight: 860,
     lineHeight: 1.15,
   };
 }
@@ -9548,30 +9578,34 @@ const exportActionReasonStyle: CSSProperties = {
 
 function exportModeButtonStyle(active: boolean): CSSProperties {
   return {
-    ...editorButtonChromeStyle({ tone: 'purple', active }),
-    minHeight: 32,
-    borderRadius: 8,
+    border: `1px solid ${active ? 'rgba(190, 232, 95, 0.44)' : 'rgba(80, 91, 119, 0.34)'}`,
+    background: active ? 'rgba(190, 232, 95, 0.1)' : 'rgba(15, 21, 32, 0.58)',
+    color: active ? '#ecffc3' : '#aeb6c9',
+    minHeight: 31,
+    borderRadius: 7,
     padding: '6px 8px',
     fontSize: 12,
-    fontWeight: 900,
+    fontWeight: active ? 900 : 780,
+    cursor: 'pointer',
+    boxShadow: active ? 'inset 0 0 0 1px rgba(190, 232, 95, 0.08)' : 'none',
   };
 }
 
 const exportHintStyle: CSSProperties = {
   marginTop: 8,
-  color: '#8f92aa',
+  color: '#8d96aa',
   fontSize: 11,
-  lineHeight: 1.6,
+  lineHeight: 1.45,
 };
 
 const exportPreflightStyle: CSSProperties = {
   display: 'grid',
-  gap: 6,
+  gap: 5,
   marginTop: 10,
-  padding: '8px 10px',
+  padding: '7px 9px',
   borderRadius: 8,
-  border: '1px solid rgba(48, 52, 76, 0.72)',
-  background: 'rgba(17, 20, 35, 0.82)',
+  border: '1px solid rgba(48, 52, 76, 0.42)',
+  background: 'rgba(15, 20, 31, 0.46)',
 };
 
 const exportPreflightRowStyle: CSSProperties = {
@@ -9581,7 +9615,7 @@ const exportPreflightRowStyle: CSSProperties = {
   alignItems: 'start',
   minWidth: 0,
   fontSize: 11,
-  lineHeight: 1.45,
+  lineHeight: 1.36,
 };
 
 const exportPreflightLabelStyle: CSSProperties = {
@@ -9603,21 +9637,21 @@ const exportPreflightWarningStyle: CSSProperties = {
 
 function exportStatusStyle(tone: StemExportStatusTone): CSSProperties {
   const color = tone === 'success'
-    ? 'rgba(52, 211, 153, 0.58)'
+    ? 'rgba(52, 211, 153, 0.34)'
     : tone === 'error'
-      ? 'rgba(248, 113, 113, 0.52)'
+      ? 'rgba(248, 113, 113, 0.42)'
       : tone === 'warning'
-        ? 'rgba(251, 191, 36, 0.48)'
+        ? 'rgba(251, 191, 36, 0.36)'
         : tone === 'info'
-          ? 'rgba(96, 165, 250, 0.48)'
-          : 'rgba(75, 85, 99, 0.64)';
+          ? 'rgba(96, 165, 250, 0.34)'
+          : 'rgba(75, 85, 99, 0.38)';
 
   return {
     marginTop: 10,
-    padding: '8px 10px',
+    padding: '8px 9px',
     borderRadius: 8,
     border: `1px solid ${color}`,
-    background: 'rgba(10, 13, 24, 0.82)',
+    background: 'rgba(8, 12, 21, 0.52)',
   };
 }
 
@@ -9626,9 +9660,9 @@ const exportStatusHeaderStyle: CSSProperties = {
   alignItems: 'center',
   justifyContent: 'space-between',
   gap: 10,
-  color: '#edf0ff',
+  color: '#dbe3f1',
   fontSize: 12,
-  fontWeight: 900,
+  fontWeight: 820,
 };
 
 const exportStatusTrackStyle: CSSProperties = {
@@ -10313,12 +10347,12 @@ const timelineZoomFitButtonStyle: CSSProperties = {
 const timelineToolbarPillStyle: CSSProperties = {
   flex: '0 0 auto',
   borderRadius: 999,
-  border: '1px solid rgba(151, 165, 196, 0.22)',
-  background: 'rgba(20, 25, 36, 0.66)',
-  color: '#cfd7e8',
-  padding: '3px 8px',
+  border: '1px solid rgba(151, 165, 196, 0.14)',
+  background: 'rgba(18, 23, 34, 0.36)',
+  color: '#aeb8cb',
+  padding: '3px 7px',
   fontSize: 11,
-  fontWeight: 800,
+  fontWeight: 760,
   whiteSpace: 'nowrap',
 };
 
@@ -10338,12 +10372,12 @@ const timelineSelectionActionsStyle: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   gap: 3,
-  minHeight: 28,
-  padding: '3px 4px',
-  borderRadius: 10,
-  border: '1px solid rgba(83, 91, 124, 0.46)',
-  background: 'linear-gradient(180deg, rgba(13, 17, 29, 0.84), rgba(8, 11, 20, 0.74))',
-  boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 8px 18px rgba(0, 0, 0, 0.16)',
+  minHeight: 26,
+  padding: '2px 3px',
+  borderRadius: 8,
+  border: '1px solid rgba(83, 91, 124, 0.3)',
+  background: 'rgba(9, 13, 23, 0.58)',
+  boxShadow: 'none',
   whiteSpace: 'nowrap',
 };
 
@@ -10360,10 +10394,10 @@ function timelineIconButtonStyle({
     ...editorButtonChromeStyle({ tone, compact: true, active, disabled }),
     position: 'relative',
     flex: '0 0 auto',
-    width: 28,
-    height: 26,
-    minWidth: 28,
-    minHeight: 26,
+    width: 27,
+    height: 25,
+    minWidth: 27,
+    minHeight: 25,
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -10730,13 +10764,13 @@ function stemTrackStyle(
     minWidth,
     boxSizing: 'border-box',
     minHeight: collapsed ? collapsedHeight : Math.max(rowHeight, openHeight),
-    borderRadius: 8,
+    borderRadius: 7,
     border: mutedVisual
       ? selectedTrack
         ? '1px solid rgba(156, 163, 175, 0.58)'
         : '1px solid rgba(95, 103, 118, 0.74)'
       : selectedTrack
-      ? `1px solid ${colorWithAlpha(trackColor, 0.58)}`
+      ? `1px solid ${colorWithAlpha(trackColor, 0.46)}`
       : solo
         ? '1px solid rgba(206, 255, 53, 0.42)'
         : '1px solid rgba(25, 30, 46, 0.92)',
@@ -10746,7 +10780,7 @@ function stemTrackStyle(
         repeating-linear-gradient(135deg, rgba(255,255,255,0.026) 0 8px, rgba(255,255,255,0) 8px 16px)
       `
       : `
-        linear-gradient(90deg, ${selectedTrack ? selectionWash : 'rgba(4, 7, 12, 0.98)'}, rgba(7, 10, 17, 0.96) 26%, rgba(3, 6, 11, 0.98)),
+        linear-gradient(90deg, ${selectedTrack ? selectionWash : 'rgba(5, 8, 14, 0.96)'}, rgba(8, 12, 19, 0.95) 28%, rgba(4, 7, 13, 0.98)),
         linear-gradient(180deg, rgba(255,255,255,0.026), rgba(255,255,255,0))
       `,
     boxShadow: mutedVisual
@@ -10754,7 +10788,7 @@ function stemTrackStyle(
         ? 'inset 0 0 0 1px rgba(148, 163, 184, 0.18), inset 3px 0 0 rgba(148, 163, 184, 0.72)'
         : 'inset 3px 0 0 rgba(100, 116, 139, 0.62)'
       : selectedTrack
-      ? `inset 0 0 0 1px ${colorWithAlpha(trackColor, 0.24)}, inset 3px 0 0 ${selectionEdge}`
+      ? `inset 0 0 0 1px ${colorWithAlpha(trackColor, 0.16)}, inset 3px 0 0 ${selectionEdge}`
       : solo
         ? 'inset 3px 0 0 rgba(206, 255, 53, 0.58)'
         : 'none',
@@ -10791,8 +10825,8 @@ function stemNameStyle(selectedTrack: boolean, trackColor: string, collapsed = f
     background: mutedVisual
       ? 'linear-gradient(90deg, rgba(43, 48, 58, 0.98), rgba(15, 18, 25, 0.98))'
       : selectedTrack
-      ? `linear-gradient(90deg, ${colorWithAlpha(trackColor, 0.18)}, rgba(12, 15, 21, 0.98))`
-      : 'linear-gradient(90deg, rgba(10, 14, 19, 0.99), rgba(8, 11, 16, 0.98))',
+      ? `linear-gradient(90deg, ${colorWithAlpha(trackColor, 0.14)}, rgba(11, 15, 22, 0.98))`
+      : 'linear-gradient(90deg, rgba(9, 13, 18, 0.98), rgba(7, 10, 15, 0.98))',
     boxShadow: mutedVisual
       ? `inset 3px 0 0 ${MUTED_TRACK_COLOR}`
       : selectedTrack ? `inset 3px 0 0 ${trackColor}` : 'none',
