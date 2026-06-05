@@ -147,10 +147,10 @@ export default function HomePage() {
       <section className="hc-container home-section home-discovery">
         <div className="home-section-head">
           <div>
-            <h2 className="hc-section-title">精选模板</h2>
+            <h2 className="hc-section-title">精选模板 <span className="section-spark">✦</span></h2>
             <p className="hc-section-kicker">从可套用的风格模板开始，比空白提示词更快接近成品。</p>
           </div>
-          <Link href="/templates" className="home-text-link">查看全部</Link>
+          <Link href="/templates" className="home-text-link">查看全部模板 <span aria-hidden="true">→</span></Link>
         </div>
         <div className="home-filter-row" aria-label="模板分类">
           {TEMPLATE_FILTERS.map((filter, index) => (
@@ -184,10 +184,10 @@ export default function HomePage() {
       <section className="hc-container home-section home-producer-section">
         <div className="home-section-head">
           <div>
-            <h2 className="hc-section-title">知名制作人</h2>
+            <h2 className="hc-section-title">知名制作人 <span className="section-badge">Pro</span></h2>
             <p className="hc-section-kicker">他们正在使用 HookCraft 创作。</p>
           </div>
-          <Link href="/templates" className="home-text-link">查看全部</Link>
+          <Link href="/templates" className="home-text-link">查看全部 <span aria-hidden="true">→</span></Link>
         </div>
         <div className="home-producer-strip">
           {producerShowcase.map((producer) => (
@@ -491,6 +491,33 @@ const homeStyles = `
     margin-bottom: 10px;
   }
 
+  .hc-section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .section-spark {
+    color: var(--hc-lime);
+    font-size: .72em;
+    line-height: 1;
+    transform: translateY(-5px);
+  }
+
+  .section-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 18px;
+    border-radius: 4px;
+    border: 1px solid rgba(206, 255, 53, .35);
+    background: rgba(206, 255, 53, .1);
+    color: var(--hc-lime);
+    padding: 0 6px;
+    font-size: 10px;
+    font-weight: 900;
+    line-height: 1;
+  }
+
   .home-filter-row {
     display: flex;
     flex-wrap: wrap;
@@ -520,11 +547,19 @@ const homeStyles = `
   }
 
   .home-text-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     color: var(--hc-lime);
     text-decoration: none;
     font-size: 14px;
     font-weight: 820;
     white-space: nowrap;
+  }
+
+  .home-text-link span {
+    font-size: 15px;
+    transform: translateY(-1px);
   }
 
   .home-empty {
