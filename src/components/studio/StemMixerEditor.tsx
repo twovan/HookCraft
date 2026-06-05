@@ -8372,11 +8372,12 @@ function editorHeaderFactStyle(tone: 'project' | 'neutral' | 'ready' | 'loading'
 const editorStatusClusterStyle: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
-  gap: 12,
-  color: '#9ca3af',
-  fontSize: 12,
+  gap: 8,
+  color: '#8b93a6',
+  fontSize: 11,
   fontVariantNumeric: 'tabular-nums',
   whiteSpace: 'nowrap',
+  paddingLeft: 2,
 };
 
 const editorActionStyle: CSSProperties = {
@@ -8461,12 +8462,12 @@ function saveBadgeStyle(tone: StemEditSaveBadgeTone): CSSProperties {
 
   return {
     border: `1px solid ${palette[tone].border}`,
-    background: palette[tone].background,
+    background: tone === 'error' ? palette[tone].background : 'transparent',
     color: palette[tone].color,
     borderRadius: 999,
-    padding: '2px 8px',
+    padding: '2px 7px',
     fontSize: 11,
-    fontWeight: 900,
+    fontWeight: 820,
     lineHeight: 1.45,
     whiteSpace: 'nowrap',
   };
@@ -8804,34 +8805,34 @@ function controlGridStyle(collapsed: boolean, metrics: DawEditorLayoutMetrics): 
 
 function inspectorHeaderStyle(collapsed: boolean): CSSProperties {
   return {
-    display: 'flex',
+    display: 'grid',
     alignItems: 'center',
-    justifyContent: collapsed ? 'center' : 'space-between',
-    flexDirection: collapsed ? 'column' : 'row',
+    gridTemplateColumns: collapsed ? 'minmax(0, 1fr)' : 'minmax(0, 1fr) auto auto',
+    justifyContent: collapsed ? 'center' : 'stretch',
     gap: collapsed ? 6 : 10,
     minHeight: collapsed ? 98 : 42,
-    padding: collapsed ? '9px 6px' : '6px 4px 8px',
+    padding: collapsed ? '9px 6px' : '4px 2px 7px',
     borderRadius: 8,
     border: collapsed ? '1px solid rgba(48, 52, 76, 0.62)' : '0',
-    borderBottom: collapsed ? undefined : '1px solid rgba(55, 65, 88, 0.5)',
+    borderBottom: collapsed ? undefined : '1px solid rgba(55, 65, 88, 0.32)',
     background: collapsed ? 'rgba(12, 16, 27, 0.72)' : 'transparent',
     textAlign: collapsed ? 'center' : 'left',
   };
 }
 
 const inspectorEyebrowStyle: CSSProperties = {
-  color: '#717791',
-  fontSize: 10,
-  fontWeight: 900,
+  color: '#626b80',
+  fontSize: 9,
+  fontWeight: 820,
   textTransform: 'uppercase',
   letterSpacing: 0,
 };
 
 const inspectorTitleStyle: CSSProperties = {
   marginTop: 2,
-  color: '#f4f4fb',
-  fontSize: 14,
-  fontWeight: 900,
+  color: '#dce4f2',
+  fontSize: 13,
+  fontWeight: 860,
 };
 
 const inspectorBadgeStyle: CSSProperties = {
@@ -8840,12 +8841,12 @@ const inspectorBadgeStyle: CSSProperties = {
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
   borderRadius: 999,
-  border: '1px solid rgba(125, 211, 252, 0.18)',
-  background: 'rgba(15, 23, 42, 0.42)',
-  color: '#9cc8df',
+  border: '1px solid rgba(125, 211, 252, 0.14)',
+  background: 'rgba(15, 23, 42, 0.22)',
+  color: '#8fb5ca',
   padding: '2px 7px',
-  fontSize: 11,
-  fontWeight: 800,
+  fontSize: 10,
+  fontWeight: 780,
 };
 
 const inspectorTabsStyle: CSSProperties = {
@@ -8878,13 +8879,16 @@ function inspectorTabButtonStyle(active: boolean): CSSProperties {
 
 function inspectorCollapseButtonStyle(collapsed: boolean): CSSProperties {
   return {
-    ...editorButtonChromeStyle({ tone: 'purple', compact: true, round: collapsed, active: collapsed }),
+    ...editorButtonChromeStyle({ tone: 'neutral', compact: true, round: collapsed, active: collapsed }),
     borderRadius: collapsed ? 999 : 7,
     minHeight: collapsed ? 28 : 26,
-    minWidth: collapsed ? 72 : 68,
-    padding: collapsed ? '0 8px' : '0 9px',
-    fontSize: 11,
-    fontWeight: 900,
+    minWidth: collapsed ? 72 : 62,
+    padding: collapsed ? '0 8px' : '0 8px',
+    borderColor: 'rgba(102, 114, 145, 0.26)',
+    background: 'rgba(16, 22, 34, 0.42)',
+    color: '#aeb8cb',
+    fontSize: 10,
+    fontWeight: 780,
   };
 }
 
@@ -10321,8 +10325,8 @@ const timelineZoomControlsStyle: CSSProperties = {
   gap: 4,
   padding: 3,
   borderRadius: 7,
-  border: '1px solid rgba(48, 52, 76, 0.74)',
-  background: 'rgba(7, 9, 18, 0.72)',
+  border: '1px solid rgba(48, 52, 76, 0.46)',
+  background: 'rgba(7, 9, 18, 0.46)',
 };
 
 function timelineZoomButtonStyle(disabled: boolean): CSSProperties {
@@ -10358,12 +10362,12 @@ const timelineZoomFitButtonStyle: CSSProperties = {
 const timelineToolbarPillStyle: CSSProperties = {
   flex: '0 0 auto',
   borderRadius: 999,
-  border: '1px solid rgba(151, 165, 196, 0.14)',
-  background: 'rgba(18, 23, 34, 0.36)',
-  color: '#aeb8cb',
-  padding: '3px 7px',
-  fontSize: 11,
-  fontWeight: 760,
+  border: '1px solid rgba(151, 165, 196, 0.1)',
+  background: 'rgba(14, 18, 28, 0.2)',
+  color: '#8994a9',
+  padding: '2px 7px',
+  fontSize: 10,
+  fontWeight: 720,
   whiteSpace: 'nowrap',
 };
 
@@ -10372,7 +10376,7 @@ const timelineAddTrackButtonStyle: CSSProperties = {
   flex: '0 0 auto',
   minHeight: 24,
   borderRadius: 999,
-  padding: '3px 9px',
+  padding: '3px 10px',
   fontSize: 11,
   fontWeight: 900,
   whiteSpace: 'nowrap',
@@ -10417,7 +10421,7 @@ function timelineIconButtonStyle({
     color: disabled ? 'rgba(143, 153, 181, 0.46)' : undefined,
     cursor: disabled ? 'not-allowed' : 'pointer',
     boxShadow: active
-      ? '0 0 0 1px rgba(255,255,255,0.05) inset, 0 0 13px rgba(190, 232, 95, 0.18)'
+      ? '0 0 0 1px rgba(190, 232, 95, 0.1) inset'
       : '0 0 0 1px rgba(255,255,255,0.025) inset',
     transition: 'transform 120ms ease, border-color 120ms ease, background 120ms ease, box-shadow 120ms ease',
     fontWeight: 900,
@@ -10960,7 +10964,7 @@ function stemAudioStatusBadgeStyle(status: StemTrackAudioStatus): CSSProperties 
     ...palette[status],
     padding: '1px 5px',
     fontSize: 9,
-    fontWeight: 900,
+    fontWeight: 820,
     lineHeight: 1.25,
     whiteSpace: 'nowrap',
     flexShrink: 0,
@@ -10996,7 +11000,7 @@ function stemStateBadgeStyle(tone: 'solo' | 'muted' | 'range' | 'volume'): CSSPr
     ...palette[tone],
     padding: '1px 5px',
     fontSize: 9,
-    fontWeight: 900,
+    fontWeight: 820,
     lineHeight: 1.25,
     whiteSpace: 'nowrap',
     flexShrink: 0,
@@ -11038,7 +11042,9 @@ function trackCollapseButtonStyle(active: boolean): CSSProperties {
     minWidth: 24,
     minHeight: 24,
     padding: 0,
-    color: active ? '#081018' : '#f8fafc',
+    borderColor: active ? 'rgba(122, 167, 255, 0.3)' : 'rgba(102, 114, 145, 0.22)',
+    background: active ? 'rgba(64, 101, 158, 0.58)' : 'rgba(16, 22, 34, 0.38)',
+    color: active ? '#eaf2ff' : '#9ca8bd',
     lineHeight: 0,
     verticalAlign: 'middle',
   };
@@ -11052,9 +11058,11 @@ const trackFxButtonStyle: CSSProperties = {
   minWidth: 52,
   minHeight: 20,
   padding: '0 7px',
-  color: '#f8fafc',
+  borderColor: 'rgba(102, 114, 145, 0.22)',
+  background: 'rgba(16, 22, 34, 0.34)',
+  color: '#aeb8cb',
   fontSize: 10,
-  fontWeight: 950,
+  fontWeight: 820,
 };
 
 const trackMiniActionsStyle: CSSProperties = {
@@ -11068,12 +11076,15 @@ const trackMiniActionsStyle: CSSProperties = {
 
 function trackMiniActionStyle(disabled: boolean): CSSProperties {
   return {
-    ...editorButtonChromeStyle({ tone: 'purple', compact: true, round: true, disabled }),
+    ...editorButtonChromeStyle({ tone: 'neutral', compact: true, round: true, disabled }),
     minWidth: 58,
     minHeight: 20,
     padding: '0 7px',
+    borderColor: disabled ? 'rgba(48, 52, 76, 0.58)' : 'rgba(102, 114, 145, 0.24)',
+    background: disabled ? 'rgba(20, 24, 34, 0.42)' : 'rgba(16, 22, 34, 0.36)',
+    color: disabled ? '#62687c' : '#aeb8cb',
     fontSize: 10,
-    fontWeight: 950,
+    fontWeight: 820,
   };
 }
 
@@ -11122,9 +11133,12 @@ function trackToggleStyle(active: boolean, tone: 'mute' | 'solo' | 'export' | 'r
     minWidth: tone === 'export' ? 38 : 25,
     minHeight: 24,
     padding: tone === 'export' ? '0 6px' : '0 3px',
+    borderColor: active ? undefined : 'rgba(102, 114, 145, 0.26)',
+    background: active ? undefined : 'rgba(16, 22, 34, 0.46)',
+    color: active ? undefined : '#aeb8cb',
     borderRadius: 5,
     fontSize: 10,
-    fontWeight: 900,
+    fontWeight: active ? 900 : 760,
     fontVariantNumeric: 'tabular-nums',
   };
 }
