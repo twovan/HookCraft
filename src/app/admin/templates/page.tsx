@@ -456,6 +456,12 @@ export default function AdminTemplatesPage() {
         }
 
         const { urls } = await uploadUrlRes.json();
+        const uploadedAudioPaths = urls
+          .map((item: any) => item?.path)
+          .filter((path: unknown): path is string => typeof path === 'string' && path.length > 0);
+        if (uploadedAudioPaths.length !== filesToUpload.length) {
+          throw new Error('参考音频上传路径缺失，请重新上传后再分析');
+        }
 
         // Upload each file directly to storage via signed URL
         for (let i = 0; i < filesToUpload.length; i++) {
@@ -484,9 +490,7 @@ export default function AdminTemplatesPage() {
             const analysisFormData = new FormData();
             analysisFormData.append('templateId', templateId);
             analysisFormData.append('analysisType', toServerAnalysisType(analysisType));
-            filesToUpload.forEach((file) => {
-              analysisFormData.append('audio', file);
-            });
+            analysisFormData.append('audioPaths', JSON.stringify(uploadedAudioPaths));
 
             const analysisRes = await fetch('/api/admin/templates/analyze', {
               method: 'POST',
