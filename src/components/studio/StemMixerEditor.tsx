@@ -4503,12 +4503,13 @@ export default function StemMixerEditor({
     const rect = event.currentTarget.getBoundingClientRect();
     const ratio = rect.width > 0 ? Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)) : 0;
     const shouldSnap = snapToGrid && !event.altKey;
+    const rulerDuration = timelineEditDuration || duration;
     return {
       ratio,
       shouldSnap,
-      time: snapStemEditorTime(duration * ratio, duration, shouldSnap, snapStepSeconds),
+      time: snapStemEditorTime(rulerDuration * ratio, rulerDuration, shouldSnap, snapStepSeconds),
     };
-  }, [duration, snapStepSeconds, snapToGrid]);
+  }, [duration, snapStepSeconds, snapToGrid, timelineEditDuration]);
 
   const updateTimelineRulerGuide = useCallback((event: PointerEvent<HTMLDivElement>, active: boolean) => {
     if (duration <= 0) return;
