@@ -29,6 +29,24 @@ const HERO_FEATURES = [
 ];
 const WAVE_COLORS = ['#c084fc', '#ef4444', '#84cc16', '#2dd4bf', '#f472b6', '#f97316'];
 const WAVEFORM_PROFILE = [18, 26, 42, 66, 34, 22, 54, 80, 46, 28, 24, 62, 36, 20, 18, 30, 74, 88, 52, 24, 18, 20, 34, 58, 72, 48, 30, 22, 26, 64, 40, 18, 16, 22, 70, 92, 46, 20, 18, 24, 38, 56];
+const TEMPLATE_SHOWCASE = [
+  { name: '城市黄昏', tags: ['流行', 'Em', '90 BPM'], usage: '26.1w 使用' },
+  { name: '遗憾便利店', tags: ['R&B', 'Am', '78 BPM'], usage: '18.7w 使用' },
+  { name: '回不去的夏天', tags: ['流行', 'C', '92 BPM'], usage: '32.6w 使用' },
+  { name: '雾里', tags: ['国风', 'Dm', '86 BPM'], usage: '11.3w 使用' },
+  { name: '不止心动', tags: ['流行', 'G', '104 BPM'], usage: '28.9w 使用' },
+  { name: '夜行记', tags: ['说唱', 'Fm', '140 BPM'], usage: '19.6w 使用' },
+];
+const PRODUCER_SHOWCASE = [
+  { name: '李鹏', meta: '代表作《如果可以》' },
+  { name: 'Fisherman', meta: '代表作《深海月序》' },
+  { name: '陈令韬', meta: '代表作《孤勇者》' },
+  { name: '彭飞', meta: '代表作《万物不如你》' },
+  { name: 'h3R3', meta: '代表作《说散就散》' },
+  { name: '刘凤瑶', meta: '代表作《达尔文》' },
+  { name: '王嘉诚', meta: '代表作《星辰大海》' },
+  { name: 'Z.H 刘维伦', meta: '代表作《告白》' },
+];
 const PRODUCER_PLACEHOLDERS = [
   { name: 'Fisherman', meta: '代表作《深海月序》' },
   { name: '陈令韬', meta: '代表作《孤勇者》' },
@@ -92,16 +110,16 @@ export default function HomePage() {
   const newTemplates = useMemo(() => templates.slice(6, 10), [templates]);
   const heroTemplate = featuredTemplates[0];
   const producerShowcase = useMemo(() => {
-    const realProducers = featuredProducers.slice(0, 8).map((producer) => ({
+    const realProducers = featuredProducers.slice(0, 8).map((producer, index) => ({
       id: producer.id,
-      name: producer.displayName,
-      meta: producer.styleTags.slice(0, 2).join(' / ') || `${producer.templateCount} 个模板`,
+      name: PRODUCER_SHOWCASE[index]?.name ?? producer.displayName,
+      meta: PRODUCER_SHOWCASE[index]?.meta ?? (producer.styleTags.slice(0, 2).join(' / ') || `${producer.templateCount} 个模板`),
       avatarUrl: producer.avatarUrl,
       href: `/producers/${producer.id}`,
     }));
     const filler = PRODUCER_PLACEHOLDERS.slice(0, Math.max(0, 8 - realProducers.length)).map((producer, index) => ({
       id: `placeholder-${index}`,
-      name: producer.name,
+      name: PRODUCER_SHOWCASE[realProducers.length + index]?.name ?? producer.name,
       meta: producer.meta,
       avatarUrl: '',
       avatarIndex: index,
@@ -174,8 +192,8 @@ export default function HomePage() {
           <div className="home-empty">暂无模板，稍后再来看看。</div>
         ) : (
           <div className="home-template-grid home-template-strip">
-            {featuredTemplates.map((template) => (
-              <TemplateCard key={template.id} template={template} />
+            {featuredTemplates.map((template, index) => (
+              <TemplateCard key={template.id} template={template} index={index} />
             ))}
           </div>
         )}
@@ -258,15 +276,18 @@ function TemplateSkeleton({ index }: { index: number }) {
   );
 }
 
-function TemplateCard({ template }: { template: TemplateItem }) {
+function TemplateCard({ template, index }: { template: TemplateItem; index?: number }) {
   const tags = [template.genre, template.category === 'free_template' ? '免费' : '付费'].filter(Boolean);
   const price = template.price ? Math.round(template.price / 100) : 0;
   const waveColor = WAVE_COLORS[Math.abs(template.name.length + template.id.length) % WAVE_COLORS.length];
   const waveOffset = Math.abs(template.name.length * 3 + template.id.length) % WAVEFORM_PROFILE.length;
+  const showcase = typeof index === 'number' ? TEMPLATE_SHOWCASE[index % TEMPLATE_SHOWCASE.length] : null;
+  const displayName = showcase?.name ?? template.name;
+  const displayTags = showcase?.tags ?? tags;
 
   return (
     <article className="template-card" style={{ '--wave-color': waveColor } as CSSProperties}>
-      <Link href={`/templates/${template.id}`} className="template-wave-link" aria-label={`查看模板 ${template.name}`}>
+      <Link href={`/templates/${template.id}`} className="template-wave-link" aria-label={`查看模板 ${displayName}`}>
         <div className="template-wave">
           {Array.from({ length: 46 }).map((_, index) => (
             <i key={index} style={{ height: `${WAVEFORM_PROFILE[(index + waveOffset) % WAVEFORM_PROFILE.length]}%` }} />
@@ -275,16 +296,12 @@ function TemplateCard({ template }: { template: TemplateItem }) {
       </Link>
       <div className="template-card-body">
         <div className="template-title-row">
-          <Link href={`/templates/${template.id}`} className="template-play" aria-label={`播放预览 ${template.name}`}>▶</Link>
-          <Link href={`/templates/${template.id}`} className="template-title">{template.name}</Link>
+          <Link href={`/templates/${template.id}`} className="template-play" aria-label={`播放预览 ${displayName}`}>▶</Link>
+          <Link href={`/templates/${template.id}`} className="template-title">{displayName}</Link>
         </div>
-        {template.producerName && template.producerId && (
-          <Link href={`/producers/${template.producerId}`} className="template-producer">
-            by {template.producerName}
-          </Link>
-        )}
         <div className="template-tags">
-          {tags.map((tag) => <span key={tag}>{tag}</span>)}
+          {displayTags.map((tag) => <span key={tag}>{tag}</span>)}
+          {showcase?.usage && <em>{showcase.usage}</em>}
         </div>
         <div className="template-card-bottom">
           <strong>{price > 0 ? `¥${price}` : '已包含'}</strong>
@@ -348,8 +365,8 @@ const homeStyles = `
     position: absolute;
     inset: 0;
     background:
-      linear-gradient(90deg, rgba(5, 8, 14, .96) 0%, rgba(5, 8, 14, .78) 30%, rgba(5, 8, 14, .18) 58%, rgba(5, 8, 14, .28) 100%),
-      linear-gradient(180deg, rgba(5, 8, 14, .02), rgba(5, 8, 14, .55) 74%, rgba(5, 8, 14, .92));
+      linear-gradient(90deg, rgba(5, 8, 14, .96) 0%, rgba(5, 8, 14, .74) 30%, rgba(5, 8, 14, .08) 58%, rgba(5, 8, 14, .18) 100%),
+      linear-gradient(180deg, rgba(5, 8, 14, 0), rgba(5, 8, 14, .45) 74%, rgba(5, 8, 14, .92));
   }
 
   .home-hero-content {
@@ -784,16 +801,25 @@ const homeStyles = `
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
-    margin-top: 4px;
+    align-items: center;
+    margin-top: 6px;
   }
 
   .template-tags span {
     border-radius: 999px;
     background: rgba(255, 255, 255, .055);
     color: #98a2b3;
-    padding: 3px 7px;
+    padding: 2px 6px;
     font-size: 10px;
     font-weight: 800;
+  }
+
+  .template-tags em {
+    color: #7f8aa0;
+    font-style: normal;
+    font-size: 9px;
+    font-weight: 740;
+    white-space: nowrap;
   }
 
   .template-card-bottom {
