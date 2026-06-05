@@ -379,6 +379,7 @@ function snapStemClipStartToNeighborEdges(
   duration: number,
   enabled: boolean,
   stepSeconds: number,
+  neighborEdges: number[] = [],
 ) {
   if (!enabled || clipDuration <= 0 || !Number.isFinite(proposedStart)) return proposedStart;
   const threshold = resolveStemClipMagnetThreshold(duration, stepSeconds);
@@ -395,11 +396,8 @@ function snapStemClipStartToNeighborEdges(
   let bestDistance = threshold;
   const proposedEnd = bestStart + clipDuration;
 
-  clips.forEach((clip) => {
-    if (clip.id === clipId) return;
-    const clipStart = clip.start;
-    const clipEnd = clip.start + getStemClipDuration(clip);
-    [clipStart, clipEnd].forEach((edge) => {
+  const applyCandidateEdge = (edge: number) => {
+    if (!Number.isFinite(edge)) return;
       const edgeIsOriginalStart = originalStart !== null && Math.abs(edge - originalStart) <= 0.001;
       const edgeIsOriginalEnd = originalEnd !== null && Math.abs(edge - originalEnd) <= 0.001;
       const startDistance = Math.abs(bestStart - edge);
@@ -412,8 +410,15 @@ function snapStemClipStartToNeighborEdges(
         bestDistance = endDistance;
         bestStart = edge - clipDuration;
       }
-    });
+  };
+
+  clips.forEach((clip) => {
+    if (clip.id === clipId) return;
+    const clipStart = clip.start;
+    const clipEnd = clip.start + getStemClipDuration(clip);
+    [clipStart, clipEnd].forEach(applyCandidateEdge);
   });
+  neighborEdges.forEach(applyCandidateEdge);
 
   return Number(Math.max(0, Math.min(maxStart, bestStart)).toFixed(3));
 }
@@ -426,6 +431,7 @@ function snapStemClipEdgeToNeighborEdges(
   duration: number,
   enabled: boolean,
   stepSeconds: number,
+  neighborEdges: number[] = [],
 ) {
   if (!enabled || !Number.isFinite(proposedTime)) return proposedTime;
   const threshold = resolveStemClipMagnetThreshold(duration, stepSeconds);
@@ -433,18 +439,22 @@ function snapStemClipEdgeToNeighborEdges(
   let bestTime = safeTime;
   let bestDistance = threshold;
 
-  clips.forEach((clip) => {
-    if (clip.id === clipId) return;
-    const clipStart = clip.start;
-    const clipEnd = clip.start + getStemClipDuration(clip);
-    [clipStart, clipEnd].forEach((neighborEdge) => {
+  const applyCandidateEdge = (neighborEdge: number) => {
+    if (!Number.isFinite(neighborEdge)) return;
       const distance = Math.abs(safeTime - neighborEdge);
       if (distance <= bestDistance) {
         bestDistance = distance;
         bestTime = neighborEdge;
       }
-    });
+  };
+
+  clips.forEach((clip) => {
+    if (clip.id === clipId) return;
+    const clipStart = clip.start;
+    const clipEnd = clip.start + getStemClipDuration(clip);
+    [clipStart, clipEnd].forEach(applyCandidateEdge);
   });
+  neighborEdges.forEach(applyCandidateEdge);
 
   return Number(Math.max(0, Math.min(duration, bestTime)).toFixed(3));
 }
@@ -2604,6 +2614,19 @@ export default function StemMixerEditor({
     const clipState = resolveTrackClipState(state, duration);
     return clipState.clips.find((clip) => clip.id === selectedClipSelection.clipId) || null;
   }, [duration, selectedClipSelection, tracks]);
+  const collectOtherTrackClipEdges = useCallback((trackType: string, movingClipId?: string | null) => {
+    const edges: number[] = [];
+    stems.forEach((stem) => {
+      if (stem.type === trackType) return;
+      const state = tracks[stem.type] || defaultTrackState();
+      const clipState = resolveTrackClipState(state, duration);
+      clipState.clips.forEach((clip) => {
+        if (movingClipId && clip.id === movingClipId) return;
+        edges.push(clip.start, clip.start + getStemClipDuration(clip));
+      });
+    });
+    return edges;
+  }, [duration, stems, tracks]);
   const selectedTrackMutedRanges = selectedTrackState
     ? normalizeStemMutedRanges(selectedTrackState.mutedRanges, duration)
     : [];
@@ -4046,6 +4069,7 @@ export default function StemMixerEditor({
             duration,
             magnetSnap,
             snapStepSeconds,
+            collectOtherTrackClipEdges(type, targetClip.id),
           ),
           duration,
         );
@@ -4090,7 +4114,7 @@ export default function StemMixerEditor({
         },
       };
     }, historyMode);
-  }, [canUseTrim, commitTrackChange, duration, magnetSnap, snapStepSeconds, snapToGrid]);
+  }, [canUseTrim, collectOtherTrackClipEdges, commitTrackChange, duration, magnetSnap, snapStepSeconds, snapToGrid]);
 
   const setTrackClipTrim = useCallback((
     type: string,
@@ -4118,6 +4142,7 @@ export default function StemMixerEditor({
           duration,
           magnetSnap,
           snapStepSeconds,
+          collectOtherTrackClipEdges(type, clipId),
         ),
         duration,
       );
@@ -4141,7 +4166,7 @@ export default function StemMixerEditor({
         },
       };
     }, historyMode);
-  }, [canUseTrim, commitTrackChange, duration, magnetSnap, snapStepSeconds, snapToGrid]);
+  }, [canUseTrim, collectOtherTrackClipEdges, commitTrackChange, duration, magnetSnap, snapStepSeconds, snapToGrid]);
 
   const setTrackTrimRange = useCallback((type: string, nextStart: number, shouldSnap = snapToGrid, historyMode: StemHistoryMode = 'immediate') => {
     if (!canUseTrim) return;
@@ -4330,6 +4355,7 @@ export default function StemMixerEditor({
       moveHorizonDuration,
       magnetSnap,
       snapStepSeconds,
+      collectOtherTrackClipEdges(targetType, clipId),
     );
     const previewClipId = `${clipId}-drag-preview`;
     setClipDragPreview({
@@ -4345,7 +4371,7 @@ export default function StemMixerEditor({
       },
     });
     setSelectedTrackType(targetType);
-  }, [canUseClipDrag, canUseCrossTrackDrag, duration, magnetSnap, resolveTrackDropTarget, snapStepSeconds, snapToGrid, stems, tracks]);
+  }, [canUseClipDrag, canUseCrossTrackDrag, collectOtherTrackClipEdges, duration, magnetSnap, resolveTrackDropTarget, snapStepSeconds, snapToGrid, stems, tracks]);
 
   const moveTrackClip = useCallback((
     type: string,
@@ -4385,6 +4411,7 @@ export default function StemMixerEditor({
         moveHorizonDuration,
         magnetSnap,
         snapStepSeconds,
+        collectOtherTrackClipEdges(targetType, clipId),
       )
       : snapStemEditorTime(nextStart, duration, shouldSnap, snapStepSeconds);
     const nextDuration = movingClip
@@ -4497,7 +4524,7 @@ export default function StemMixerEditor({
         },
       };
     }, historyMode);
-  }, [canUseClipDrag, canUseCrossTrackDrag, commitTrackChange, duration, magnetSnap, resolveTrackDropTarget, snapStepSeconds, snapToGrid, stems, tracks]);
+  }, [canUseClipDrag, canUseCrossTrackDrag, collectOtherTrackClipEdges, commitTrackChange, duration, magnetSnap, resolveTrackDropTarget, snapStepSeconds, snapToGrid, stems, tracks]);
 
   const resolveTimelineRulerPointer = useCallback((event: PointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -7544,6 +7571,7 @@ export default function StemMixerEditor({
             : selectedClipSelection?.trackType === stem.type
               ? selectedClipSelection.clipId
               : null;
+          const otherTrackClipEdges = collectOtherTrackClipEdges(stem.type);
           const trimEnd = state.trimEnd ?? duration;
           const isAudible = !state.muted && (!hasSoloTrack || state.solo);
           const isMutedVisual = !isAudible;
@@ -7750,6 +7778,7 @@ export default function StemMixerEditor({
                 editable={canUseTrim || canUseClipDrag}
                 snapEnabled={canUseSnap && snapToGrid}
                 magnetSnapEnabled={canUseSnap && magnetSnap}
+                magnetSnapEdges={otherTrackClipEdges}
                 snapStepSeconds={snapStepSeconds}
                 bufferVersion={bufferVersion}
                 liveSeekOnDrag={!isPlaying}
@@ -10935,12 +10964,13 @@ function stemAudioCornerBadgeStyle(status: StemTrackAudioStatus): CSSProperties 
   return {
     position: 'absolute',
     top: 8,
-    left: 2,
-    width: 10,
-    height: 10,
+    left: 31,
+    width: 5,
+    height: 5,
     borderRadius: 999,
     background: palette[status],
-    boxShadow: `0 0 0 2px rgba(8, 12, 21, 0.96), 0 0 10px ${palette[status]}66`,
+    boxShadow: `0 0 0 1px rgba(8, 12, 21, 0.95), 0 0 6px ${palette[status]}4d`,
+    opacity: status === 'ready' ? 0.88 : 0.78,
     pointerEvents: 'none',
   };
 }
@@ -11252,6 +11282,7 @@ function WaveformTrackCanvas({
   editable,
   snapEnabled,
   magnetSnapEnabled,
+  magnetSnapEdges,
   snapStepSeconds,
   bufferVersion,
   liveSeekOnDrag,
@@ -11286,6 +11317,7 @@ function WaveformTrackCanvas({
   editable: boolean;
   snapEnabled: boolean;
   magnetSnapEnabled: boolean;
+  magnetSnapEdges: number[];
   snapStepSeconds: number;
   bufferVersion: number;
   liveSeekOnDrag: boolean;
@@ -11366,20 +11398,24 @@ function WaveformTrackCanvas({
         : [];
 
     let best: { time: number; distance: number } | null = null;
-    clips.forEach((clip) => {
-      if (clip.id === draggedClipId) return;
-      [clip.start, clip.start + getStemClipDuration(clip)].forEach((edgeTime) => {
+    const applyCandidateEdge = (edgeTime: number) => {
+      if (!Number.isFinite(edgeTime)) return;
         candidateEdges.forEach((candidateTime) => {
           const distance = Math.abs(candidateTime - edgeTime);
           if (distance <= threshold && (!best || distance < best.distance)) {
             best = { time: edgeTime, distance };
           }
         });
-      });
+    };
+
+    clips.forEach((clip) => {
+      if (clip.id === draggedClipId) return;
+      [clip.start, clip.start + getStemClipDuration(clip)].forEach(applyCandidateEdge);
     });
+    magnetSnapEdges.forEach(applyCandidateEdge);
 
     return best;
-  }, [clips, displayDuration, magnetSnapEnabled, snapStepSeconds]);
+  }, [clips, displayDuration, magnetSnapEdges, magnetSnapEnabled, snapStepSeconds]);
 
   const updatePointerGuide = useCallback((
     event: PointerEvent<HTMLCanvasElement>,
