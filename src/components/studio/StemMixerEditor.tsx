@@ -8272,9 +8272,9 @@ const editorHeaderStyle: CSSProperties = {
   minHeight: 72,
   padding: '9px 18px 9px 22px',
   borderRadius: 0,
-  borderBottom: '1px solid rgba(48, 52, 76, 0.72)',
-  background: 'linear-gradient(180deg, rgba(13, 19, 29, 0.98), rgba(7, 11, 19, 0.96))',
-  boxShadow: '0 10px 26px rgba(0, 0, 0, 0.26)',
+  borderBottom: '1px solid rgba(48, 52, 76, 0.54)',
+  background: 'linear-gradient(180deg, rgba(12, 17, 27, 0.98), rgba(7, 11, 19, 0.96))',
+  boxShadow: '0 8px 22px rgba(0, 0, 0, 0.2)',
 };
 
 const editorHeaderPrimaryStyle: CSSProperties = {
@@ -8293,7 +8293,7 @@ const editorBrandStyle: CSSProperties = {
   alignItems: 'center',
   minWidth: 172,
   paddingRight: 20,
-  borderRight: '1px solid rgba(48, 52, 76, 0.72)',
+  borderRight: '1px solid rgba(48, 52, 76, 0.48)',
   textDecoration: 'none',
   flex: '0 0 auto',
 };
@@ -8369,19 +8369,20 @@ function editorHeaderFactStyle(tone: 'project' | 'neutral' | 'ready' | 'loading'
 const editorStatusClusterStyle: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
-  gap: 8,
-  color: '#8b93a6',
+  gap: 7,
+  color: '#747d92',
   fontSize: 11,
+  fontWeight: 720,
   fontVariantNumeric: 'tabular-nums',
   whiteSpace: 'nowrap',
-  paddingLeft: 2,
+  paddingLeft: 1,
 };
 
 const editorActionStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'flex-end',
-  gap: 8,
+  gap: 7,
   flexWrap: 'wrap',
   minWidth: 0,
 };
@@ -8429,43 +8430,39 @@ const editorModeBadgeStyle: CSSProperties = {
 };
 
 function saveBadgeStyle(tone: StemEditSaveBadgeTone): CSSProperties {
-  const palette: Record<StemEditSaveBadgeTone, { border: string; background: string; color: string }> = {
+  const palette: Record<StemEditSaveBadgeTone, { accent: string; color: string }> = {
     idle: {
-      border: 'rgba(148, 163, 184, 0.32)',
-      background: 'rgba(148, 163, 184, 0.1)',
-      color: '#cbd5e1',
+      accent: 'rgba(148, 163, 184, 0.46)',
+      color: '#9ca3af',
     },
     pending: {
-      border: 'rgba(250, 204, 21, 0.45)',
-      background: 'rgba(113, 63, 18, 0.28)',
-      color: '#fde68a',
+      accent: 'rgba(250, 204, 21, 0.64)',
+      color: '#d9bd74',
     },
     saving: {
-      border: 'rgba(96, 165, 250, 0.5)',
-      background: 'rgba(30, 64, 175, 0.24)',
-      color: '#bfdbfe',
+      accent: 'rgba(96, 165, 250, 0.66)',
+      color: '#9dc4f5',
     },
     saved: {
-      border: 'rgba(74, 222, 128, 0.38)',
-      background: 'rgba(20, 83, 45, 0.24)',
-      color: '#bbf7d0',
+      accent: 'rgba(74, 222, 128, 0.62)',
+      color: '#9bdcb2',
     },
     error: {
-      border: 'rgba(248, 113, 113, 0.5)',
-      background: 'rgba(127, 29, 29, 0.28)',
+      accent: 'rgba(248, 113, 113, 0.72)',
       color: '#fecaca',
     },
   };
 
   return {
-    border: `1px solid ${palette[tone].border}`,
-    background: tone === 'error' ? palette[tone].background : 'transparent',
+    border: 0,
+    borderLeft: `2px solid ${palette[tone].accent}`,
+    background: 'transparent',
     color: palette[tone].color,
-    borderRadius: 999,
-    padding: '2px 7px',
+    borderRadius: 0,
+    padding: '0 0 0 6px',
     fontSize: 11,
-    fontWeight: 820,
-    lineHeight: 1.45,
+    fontWeight: 760,
+    lineHeight: 1.2,
     whiteSpace: 'nowrap',
   };
 }
@@ -8480,14 +8477,15 @@ const editorTitleStyle: CSSProperties = {
 function editorPanelBadgeStyle(editorPanel: EditorPanelAccess): CSSProperties {
   const isProEditor = editorPanel === 'proEditor';
   return {
-    borderRadius: 999,
-    border: isProEditor ? '1px solid rgba(245, 158, 11, 0.46)' : '1px solid rgba(96, 165, 250, 0.46)',
-    background: isProEditor ? 'rgba(245, 158, 11, 0.14)' : 'rgba(37, 99, 235, 0.18)',
-    color: isProEditor ? '#fcd38a' : '#bfdbfe',
-    padding: '3px 9px',
+    borderRadius: 0,
+    border: 0,
+    borderLeft: isProEditor ? '2px solid rgba(245, 158, 11, 0.72)' : '2px solid rgba(96, 165, 250, 0.72)',
+    background: 'transparent',
+    color: isProEditor ? '#d9a652' : '#9dbdf4',
+    padding: '0 0 0 7px',
     fontSize: 11,
-    fontWeight: 900,
-    lineHeight: 1.35,
+    fontWeight: 780,
+    lineHeight: 1.2,
     whiteSpace: 'nowrap',
   };
 }
@@ -8506,17 +8504,23 @@ const editorProjectMetaStyle: CSSProperties = {
 const ghostButtonStyle: CSSProperties = {
   ...editorButtonChromeStyle({ tone: 'neutral' }),
   minWidth: 70,
-  minHeight: 32,
-  padding: '6px 11px',
+  minHeight: 31,
+  padding: '5px 10px',
+  borderColor: 'rgba(102, 114, 145, 0.24)',
+  background: 'rgba(15, 21, 33, 0.32)',
+  color: '#aeb8cb',
   fontSize: 12,
-  fontWeight: 850,
+  fontWeight: 780,
 };
 
 function historyButtonStyle(enabled: boolean): CSSProperties {
   return {
     ...ghostButtonStyle,
     minWidth: 82,
-    opacity: enabled ? 1 : 0.45,
+    borderColor: enabled ? 'rgba(102, 114, 145, 0.24)' : 'rgba(64, 74, 99, 0.18)',
+    background: enabled ? 'rgba(15, 21, 33, 0.32)' : 'rgba(15, 21, 33, 0.18)',
+    color: enabled ? '#aeb8cb' : '#626b7c',
+    opacity: 1,
     cursor: enabled ? 'pointer' : 'not-allowed',
   };
 }
