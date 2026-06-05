@@ -40,6 +40,15 @@ const MAX_TEMPLATE_ANALYSIS_CHARS = 1000;
 type AnalysisType = 'lyria3' | 'suno';
 type AnalysisChoice = AnalysisType | 'both';
 
+const analysisDisplayNameMap: Record<AnalysisType, string> = {
+  lyria3: 'Lyria 风格提示',
+  suno: '高级生成风格',
+};
+
+function getAnalysisDisplayName(analysisType: AnalysisType) {
+  return analysisDisplayNameMap[analysisType];
+}
+
 const statusColorMap: Record<string, 'green' | 'blue' | 'orange' | 'red' | 'gray'> = {
   published: 'green',
   pending: 'orange',
@@ -524,10 +533,10 @@ export default function AdminTemplatesPage() {
           const analysisTypes: AnalysisType[] = analysisChoice === 'both' ? ['suno', 'lyria3'] : [analysisChoice];
 
           for (const analysisType of analysisTypes) {
-            setUploadProgress({ current: filesToUpload.length, total: filesToUpload.length, status: `Generating ${analysisType.toUpperCase()} analysis...` });
+            setUploadProgress({ current: filesToUpload.length, total: filesToUpload.length, status: `正在生成${getAnalysisDisplayName(analysisType)}...` });
             const geminiResult = await callGeminiFromBrowser(apiKey, audioBase64Files, analysisType);
 
-            setUploadProgress({ current: filesToUpload.length, total: filesToUpload.length, status: `Saving ${analysisType.toUpperCase()} analysis...` });
+            setUploadProgress({ current: filesToUpload.length, total: filesToUpload.length, status: `正在保存${getAnalysisDisplayName(analysisType)}...` });
             const saveRes = await fetch(`/api/admin/templates/${templateId}/save-analysis`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -538,7 +547,7 @@ export default function AdminTemplatesPage() {
               }),
             });
             if (!saveRes.ok) {
-              console.error(`Failed to save ${analysisType} analysis`);
+              console.error(`Failed to save ${getAnalysisDisplayName(analysisType)} analysis`);
             }
           }
         } catch (geminiErr) {
@@ -712,12 +721,12 @@ export default function AdminTemplatesPage() {
       render: (row) => {
         const s = row.analysis_status || 'pending';
         const sunoStatus = row.suno_analysis_status || 'pending';
-        const labelMap: Record<string, string> = { completed: 'done', analyzing: 'running', failed: 'failed', pending: 'pending' };
+        const labelMap: Record<string, string> = { completed: '已完成', analyzing: '分析中', failed: '失败', pending: '待分析' };
         const colorMap: Record<string, 'green' | 'orange' | 'red' | 'gray'> = { completed: 'green', analyzing: 'orange', failed: 'red', pending: 'gray' };
         return (
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             <Tag label={`Lyria ${labelMap[s] || s}`} color={colorMap[s] || 'gray'} />
-            <Tag label={`SUNO ${labelMap[sunoStatus] || sunoStatus}`} color={colorMap[sunoStatus] || 'gray'} />
+            <Tag label={`高级风格 ${labelMap[sunoStatus] || sunoStatus}`} color={colorMap[sunoStatus] || 'gray'} />
           </div>
         );
       },
@@ -797,8 +806,17 @@ export default function AdminTemplatesPage() {
         loading={submitting}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Cover Image Upload */}
-          <div>
+          <div style={templateFlowStyle}>
+            <div style={templateFlowItemStyle}><strong>1</strong><span>基础信息</span></div>
+            <div style={templateFlowItemStyle}><strong>2</strong><span>参考音频</span></div>
+            <div style={templateFlowItemStyle}><strong>3</strong><span>风格分析</span></div>
+            <div style={templateFlowItemStyle}><strong>4</strong><span>发布设置</span></div>
+          </div>
+
+          <div style={formSectionStyle}>
+            <div style={formSectionTitleStyle}>1. 基础信息</div>
+            {/* Cover Image Upload */}
+            <div>
             <label style={labelStyle}>封面图片</label>
             <div style={{
               display: 'flex', alignItems: 'center', gap: 16,
@@ -852,6 +870,10 @@ export default function AdminTemplatesPage() {
               style={{ ...inputStyle, minHeight: 60, resize: 'vertical' }}
             />
           </div>
+          </div>
+
+          <div style={formSectionStyle}>
+          <div style={formSectionTitleStyle}>2-3. 参考音频与风格分析</div>
           {/* Audio Upload - multi-file with progress */}
           <div>
             <label style={labelStyle}>参考音频（可多选）</label>
@@ -875,7 +897,7 @@ export default function AdminTemplatesPage() {
                 style={{ fontSize: 12, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" }}
               />
               <div style={{ fontSize: 11, color: '#9ca3af' }}>
-                支持 MP3、WAV、OGG、FLAC，最大 20MB/文件，可选多个参考音频
+                支持 MP3、WAV、OGG、FLAC，最大 20MB/文件。保存时会进入风格分析步骤，生成高级生成风格与 Lyria 风格提示。
               </div>
               {/* File list with players and delete buttons */}
               {audioFiles.length > 0 && (
@@ -943,6 +965,10 @@ export default function AdminTemplatesPage() {
               )}
             </div>
           </div>
+          </div>
+
+          <div style={formSectionStyle}>
+          <div style={formSectionTitleStyle}>4. 发布设置</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
               <label style={labelStyle}>分类</label>
@@ -1005,6 +1031,7 @@ export default function AdminTemplatesPage() {
               style={inputStyle}
             />
           </div>
+          </div>
         </div>
       </FormModal>
 
@@ -1019,22 +1046,22 @@ export default function AdminTemplatesPage() {
             background: '#fff', borderRadius: 14, width: '100%', maxWidth: 520,
             padding: 24, boxShadow: '0 28px 80px rgba(0,0,0,0.35)',
           }} onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ margin: '0 0 8px', fontSize: 18, color: '#111827' }}>选择分析结果</h3>
+            <h3 style={{ margin: '0 0 8px', fontSize: 18, color: '#111827' }}>风格分析设置</h3>
             <p style={{ margin: '0 0 18px', fontSize: 13, lineHeight: 1.7, color: '#6b7280' }}>
-              上传音频后可以生成 SUNO、Lyria3，或两种都生成。两类结果会分别保存、分别查看。
+              上传参考音频后，可以生成面向高级生成的风格描述、Lyria 风格提示，或两种都生成。两类结果会分别保存、分别查看。
             </p>
             <div style={{ display: 'grid', gap: 10 }}>
               <button type="button" onClick={() => resolveAnalysisChoice('suno')} style={choiceBtnStyle}>
-                <strong>SUNO</strong>
-                <span>1000 字符内，只分析编曲与制作，供 SUNO style 使用</span>
+                <strong>高级生成风格</strong>
+                <span>1000 字符内，只分析编曲与制作，供高级生成的风格输入使用</span>
               </button>
               <button type="button" onClick={() => resolveAnalysisChoice('lyria3')} style={choiceBtnStyle}>
-                <strong>Lyria3</strong>
-                <span>保留原模板分析逻辑，供 Lyria3 模板提示词使用</span>
+                <strong>Lyria 风格提示</strong>
+                <span>保留原模板分析逻辑，供 Lyria 模板提示词使用</span>
               </button>
               <button type="button" onClick={() => resolveAnalysisChoice('both')} style={{ ...choiceBtnStyle, borderColor: '#D4A574', background: '#fffbeb' }}>
                 <strong>一起生成</strong>
-                <span>SUNO 和 Lyria3 各生成一份，并分别保存</span>
+                <span>高级生成风格和 Lyria 风格提示各生成一份，并分别保存</span>
               </button>
             </div>
             <button type="button" onClick={() => resolveAnalysisChoice(null)} style={{ ...actionBtnStyle, marginTop: 16 }}>
@@ -1071,7 +1098,7 @@ export default function AdminTemplatesPage() {
           }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <h2 style={{ fontSize: 18, fontWeight: 700, color: '#1f2937', margin: 0 }}>
-                Analysis - {analysisTemplate.name}
+                模板风格分析 - {analysisTemplate.name}
               </h2>
               <button onClick={() => setAnalysisOpen(false)} style={{
                 border: 'none', background: '#f3f4f6', borderRadius: 8,
@@ -1083,7 +1110,7 @@ export default function AdminTemplatesPage() {
             {analysisTemplate.analysis_result && (
               <div style={{ marginBottom: 24 }}>
                 <h3 style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
-                  Lyria3 Analysis {renderCharacterCount(analysisTemplate.analysis_result)}
+                  Lyria 风格分析 {renderCharacterCount(analysisTemplate.analysis_result)}
                 </h3>
                 <div style={{ background: '#f9fafb', borderRadius: 10, padding: 16, fontSize: 13, lineHeight: 1.8, color: '#374151', whiteSpace: 'pre-wrap', border: '1px solid #e5e7eb' }}>
                   {analysisTemplate.analysis_result}
@@ -1094,7 +1121,7 @@ export default function AdminTemplatesPage() {
             {analysisTemplate.lyria_prompt && (
               <div style={{ marginBottom: 24 }}>
                 <h3 style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
-                  Lyria3 Prompt {renderCharacterCount(analysisTemplate.lyria_prompt)}
+                  Lyria 风格提示 {renderCharacterCount(analysisTemplate.lyria_prompt)}
                 </h3>
                 <div style={{ background: '#f0fdf4', borderRadius: 10, padding: 16, fontSize: 13, lineHeight: 1.6, color: '#166534', fontFamily: 'monospace', border: '1px solid #bbf7d0', whiteSpace: 'pre-wrap' }}>
                   {analysisTemplate.lyria_prompt}
@@ -1104,7 +1131,7 @@ export default function AdminTemplatesPage() {
 
             {(analysisTemplate.suno_analysis_result || analysisTemplate.suno_prompt) && (
               <div>
-                <h3 style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 8 }}>SUNO Analysis</h3>
+                <h3 style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 8 }}>高级生成风格</h3>
                 {analysisTemplate.suno_analysis_result && (
                   <>
                     <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>
@@ -1118,7 +1145,7 @@ export default function AdminTemplatesPage() {
                 {analysisTemplate.suno_prompt && (
                   <>
                     <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>
-                      SUNO style {renderCharacterCount(formatAnalysisForDisplay(analysisTemplate.suno_prompt), MAX_TEMPLATE_ANALYSIS_CHARS)}
+                      高级生成风格描述 {renderCharacterCount(formatAnalysisForDisplay(analysisTemplate.suno_prompt), MAX_TEMPLATE_ANALYSIS_CHARS)}
                     </div>
                     <div style={{ background: '#fefce8', borderRadius: 10, padding: 16, fontSize: 13, lineHeight: 1.6, color: '#713f12', fontFamily: 'monospace', border: '1px solid #fde68a', whiteSpace: 'pre-wrap' }}>
                       {formatAnalysisForDisplay(analysisTemplate.suno_prompt)}
@@ -1184,6 +1211,43 @@ const choiceBtnStyle: React.CSSProperties = {
   cursor: 'pointer',
   fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
   textAlign: 'left',
+};
+
+const templateFlowStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+  gap: 8,
+  padding: 12,
+  borderRadius: 12,
+  background: '#f9fafb',
+  border: '1px solid #e5e7eb',
+};
+
+const templateFlowItemStyle: React.CSSProperties = {
+  minWidth: 0,
+  display: 'flex',
+  alignItems: 'center',
+  gap: 7,
+  color: '#4b5563',
+  fontSize: 12,
+  fontWeight: 600,
+  whiteSpace: 'nowrap',
+};
+
+const formSectionStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 14,
+  padding: 14,
+  borderRadius: 12,
+  border: '1px solid #eef2f7',
+  background: '#fff',
+};
+
+const formSectionTitleStyle: React.CSSProperties = {
+  fontSize: 13,
+  fontWeight: 700,
+  color: '#111827',
 };
 
 const labelStyle: React.CSSProperties = {
