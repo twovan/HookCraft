@@ -7548,9 +7548,11 @@ export default function StemMixerEditor({
               : null;
           const trimEnd = state.trimEnd ?? duration;
           const isAudible = !state.muted && (!hasSoloTrack || state.solo);
+          const isMutedVisual = !isAudible;
           const displayName = getStemDisplayName(stem);
           const isSelectedTrack = selectedTrack?.type === stem.type;
           const trackColor = getTrackColor(stem.type);
+          const visualTrackColor = isMutedVisual ? MUTED_TRACK_COLOR : trackColor;
           const isTrackCollapsed = state.collapsed === true;
           const firstCopiedSourceType = trackClipState.clips.find((clip) => clip.sourceTrackType)?.sourceTrackType;
           const sourceStemForWaveform = firstCopiedSourceType
@@ -7585,12 +7587,12 @@ export default function StemMixerEditor({
               }}
               onContextMenu={(event) => openTrackContextMenu(event, stem.type, currentTime)}
               style={{
-                ...stemTrackStyle(state.solo, showAdvancedControls, isSelectedTrack, trackColor, timelineGridColumns, timelineMinWidth, trackDensity, isTrackCollapsed),
+                ...stemTrackStyle(state.solo, showAdvancedControls, isSelectedTrack, trackColor, timelineGridColumns, timelineMinWidth, trackDensity, isTrackCollapsed, isMutedVisual),
               }}
             >
               <div
                 className="stem-track-header"
-                style={stemNameStyle(isSelectedTrack, trackColor, isTrackCollapsed)}
+                style={stemNameStyle(isSelectedTrack, trackColor, isTrackCollapsed, isMutedVisual)}
                 title="点击选择轨道"
                 onPointerDown={(event) => handleTrackHeaderPointerDown(event, stem.type)}
                 onPointerMove={handleTrackHeaderPointerMove}
@@ -7602,14 +7604,14 @@ export default function StemMixerEditor({
                   title={stemAudioStatusLabel(audioStatus)}
                   style={stemAudioCornerBadgeStyle(audioStatus)}
                 />
-                <span style={stemIndexStyle(isSelectedTrack)}>{String(index + 1).padStart(2, '0')}</span>
-                <span style={stemColorStyle(trackColor)} />
+                <span style={stemIndexStyle(isSelectedTrack, isMutedVisual)}>{String(index + 1).padStart(2, '0')}</span>
+                <span style={stemColorStyle(trackColor, isMutedVisual)} />
                 <div style={stemIdentityStyle}>
                   <div style={stemTitleRowStyle}>
-                    <span style={stemLabelStyle}>{displayName.zh}</span>
+                    <span style={stemLabelStyle(isMutedVisual)}>{displayName.zh}</span>
                   </div>
                   <div style={stemStatusRowStyle}>
-                    <span style={stemTypeStyle}>{displayName.en}</span>
+                    <span style={stemTypeStyle(isMutedVisual)}>{displayName.en}</span>
                     {state.solo && <span style={stemStateBadgeStyle('solo')}>独奏</span>}
                     {state.muted && <span style={stemStateBadgeStyle('muted')}>静音</span>}
                     {state.mutedRanges.length > 0 && <span style={stemStateBadgeStyle('range')}>{state.mutedRanges.length} 段</span>}
@@ -7696,7 +7698,7 @@ export default function StemMixerEditor({
                         step={0.01}
                         value={state.volume}
                         style={{
-                          '--stem-track-color': trackColor,
+                          '--stem-track-color': visualTrackColor,
                           '--stem-track-fill': `${state.volume * 100}%`,
                         } as CSSProperties}
                         onFocus={beginContinuousControlEdit}
@@ -7718,7 +7720,7 @@ export default function StemMixerEditor({
                         step={0.01}
                         value={state.pan}
                         style={{
-                          '--stem-track-color': trackColor,
+                          '--stem-track-color': visualTrackColor,
                           '--stem-track-fill': `${((state.pan + 1) / 2) * 100}%`,
                         } as CSSProperties}
                         onFocus={beginContinuousControlEdit}
@@ -7737,7 +7739,7 @@ export default function StemMixerEditor({
               <WaveformTrackCanvas
                 buffer={audioBuffer}
                 waveform={waveformForTrack}
-                color={trackColor}
+                color={visualTrackColor}
                 currentTime={currentTime}
                 duration={duration}
                 timelineDuration={timelineEditDuration || duration}
@@ -10688,6 +10690,8 @@ const timelineRulerMetaStyle: CSSProperties = {
   textAlign: 'center',
 };
 
+const MUTED_TRACK_COLOR = '#8b929f';
+
 function stemTrackStyle(
   solo: boolean,
   advanced: boolean,
@@ -10697,6 +10701,7 @@ function stemTrackStyle(
   minWidth: number,
   trackDensity: TrackDensity,
   collapsed: boolean,
+  mutedVisual = false,
 ): CSSProperties {
   const selectionWash = colorWithAlpha(trackColor, 0.16);
   const selectionEdge = colorWithAlpha(trackColor, 0.72);
@@ -10716,16 +10721,29 @@ function stemTrackStyle(
     boxSizing: 'border-box',
     minHeight: collapsed ? collapsedHeight : Math.max(rowHeight, openHeight),
     borderRadius: 8,
-    border: selectedTrack
+    border: mutedVisual
+      ? selectedTrack
+        ? '1px solid rgba(156, 163, 175, 0.58)'
+        : '1px solid rgba(95, 103, 118, 0.74)'
+      : selectedTrack
       ? `1px solid ${colorWithAlpha(trackColor, 0.58)}`
       : solo
         ? '1px solid rgba(206, 255, 53, 0.42)'
         : '1px solid rgba(25, 30, 46, 0.92)',
-    background: `
-      linear-gradient(90deg, ${selectedTrack ? selectionWash : 'rgba(4, 7, 12, 0.98)'}, rgba(7, 10, 17, 0.96) 26%, rgba(3, 6, 11, 0.98)),
-      linear-gradient(180deg, rgba(255,255,255,0.026), rgba(255,255,255,0))
-    `,
-    boxShadow: selectedTrack
+    background: mutedVisual
+      ? `
+        linear-gradient(90deg, rgba(38, 43, 52, 0.92), rgba(18, 22, 30, 0.96) 28%, rgba(8, 11, 17, 0.98)),
+        repeating-linear-gradient(135deg, rgba(255,255,255,0.026) 0 8px, rgba(255,255,255,0) 8px 16px)
+      `
+      : `
+        linear-gradient(90deg, ${selectedTrack ? selectionWash : 'rgba(4, 7, 12, 0.98)'}, rgba(7, 10, 17, 0.96) 26%, rgba(3, 6, 11, 0.98)),
+        linear-gradient(180deg, rgba(255,255,255,0.026), rgba(255,255,255,0))
+      `,
+    boxShadow: mutedVisual
+      ? selectedTrack
+        ? 'inset 0 0 0 1px rgba(148, 163, 184, 0.18), inset 3px 0 0 rgba(148, 163, 184, 0.72)'
+        : 'inset 3px 0 0 rgba(100, 116, 139, 0.62)'
+      : selectedTrack
       ? `inset 0 0 0 1px ${colorWithAlpha(trackColor, 0.24)}, inset 3px 0 0 ${selectionEdge}`
       : solo
         ? 'inset 3px 0 0 rgba(206, 255, 53, 0.58)'
@@ -10735,11 +10753,11 @@ function stemTrackStyle(
       ? collapsed ? '4px 8px' : compact ? '4px 8px' : '5px 8px'
       : collapsed ? '4px 8px' : compact ? '4px 8px' : '5px 8px',
     cursor: 'pointer',
-    transition: 'min-height 180ms ease, opacity 140ms ease, border-color 140ms ease, background 140ms ease, box-shadow 140ms ease, padding 180ms ease',
+    transition: 'min-height 180ms ease, opacity 140ms ease, border-color 140ms ease, background 140ms ease, box-shadow 140ms ease, padding 180ms ease, filter 140ms ease',
   };
 }
 
-function stemNameStyle(selectedTrack: boolean, trackColor: string, collapsed = false): CSSProperties {
+function stemNameStyle(selectedTrack: boolean, trackColor: string, collapsed = false, mutedVisual = false): CSSProperties {
   return {
     position: 'sticky',
     left: 0,
@@ -10757,11 +10775,17 @@ function stemNameStyle(selectedTrack: boolean, trackColor: string, collapsed = f
     padding: collapsed ? '5px 9px' : '7px 9px',
     borderRadius: 0,
     border: 'none',
-    borderRight: selectedTrack ? `1px solid ${colorWithAlpha(trackColor, 0.42)}` : '1px solid rgba(255, 255, 255, 0.055)',
-    background: selectedTrack
+    borderRight: mutedVisual
+      ? '1px solid rgba(148, 163, 184, 0.22)'
+      : selectedTrack ? `1px solid ${colorWithAlpha(trackColor, 0.42)}` : '1px solid rgba(255, 255, 255, 0.055)',
+    background: mutedVisual
+      ? 'linear-gradient(90deg, rgba(43, 48, 58, 0.98), rgba(15, 18, 25, 0.98))'
+      : selectedTrack
       ? `linear-gradient(90deg, ${colorWithAlpha(trackColor, 0.18)}, rgba(12, 15, 21, 0.98))`
       : 'linear-gradient(90deg, rgba(10, 14, 19, 0.99), rgba(8, 11, 16, 0.98))',
-    boxShadow: selectedTrack ? `inset 3px 0 0 ${trackColor}` : 'none',
+    boxShadow: mutedVisual
+      ? `inset 3px 0 0 ${MUTED_TRACK_COLOR}`
+      : selectedTrack ? `inset 3px 0 0 ${trackColor}` : 'none',
     overflow: 'hidden',
     isolation: 'isolate',
     opacity: 1,
@@ -10770,11 +10794,11 @@ function stemNameStyle(selectedTrack: boolean, trackColor: string, collapsed = f
   };
 }
 
-function stemIndexStyle(selectedTrack: boolean): CSSProperties {
+function stemIndexStyle(selectedTrack: boolean, mutedVisual = false): CSSProperties {
   return {
     width: 18,
     flexShrink: 0,
-    color: selectedTrack ? '#f8fafc' : '#cbd5e1',
+    color: mutedVisual ? '#a8afbd' : selectedTrack ? '#f8fafc' : '#cbd5e1',
     fontSize: 10,
     fontWeight: 900,
     fontVariantNumeric: 'tabular-nums',
@@ -10794,16 +10818,18 @@ const stemTitleRowStyle: CSSProperties = {
   overflow: 'hidden',
 };
 
-const stemLabelStyle: CSSProperties = {
-  display: 'block',
-  color: '#f8fafc',
-  fontSize: 12,
-  fontWeight: 900,
-  lineHeight: 1.15,
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
-};
+function stemLabelStyle(mutedVisual = false): CSSProperties {
+  return {
+    display: 'block',
+    color: mutedVisual ? '#d1d5db' : '#f8fafc',
+    fontSize: 12,
+    fontWeight: 900,
+    lineHeight: 1.15,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  };
+}
 
 const stemStatusRowStyle: CSSProperties = {
   display: 'flex',
@@ -10922,18 +10948,20 @@ function stemStateBadgeStyle(tone: 'solo' | 'muted' | 'range' | 'volume'): CSSPr
   };
 }
 
-const stemTypeStyle: CSSProperties = {
-  color: '#b7bdc9',
-  fontSize: 10,
-  fontWeight: 700,
-  lineHeight: 1.25,
-  textTransform: 'capitalize',
-  minWidth: 0,
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
-  flex: '1 1 32px',
-};
+function stemTypeStyle(mutedVisual = false): CSSProperties {
+  return {
+    color: mutedVisual ? '#9ca3af' : '#b7bdc9',
+    fontSize: 10,
+    fontWeight: 700,
+    lineHeight: 1.25,
+    textTransform: 'capitalize',
+    minWidth: 0,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    flex: '1 1 32px',
+  };
+}
 
 const trackHeaderSwitchesStyle: CSSProperties = {
   gridColumn: '5',
@@ -11356,13 +11384,17 @@ function WaveformTrackCanvas({
       const baseColor = recording ? '#f97316' : color;
       const backgroundColor = recording
         ? 'rgba(31, 17, 22, 0.96)'
+        : muted
+          ? selected
+            ? 'rgba(31, 36, 46, 0.96)'
+            : 'rgba(20, 24, 32, 0.98)'
         : selected
           ? colorWithAlpha(baseColor, 0.12)
           : 'rgba(5, 8, 14, 0.98)';
       const waveformColor = recording
         ? '#f97316'
         : muted
-          ? colorWithAlpha(baseColor, 0.42)
+          ? MUTED_TRACK_COLOR
           : baseColor;
       context.clearRect(0, 0, width, height);
       context.fillStyle = backgroundColor;
@@ -11420,7 +11452,9 @@ function WaveformTrackCanvas({
       context.fillRect(endX, 0, Math.max(0, width - endX), height);
 
       if (clips.length <= 1) {
-        context.fillStyle = selected ? colorWithAlpha(baseColor, 0.08) : 'rgba(255,255,255,0.012)';
+        context.fillStyle = muted
+          ? 'rgba(148, 163, 184, 0.07)'
+          : selected ? colorWithAlpha(baseColor, 0.08) : 'rgba(255,255,255,0.012)';
         context.fillRect(startX, 0, Math.max(0, endX - startX), height);
       }
 
@@ -11443,23 +11477,23 @@ function WaveformTrackCanvas({
         const sourcePeaks = clipSource?.peaks?.length ? clipSource.peaks : displayPeaks;
         const sourceDuration = Math.max(clipSource?.duration || 0, waveform?.duration || 0, buffer?.duration || 0) || duration;
         const clipTrackLabel = clipSource?.label || trackLabel;
-        const clipBaseColor = baseColor;
+        const clipBaseColor = muted && !recording ? MUTED_TRACK_COLOR : baseColor;
         const clipWaveformColor = recording
           ? '#f97316'
           : muted
-            ? colorWithAlpha(clipBaseColor, 0.42)
+            ? '#c6ccd5'
             : clipBaseColor;
         const clipPeaks = sliceStemClipPeaks(sourceClip, sourceDuration, sourcePeaks);
         const clipGradient = context.createLinearGradient(clipStartX, 0, clipEndX, 0);
-        clipGradient.addColorStop(0, colorWithAlpha(clipBaseColor, recording ? 0.42 : isSelectedClip ? 0.48 : selected ? 0.36 : 0.24));
-        clipGradient.addColorStop(0.55, colorWithAlpha(clipBaseColor, recording ? 0.34 : isSelectedClip ? 0.36 : selected ? 0.28 : 0.18));
-        clipGradient.addColorStop(1, colorWithAlpha(clipBaseColor, recording ? 0.24 : isSelectedClip ? 0.28 : selected ? 0.22 : 0.13));
+        clipGradient.addColorStop(0, colorWithAlpha(clipBaseColor, muted ? 0.28 : recording ? 0.42 : isSelectedClip ? 0.48 : selected ? 0.36 : 0.24));
+        clipGradient.addColorStop(0.55, colorWithAlpha(clipBaseColor, muted ? 0.22 : recording ? 0.34 : isSelectedClip ? 0.36 : selected ? 0.28 : 0.18));
+        clipGradient.addColorStop(1, colorWithAlpha(clipBaseColor, muted ? 0.16 : recording ? 0.24 : isSelectedClip ? 0.28 : selected ? 0.22 : 0.13));
         context.fillStyle = clipGradient;
         context.fillRect(clipStartX, 0, clipWidth, height);
 
         const takeGradient = context.createLinearGradient(clipStartX, 0, clipEndX, 0);
-        takeGradient.addColorStop(0, colorWithAlpha(clipBaseColor, recording ? 0.94 : 0.9));
-        takeGradient.addColorStop(1, colorWithAlpha(clipBaseColor, recording ? 0.68 : 0.58));
+        takeGradient.addColorStop(0, colorWithAlpha(clipBaseColor, muted ? 0.72 : recording ? 0.94 : 0.9));
+        takeGradient.addColorStop(1, colorWithAlpha(clipBaseColor, muted ? 0.48 : recording ? 0.68 : 0.58));
         context.fillStyle = takeGradient;
         context.fillRect(clipStartX, 0, clipWidth, takeBarHeight);
 
@@ -11478,7 +11512,7 @@ function WaveformTrackCanvas({
         }
         context.stroke();
 
-        context.fillStyle = '#fff7ff';
+        context.fillStyle = muted ? 'rgba(241,245,249,0.58)' : '#fff7ff';
         context.font = `${Math.max(8, 9 * ratio)}px sans-serif`;
         context.textAlign = 'left';
         context.fillText(`♛ Takes   ${clipTrackLabel}`, clipStartX + 7 * ratio, Math.max(10 * ratio, takeBarHeight - 4 * ratio));
@@ -11498,9 +11532,9 @@ function WaveformTrackCanvas({
           });
 
           const waveformFill = context.createLinearGradient(0, takeBarHeight, 0, height);
-          waveformFill.addColorStop(0, muted ? colorWithAlpha(clipBaseColor, 0.44) : colorWithAlpha(clipWaveformColor, recording ? 0.94 : 0.96));
-          waveformFill.addColorStop(0.5, muted ? colorWithAlpha(clipBaseColor, 0.34) : colorWithAlpha(clipWaveformColor, recording ? 0.9 : 0.88));
-          waveformFill.addColorStop(1, muted ? colorWithAlpha(clipBaseColor, 0.26) : colorWithAlpha(clipWaveformColor, recording ? 0.72 : 0.68));
+          waveformFill.addColorStop(0, muted ? colorWithAlpha(clipWaveformColor, 0.5) : colorWithAlpha(clipWaveformColor, recording ? 0.94 : 0.96));
+          waveformFill.addColorStop(0.5, muted ? colorWithAlpha(clipWaveformColor, 0.4) : colorWithAlpha(clipWaveformColor, recording ? 0.9 : 0.88));
+          waveformFill.addColorStop(1, muted ? colorWithAlpha(clipWaveformColor, 0.28) : colorWithAlpha(clipWaveformColor, recording ? 0.72 : 0.68));
 
           context.save();
           context.shadowColor = recording ? 'rgba(249, 115, 22, 0.62)' : muted ? 'transparent' : colorWithAlpha(clipBaseColor, selected ? 0.38 : 0.22);
@@ -11526,7 +11560,9 @@ function WaveformTrackCanvas({
 
         context.restore();
 
-        context.strokeStyle = isSelectedClip ? '#f8fafc' : selected ? colorWithAlpha(clipBaseColor, 0.82) : colorWithAlpha(clipBaseColor, 0.46);
+        context.strokeStyle = muted
+          ? isSelectedClip ? 'rgba(248, 250, 252, 0.84)' : 'rgba(148, 163, 184, 0.54)'
+          : isSelectedClip ? '#f8fafc' : selected ? colorWithAlpha(clipBaseColor, 0.82) : colorWithAlpha(clipBaseColor, 0.46);
         context.lineWidth = Math.max(1, isSelectedClip ? 1.6 * ratio : selected ? 1.1 * ratio : ratio);
         context.strokeRect(clipStartX + 0.5 * ratio, 0.5 * ratio, Math.max(0, clipWidth - ratio), Math.max(0, height - ratio));
       };
@@ -11534,6 +11570,20 @@ function WaveformTrackCanvas({
       clips.forEach((clip) => {
         renderClipWaveform(clip);
       });
+
+      if (muted && !recording) {
+        context.fillStyle = 'rgba(2, 6, 12, 0.28)';
+        context.fillRect(0, 0, width, height);
+        context.strokeStyle = 'rgba(255,255,255,0.045)';
+        context.lineWidth = Math.max(1, ratio);
+        context.beginPath();
+        const stripeStep = 16 * ratio;
+        for (let x = -height; x < width; x += stripeStep) {
+          context.moveTo(x, height);
+          context.lineTo(x + height, 0);
+        }
+        context.stroke();
+      }
 
       const mutedRects = mapStemMutedRangesToPixels({ mutedRanges, duration: displayDuration, width });
       mutedRects.forEach((rect) => {
@@ -11865,15 +11915,28 @@ function waveformCanvasStyle(selected: boolean, muted: boolean, editable: boolea
       ? compact ? 34 : 40
       : waveformHeight,
     borderRadius: 4,
-    border: recording ? '1px solid rgba(251, 113, 133, 0.92)' : selected ? '1px solid rgba(206, 255, 53, 0.46)' : '1px solid rgba(55, 61, 83, 0.82)',
-    background: recording ? 'linear-gradient(180deg, #241317, #090b12)' : 'linear-gradient(180deg, #111827, #080c15)',
-    boxShadow: selected
+    border: recording
+      ? '1px solid rgba(251, 113, 133, 0.92)'
+      : muted
+        ? selected ? '1px solid rgba(203, 213, 225, 0.5)' : '1px solid rgba(100, 116, 139, 0.72)'
+        : selected ? '1px solid rgba(206, 255, 53, 0.46)' : '1px solid rgba(55, 61, 83, 0.82)',
+    background: recording
+      ? 'linear-gradient(180deg, #241317, #090b12)'
+      : muted
+        ? 'linear-gradient(180deg, #222833, #0a0d14)'
+        : 'linear-gradient(180deg, #111827, #080c15)',
+    boxShadow: muted && !recording
+      ? selected
+        ? 'inset 0 0 0 1px rgba(203, 213, 225, 0.16), inset 0 0 34px rgba(0,0,0,0.28)'
+        : 'inset 0 1px 0 rgba(255,255,255,0.04), inset 0 0 28px rgba(0,0,0,0.34)'
+      : selected
       ? recording
         ? 'inset 0 0 0 1px rgba(251, 113, 133, 0.22), 0 0 22px rgba(248, 113, 113, 0.16)'
         : 'inset 0 0 0 1px rgba(206, 255, 53, 0.18), 0 0 0 1px rgba(82, 214, 198, 0.18)'
       : 'inset 0 1px 0 rgba(255,255,255,0.035)',
     cursor: editable ? 'grab' : 'default',
-    opacity: muted ? 0.72 : 1,
+    opacity: muted ? 0.86 : 1,
+    filter: muted && !recording ? 'saturate(0.12) contrast(0.92)' : 'none',
     touchAction: 'none',
     userSelect: 'none',
     WebkitUserSelect: 'none',
@@ -11994,13 +12057,15 @@ function stemColorForType(type: string) {
   return colorMap[type] || '#94a3b8';
 }
 
-function stemColorStyle(color: string): CSSProperties {
+function stemColorStyle(color: string, mutedVisual = false): CSSProperties {
   return {
     width: 8,
     height: 32,
     flexShrink: 0,
     borderRadius: 999,
-    background: color,
+    background: mutedVisual ? MUTED_TRACK_COLOR : color,
+    boxShadow: mutedVisual ? 'inset 0 0 0 1px rgba(255,255,255,0.12)' : 'none',
+    opacity: mutedVisual ? 0.9 : 1,
   };
 }
 
