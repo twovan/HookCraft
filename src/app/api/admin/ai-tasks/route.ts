@@ -46,6 +46,35 @@ function getStyleTag(task: any) {
   return parts.join(' / ');
 }
 
+async function getUserDisplayMap(userIds: string[]) {
+  const userMap = new Map<string, { name: string; email: string }>();
+
+  await Promise.all(userIds.map(async (userId) => {
+    try {
+      const { data } = await supabaseAdmin.auth.admin.getUserById(userId);
+      const user = data?.user;
+      if (!user) {
+        userMap.set(userId, { name: userId.slice(0, 8), email: '' });
+        return;
+      }
+
+      userMap.set(userId, {
+        name: user.user_metadata?.display_name
+          || user.user_metadata?.name
+          || user.user_metadata?.full_name
+          || user.user_metadata?.username
+          || user.email?.split('@')[0]
+          || userId.slice(0, 8),
+        email: user.email || '',
+      });
+    } catch {
+      userMap.set(userId, { name: userId.slice(0, 8), email: '' });
+    }
+  }));
+
+  return userMap;
+}
+
 /**
  * GET /api/admin/ai-tasks
  * 获取 AI 生成任务列表和统计。
@@ -76,6 +105,9 @@ export async function GET(req: NextRequest) {
       .range(from, to);
 
     if (error) throw error;
+
+    const userIds = Array.from(new Set((tasks || []).map((t: any) => t.user_id).filter(Boolean)));
+    const userMap = await getUserDisplayMap(userIds);
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -152,7 +184,8 @@ export async function GET(req: NextRequest) {
         return {
           id: t.id,
           userId: t.user_id,
-          userName: t.user_id || '未知用户',
+          userName: userMap.get(t.user_id)?.name || t.user_id?.slice(0, 8) || '未知用户',
+          userEmail: userMap.get(t.user_id)?.email || '',
           styleTag: getStyleTag(t),
           duration: getDurationSeconds(t),
           creditsConsumed: t.credits_consumed || 0,

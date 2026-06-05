@@ -10,6 +10,7 @@ interface TaskItem {
   id: string;
   userId: string;
   userName: string;
+  userEmail?: string;
   styleTag: string;
   duration: number | null;
   creditsConsumed: number;
@@ -137,8 +138,12 @@ export default function AdminAITasksPage() {
     },
     {
       key: 'userName',
-      title: '用户ID',
-      render: (row) => <span style={monoCellStyle} title={row.userId}>{row.userName}</span>,
+      title: '用户',
+      render: (row) => (
+        <span style={userCellStyle} title={[row.userName, row.userEmail, row.userId].filter(Boolean).join(' / ')}>
+          {row.userName}
+        </span>
+      ),
     },
     { key: 'styleTag', title: '风格/模型/种子' },
     {
@@ -261,6 +266,18 @@ const monoCellStyle: React.CSSProperties = {
   verticalAlign: 'middle',
   fontSize: 11,
   fontFamily: 'monospace',
+};
+
+const userCellStyle: React.CSSProperties = {
+  display: 'inline-block',
+  maxWidth: 180,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  verticalAlign: 'middle',
+  whiteSpace: 'nowrap',
+  fontSize: 12,
+  fontWeight: 600,
+  color: '#374151',
 };
 
 const sidebarCardStyle: React.CSSProperties = {
