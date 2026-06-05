@@ -516,44 +516,33 @@ export default function AdminTemplatesPage() {
           }
         }
 
-        setUploadProgress({ current: filesToUpload.length, total: filesToUpload.length, status: 'AI analyzing...' });
+        setUploadProgress({ current: filesToUpload.length, total: filesToUpload.length, status: '正在生成风格分析...' });
 
         try {
-          const keyRes = await fetch('/api/admin/gemini-key');
-          if (!keyRes.ok) throw new Error('Failed to get Gemini key');
-          const { apiKey } = await keyRes.json();
-
-          const audioBase64Files = await Promise.all(
-            filesToUpload.map(async (file) => ({
-              base64: await fileToBase64(file),
-              mimeType: file.type || 'audio/mpeg',
-            }))
-          );
-
           const analysisTypes: AnalysisType[] = analysisChoice === 'both' ? ['suno', 'lyria3'] : [analysisChoice];
+          const analysisFile = filesToUpload[0];
 
           for (const analysisType of analysisTypes) {
             setUploadProgress({ current: filesToUpload.length, total: filesToUpload.length, status: `正在生成${getAnalysisDisplayName(analysisType)}...` });
-            const geminiResult = await callGeminiFromBrowser(apiKey, audioBase64Files, analysisType);
 
-            setUploadProgress({ current: filesToUpload.length, total: filesToUpload.length, status: `正在保存${getAnalysisDisplayName(analysisType)}...` });
-            const saveRes = await fetch(`/api/admin/templates/${templateId}/save-analysis`, {
+            const analysisFormData = new FormData();
+            analysisFormData.append('templateId', templateId);
+            analysisFormData.append('analysisType', analysisType);
+            analysisFormData.append('audio', analysisFile);
+
+            const analysisRes = await fetch('/api/admin/templates/analyze', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                analysisType,
-                analysisResult: geminiResult.analysisResult,
-                lyriaPrompt: geminiResult.lyriaPrompt,
-              }),
+              body: analysisFormData,
             });
-            if (!saveRes.ok) {
-              console.error(`Failed to save ${getAnalysisDisplayName(analysisType)} analysis`);
+            if (!analysisRes.ok) {
+              const analysisErr = await analysisRes.json().catch(() => ({ error: '风格分析失败' }));
+              throw new Error(analysisErr.error || `${getAnalysisDisplayName(analysisType)}分析失败`);
             }
           }
         } catch (geminiErr) {
-          console.error('Gemini 分析失败:', geminiErr);
+          console.error('模板风格分析失败:', geminiErr);
           // Don't block the form submission if analysis fails
-          alert(`音频已上传，但 AI 分析失败: ${geminiErr instanceof Error ? geminiErr.message : '未知错误'}`);
+          alert(`音频已上传，但风格分析失败: ${geminiErr instanceof Error ? geminiErr.message : '未知错误'}`);
         }
       }
 
@@ -897,7 +886,7 @@ export default function AdminTemplatesPage() {
                 style={{ fontSize: 12, fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif" }}
               />
               <div style={{ fontSize: 11, color: '#9ca3af' }}>
-                支持 MP3、WAV、OGG、FLAC，最大 20MB/文件。保存时会进入风格分析步骤，生成高级生成风格与 Lyria 风格提示。
+                支持 MP3、WAV、OGG、FLAC，最大 20MB/文件。多文件会全部上传留存，风格分析优先使用第一首参考音频。
               </div>
               {/* File list with players and delete buttons */}
               {audioFiles.length > 0 && (

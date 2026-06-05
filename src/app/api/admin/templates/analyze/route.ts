@@ -3,6 +3,8 @@ import { TemplateAdminService } from "../../../../../lib/admin/TemplateAdminServ
 import { supabaseAdmin } from "../../../../../lib/supabase/server";
 import { requireAdmin } from "../../../../../lib/admin/auth";
 
+export const maxDuration = 300;
+
 /**
  * POST /api/admin/templates/analyze
  *
@@ -11,7 +13,7 @@ import { requireAdmin } from "../../../../../lib/admin/auth";
  *
  * FormData 参数：
  * - templateId: string（必填）
- * - audio: File（必填，参考音频文件）
+ * - audio: File（必填，参考音频文件；多文件流程当前由前端传入主参考音频）
  *
  * 返回：TemplateAnalysisResult
  */
