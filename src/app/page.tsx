@@ -23,9 +23,9 @@ interface TemplateItem {
 const GENRE_CHANNELS = ['Chinese Pop', 'EDM', 'Hip-Hop', 'Lo-Fi', 'Rock', 'Jazz'];
 const TEMPLATE_FILTERS = ['全部', '流行', 'R&B', '说唱', '摇滚', '电子', '国风', '...'];
 const HERO_FEATURES = [
-  { title: '一站式创作', detail: '词曲编录混导出' },
-  { title: 'AI 加速创作', detail: '灵感到成品更快' },
-  { title: '可商用发布', detail: '版权清晰更安心' },
+  { title: '一站式创作', detail: '词曲编录混导出', icon: 'mix' },
+  { title: 'AI 加速创作', detail: '灵感到成品更快', icon: 'spark' },
+  { title: '可商用发布', detail: '版权清晰更安心', icon: 'safe' },
 ];
 const WAVE_COLORS = ['#c084fc', '#ef4444', '#84cc16', '#2dd4bf', '#f472b6', '#f97316'];
 const WAVEFORM_PROFILE = [18, 26, 42, 66, 34, 22, 54, 80, 46, 28, 24, 62, 36, 20, 18, 30, 74, 88, 52, 24, 18, 20, 34, 58, 72, 48, 30, 22, 26, 64, 40, 18, 16, 22, 70, 92, 46, 20, 18, 24, 38, 56];
@@ -134,7 +134,7 @@ export default function HomePage() {
             <div className="home-feature-row" aria-label="核心能力">
               {HERO_FEATURES.map((item) => (
                 <span key={item.title}>
-                  <i aria-hidden="true">◎</i>
+                  <i className={`home-feature-icon ${item.icon}`} aria-hidden="true"><b /></i>
                   <strong>{item.title}</strong>
                   <em>{item.detail}</em>
                 </span>
@@ -453,17 +453,75 @@ const homeStyles = `
     gap: 8px;
   }
 
-  .home-feature-row i {
+  .home-feature-icon {
+    position: relative;
     width: 30px;
     height: 30px;
     border: 1px solid rgba(151, 165, 196, .32);
     border-radius: 7px;
-    color: #ccecff;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     font-style: normal;
-    font-size: 12px;
+    color: #dcefff;
+  }
+
+  .home-feature-icon::before,
+  .home-feature-icon::after,
+  .home-feature-icon b {
+    content: "";
+    position: absolute;
+    display: block;
+  }
+
+  .home-feature-icon.mix::before,
+  .home-feature-icon.mix::after,
+  .home-feature-icon.mix b {
+    width: 13px;
+    height: 1px;
+    left: 8px;
+    border-radius: 999px;
+    background: currentColor;
+    box-shadow: 0 0 8px rgba(206, 255, 53, .12);
+  }
+
+  .home-feature-icon.mix::before { top: 10px; }
+  .home-feature-icon.mix b { top: 15px; width: 10px; }
+  .home-feature-icon.mix::after { top: 20px; width: 15px; }
+
+  .home-feature-icon.spark::before {
+    width: 12px;
+    height: 12px;
+    border: 1px solid currentColor;
+    transform: rotate(45deg);
+    border-radius: 3px;
+  }
+
+  .home-feature-icon.spark::after {
+    width: 4px;
+    height: 4px;
+    right: 7px;
+    top: 7px;
+    border-radius: 999px;
+    background: var(--hc-lime);
+  }
+
+  .home-feature-icon.safe::before {
+    width: 13px;
+    height: 15px;
+    border: 1px solid currentColor;
+    border-radius: 8px 8px 6px 6px;
+    clip-path: polygon(50% 0, 100% 22%, 88% 100%, 12% 100%, 0 22%);
+  }
+
+  .home-feature-icon.safe::after {
+    width: 5px;
+    height: 8px;
+    border-right: 1px solid var(--hc-lime);
+    border-bottom: 1px solid var(--hc-lime);
+    transform: rotate(38deg);
+    top: 9px;
+    left: 12px;
   }
 
   .home-feature-row strong {
