@@ -6562,9 +6562,6 @@ export default function StemMixerEditor({
                   <span style={selectedTrackStatChipBaseStyle}>剪辑 {selectedTrackClipCount}</span>
                   <span style={selectedTrackStatChipBaseStyle}>音量 {Math.round(selectedTrackState.volume * 100)}%</span>
                   <span style={selectedTrackStatChipBaseStyle}>声像 {formatPan(selectedTrackState.pan)}</span>
-                  <span style={selectedTrackStatChipBaseStyle}>淡入 {selectedTrackState.fadeIn.toFixed(2)}s</span>
-                  <span style={selectedTrackStatChipBaseStyle}>淡出 {selectedTrackState.fadeOut.toFixed(2)}s</span>
-                  <span style={selectedTrackStatChipBaseStyle}>静音片段 {selectedTrackMutedRanges.length}</span>
                 </div>
                 <div style={selectedTrackControlsGridStyle}>
                   {canUseTrim && <label style={selectedTrackControlStyle}>
@@ -9667,10 +9664,11 @@ function exportStatusStyle(tone: StemExportStatusTone): CSSProperties {
 
   return {
     marginTop: 10,
-    padding: '8px 9px',
+    padding: '7px 8px',
     borderRadius: 8,
-    border: `1px solid ${color}`,
-    background: 'rgba(8, 12, 21, 0.52)',
+    border: '1px solid rgba(48, 52, 76, 0.34)',
+    borderLeft: `2px solid ${color}`,
+    background: 'rgba(8, 12, 21, 0.34)',
   };
 }
 
@@ -9679,9 +9677,9 @@ const exportStatusHeaderStyle: CSSProperties = {
   alignItems: 'center',
   justifyContent: 'space-between',
   gap: 10,
-  color: '#dbe3f1',
-  fontSize: 12,
-  fontWeight: 820,
+  color: '#b9c2d4',
+  fontSize: 11,
+  fontWeight: 760,
 };
 
 const exportStatusTrackStyle: CSSProperties = {
@@ -10976,38 +10974,38 @@ function stemAudioStatusBadgeStyle(status: StemTrackAudioStatus): CSSProperties 
 }
 
 function stemStateBadgeStyle(tone: 'solo' | 'muted' | 'range' | 'volume'): CSSProperties {
-  const palette: Record<typeof tone, { border: string; background: string; color: string }> = {
+  const palette: Record<typeof tone, { accent: string; color: string }> = {
     solo: {
-      border: '1px solid rgba(251, 191, 36, 0.46)',
-      background: 'rgba(251, 191, 36, 0.14)',
+      accent: 'rgba(251, 191, 36, 0.72)',
       color: '#fde68a',
     },
     muted: {
-      border: '1px solid rgba(248, 113, 113, 0.46)',
-      background: 'rgba(248, 113, 113, 0.14)',
+      accent: 'rgba(248, 113, 113, 0.72)',
       color: '#fecaca',
     },
     range: {
-      border: '1px solid rgba(216, 180, 254, 0.42)',
-      background: 'rgba(126, 34, 206, 0.16)',
+      accent: 'rgba(216, 180, 254, 0.68)',
       color: '#e9d5ff',
     },
     volume: {
-      border: '1px solid rgba(96, 165, 250, 0.42)',
-      background: 'rgba(37, 99, 235, 0.14)',
+      accent: 'rgba(96, 165, 250, 0.68)',
       color: '#bfdbfe',
     },
   };
 
   return {
-    borderRadius: 999,
-    ...palette[tone],
-    padding: '1px 5px',
+    borderRadius: 0,
+    border: 0,
+    borderLeft: `2px solid ${palette[tone].accent}`,
+    background: 'transparent',
+    color: palette[tone].color,
+    padding: '0 0 0 5px',
     fontSize: 9,
-    fontWeight: 820,
+    fontWeight: 780,
     lineHeight: 1.25,
     whiteSpace: 'nowrap',
     flexShrink: 0,
+    opacity: 0.82,
   };
 }
 
