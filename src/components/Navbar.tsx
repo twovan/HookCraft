@@ -119,12 +119,15 @@ export default function Navbar() {
 
       .hc-nav-home {
         height: 68px !important;
+        padding: 0 20px !important;
         background: linear-gradient(180deg, rgba(5, 8, 14, .72), rgba(5, 8, 14, .42)) !important;
         border-bottom-color: rgba(206, 255, 53, .12) !important;
         box-shadow: none !important;
       }
 
       .hc-nav-home::after {
+        left: 20px;
+        right: 20px;
         background: linear-gradient(90deg, transparent, rgba(206,255,53,.2), rgba(82,214,198,.12), transparent);
       }
 
