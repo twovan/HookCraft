@@ -7354,22 +7354,6 @@ export default function StemMixerEditor({
             </button>
           </div>}
           <div className="stem-timeline-toolbar-strip" style={timelineToolbarStatsStyle}>
-            {editorFeatures.advanced.addTrack && <button
-              type="button"
-              style={timelineAddTrackButtonStyle}
-              onClick={createEmptyCustomTrack}
-            >
-              添加轨道
-            </button>}
-            <span style={timelineToolbarPillStyle}>显示 {visibleStems.length}/{stems.length}</span>
-            <span style={timelineToolbarPillStyle}>时长 {formatStemTimecode(duration)}</span>
-            <span style={timelineToolbarPillStyle}>{selectedTrack ? `选中 ${getStemDisplayName(selectedTrack).zh}` : '未选轨道'}</span>
-            {selectedTrack && (
-              <span style={timelineToolbarPillStyle}>选区 {formatStemTimecode(selectedTrackClipDuration)}</span>
-            )}
-            {selectedTrack && (
-              <span style={timelineToolbarPillStyle}>片段 {selectedTrackClipCount}</span>
-            )}
             {selectedTrack && selectedTrackTrimControls && (
               <span style={timelineSelectionActionsStyle}>
                 {canUseTrim && <TimelineIconButton
@@ -7474,6 +7458,17 @@ export default function StemMixerEditor({
                 return next;
               })}
             />}
+            <span style={timelineToolbarStatusGroupStyle}>
+              <span style={timelineToolbarPillStyle}>显示 {visibleStems.length}/{stems.length}</span>
+              <span style={timelineToolbarPillStyle}>时长 {formatStemTimecode(duration)}</span>
+              <span style={timelineToolbarPillStyle}>{selectedTrack ? `选中 ${getStemDisplayName(selectedTrack).zh}` : '未选轨道'}</span>
+              {selectedTrack && (
+                <span style={timelineToolbarPillStyle}>选区 {formatStemTimecode(selectedTrackClipDuration)}</span>
+              )}
+              {selectedTrack && (
+                <span style={timelineToolbarPillStyle}>片段 {selectedTrackClipCount}</span>
+              )}
+            </span>
           </div>
         </div>
         {timelineTooltip && typeof document !== 'undefined' && createPortal(
@@ -10423,6 +10418,17 @@ const timelineToolbarStatsStyle: CSSProperties = {
   paddingBottom: 1,
 };
 
+const timelineToolbarStatusGroupStyle: CSSProperties = {
+  flex: '1 1 auto',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'flex-end',
+  gap: 6,
+  minWidth: 0,
+  marginLeft: 'auto',
+  overflow: 'hidden',
+};
+
 const timelineZoomControlsStyle: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
@@ -10473,17 +10479,6 @@ const timelineToolbarPillStyle: CSSProperties = {
   padding: '2px 7px',
   fontSize: 10,
   fontWeight: 720,
-  whiteSpace: 'nowrap',
-};
-
-const timelineAddTrackButtonStyle: CSSProperties = {
-  ...editorButtonChromeStyle({ tone: 'primary', compact: true }),
-  flex: '0 0 auto',
-  minHeight: 24,
-  borderRadius: 999,
-  padding: '3px 10px',
-  fontSize: 11,
-  fontWeight: 900,
   whiteSpace: 'nowrap',
 };
 
