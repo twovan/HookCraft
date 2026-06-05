@@ -8993,10 +8993,12 @@ const selectedTrackStatsStyle: CSSProperties = {
 };
 
 const selectedTrackStatChipBaseStyle: CSSProperties = {
-  borderRadius: 999,
-  border: '1px solid rgba(107, 119, 149, 0.18)',
-  background: 'rgba(15, 22, 34, 0.34)',
-  padding: '2px 6px',
+  borderRadius: 0,
+  border: 0,
+  borderLeft: '1px solid rgba(107, 119, 149, 0.28)',
+  background: 'transparent',
+  padding: '0 0 0 7px',
+  color: '#8791a7',
 };
 
 const selectedTrackControlsGridStyle: CSSProperties = {
@@ -9054,9 +9056,9 @@ const selectedTrackShortcutStyle: CSSProperties = {
 const controlPanelStyle: CSSProperties = {
   minWidth: 0,
   borderRadius: 8,
-  border: '1px solid rgba(48, 52, 76, 0.36)',
-  background: 'rgba(7, 11, 19, 0.46)',
-  padding: '9px 10px',
+  border: '1px solid rgba(48, 52, 76, 0.28)',
+  background: 'rgba(7, 11, 19, 0.34)',
+  padding: '8px 9px',
 };
 
 function addTrackPanelStyle(open: boolean): CSSProperties {
@@ -9389,23 +9391,23 @@ const panelHeadingStyle: CSSProperties = {
 };
 
 const panelHeadingMetaStyle: CSSProperties = {
-  color: '#717791',
-  fontSize: 10,
-  fontWeight: 900,
+  color: '#626a80',
+  fontSize: 9,
+  fontWeight: 820,
   textTransform: 'uppercase',
   letterSpacing: 0,
 };
 
 const presetButtonStyle: CSSProperties = {
   ...editorButtonChromeStyle({ tone: 'neutral', compact: true }),
-  minHeight: 27,
+  minHeight: 26,
   borderRadius: 7,
-  padding: '4px 8px',
-  borderColor: 'rgba(102, 114, 145, 0.28)',
-  background: 'rgba(16, 22, 34, 0.52)',
-  color: '#c3ccdc',
+  padding: '3px 8px',
+  borderColor: 'rgba(102, 114, 145, 0.22)',
+  background: 'rgba(16, 22, 34, 0.38)',
+  color: '#b8c1d2',
   fontSize: 11,
-  fontWeight: 780,
+  fontWeight: 740,
   minWidth: 0,
 };
 
@@ -9424,22 +9426,26 @@ const deleteTrackButtonStyle: CSSProperties = {
 function viewModeButtonStyle(active: boolean): CSSProperties {
   return {
     ...editorButtonChromeStyle({ tone: 'purple', compact: true, active }),
-    minHeight: 30,
+    minHeight: 28,
     borderRadius: 7,
-    padding: '5px 10px',
-    fontSize: 12,
-    fontWeight: 900,
+    padding: '4px 9px',
+    borderColor: active ? 'rgba(190, 232, 95, 0.34)' : 'rgba(102, 114, 145, 0.2)',
+    background: active ? 'rgba(190, 232, 95, 0.08)' : 'rgba(16, 22, 34, 0.32)',
+    color: active ? '#efffc0' : '#9ba6b8',
+    fontSize: 11,
+    fontWeight: active ? 860 : 740,
     minWidth: 0,
+    boxShadow: 'none',
   };
 }
 
 const exportPanelStyle: CSSProperties = {
   gridColumn: 'auto',
   minWidth: 0,
-  padding: '9px 10px 10px',
+  padding: '8px 9px 10px',
   borderRadius: 8,
-  border: '1px solid rgba(48, 52, 76, 0.5)',
-  background: 'rgba(8, 12, 21, 0.72)',
+  border: '1px solid rgba(48, 52, 76, 0.38)',
+  background: 'rgba(8, 12, 21, 0.52)',
 };
 
 const exportPanelHeaderStyle: CSSProperties = {
@@ -9616,33 +9622,34 @@ const exportHintStyle: CSSProperties = {
 
 const exportPreflightStyle: CSSProperties = {
   display: 'grid',
-  gap: 5,
-  marginTop: 10,
-  padding: '7px 9px',
-  borderRadius: 8,
-  border: '1px solid rgba(48, 52, 76, 0.42)',
-  background: 'rgba(15, 20, 31, 0.46)',
+  gap: 4,
+  marginTop: 9,
+  padding: '6px 0 0',
+  borderRadius: 0,
+  border: 0,
+  borderTop: '1px solid rgba(48, 52, 76, 0.34)',
+  background: 'transparent',
 };
 
 const exportPreflightRowStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: '64px minmax(0, 1fr)',
+  gridTemplateColumns: '58px minmax(0, 1fr)',
   gap: 8,
   alignItems: 'start',
   minWidth: 0,
-  fontSize: 11,
-  lineHeight: 1.36,
+  fontSize: 10,
+  lineHeight: 1.32,
 };
 
 const exportPreflightLabelStyle: CSSProperties = {
-  color: '#8f92aa',
-  fontWeight: 800,
+  color: '#737b91',
+  fontWeight: 760,
   whiteSpace: 'nowrap',
 };
 
 const exportPreflightValueStyle: CSSProperties = {
-  color: '#cfd3e6',
-  fontWeight: 700,
+  color: '#aeb7ca',
+  fontWeight: 660,
   overflowWrap: 'anywhere',
 };
 
