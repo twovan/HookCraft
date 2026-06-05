@@ -9045,9 +9045,13 @@ const selectedTrackNudgeGridStyle: CSSProperties = {
 };
 
 const selectedTrackShortcutStyle: CSSProperties = {
-  color: '#858aa3',
-  fontSize: 11,
-  lineHeight: 1.35,
+  flexBasis: '100%',
+  maxHeight: 0,
+  opacity: 0,
+  overflow: 'hidden',
+  color: '#6f778a',
+  fontSize: 10,
+  lineHeight: 1.3,
 };
 
 const controlPanelStyle: CSSProperties = {
@@ -9076,10 +9080,10 @@ const addTrackModeGridStyle: CSSProperties = {
 };
 
 const addTrackHintStyle: CSSProperties = {
-  marginTop: 8,
-  color: '#aeb2c9',
-  fontSize: 11,
-  lineHeight: 1.45,
+  marginTop: 7,
+  color: '#7d879c',
+  fontSize: 10,
+  lineHeight: 1.36,
 };
 
 const recordingInputPanelStyle: CSSProperties = {
@@ -9354,10 +9358,10 @@ function recordingActionButtonStyle(active: boolean): CSSProperties {
 }
 
 const buttonWrapStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  flexWrap: 'wrap',
-  gap: 8,
+  display: 'grid',
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  alignItems: 'stretch',
+  gap: 6,
   marginTop: 8,
 };
 
@@ -9593,24 +9597,24 @@ const exportActionReasonStyle: CSSProperties = {
 
 function exportModeButtonStyle(active: boolean): CSSProperties {
   return {
-    border: `1px solid ${active ? 'rgba(190, 232, 95, 0.44)' : 'rgba(80, 91, 119, 0.34)'}`,
-    background: active ? 'rgba(190, 232, 95, 0.1)' : 'rgba(15, 21, 32, 0.58)',
-    color: active ? '#ecffc3' : '#aeb6c9',
-    minHeight: 31,
+    border: `1px solid ${active ? 'rgba(190, 232, 95, 0.38)' : 'rgba(80, 91, 119, 0.22)'}`,
+    background: active ? 'rgba(190, 232, 95, 0.09)' : 'rgba(13, 18, 29, 0.34)',
+    color: active ? '#ecffc3' : '#939db2',
+    minHeight: 29,
     borderRadius: 7,
-    padding: '6px 8px',
-    fontSize: 12,
-    fontWeight: active ? 900 : 780,
+    padding: '5px 8px',
+    fontSize: 11,
+    fontWeight: active ? 860 : 720,
     cursor: 'pointer',
-    boxShadow: active ? 'inset 0 0 0 1px rgba(190, 232, 95, 0.08)' : 'none',
+    boxShadow: 'none',
   };
 }
 
 const exportHintStyle: CSSProperties = {
   marginTop: 8,
-  color: '#8d96aa',
-  fontSize: 11,
-  lineHeight: 1.45,
+  color: '#778196',
+  fontSize: 10,
+  lineHeight: 1.35,
 };
 
 const exportPreflightStyle: CSSProperties = {
