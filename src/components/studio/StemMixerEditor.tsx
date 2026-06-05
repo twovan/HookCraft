@@ -7802,7 +7802,7 @@ export default function StemMixerEditor({
             </div>
           );
           })}
-          {editorFeatures.advanced.addTrack && <div style={timelineAddTrackRowStyle}>
+          {editorFeatures.advanced.addTrack && <div style={timelineAddTrackRowStyle(timelineViewportWidth)}>
             <button
               type="button"
               className="stem-add-track-dropzone"
@@ -10143,16 +10143,21 @@ const emptyTrackNoticeStyle: CSSProperties = {
   textAlign: 'center',
 };
 
-const timelineAddTrackRowStyle: CSSProperties = {
-  position: 'sticky',
-  left: 0,
-  zIndex: 3,
-  width: '100%',
-  minWidth: 0,
-  boxSizing: 'border-box',
-  padding: '9px 8px 10px',
-  background: 'linear-gradient(180deg, rgba(5, 8, 14, 0.28), rgba(5, 8, 14, 0.82))',
-};
+function timelineAddTrackRowStyle(viewportWidth: number): CSSProperties {
+  const visibleWidth = viewportWidth > 0 ? Math.max(280, viewportWidth - 14) : undefined;
+
+  return {
+    position: 'sticky',
+    left: 0,
+    zIndex: 3,
+    width: visibleWidth,
+    maxWidth: visibleWidth,
+    minWidth: 0,
+    boxSizing: 'border-box',
+    padding: '9px 8px 10px',
+    background: 'linear-gradient(180deg, rgba(5, 8, 14, 0.28), rgba(5, 8, 14, 0.82))',
+  };
+}
 
 const trackAddDropzoneButtonStyle: CSSProperties = {
   width: '100%',
