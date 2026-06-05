@@ -28,6 +28,7 @@ const HERO_FEATURES = [
   { title: '可商用发布', detail: '版权清晰更安心' },
 ];
 const WAVE_COLORS = ['#c084fc', '#ef4444', '#84cc16', '#2dd4bf', '#f472b6', '#f97316'];
+const WAVEFORM_PROFILE = [18, 26, 42, 66, 34, 22, 54, 80, 46, 28, 24, 62, 36, 20, 18, 30, 74, 88, 52, 24, 18, 20, 34, 58, 72, 48, 30, 22, 26, 64, 40, 18, 16, 22, 70, 92, 46, 20, 18, 24, 38, 56];
 const PRODUCER_PLACEHOLDERS = [
   { name: 'Fisherman', meta: '代表作《深海月序》' },
   { name: '陈令韬', meta: '代表作《孤勇者》' },
@@ -245,8 +246,8 @@ function TemplateSkeleton({ index }: { index: number }) {
   return (
     <article className="template-card template-card-skeleton">
       <div className="template-skeleton-wave" style={{ '--wave-color': WAVE_COLORS[index % WAVE_COLORS.length] } as CSSProperties}>
-        {Array.from({ length: 28 }).map((_, bar) => (
-          <i key={bar} style={{ height: `${28 + ((bar + index * 4) % 9) * 6}%` }} />
+        {Array.from({ length: 38 }).map((_, bar) => (
+          <i key={bar} style={{ height: `${WAVEFORM_PROFILE[(bar + index * 5) % WAVEFORM_PROFILE.length]}%` }} />
         ))}
       </div>
       <div className="template-card-body">
@@ -261,13 +262,14 @@ function TemplateCard({ template }: { template: TemplateItem }) {
   const tags = [template.genre, template.category === 'free_template' ? '免费' : '付费'].filter(Boolean);
   const price = template.price ? Math.round(template.price / 100) : 0;
   const waveColor = WAVE_COLORS[Math.abs(template.name.length + template.id.length) % WAVE_COLORS.length];
+  const waveOffset = Math.abs(template.name.length * 3 + template.id.length) % WAVEFORM_PROFILE.length;
 
   return (
     <article className="template-card" style={{ '--wave-color': waveColor } as CSSProperties}>
       <Link href={`/templates/${template.id}`} className="template-wave-link" aria-label={`查看模板 ${template.name}`}>
         <div className="template-wave">
-          {Array.from({ length: 34 }).map((_, index) => (
-            <i key={index} style={{ height: `${24 + ((index * 7 + template.name.length) % 10) * 6}%` }} />
+          {Array.from({ length: 46 }).map((_, index) => (
+            <i key={index} style={{ height: `${WAVEFORM_PROFILE[(index + waveOffset) % WAVEFORM_PROFILE.length]}%` }} />
           ))}
         </div>
       </Link>
@@ -566,10 +568,10 @@ const homeStyles = `
   }
 
   .template-skeleton-wave {
-    height: 44px;
+    height: 46px;
     display: flex;
     align-items: center;
-    gap: 2px;
+    gap: 1.5px;
     padding: 8px 10px;
     border-bottom: 1px solid rgba(100, 113, 143, .18);
     background: color-mix(in srgb, var(--wave-color, #8b5cf6) 20%, rgba(8, 12, 20, .9));
@@ -579,7 +581,8 @@ const homeStyles = `
     flex: 1;
     border-radius: 999px;
     background: var(--wave-color, #8b5cf6);
-    opacity: .7;
+    opacity: .72;
+    min-width: 2px;
   }
 
   .template-skeleton-title,
@@ -608,13 +611,25 @@ const homeStyles = `
   }
 
   .template-wave {
-    height: 44px;
+    position: relative;
+    height: 46px;
     display: flex;
     align-items: center;
-    gap: 2px;
-    padding: 8px 10px;
+    gap: 1.5px;
+    padding: 8px 9px;
     border-bottom: 1px solid rgba(100, 113, 143, .18);
     background: color-mix(in srgb, var(--wave-color, #8b5cf6) 19%, rgba(8, 12, 20, .92));
+  }
+
+  .template-wave::after {
+    content: "";
+    position: absolute;
+    left: 9px;
+    right: 9px;
+    top: 50%;
+    height: 1px;
+    background: color-mix(in srgb, var(--wave-color, #8b5cf6) 34%, transparent);
+    opacity: .42;
   }
 
   .template-wave i {
@@ -622,6 +637,8 @@ const homeStyles = `
     border-radius: 999px;
     background: var(--wave-color, #8b5cf6);
     opacity: .82;
+    min-width: 1px;
+    z-index: 1;
   }
 
   .template-card-body {
