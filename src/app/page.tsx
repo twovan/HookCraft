@@ -22,7 +22,6 @@ interface TemplateItem {
 
 const GENRE_CHANNELS = ['Chinese Pop', 'EDM', 'Hip-Hop', 'Lo-Fi', 'Rock', 'Jazz'];
 const TEMPLATE_FILTERS = ['全部', '流行', 'R&B', '说唱', '摇滚', '电子', '国风', '...'];
-const WORKFLOW_STEPS = ['选择模板', '生成双版本', '分轨编辑', '导出交付'];
 const HERO_FEATURES = [
   { title: '一站式创作', detail: '词曲编录混导出' },
   { title: 'AI 加速创作', detail: '灵感到成品更快' },
@@ -141,15 +140,6 @@ export default function HomePage() {
             </div>
           </div>
         </div>
-      </section>
-
-      <section className="hc-container home-workflow" aria-label="创作流程">
-        {WORKFLOW_STEPS.map((step, index) => (
-          <div className="home-workflow-step" key={step}>
-            <span>{String(index + 1).padStart(2, '0')}</span>
-            <strong>{step}</strong>
-          </div>
-        ))}
       </section>
 
       <section className="hc-container home-section home-discovery">
@@ -335,7 +325,7 @@ const homeStyles = `
 
   .home-hero {
     position: relative;
-    min-height: 540px;
+    min-height: 560px;
     display: flex;
     align-items: stretch;
     overflow: hidden;
@@ -365,9 +355,9 @@ const homeStyles = `
     grid-template-columns: minmax(0, 650px) minmax(360px, 1fr);
     align-items: center;
     gap: 56px;
-    min-height: 540px;
-    padding-top: 22px;
-    padding-bottom: 26px;
+    min-height: 560px;
+    padding-top: 18px;
+    padding-bottom: 18px;
   }
 
   .home-hero-copy {
@@ -389,7 +379,7 @@ const homeStyles = `
   }
 
   .home-hero-copy h1 {
-    margin: 14px 0 0;
+    margin: 12px 0 0;
     max-width: 780px;
     font-family: var(--hc-font-display);
     font-size: clamp(31px, 3.25vw, 50px);
@@ -413,7 +403,7 @@ const homeStyles = `
 
   .home-hero-copy h1 small {
     display: block;
-    margin-top: 10px;
+    margin-top: 8px;
     color: #f8fafc;
     font-size: clamp(30px, 3.15vw, 48px);
     line-height: 1.12;
@@ -428,7 +418,7 @@ const homeStyles = `
 
   .home-hero-copy p {
     max-width: 640px;
-    margin: 14px 0 0;
+    margin: 12px 0 0;
     color: #b9c3d4;
     font-size: 17px;
     line-height: 1.55;
@@ -439,7 +429,7 @@ const homeStyles = `
     display: flex;
     flex-wrap: wrap;
     gap: 12px;
-    margin-top: 20px;
+    margin-top: 18px;
   }
 
   .home-feature-row {
@@ -447,7 +437,7 @@ const homeStyles = `
     align-items: center;
     flex-wrap: wrap;
     gap: 26px;
-    margin-top: 22px;
+    margin-top: 18px;
     color: #9ca8ba;
     font-size: 12px;
     font-weight: 760;
@@ -485,45 +475,8 @@ const homeStyles = `
     font-weight: 700;
   }
 
-  .home-workflow {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 0;
-    transform: translateY(-14px);
-    border: 1px solid rgba(100, 113, 143, .22);
-    border-radius: 8px;
-    background: rgba(7, 10, 18, .84);
-    backdrop-filter: blur(18px);
-    overflow: hidden;
-  }
-
-  .home-workflow-step {
-    min-height: 58px;
-    padding: 13px 20px;
-    border-right: 1px solid rgba(100, 113, 143, .18);
-  }
-
-  .home-workflow-step:last-child {
-    border-right: 0;
-  }
-
-  .home-workflow-step span {
-    display: block;
-    color: #6f7b91;
-    font-size: 10px;
-    font-weight: 900;
-  }
-
-  .home-workflow-step strong {
-    display: block;
-    margin-top: 4px;
-    color: #f1f5f9;
-    font-size: 15px;
-    font-weight: 900;
-  }
-
   .home-section {
-    padding-top: 28px;
+    padding-top: 20px;
   }
 
   .home-section-head {
@@ -531,14 +484,14 @@ const homeStyles = `
     align-items: end;
     justify-content: space-between;
     gap: 24px;
-    margin-bottom: 14px;
+    margin-bottom: 10px;
   }
 
   .home-filter-row {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
   }
 
   .home-filter-row a {
@@ -611,11 +564,11 @@ const homeStyles = `
   }
 
   .template-skeleton-wave {
-    height: 52px;
+    height: 44px;
     display: flex;
     align-items: center;
     gap: 2px;
-    padding: 10px;
+    padding: 8px 10px;
     border-bottom: 1px solid rgba(100, 113, 143, .18);
     background: color-mix(in srgb, var(--wave-color, #8b5cf6) 20%, rgba(8, 12, 20, .9));
   }
@@ -653,11 +606,11 @@ const homeStyles = `
   }
 
   .template-wave {
-    height: 52px;
+    height: 44px;
     display: flex;
     align-items: center;
     gap: 2px;
-    padding: 10px;
+    padding: 8px 10px;
     border-bottom: 1px solid rgba(100, 113, 143, .18);
     background: color-mix(in srgb, var(--wave-color, #8b5cf6) 19%, rgba(8, 12, 20, .92));
   }
@@ -670,7 +623,7 @@ const homeStyles = `
   }
 
   .template-card-body {
-    padding: 8px 10px 9px;
+    padding: 7px 10px 8px;
   }
 
   .template-title-row {
@@ -681,8 +634,8 @@ const homeStyles = `
   }
 
   .template-play {
-    width: 22px;
-    height: 22px;
+    width: 20px;
+    height: 20px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -698,7 +651,7 @@ const homeStyles = `
     display: block;
     color: #f8fafc;
     text-decoration: none;
-    font-size: 13px;
+    font-size: 12px;
     line-height: 1.35;
     font-weight: 900;
     overflow: hidden;
@@ -708,10 +661,10 @@ const homeStyles = `
 
   .template-producer {
     display: inline-block;
-    margin-top: 3px;
+    margin-top: 2px;
     color: #8f9ab2;
     text-decoration: none;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 720;
   }
 
@@ -719,14 +672,14 @@ const homeStyles = `
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
-    margin-top: 5px;
+    margin-top: 4px;
   }
 
   .template-tags span {
     border-radius: 999px;
     background: rgba(255, 255, 255, .055);
     color: #98a2b3;
-    padding: 4px 8px;
+    padding: 3px 7px;
     font-size: 10px;
     font-weight: 800;
   }
@@ -760,7 +713,8 @@ const homeStyles = `
   }
 
   .home-producer-section {
-    padding-top: 22px;
+    padding-top: 18px;
+    padding-bottom: 42px;
   }
 
   .home-producer-strip {
@@ -914,7 +868,6 @@ const homeStyles = `
       display: none;
     }
 
-    .home-workflow,
     .home-template-grid,
     .home-channel-list {
       grid-template-columns: 1fr;
@@ -922,16 +875,6 @@ const homeStyles = `
 
     .home-producer-strip {
       grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .home-workflow {
-      transform: none;
-      margin-top: 18px;
-    }
-
-    .home-workflow-step {
-      border-right: 0;
-      border-bottom: 1px solid rgba(100, 113, 143, .18);
     }
 
     .home-section-head {
