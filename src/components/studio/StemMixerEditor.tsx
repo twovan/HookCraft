@@ -7849,7 +7849,7 @@ function editorStyle(metrics: DawEditorLayoutMetrics): CSSProperties {
       linear-gradient(180deg, rgba(13, 18, 27, 0.99), rgba(4, 8, 14, 0.99)),
       linear-gradient(90deg, rgba(18, 24, 35, 0.72), transparent 38%)
     `,
-    padding: `${metrics.headerHeight + 8}px 12px ${metrics.bottomTransportHeight + 42}px ${metrics.sideRailWidth + 8}px`,
+    padding: `${metrics.headerHeight + 8}px 12px ${metrics.bottomTransportHeight + 34}px ${metrics.sideRailWidth + 8}px`,
     display: 'grid',
     gridTemplateColumns: `minmax(0, 1fr) ${metrics.inspectorWidth}px`,
     gridAutoFlow: 'row dense',
@@ -8539,10 +8539,10 @@ function transportPanelStyle(compactTransport: boolean): CSSProperties {
     zIndex: 40,
     borderRadius: 0,
     border: 'none',
-    borderTop: '1px solid rgba(48, 52, 76, 0.86)',
-    background: 'linear-gradient(180deg, rgba(15, 20, 30, 0.98), rgba(7, 11, 18, 0.99))',
-    boxShadow: '0 -18px 44px rgba(0, 0, 0, 0.45)',
-    padding: compactTransport ? '12px 22px' : '12px 22px 14px',
+    borderTop: '1px solid rgba(48, 52, 76, 0.56)',
+    background: 'linear-gradient(180deg, rgba(12, 16, 24, 0.94), rgba(6, 9, 15, 0.98))',
+    boxShadow: '0 -10px 28px rgba(0, 0, 0, 0.34)',
+    padding: compactTransport ? '9px 18px' : '10px 20px 12px',
     minWidth: 0,
     maxWidth: '100vw',
     boxSizing: 'border-box',
@@ -8553,8 +8553,8 @@ function transportPanelStyle(compactTransport: boolean): CSSProperties {
 
 const transportStyle: CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'minmax(240px, 340px) 116px minmax(220px, 1fr) 84px',
-  gap: 14,
+  gridTemplateColumns: 'minmax(220px, 300px) 104px minmax(220px, 1fr) 76px',
+  gap: 12,
   alignItems: 'center',
 };
 
@@ -8562,19 +8562,19 @@ const transportButtonGroupStyle: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   flexWrap: 'nowrap',
-  gap: 5,
+  gap: 4,
   minWidth: 0,
-  padding: 4,
-  borderRadius: 12,
-  border: '1px solid rgba(48, 52, 76, 0.78)',
-  background: 'linear-gradient(180deg, rgba(18, 23, 38, 0.9), rgba(7, 9, 18, 0.82))',
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
+  padding: 3,
+  borderRadius: 10,
+  border: '1px solid rgba(48, 52, 76, 0.46)',
+  background: 'rgba(11, 15, 24, 0.46)',
+  boxShadow: 'none',
 };
 
 const playButtonStyle: CSSProperties = {
   ...editorButtonChromeStyle({ tone: 'primary', round: true, active: true }),
-  minHeight: 38,
-  minWidth: 46,
+  minHeight: 34,
+  minWidth: 42,
   border: '1px solid rgba(190, 232, 95, 0.66)',
   background: '#bee85f',
   color: '#08100c',
@@ -8592,8 +8592,8 @@ function transportIconButtonStyle(disabled: boolean): CSSProperties {
   return {
     ...editorButtonChromeStyle({ tone: 'neutral', compact: false, disabled }),
     position: 'relative',
-    minWidth: 34,
-    minHeight: 34,
+    minWidth: 31,
+    minHeight: 31,
     padding: 0,
     display: 'inline-flex',
     alignItems: 'center',
@@ -8675,19 +8675,19 @@ function transportOptionButtonStyle(active: boolean, disabled: boolean): CSSProp
 }
 
 const timeStyle: CSSProperties = {
-  color: '#cfd0dc',
-  fontSize: 12,
+  color: '#99a2b6',
+  fontSize: 11,
   fontVariantNumeric: 'tabular-nums',
   textAlign: 'center',
 };
 
 const timeInputStyle: CSSProperties = {
   width: '100%',
-  minHeight: 30,
+  minHeight: 28,
   borderRadius: 7,
-  border: '1px solid rgba(48, 52, 76, 0.9)',
-  background: '#0f1220',
-  color: '#f4f4fb',
+  border: '1px solid rgba(48, 52, 76, 0.58)',
+  background: 'rgba(10, 14, 24, 0.58)',
+  color: '#dce4f2',
   padding: '4px 6px',
   fontSize: 12,
   fontWeight: 800,
@@ -8697,7 +8697,7 @@ const timeInputStyle: CSSProperties = {
 
 const timelineStyle: CSSProperties = {
   width: '100%',
-  accentColor: '#9c6cff',
+  accentColor: '#8a7cff',
 };
 
 const mixerSummaryStyle: CSSProperties = {
@@ -10493,12 +10493,12 @@ function timelineScrollProgressStyle(metrics: DawEditorLayoutMetrics): CSSProper
     zIndex: 39,
     minWidth: 0,
     boxSizing: 'border-box',
-    height: 20,
-    padding: '6px 10px',
-    borderRadius: 10,
-    border: '1px solid rgba(48, 52, 76, 0.72)',
-    background: 'linear-gradient(180deg, rgba(8, 13, 22, 0.9), rgba(3, 6, 12, 0.98))',
-    boxShadow: '0 -10px 30px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255,255,255,0.045)',
+    height: 16,
+    padding: '5px 10px',
+    borderRadius: 8,
+    border: '1px solid rgba(48, 52, 76, 0.5)',
+    background: 'rgba(6, 10, 17, 0.72)',
+    boxShadow: '0 -6px 18px rgba(0, 0, 0, 0.24)',
     overflow: 'hidden',
     cursor: 'ew-resize',
     userSelect: 'none',
@@ -10513,13 +10513,13 @@ function timelineScrollThumbStyle(progress: number, viewRatio: number): CSSPrope
   return {
     position: 'absolute',
     left: `calc(10px + ${leftPercent}%)`,
-    top: 6,
+    top: 5,
     width: `calc(${widthPercent}% - 20px)`,
     minWidth: 42,
-    height: 7,
+    height: 6,
     borderRadius: 999,
-    background: 'linear-gradient(90deg, rgba(206, 255, 53, 0.86), rgba(82, 214, 198, 0.9))',
-    boxShadow: '0 0 12px rgba(206, 255, 53, 0.34)',
+    background: 'linear-gradient(90deg, rgba(190, 232, 95, 0.62), rgba(82, 214, 198, 0.66))',
+    boxShadow: 'none',
     pointerEvents: 'none',
     userSelect: 'none',
     WebkitUserSelect: 'none',
