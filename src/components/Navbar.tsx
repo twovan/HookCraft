@@ -30,7 +30,12 @@ export default function Navbar() {
   const fetchPreviewCount = useCreditStore((s) => s.fetchPreviewCount);
 
   const [showDropdown, setShowDropdown] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Fetch membership and credits when user is logged in
   useEffect(() => {
@@ -175,7 +180,7 @@ export default function Navbar() {
           )}
         </Link>
 
-        {!loading && (
+        {mounted && !loading && (
           user ? (
             <div ref={dropdownRef} style={{ position: 'relative' }}>
               {/* Avatar button */}
