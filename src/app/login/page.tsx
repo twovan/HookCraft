@@ -67,7 +67,7 @@ function LoginPageContent() {
 function LinkLogo() {
   return (
     <a href="/" className="auth-logo" aria-label="HookCraft 首页">
-      <Image src="/logo-nav-lime.svg" alt="HookCraft" width={170} height={44} priority />
+      <Image src="/logo-nav.svg" alt="HookCraft" width={170} height={44} priority />
     </a>
   );
 }

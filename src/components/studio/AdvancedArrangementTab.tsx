@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
 import AudioUploader from './AudioUploader';
 import WaveformVisualizer from './WaveformVisualizer';
 import type { Template } from '@/types/template';
@@ -60,6 +61,7 @@ export default function AdvancedArrangementTab({
   variant = 'advanced',
   selectedTemplate = null,
 }: AdvancedArrangementTabProps) {
+  const router = useRouter();
   const isTemplateVariant = variant === 'template';
   const isTemplateInstrumentalVariant = variant === 'templateInstrumental';
   const usesSelectedTemplate = isTemplateVariant || isTemplateInstrumentalVariant;
@@ -351,6 +353,7 @@ export default function AdvancedArrangementTab({
   ]);
 
   const isBusy = generateStatus === 'uploading' || generateStatus === 'queued' || generateStatus === 'generating';
+  const showProgressOverlay = isBusy || generateStatus === 'completed';
   const canGenerate = uploadStatus === 'ready' && !isBusy && (
     !usesSelectedTemplate ||
     Boolean(selectedTemplate && (isTemplateInstrumentalVariant || effectiveStyle.trim()))
@@ -373,6 +376,16 @@ export default function AdvancedArrangementTab({
     trackAudioRefs.current = trackAudioRefs.current.slice(0, playableTracks.length);
   }, [playableTracks.length]);
 
+  useEffect(() => {
+    if (generateStatus !== 'completed') return;
+    const targetId = batchId || localTaskId || taskId;
+    const timer = window.setTimeout(() => {
+      router.push(targetId ? `/account/creations?expand=${encodeURIComponent(targetId)}` : '/account/creations');
+    }, 1400);
+
+    return () => window.clearTimeout(timer);
+  }, [batchId, generateStatus, localTaskId, router, taskId]);
+
   const handleTrackAudioPlay = useCallback((activeIndex: number) => {
     trackAudioRefs.current.forEach((audio, index) => {
       if (index !== activeIndex && audio && !audio.paused) {
@@ -393,12 +406,16 @@ export default function AdvancedArrangementTab({
     }
   }, [allLyricsText]);
 
-  const progressPercent = Math.min(92, Math.max(
-    generateStatus === 'uploading' ? 12 : generateStatus === 'queued' ? 24 : 38,
-    Math.round((elapsedSeconds / 360) * 92)
-  ));
+  const progressPercent = generateStatus === 'completed'
+    ? 100
+    : Math.min(92, Math.max(
+      generateStatus === 'uploading' ? 12 : generateStatus === 'queued' ? 24 : 38,
+      Math.round((elapsedSeconds / 360) * 92)
+    ));
   const progressStage =
-    generateStatus === 'uploading'
+    generateStatus === 'completed'
+      ? '生成完成，正在跳转到我的作品'
+      : generateStatus === 'uploading'
       ? '正在上传参考音频'
       : remoteStatus === 'TEXT_SUCCESS'
         ? '歌词与编曲方案已生成'
@@ -421,12 +438,14 @@ export default function AdvancedArrangementTab({
         ? '任务已提交'
         : '正在生成';
 
+  const progressDialogText = generateStatus === 'completed' ? '生成已完成' : progressText;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <div style={{
         display: 'grid',
-        gridTemplateColumns: usesSelectedTemplate ? 'minmax(0, 0.82fr) minmax(0, 1.18fr)' : 'minmax(0, 0.9fr) minmax(0, 1.1fr)',
-        gap: 32,
+        gridTemplateColumns: usesSelectedTemplate ? '1fr' : 'minmax(0, 0.9fr) minmax(0, 1.1fr)',
+        gap: usesSelectedTemplate ? 18 : 32,
         alignItems: 'start',
       }}>
         <section style={panelStyle}>
@@ -458,6 +477,7 @@ export default function AdvancedArrangementTab({
             maxSizeMB={100}
             maxDurationSeconds={480}
             requirementText="仅支持 MP3/WAV 格式，最大 100MB，时长 6秒-8分钟"
+            compact={usesSelectedTemplate}
           />
 
           {audioFile && uploadStatus === 'ready' && (
@@ -678,7 +698,7 @@ export default function AdvancedArrangementTab({
         </section>
       </div>
 
-      {isBusy && (
+      {showProgressOverlay && (
         <div style={statusPanelStyle}>
           <div style={spinnerStyle} />
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -690,14 +710,16 @@ export default function AdvancedArrangementTab({
               <div style={{ ...progressBarFillStyle, width: `${progressPercent}%` }} />
             </div>
             <div style={{ color: '#9ca3af', fontSize: 12, marginTop: 8, lineHeight: 1.6 }}>
-              {progressText} · 已等待 {elapsedSeconds}s · 第 {pollCount} 次查询
+              {generateStatus === 'completed'
+                ? '作品已保存，即将进入我的作品'
+                : `${progressDialogText} · 已等待 ${elapsedSeconds}s · 第 ${pollCount} 次查询`}
             </div>
             <div style={{ color: '#6b7280', fontSize: 11, marginTop: 4, lineHeight: 1.6 }}>
               {taskId ? `任务 ID：${taskId}` : '正在准备任务，请保持页面打开'} · {progressHint}
             </div>
           </div>
           <div style={{ display: 'none' }}>
-            <div style={{ color: '#e8e8f0', fontSize: 14, fontWeight: 600 }}>{progressText}</div>
+            <div style={{ color: '#e8e8f0', fontSize: 14, fontWeight: 600 }}>{progressDialogText}</div>
             <div style={{ color: '#9ca3af', fontSize: 12, marginTop: 6 }}>
               {taskId ? `任务 ID：${taskId}` : '正在准备任务，请保持页面打开'}
             </div>
@@ -1409,9 +1431,19 @@ const progressBarFillStyle: CSSProperties = {
 
 const statusPanelStyle: CSSProperties = {
   ...panelStyle,
+  position: 'fixed',
+  left: '50%',
+  top: '50%',
+  zIndex: 10020,
+  width: 'min(560px, calc(100vw - 40px))',
+  transform: 'translate(-50%, -50%)',
   display: 'flex',
   alignItems: 'center',
   gap: 14,
+  padding: 24,
+  borderColor: 'rgba(206, 255, 53, 0.24)',
+  background: 'linear-gradient(180deg, rgba(20, 24, 31, 0.98), rgba(9, 11, 16, 0.98))',
+  boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.72), 0 28px 90px rgba(0, 0, 0, 0.62), 0 0 42px rgba(206, 255, 53, 0.08)',
 };
 
 const spinnerStyle: CSSProperties = {

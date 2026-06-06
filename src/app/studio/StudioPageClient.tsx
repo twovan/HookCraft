@@ -492,7 +492,7 @@ export default function StudioPageClient({
 
       <div className="studio-shell-inner" style={{ position: 'relative', zIndex: 1, maxWidth: 1400, margin: '0 auto', padding: '48px clamp(20px, 4vw, 48px)' }}>
         {/* Page Header */}
-        <div className="studio-hero" style={{ marginBottom: '32px' }}>
+        <div className="studio-hero" style={{ marginBottom: '22px' }}>
           <h1
             style={{
               fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
@@ -530,12 +530,12 @@ export default function StudioPageClient({
           className="studio-tabbar"
           style={{
             display: showStudioTabs ? 'flex' : 'none',
-            gap: '4px',
-            marginBottom: '32px',
-            background: 'rgba(255,255,255,0.04)',
-            borderRadius: '12px',
-            padding: '4px',
-            border: '1px solid rgba(255,255,255,0.1)',
+            gap: '6px',
+            marginBottom: '22px',
+            background: 'rgba(6,8,12,0.76)',
+            borderRadius: '10px',
+            padding: '5px',
+            border: '1px solid rgba(255,255,255,0.12)',
             overflowX: 'auto',
           }}
         >
@@ -1122,23 +1122,15 @@ export default function StudioPageClient({
 
         {/* Template Arrangement Tab Content */}
         <div style={{ display: activeTab === 'templateArrangement' ? 'block' : 'none' }}>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'minmax(260px, 320px) minmax(0, 1fr)',
-              gap: 24,
-              alignItems: 'start',
-            }}
-          >
+          <div className="studio-production-workbench">
             <section
+              className="studio-template-source"
               style={{
                 background: 'var(--hc-panel)',
-                borderRadius: 14,
-                padding: 24,
+                borderRadius: 12,
+                padding: 20,
                 border: '1px solid var(--hc-border)',
                 boxShadow: 'none',
-                position: 'sticky',
-                top: 24,
               }}
             >
               <div style={{ marginBottom: 18 }}>
@@ -1162,7 +1154,7 @@ export default function StudioPageClient({
                 selectedTemplateId={selectedTemplate?.id}
                 onSelect={(t) => setSelectedTemplate(t)}
                 loading={templatesLoading}
-                columns={2}
+                columns={4}
               />
             </section>
 
@@ -1175,23 +1167,15 @@ export default function StudioPageClient({
 
         {/* Template Instrumental Tab Content */}
         <div style={{ display: activeTab === 'templateInstrumental' ? 'block' : 'none' }}>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'minmax(260px, 320px) minmax(0, 1fr)',
-              gap: 24,
-              alignItems: 'start',
-            }}
-          >
+          <div className="studio-production-workbench">
             <section
+              className="studio-template-source"
               style={{
                 background: 'var(--hc-panel)',
-                borderRadius: 14,
-                padding: 24,
+                borderRadius: 12,
+                padding: 20,
                 border: '1px solid var(--hc-border)',
                 boxShadow: 'none',
-                position: 'sticky',
-                top: 24,
               }}
             >
               <div style={{ marginBottom: 18 }}>
@@ -1215,7 +1199,7 @@ export default function StudioPageClient({
                 selectedTemplateId={selectedTemplate?.id}
                 onSelect={(t) => setSelectedTemplate(t)}
                 loading={templatesLoading}
-                columns={2}
+                columns={4}
               />
             </section>
 
@@ -1370,6 +1354,20 @@ const studioPageStyles = `
     min-height: 44px;
   }
 
+  .studio-production-workbench {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 430px);
+    gap: 18px;
+    align-items: start;
+  }
+
+  .studio-template-source {
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.052), rgba(255,255,255,.018)) !important;
+    border-color: rgba(255,255,255,.12) !important;
+    box-shadow: var(--hc-shadow-soft) !important;
+  }
+
   .studio-create-grid {
     align-items: start;
   }
@@ -1454,12 +1452,18 @@ const studioPageStyles = `
     }
 
     .studio-page [style*="grid-template-columns: 1fr 1fr"],
-    .studio-page [style*="grid-template-columns: minmax(260px, 320px) minmax(0, 1fr)"] {
+    .studio-page [style*="grid-template-columns: minmax(260px, 320px) minmax(0, 1fr)"],
+    .studio-page [style*="grid-template-columns: minmax(0, 1fr) minmax(360px, 420px)"],
+    .studio-production-workbench {
       grid-template-columns: 1fr !important;
     }
 
     .studio-page [style*="position: sticky"] {
       position: static !important;
+    }
+
+    .studio-template-source [style*="repeat(4, minmax(0, 1fr))"] {
+      grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
     }
   }
 
@@ -1490,6 +1494,11 @@ const studioPageStyles = `
 
     .studio-page [style*="display: flex"][style*="gap: 8px"] {
       flex-wrap: wrap;
+    }
+
+    .studio-template-source [style*="repeat(4, minmax(0, 1fr))"],
+    .studio-template-source [style*="repeat(3, minmax(0, 1fr))"] {
+      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     }
   }
 `;

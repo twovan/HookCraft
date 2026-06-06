@@ -15,6 +15,7 @@ export interface AudioUploaderProps {
   maxSizeMB?: number;
   maxDurationSeconds?: number;
   requirementText?: string;
+  compact?: boolean;
 }
 
 function formatFileSize(bytes: number): string {
@@ -32,6 +33,7 @@ export default function AudioUploader({
   error,
   maxSizeMB,
   maxDurationSeconds,
+  compact = false,
   requirementText = '支持 MP3/WAV，最大 50MB，时长 6 秒到 6 分钟。',
 }: AudioUploaderProps) {
   const [isDragOver, setIsDragOver] = useState(false);
@@ -138,7 +140,7 @@ export default function AudioUploader({
           handleClick();
         }
       }}
-      style={dropzoneStyle(status, isDragOver)}
+      style={dropzoneStyle(status, isDragOver, compact)}
     >
       <input
         ref={fileInputRef}
@@ -249,7 +251,7 @@ function CloseIcon() {
   );
 }
 
-function dropzoneStyle(status: AudioUploaderProps['status'], isDragOver: boolean): CSSProperties {
+function dropzoneStyle(status: AudioUploaderProps['status'], isDragOver: boolean, compact: boolean): CSSProperties {
   const isError = status === 'error';
   const isReady = status === 'ready';
   const borderColor = isDragOver
@@ -262,8 +264,8 @@ function dropzoneStyle(status: AudioUploaderProps['status'], isDragOver: boolean
 
   return {
     position: 'relative',
-    minHeight: 218,
-    borderRadius: 18,
+    minHeight: compact ? 148 : 218,
+    borderRadius: compact ? 14 : 18,
     overflow: 'hidden',
     border: `1px ${isReady ? 'solid' : 'dashed'} ${borderColor}`,
     background: isDragOver
@@ -274,7 +276,7 @@ function dropzoneStyle(status: AudioUploaderProps['status'], isDragOver: boolean
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
+    padding: compact ? 18 : 24,
     boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
   };
 }

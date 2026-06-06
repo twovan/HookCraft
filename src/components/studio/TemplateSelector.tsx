@@ -12,7 +12,7 @@ export interface TemplateSelectorProps {
   selectedTemplateId?: string;
   onSelect: (template: Template) => void;
   loading?: boolean;
-  columns?: 2 | 3;
+  columns?: 2 | 3 | 4;
 }
 
 export default function TemplateSelector({
