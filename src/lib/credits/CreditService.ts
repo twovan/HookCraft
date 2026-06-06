@@ -439,18 +439,33 @@ export class CreditService {
     }
 
     // 3. 归档当前周期到 credit_history（含分类消耗）
+    const historyPayload = {
+      user_id: userId,
+      month,
+      used: monthlyUsed + purchasedUsed || current.used,
+      total: current.total,
+      monthly_used: monthlyUsed,
+      purchased_used: purchasedUsed,
+    };
+
     const { error: insertError } = await this.supabase
       .from('credit_history')
-      .insert({
-        user_id: userId,
-        month,
-        used: monthlyUsed + purchasedUsed || current.used,
-        total: current.total,
-        monthly_used: monthlyUsed,
-        purchased_used: purchasedUsed,
-      });
+      .insert(historyPayload);
 
-    if (insertError) throw toAppError(insertError, 'credit_history', 'insert');
+    if (insertError && isMissingCreditHistoryUsageColumnsError(insertError)) {
+      const { error: legacyInsertError } = await this.supabase
+        .from('credit_history')
+        .insert({
+          user_id: historyPayload.user_id,
+          month: historyPayload.month,
+          used: historyPayload.used,
+          total: historyPayload.total,
+        });
+
+      if (legacyInsertError) throw toAppError(legacyInsertError, 'credit_history', 'insert');
+    } else if (insertError) {
+      throw toAppError(insertError, 'credit_history', 'insert');
+    }
 
     // 4. 重置 credits 表（purchased_credits 保持不变）
     const now = new Date();
@@ -748,4 +763,15 @@ export class CreditService {
       return fallback;
     }
   }
+}
+
+function isMissingCreditHistoryUsageColumnsError(error: unknown): boolean {
+  const candidate = error as { code?: string; message?: string };
+  const message = String(candidate?.message ?? '').toLowerCase();
+  return (
+    candidate?.code === 'PGRST204' &&
+    message.includes('credit_history') &&
+    message.includes('schema cache') &&
+    (message.includes('monthly_used') || message.includes('purchased_used'))
+  );
 }
