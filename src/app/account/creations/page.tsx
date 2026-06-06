@@ -61,6 +61,21 @@ async function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit, ti
   }
 }
 
+function resolveHighlightedVersionId(versions: VersionDetail[], requestedTaskId: string) {
+  const requested = versions.find((version) => version.taskId === requestedTaskId);
+  if (requested) return requested.taskId;
+
+  const playableCompleted = versions
+    .filter((version) => version.audioUrl && version.status === 'completed')
+    .sort((a, b) => {
+      const byVersion = (b.versionNumber || 0) - (a.versionNumber || 0);
+      if (byVersion !== 0) return byVersion;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+
+  return playableCompleted[0]?.taskId || versions[versions.length - 1]?.taskId;
+}
+
 export default function CreationsPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
@@ -81,6 +96,7 @@ export default function CreationsPage() {
   const [expandedTaskId, setExpandedTaskId] = useState<string | undefined>(undefined);
   const [expandedVersions, setExpandedVersions] = useState<VersionDetail[] | undefined>(undefined);
   const [expandedBatchDetail, setExpandedBatchDetail] = useState<{ templateName?: string; prompt?: string } | undefined>(undefined);
+  const [highlightedVersionId, setHighlightedVersionId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     if (!authLoading) {
@@ -136,6 +152,7 @@ export default function CreationsPage() {
     setExpandedTaskId(undefined);
     setExpandedVersions(undefined);
     setExpandedBatchDetail(undefined);
+    setHighlightedVersionId(undefined);
   };
 
   const handleRangeChange = (nextRange: TimeRange) => {
@@ -166,7 +183,8 @@ export default function CreationsPage() {
       if (res.ok) {
         const data = await res.json();
         const versions = data.versions || [];
-        setExpandedVersions(versions.filter((version: VersionDetail) => version.taskId === taskId));
+        setExpandedVersions(versions);
+        setHighlightedVersionId(resolveHighlightedVersionId(versions, taskId));
         setExpandedBatchDetail({
           templateName: data.batch?.templateName,
           prompt: data.batch?.promptSummary,
@@ -268,6 +286,7 @@ export default function CreationsPage() {
               expandedTaskId={expandedTaskId}
               expandedVersions={expandedVersions}
               expandedBatchDetail={expandedBatchDetail}
+              highlightedVersionId={highlightedVersionId}
             />
             {total > PAGE_SIZE && (
               <nav className="pagination" aria-label="创作记录分页">

@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
 import SyncedLyrics from '@/components/studio/SyncedLyrics';
@@ -63,6 +63,7 @@ interface HistoryListProps {
   expandedTaskId?: string;
   expandedVersions?: VersionDetail[];
   expandedBatchDetail?: { templateName?: string; prompt?: string };
+  highlightedVersionId?: string;
 }
 
 export default function HistoryList({
@@ -74,6 +75,7 @@ export default function HistoryList({
   expandedTaskId,
   expandedVersions,
   expandedBatchDetail,
+  highlightedVersionId,
 }: HistoryListProps) {
   const [playingTaskId, setPlayingTaskId] = useState<string | null>(null);
   const [downloadingTaskId, setDownloadingTaskId] = useState<string | null>(null);
@@ -82,9 +84,18 @@ export default function HistoryList({
   const [batchNames, setBatchNames] = useState<Record<string, string>>({});
   const [audioTimes, setAudioTimes] = useState<Record<string, number>>({});
   const audioRefs = useRef<Record<string, HTMLAudioElement>>({});
+  const highlightedVersionRef = useRef<HTMLDivElement | null>(null);
 
   const expandedBatch = batches.find((batch) => (batch.taskId || batch.batchId) === expandedTaskId);
   const showDetail = Boolean(expandedBatchId && expandedBatch && expandedVersions);
+
+  useEffect(() => {
+    if (!highlightedVersionId) return;
+    const timer = window.setTimeout(() => {
+      highlightedVersionRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }, 120);
+    return () => window.clearTimeout(timer);
+  }, [highlightedVersionId, expandedVersions]);
 
   const handleAudioPlay = (taskId: string) => {
     Object.entries(audioRefs.current).forEach(([id, el]) => {
@@ -346,13 +357,19 @@ export default function HistoryList({
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {(expandedVersions || []).map((version) => {
-              const isSelected = version.status === 'selected';
+              const isHighlighted = highlightedVersionId === version.taskId;
+              const isSelected = version.status === 'selected' || isHighlighted;
               return (
                 <div
                   key={version.taskId}
+                  ref={isHighlighted ? highlightedVersionRef : undefined}
                   style={{
                     ...versionCardStyle,
                     borderColor: isSelected ? 'rgba(206, 255, 53, 0.42)' : 'var(--hc-line)',
+                    background: isHighlighted
+                      ? 'linear-gradient(135deg, rgba(206, 255, 53, 0.13), rgba(8, 9, 12, 0.72) 44%, rgba(91, 245, 190, 0.1))'
+                      : versionCardStyle.background,
+                    boxShadow: isHighlighted ? '0 0 0 1px rgba(206, 255, 53, 0.1), 0 18px 52px rgba(206, 255, 53, 0.08)' : undefined,
                   }}
                 >
                   <div style={versionHeaderStyle}>
@@ -363,6 +380,7 @@ export default function HistoryList({
                       <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                         <span style={durationPillStyle}>{formatDuration(version.durationSeconds)}</span>
                         {isSelected && <span style={selectedBadgeStyle}>已选</span>}
+                        {isHighlighted && <span style={latestGeneratedBadgeStyle}>最近生成</span>}
                         {(version.styleTags || []).slice(0, 3).map((tag) => (
                           <span key={tag} style={tagStyle}>{tag}</span>
                         ))}
@@ -777,6 +795,16 @@ const selectedBadgeStyle: CSSProperties = {
   background: 'rgba(206, 255, 53, 0.12)',
   border: '1px solid rgba(206, 255, 53, 0.3)',
   color: 'var(--hc-lime)',
+  padding: '3px 8px',
+  fontSize: 11,
+  fontWeight: 900,
+};
+
+const latestGeneratedBadgeStyle: CSSProperties = {
+  borderRadius: 999,
+  background: 'rgba(91, 245, 190, 0.12)',
+  border: '1px solid rgba(91, 245, 190, 0.32)',
+  color: '#8fffe0',
   padding: '3px 8px',
   fontSize: 11,
   fontWeight: 900,
