@@ -56,7 +56,6 @@ export default function Navbar() {
     return null;
   }
 
-  const isHome = pathname === '/';
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/';
     return pathname.startsWith(href);
@@ -112,56 +111,6 @@ export default function Navbar() {
         pointer-events: none;
       }
 
-      .hc-nav-home a[href="/account"],
-      .hc-nav-home a[href="/cart"] {
-        display: none !important;
-      }
-
-      .hc-nav-home {
-        height: 68px !important;
-        padding: 0 20px !important;
-        background: linear-gradient(180deg, rgba(5, 8, 14, .72), rgba(5, 8, 14, .42)) !important;
-        border-bottom-color: rgba(206, 255, 53, .12) !important;
-        box-shadow: none !important;
-      }
-
-      .hc-nav-home::after {
-        left: 20px;
-        right: 20px;
-        background: linear-gradient(90deg, transparent, rgba(206,255,53,.2), rgba(82,214,198,.12), transparent);
-      }
-
-      .hc-nav-home .hc-nav-links {
-        gap: 22px !important;
-        flex: 1 1 auto !important;
-        justify-content: flex-start !important;
-        margin-left: 74px !important;
-      }
-
-      .hc-nav-home .hc-nav-links > a:not([href="/login"]) {
-        color: #e8edf7 !important;
-        background: transparent !important;
-        padding: 8px 2px !important;
-        font-weight: 760 !important;
-      }
-
-      .hc-nav-home .hc-nav-links > a:last-child {
-        min-height: 36px !important;
-        padding: 0 22px !important;
-        background: #ceff35 !important;
-        color: #08090c !important;
-        border-radius: 7px !important;
-        font-weight: 900 !important;
-      }
-
-      .hc-nav-home a[href="/login"] {
-        margin-left: auto !important;
-        padding: 8px 8px !important;
-        background: transparent !important;
-        color: #d7dce8 !important;
-        font-weight: 760 !important;
-      }
-
       @media (max-width: 980px) {
         .hc-nav { padding: 0 20px !important; }
         .hc-nav::after { left: 20px; right: 20px; }
@@ -192,13 +141,13 @@ export default function Navbar() {
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       padding: '0 48px',
       boxShadow: '0 12px 38px rgba(0,0,0,0.28)',
-    }} className={`hc-nav ${isHome ? 'hc-nav-home' : ''}`}>
+    }} className="hc-nav">
       <Link href="/" className="hc-nav-logo" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none', flex: '0 0 auto' }}>
         <Image
-          src={isHome ? "/logo-nav-lime.svg" : "/logo-nav.svg"}
+          src="/logo-nav.svg"
           alt="HookCraft"
-          width={isHome ? 170 : 140}
-          height={isHome ? 44 : 36}
+          width={140}
+          height={36}
           priority
         />
       </Link>
@@ -431,25 +380,6 @@ export default function Navbar() {
               登录
             </Link>
           )
-        )}
-        {isHome && !loading && !user && (
-          <Link href="/studio" style={{
-            minHeight: 36,
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '0 22px',
-            borderRadius: 7,
-            background: '#ceff35',
-            color: '#08090c',
-            fontSize: 13,
-            fontWeight: 900,
-            textDecoration: 'none',
-            whiteSpace: 'nowrap',
-            flexShrink: 0,
-          }}>
-            进入工作台
-          </Link>
         )}
       </div>
     </nav>
