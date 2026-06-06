@@ -102,9 +102,9 @@ export default function TierCard({
       onMouseLeave={() => setHovered(false)}
       style={{
         ...cardStyle,
-        borderColor: hovered || isRecommended ? 'rgba(206, 255, 53, 0.52)' : 'var(--hc-line)',
-        transform: hovered ? 'translateY(-6px)' : 'none',
-        boxShadow: hovered ? '0 24px 70px rgba(0, 0, 0, 0.36)' : 'var(--hc-shadow)',
+        borderColor: hovered || isRecommended ? 'rgba(206, 255, 53, 0.48)' : 'rgba(255,255,255,.12)',
+        transform: hovered ? 'translateY(-4px)' : 'none',
+        boxShadow: hovered ? '0 24px 70px rgba(0, 0, 0, 0.36)' : 'none',
       }}
     >
       {isRecommended && <div style={recommendStyle}>最受欢迎</div>}
@@ -162,14 +162,15 @@ export default function TierCard({
 
 const cardStyle: React.CSSProperties = {
   position: 'relative',
-  minHeight: 680,
+  minHeight: 650,
   display: 'flex',
   flexDirection: 'column',
-  padding: '54px 24px 24px',
-  border: '1px solid var(--hc-line)',
-  borderRadius: 'var(--hc-radius-lg)',
-  background: 'linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.018))',
-  boxShadow: 'var(--hc-shadow-soft)',
+  padding: '50px 22px 22px',
+  border: '1px solid rgba(255,255,255,.12)',
+  borderRadius: 14,
+  background:
+    'linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.018)), rgba(14,16,22,.74)',
+  boxShadow: 'none',
   transition: 'transform .24s ease, border-color .24s ease, box-shadow .24s ease',
 };
 
@@ -181,8 +182,9 @@ const recommendStyle: React.CSSProperties = {
   zIndex: 2,
   borderRadius: 999,
   padding: '7px 16px',
-  background: 'linear-gradient(135deg, var(--hc-lime), var(--hc-cyan))',
-  color: '#08090c',
+  border: '1px solid rgba(206,255,53,.38)',
+  background: 'rgba(206,255,53,.12)',
+  color: 'var(--hc-lime)',
   fontSize: 12,
   fontWeight: 950,
   whiteSpace: 'nowrap',
@@ -195,9 +197,9 @@ const currentStyle: React.CSSProperties = {
   zIndex: 2,
   borderRadius: 999,
   padding: '5px 10px',
-  border: '1px solid rgba(206,255,53,.32)',
-  background: 'rgba(206,255,53,.1)',
-  color: 'var(--hc-lime)',
+  border: '1px solid rgba(138,159,181,.3)',
+  background: 'rgba(138,159,181,.12)',
+  color: '#cbd5e1',
   fontSize: 11,
   fontWeight: 900,
 };
@@ -217,7 +219,7 @@ const tierCodeStyle: React.CSSProperties = {
 const titleStyle: React.CSSProperties = {
   margin: '8px 0',
   color: 'var(--hc-text)',
-  fontSize: 25,
+  fontSize: 24,
   fontWeight: 950,
 };
 
@@ -238,7 +240,7 @@ const priceBlockStyle: React.CSSProperties = {
 
 const priceStyle: React.CSSProperties = {
   color: 'var(--hc-lime)',
-  fontSize: 42,
+  fontSize: 40,
   fontWeight: 950,
   lineHeight: 1,
 };
@@ -259,10 +261,10 @@ const creditsStyle: React.CSSProperties = {
   display: 'grid',
   gap: 4,
   marginBottom: 18,
-  border: '1px solid var(--hc-line)',
+  border: '1px solid rgba(255,255,255,.1)',
   borderRadius: 12,
-  padding: '12px 14px',
-  background: 'rgba(8,9,12,.48)',
+  padding: '11px 12px',
+  background: 'rgba(8,9,12,.42)',
   color: 'var(--hc-muted)',
   fontSize: 12,
   lineHeight: 1.55,
@@ -301,8 +303,8 @@ const featureMarkStyle = (included: boolean): React.CSSProperties => ({
 
 const buttonStyle: React.CSSProperties = {
   width: '100%',
-  border: 'none',
-  borderRadius: 999,
+  border: '1px solid transparent',
+  borderRadius: 10,
   padding: '14px 18px',
   fontSize: 14,
   fontWeight: 950,

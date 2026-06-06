@@ -142,21 +142,27 @@ export default function PricingContent({ tiers, initialCreditsPacks }: PricingCo
 
   return (
     <div className="pricing-content">
-      <div className="billing-toggle" role="group" aria-label="计费周期">
-        <button
-          onClick={() => setBillingCycle('monthly')}
-          className={billingCycle === 'monthly' ? 'active' : ''}
-          aria-pressed={billingCycle === 'monthly'}
-        >
-          月付
-        </button>
-        <button
-          onClick={() => setBillingCycle('yearly')}
-          className={billingCycle === 'yearly' ? 'active' : ''}
-          aria-pressed={billingCycle === 'yearly'}
-        >
-          年付 <span>省 20%</span>
-        </button>
+      <div className="pricing-control-row">
+        <div>
+          <span>会员方案</span>
+          <h2>按你的创作频率选择</h2>
+        </div>
+        <div className="billing-toggle" role="group" aria-label="计费周期">
+          <button
+            onClick={() => setBillingCycle('monthly')}
+            className={billingCycle === 'monthly' ? 'active' : ''}
+            aria-pressed={billingCycle === 'monthly'}
+          >
+            月付
+          </button>
+          <button
+            onClick={() => setBillingCycle('yearly')}
+            className={billingCycle === 'yearly' ? 'active' : ''}
+            aria-pressed={billingCycle === 'yearly'}
+          >
+            年付 <span>省 20%</span>
+          </button>
+        </div>
       </div>
 
       {upgradeResult && (
@@ -244,9 +250,33 @@ export default function PricingContent({ tiers, initialCreditsPacks }: PricingCo
           padding: 0 22px;
         }
 
+        .pricing-control-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: end;
+          gap: 18px;
+          margin: 0 0 22px;
+        }
+
+        .pricing-control-row > div:first-child span {
+          color: var(--hc-lime);
+          font-size: 12px;
+          font-weight: 950;
+          letter-spacing: .12em;
+          text-transform: uppercase;
+        }
+
+        .pricing-control-row h2 {
+          margin: 8px 0 0;
+          color: var(--hc-text);
+          font-size: 24px;
+          line-height: 1.2;
+          font-weight: 950;
+        }
+
         .billing-toggle {
           width: fit-content;
-          margin: 0 auto 48px;
+          margin: 0;
           display: flex;
           gap: 4px;
           padding: 5px;
@@ -427,10 +457,15 @@ export default function PricingContent({ tiers, initialCreditsPacks }: PricingCo
         .tier-grid {
           display: grid;
           grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 22px;
+          gap: 18px;
           align-items: stretch;
-          padding-top: 18px;
-          margin-bottom: 76px;
+          padding: 18px;
+          margin-bottom: 62px;
+          border: 1px solid rgba(255,255,255,.1);
+          border-radius: 18px;
+          background:
+            linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.012)),
+            rgba(6, 8, 12, .5);
         }
 
         .tier-card {
@@ -459,11 +494,22 @@ export default function PricingContent({ tiers, initialCreditsPacks }: PricingCo
 
         .credits-section {
           scroll-margin-top: 90px;
+          display: grid;
+          grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+          gap: 22px;
+          align-items: stretch;
+          border: 1px solid rgba(255,255,255,.11);
+          border-radius: 18px;
+          padding: 22px;
+          background:
+            linear-gradient(135deg, rgba(206,255,53,.06), transparent 38%),
+            rgba(7, 9, 13, .62);
         }
 
         .section-heading {
-          text-align: center;
-          margin-bottom: 28px;
+          text-align: left;
+          margin-bottom: 0;
+          align-self: center;
         }
 
         .section-heading span {
@@ -477,13 +523,13 @@ export default function PricingContent({ tiers, initialCreditsPacks }: PricingCo
         .section-heading h2 {
           margin: 8px 0 10px;
           font-family: var(--hc-font-display);
-          font-size: clamp(30px, 4vw, 44px);
+          font-size: clamp(28px, 3vw, 38px);
           letter-spacing: 0;
         }
 
         .section-heading p {
-          margin: 0 auto;
-          max-width: 580px;
+          margin: 0;
+          max-width: 320px;
           color: var(--hc-muted);
           line-height: 1.75;
         }
@@ -500,17 +546,18 @@ export default function PricingContent({ tiers, initialCreditsPacks }: PricingCo
         }
 
         .credits-grid {
-          max-width: 920px;
-          margin: 0 auto;
+          max-width: none;
+          margin: 0;
           display: grid;
           grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 16px;
+          gap: 12px;
+          align-items: stretch;
         }
 
         .credits-pack-card {
           border: 1px solid rgba(255,255,255,.13);
-          border-radius: var(--hc-radius-lg);
-          padding: 26px 22px;
+          border-radius: 12px;
+          padding: 20px 18px;
           text-align: center;
           background: linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.02));
           box-shadow: var(--hc-shadow-soft);
@@ -563,6 +610,7 @@ export default function PricingContent({ tiers, initialCreditsPacks }: PricingCo
         @media (max-width: 980px) {
           .tier-grid {
             grid-template-columns: 1fr;
+            padding: 12px;
           }
 
           .tier-card {
@@ -572,6 +620,16 @@ export default function PricingContent({ tiers, initialCreditsPacks }: PricingCo
         }
 
         @media (max-width: 680px) {
+          .pricing-control-row,
+          .credits-section {
+            grid-template-columns: 1fr;
+            display: grid;
+          }
+
+          .pricing-control-row {
+            align-items: start;
+          }
+
           .billing-toggle,
           .credits-grid {
             width: 100%;

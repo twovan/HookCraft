@@ -33,6 +33,7 @@ export default async function PricingPage() {
       <section className="pricing-hero">
         <div className="pricing-hero-inner">
           <div>
+            <span className="pricing-kicker">HOOKCRAFT MEMBERSHIP</span>
             <h1>选择你的创作方案</h1>
             <p>从免费预览到商业交付，为 AI 音乐 Demo、分轨编辑和版权授权选择合适额度。</p>
           </div>
@@ -62,23 +63,40 @@ export default async function PricingPage() {
         }
 
         .pricing-hero {
-          padding: 74px 22px 38px;
+          padding: 56px 22px 26px;
         }
 
         .pricing-hero-inner {
           max-width: 1180px;
           margin: 0 auto;
+          min-height: 216px;
           display: grid;
-          grid-template-columns: minmax(0, 1fr) 300px;
-          align-items: end;
-          gap: 28px;
+          grid-template-columns: minmax(0, 1fr) 280px;
+          align-items: center;
+          gap: 32px;
+          border: 1px solid rgba(255,255,255,.12);
+          border-radius: 18px;
+          padding: 32px;
+          background:
+            linear-gradient(135deg, rgba(255,255,255,.07), transparent 34%),
+            linear-gradient(180deg, rgba(17,18,23,.74), rgba(9,10,14,.58));
+          box-shadow: var(--hc-shadow-soft);
+        }
+
+        .pricing-kicker {
+          display: inline-flex;
+          margin-bottom: 16px;
+          color: var(--hc-lime);
+          font-size: 12px;
+          font-weight: 950;
+          letter-spacing: .13em;
         }
 
         .pricing-hero h1 {
           margin: 0 0 14px;
           max-width: 760px;
           font-family: var(--hc-font-display);
-          font-size: clamp(42px, 7vw, 78px);
+          font-size: clamp(40px, 6vw, 68px);
           line-height: .94;
           letter-spacing: 0;
           text-wrap: balance;
@@ -94,7 +112,7 @@ export default async function PricingPage() {
         }
 
         .pricing-meter {
-          height: 118px;
+          height: 132px;
           display: grid;
           grid-template-columns: repeat(28, 1fr);
           align-items: end;
@@ -121,6 +139,7 @@ export default async function PricingPage() {
 
           .pricing-hero-inner {
             grid-template-columns: 1fr;
+            padding: 24px;
           }
 
           .pricing-meter {
