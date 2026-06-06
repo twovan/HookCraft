@@ -13,6 +13,7 @@ export interface TemplateSelectorProps {
   onSelect: (template: Template) => void;
   loading?: boolean;
   columns?: 2 | 3 | 4;
+  cardVariant?: 'portrait' | 'workbench';
 }
 
 export default function TemplateSelector({
@@ -21,6 +22,7 @@ export default function TemplateSelector({
   onSelect,
   loading = false,
   columns = 3,
+  cardVariant = 'portrait',
 }: TemplateSelectorProps) {
   const [activeTab, setActiveTab] = useState<TemplateCategory | 'purchased'>('free_template');
   const isPaid = useMembershipStore((s) => s.isPaid());
@@ -110,7 +112,7 @@ export default function TemplateSelector({
         aria-label="模板列表"
       >
         {isLoading && Array.from({ length: 6 }).map((_, index) => (
-          <div key={`template-skeleton-${index}`} style={skeletonStyle}>
+          <div key={`template-skeleton-${index}`} style={skeletonStyle(cardVariant)}>
             <span style={skeletonShineStyle} />
           </div>
         ))}
@@ -128,7 +130,7 @@ export default function TemplateSelector({
               aria-selected={isSelected}
               aria-disabled={isLocked}
               style={{
-                ...cardStyle,
+                ...cardStyle(cardVariant),
                 borderColor: isSelected ? 'rgba(206,255,53,.66)' : 'var(--hc-line)',
                 background: template.coverUrl
                   ? `url(${template.coverUrl}) center/cover`
@@ -142,6 +144,23 @@ export default function TemplateSelector({
                 <div style={lockedOverlayStyle}>
                   <span style={lockMarkStyle}>锁定</span>
                   <span>升级解锁</span>
+                </div>
+              )}
+
+              {cardVariant === 'workbench' && (
+                <div style={waveformStyle(template.id)}>
+                  {Array.from({ length: 34 }).map((_, barIndex) => (
+                    <span
+                      key={`${template.id}-wave-${barIndex}`}
+                      style={{
+                        height: `${18 + ((barIndex * 17 + template.name.length * 9) % 42)}%`,
+                        width: 2,
+                        borderRadius: 99,
+                        background: 'currentColor',
+                        flex: '1 1 0',
+                      }}
+                    />
+                  ))}
                 </div>
               )}
 
@@ -200,14 +219,16 @@ const tabStyle: React.CSSProperties = {
   cursor: 'pointer',
 };
 
-const skeletonStyle: React.CSSProperties = {
-  aspectRatio: '1 / 1.45',
+function skeletonStyle(cardVariant: TemplateSelectorProps['cardVariant']): React.CSSProperties {
+  return {
+  aspectRatio: cardVariant === 'workbench' ? '1.56 / 1' : '1 / 1.45',
   borderRadius: 12,
   border: '1px solid var(--hc-line)',
   background: 'rgba(24,26,34,.86)',
   position: 'relative',
   overflow: 'hidden',
-};
+  };
+}
 
 const skeletonShineStyle: React.CSSProperties = {
   position: 'absolute',
@@ -216,15 +237,34 @@ const skeletonShineStyle: React.CSSProperties = {
   animation: 'templateSkeleton 1.4s ease-in-out infinite',
 };
 
-const cardStyle: React.CSSProperties = {
+function cardStyle(cardVariant: TemplateSelectorProps['cardVariant']): React.CSSProperties {
+  return {
   position: 'relative',
-  aspectRatio: '1 / 1.45',
+  aspectRatio: cardVariant === 'workbench' ? '1.56 / 1' : '1 / 1.45',
   borderRadius: 12,
   border: '1px solid var(--hc-line)',
   overflow: 'hidden',
   padding: 0,
   transition: 'border-color .2s ease, box-shadow .2s ease, opacity .2s ease',
-};
+  };
+}
+
+function waveformStyle(seed: string): React.CSSProperties {
+  const colors = ['#26d7ba', '#a76cff', '#ff7a1a', '#e757a9', '#c9ff2d'];
+  const color = colors[seed.length % colors.length];
+  return {
+    position: 'absolute',
+    left: 13,
+    right: 13,
+    top: 18,
+    height: 38,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 3,
+    color,
+    opacity: 0.95,
+  };
+}
 
 const lockedOverlayStyle: React.CSSProperties = {
   position: 'absolute',

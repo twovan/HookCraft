@@ -55,11 +55,13 @@ interface GeneratedTrack {
 interface AdvancedArrangementTabProps {
   variant?: 'advanced' | 'template' | 'templateInstrumental';
   selectedTemplate?: Template | null;
+  templatePicker?: ReactNode;
 }
 
 export default function AdvancedArrangementTab({
   variant = 'advanced',
   selectedTemplate = null,
+  templatePicker,
 }: AdvancedArrangementTabProps) {
   const router = useRouter();
   const isTemplateVariant = variant === 'template';
@@ -444,16 +446,22 @@ export default function AdvancedArrangementTab({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <div style={{
         display: 'grid',
-        gridTemplateColumns: usesSelectedTemplate ? '1fr' : 'minmax(0, 0.9fr) minmax(0, 1.1fr)',
+        gridTemplateColumns: usesSelectedTemplate ? 'minmax(0, 1fr) minmax(360px, 420px)' : 'minmax(0, 0.9fr) minmax(0, 1.1fr)',
         gap: usesSelectedTemplate ? 18 : 32,
         alignItems: 'start',
       }}>
         <section style={panelStyle}>
+          {templatePicker && (
+            <div style={{ marginBottom: 26 }}>
+              {templatePicker}
+            </div>
+          )}
+
           <div style={sectionHeaderStyle}>
-            <h2 style={titleStyle}>参考音频</h2>
+            <h2 style={titleStyle}>{usesSelectedTemplate ? '参考音频（可选）' : '参考音频'}</h2>
           </div>
 
-          {usesSelectedTemplate && selectedTemplate && (
+          {usesSelectedTemplate && selectedTemplate && !templatePicker && (
             <div style={selectedTemplateStripStyle}>
               <div style={templateCoverThumbStyle(selectedTemplate.coverUrl)} />
               <div style={{ minWidth: 0 }}>
@@ -659,6 +667,26 @@ export default function AdvancedArrangementTab({
             <div style={errorStyle}>{error}</div>
           )}
 
+          {usesSelectedTemplate && (
+            <div style={estimateCardStyle}>
+              <div style={estimateTitleStyle}>生成预估</div>
+              <div style={estimateGridStyle}>
+                <div>
+                  <span style={estimateLabelStyle}>预计时长</span>
+                  <strong style={estimateValueStyle}>约 1分30秒</strong>
+                </div>
+                <div>
+                  <span style={estimateLabelStyle}>音频质量</span>
+                  <strong style={estimateValueStyle}>高品质 320kbps</strong>
+                </div>
+                <div>
+                  <span style={estimateLabelStyle}>生成次数</span>
+                  <strong style={estimateValueStyle}>1 次</strong>
+                </div>
+              </div>
+            </div>
+          )}
+
           <button
             onClick={handleGenerate}
             disabled={!canGenerate}
@@ -667,13 +695,14 @@ export default function AdvancedArrangementTab({
             style={{
               width: '100%',
               marginTop: 18,
-              padding: '14px 24px',
-              borderRadius: 24,
+              padding: usesSelectedTemplate ? '24px 24px' : '14px 24px',
+              minHeight: usesSelectedTemplate ? 76 : undefined,
+              borderRadius: usesSelectedTemplate ? 18 : 24,
               border: 'none',
-              background: canGenerate ? 'linear-gradient(135deg, var(--hc-lime), var(--hc-cyan))' : '#2a2a40',
+              background: canGenerate ? 'linear-gradient(135deg, var(--hc-lime), var(--hc-cyan))' : 'linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.07))',
               color: canGenerate ? '#08090c' : '#6b7280',
-              fontSize: 15,
-              fontWeight: 700,
+              fontSize: usesSelectedTemplate ? 18 : 15,
+              fontWeight: 800,
               cursor: canGenerate ? 'pointer' : 'not-allowed',
               fontFamily: 'var(--hc-font)',
               boxShadow: canGenerate ? '0 4px 20px rgba(206, 255, 53, 0.22)' : 'none',
@@ -1309,6 +1338,43 @@ const sliderGridStyle: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
   gap: 12,
+};
+
+const estimateCardStyle: CSSProperties = {
+  marginTop: 4,
+  marginBottom: 4,
+  borderRadius: 12,
+  border: '1px solid rgba(255,255,255,0.11)',
+  background: 'rgba(7, 9, 13, 0.64)',
+  padding: 16,
+};
+
+const estimateTitleStyle: CSSProperties = {
+  color: '#e8e8f0',
+  fontSize: 13,
+  fontWeight: 800,
+  marginBottom: 14,
+};
+
+const estimateGridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+  gap: 12,
+};
+
+const estimateLabelStyle: CSSProperties = {
+  display: 'block',
+  color: '#8f96a3',
+  fontSize: 11,
+  marginBottom: 7,
+};
+
+const estimateValueStyle: CSSProperties = {
+  display: 'block',
+  color: '#dfe5ea',
+  fontSize: 13,
+  fontWeight: 700,
+  lineHeight: 1.35,
 };
 
 const errorStyle: CSSProperties = {

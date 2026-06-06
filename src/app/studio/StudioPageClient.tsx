@@ -455,6 +455,25 @@ export default function StudioPageClient({
     }
   };
 
+  const renderTemplatePicker = (description: string) => (
+    <div className="studio-template-picker">
+      <div className="studio-template-picker-head">
+        <div>
+          <h2>选择模板</h2>
+          <p>{description}</p>
+        </div>
+      </div>
+      <TemplateSelector
+        templates={templates}
+        selectedTemplateId={selectedTemplate?.id}
+        onSelect={(t) => setSelectedTemplate(t)}
+        loading={templatesLoading}
+        columns={4}
+        cardVariant="workbench"
+      />
+    </div>
+  );
+
   if (authLoading || !user) {
     return (
       <div style={{ minHeight: '100vh', background: '#0d0d14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1122,92 +1141,20 @@ export default function StudioPageClient({
 
         {/* Template Arrangement Tab Content */}
         <div style={{ display: activeTab === 'templateArrangement' ? 'block' : 'none' }}>
-          <div className="studio-production-workbench">
-            <section
-              className="studio-template-source"
-              style={{
-                background: 'var(--hc-panel)',
-                borderRadius: 12,
-                padding: 20,
-                border: '1px solid var(--hc-border)',
-                boxShadow: 'none',
-              }}
-            >
-              <div style={{ marginBottom: 18 }}>
-                <h2
-                  style={{
-                    margin: 0,
-                    color: 'var(--hc-text)',
-                    fontSize: 18,
-                    fontWeight: 700,
-                    fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-                  }}
-                >
-                  选择模板
-                </h2>
-                <p style={{ margin: '8px 0 0', color: 'var(--hc-text-muted)', fontSize: 12, lineHeight: 1.6 }}>
-                  模板会自动填充并锁定右侧风格，生成接口沿用高级编曲。
-                </p>
-              </div>
-              <TemplateSelector
-                templates={templates}
-                selectedTemplateId={selectedTemplate?.id}
-                onSelect={(t) => setSelectedTemplate(t)}
-                loading={templatesLoading}
-                columns={4}
-              />
-            </section>
-
-            <AdvancedArrangementTab
-              variant="template"
-              selectedTemplate={selectedTemplate}
-            />
-          </div>
+          <AdvancedArrangementTab
+            variant="template"
+            selectedTemplate={selectedTemplate}
+            templatePicker={renderTemplatePicker('模板将作为主创作基调，选择一个模板开始创作。')}
+          />
         </div>
 
         {/* Template Instrumental Tab Content */}
         <div style={{ display: activeTab === 'templateInstrumental' ? 'block' : 'none' }}>
-          <div className="studio-production-workbench">
-            <section
-              className="studio-template-source"
-              style={{
-                background: 'var(--hc-panel)',
-                borderRadius: 12,
-                padding: 20,
-                border: '1px solid var(--hc-border)',
-                boxShadow: 'none',
-              }}
-            >
-              <div style={{ marginBottom: 18 }}>
-                <h2
-                  style={{
-                    margin: 0,
-                    color: 'var(--hc-text)',
-                    fontSize: 18,
-                    fontWeight: 700,
-                    fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-                  }}
-                >
-                  选择模板
-                </h2>
-                <p style={{ margin: '8px 0 0', color: 'var(--hc-text-muted)', fontSize: 12, lineHeight: 1.6 }}>
-                  模板解析会自动生成风格标签，默认使用 V5.5 伴奏模型。
-                </p>
-              </div>
-              <TemplateSelector
-                templates={templates}
-                selectedTemplateId={selectedTemplate?.id}
-                onSelect={(t) => setSelectedTemplate(t)}
-                loading={templatesLoading}
-                columns={4}
-              />
-            </section>
-
-            <AdvancedArrangementTab
-              variant="templateInstrumental"
-              selectedTemplate={selectedTemplate}
-            />
-          </div>
+          <AdvancedArrangementTab
+            variant="templateInstrumental"
+            selectedTemplate={selectedTemplate}
+            templatePicker={renderTemplatePicker('模板解析会自动生成风格标签，默认使用 V5.5 伴奏模型。')}
+          />
         </div>
       </div>
 
@@ -1359,6 +1306,29 @@ const studioPageStyles = `
     grid-template-columns: minmax(0, 1fr) minmax(360px, 430px);
     gap: 18px;
     align-items: start;
+  }
+
+  .studio-template-picker-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .studio-template-picker h2 {
+    margin: 0;
+    color: var(--hc-text);
+    font-size: 18px;
+    font-weight: 800;
+    font-family: var(--hc-font);
+  }
+
+  .studio-template-picker p {
+    margin: 8px 0 0;
+    color: var(--hc-text-muted);
+    font-size: 12px;
+    line-height: 1.65;
   }
 
   .studio-template-source {
