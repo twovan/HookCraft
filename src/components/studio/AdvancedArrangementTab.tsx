@@ -96,7 +96,6 @@ export default function AdvancedArrangementTab({
   const [pollCount, setPollCount] = useState(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [copiedLyrics, setCopiedLyrics] = useState(false);
-  const [selectedResultIndex, setSelectedResultIndex] = useState<number | null>(null);
   const effectiveCustomMode = usesSelectedTemplate ? true : customMode;
   const effectiveStyle = lockedStyle ?? style;
   const effectiveTags = templateAdvancedTags;
@@ -158,7 +157,6 @@ export default function AdvancedArrangementTab({
     setPollCount(0);
     setElapsedSeconds(0);
     setCopiedLyrics(false);
-    setSelectedResultIndex(null);
   }, []);
 
   const handleFileError = useCallback((message: string) => {
@@ -182,7 +180,6 @@ export default function AdvancedArrangementTab({
     setPollCount(0);
     setElapsedSeconds(0);
     setCopiedLyrics(false);
-    setSelectedResultIndex(null);
   }, [stopPolling]);
 
   const insertLyricTag = useCallback((tag: string) => {
@@ -248,7 +245,6 @@ export default function AdvancedArrangementTab({
         if (data.done) {
           stopPolling();
           setResult(data);
-          setSelectedResultIndex(getLatestPlayableTrackIndex(data));
           setGenerateStatus('completed');
           setCopiedLyrics(false);
           return;
@@ -283,7 +279,6 @@ export default function AdvancedArrangementTab({
     setGenerateStatus('uploading');
     setError(null);
     setResult(null);
-    setSelectedResultIndex(null);
     setTaskId(null);
     setLocalTaskId(null);
     setBatchId(null);
@@ -744,27 +739,18 @@ export default function AdvancedArrangementTab({
             <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
               {playableTracks.map((track, index) => {
                 const generationTaskId = getResultGenerationTaskId(localTaskId, index);
-                const isSelectedResult = selectedResultIndex === index;
 
                 return (
-                  <div
-                    key={track.id || index}
-                    style={resultTrackRowStyle(isSelectedResult)}
-                    onClick={() => setSelectedResultIndex(index)}
-                  >
+                  <div key={track.id || index} style={trackRowStyle}>
                     <div style={trackAudioRowStyle}>
-                      <span style={resultVersionLabelStyle(isSelectedResult)}>{'\u7248\u672c '}{index + 1}</span>
-                      {isSelectedResult && <span style={latestResultBadgeStyle}>最新生成</span>}
+                      <span style={{ color: '#9ca3af', fontSize: 12 }}>{'\u7248\u672c '}{index + 1}</span>
                       <audio
                         ref={(node) => {
                           trackAudioRefs.current[index] = node;
                         }}
                         src={track.audioUrl || track.streamAudioUrl}
                         controls
-                        onPlay={() => {
-                          setSelectedResultIndex(index);
-                          handleTrackAudioPlay(index);
-                        }}
+                        onPlay={() => handleTrackAudioPlay(index)}
                         style={{ flex: 1, height: 34 }}
                       />
                     </div>
@@ -839,14 +825,6 @@ function collectLyricsText(primaryLyrics: string | null, tracks: GeneratedTrack[
 
 function hasTrackAudio(track: GeneratedTrack) {
   return Boolean(track.audioUrl || track.streamAudioUrl);
-}
-
-function getLatestPlayableTrackIndex(response: StatusResponse | null) {
-  const tracks = Array.isArray(response?.tracks) ? response.tracks : [];
-  for (let index = tracks.length - 1; index >= 0; index -= 1) {
-    if (hasTrackAudio(tracks[index])) return index;
-  }
-  return response?.audioUrl ? 0 : null;
 }
 
 function getResultGenerationTaskId(baseTaskId: string | null, index: number) {
@@ -1478,40 +1456,15 @@ const spinnerStyle: CSSProperties = {
   flexShrink: 0,
 };
 
-function resultTrackRowStyle(selected: boolean): CSSProperties {
-  return {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'stretch',
-    gap: 12,
-    background: selected
-      ? 'linear-gradient(135deg, rgba(206, 255, 53, 0.14), rgba(18, 18, 30, 0.98) 46%, rgba(91, 245, 190, 0.12))'
-      : '#12121e',
-    border: selected ? '1px solid rgba(206, 255, 53, 0.68)' : '1px solid #2a2a40',
-    borderRadius: 10,
-    padding: 12,
-    boxShadow: selected ? '0 0 0 1px rgba(206, 255, 53, 0.12), 0 16px 46px rgba(206, 255, 53, 0.1)' : 'none',
-    cursor: 'pointer',
-  };
-}
-
-function resultVersionLabelStyle(selected: boolean): CSSProperties {
-  return {
-    color: selected ? '#f6ffd9' : '#9ca3af',
-    fontSize: 12,
-    fontWeight: selected ? 900 : 700,
-  };
-}
-
-const latestResultBadgeStyle: CSSProperties = {
-  borderRadius: 999,
-  border: '1px solid rgba(206, 255, 53, 0.38)',
-  background: 'rgba(206, 255, 53, 0.12)',
-  color: 'var(--hc-lime)',
-  fontSize: 11,
-  fontWeight: 900,
-  padding: '3px 7px',
-  whiteSpace: 'nowrap',
+const trackRowStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'stretch',
+  gap: 12,
+  background: '#12121e',
+  border: '1px solid #2a2a40',
+  borderRadius: 10,
+  padding: 12,
 };
 
 const trackAudioRowStyle: CSSProperties = {
