@@ -12,6 +12,7 @@ Checks performed:
 - The duplicate main "资料与安全" block is absent; profile/password actions live only in the left rail.
 - Desktop login-state screenshot captured at `account-local-redesign-final.png`.
 - Mobile login-state screenshot captured at `account-local-redesign-mobile.png`.
+- Wide viewport content width checked against adjacent pages; account main content is constrained to `1420px` inside the right work area instead of stretching full width.
 - Browser console after reload: no console messages found.
 - TypeScript check passed with `npm run typecheck`.
 - Production build passed with `npm run build`.

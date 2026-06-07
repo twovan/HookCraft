@@ -1100,6 +1100,12 @@ const accountStyles = `
           linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 210px);
       }
 
+      .account-main > * {
+        width: min(1420px, 100%);
+        margin-left: auto;
+        margin-right: auto;
+      }
+
       .account-main-head {
         display: flex;
         align-items: flex-end;
