@@ -358,8 +358,10 @@ function HeroStat({ icon, value, label }: { icon: HeroStatIconName; value: strin
       <span className="templates-hero-stat-icon" aria-hidden="true">
         <HeroStatIcon name={icon} />
       </span>
-      <strong>{value}</strong>
-      <span>{label}</span>
+      <span className="templates-hero-stat-copy">
+        <strong>{value}</strong>
+        <span>{label}</span>
+      </span>
     </div>
   );
 }
@@ -556,7 +558,7 @@ const templatesStyles = `
   .templates-hero-actions {
     display: flex;
     align-items: center;
-    gap: 32px;
+    gap: 28px;
     margin-top: 44px;
   }
 
@@ -585,11 +587,11 @@ const templatesStyles = `
 
   .templates-hero-stat {
     position: relative;
-    min-width: 124px;
-    display: grid;
-    grid-template-columns: auto 1fr;
+    min-width: 144px;
+    height: 58px;
+    display: flex;
     align-items: center;
-    gap: 10px 12px;
+    gap: 12px;
     color: #f4f1ea;
   }
 
@@ -601,7 +603,7 @@ const templatesStyles = `
     position: relative;
     width: 42px;
     height: 42px;
-    grid-row: span 2;
+    flex: 0 0 42px;
     display: grid;
     place-items: center;
     border-radius: 50%;
@@ -635,6 +637,15 @@ const templatesStyles = `
     filter: drop-shadow(0 0 7px rgba(206,255,53,.38));
   }
 
+  .templates-hero-stat-copy {
+    min-width: 0;
+    height: 42px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+  }
+
   .templates-hero-stat::after {
     content: "";
     position: absolute;
@@ -646,19 +657,21 @@ const templatesStyles = `
   }
 
   .templates-hero-stat strong {
-    align-self: end;
+    display: block;
     color: #f7f4ed;
     font-size: 17px;
-    line-height: 1;
+    line-height: 18px;
     font-weight: 900;
+    white-space: nowrap;
   }
 
-  .templates-hero-stat span {
-    align-self: start;
+  .templates-hero-stat-copy span {
+    display: block;
     color: rgba(244,241,234,.62);
-    font-size: 13px;
-    line-height: 1.2;
+    font-size: 12px;
+    line-height: 14px;
     font-weight: 720;
+    white-space: nowrap;
   }
 
   .templates-hero-art {
