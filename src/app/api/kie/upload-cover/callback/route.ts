@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '../../../../../lib/supabase/server';
+import { getKieUserFacingErrorMessage } from '../../../../../lib/generation/KieSunoProvider';
 import { persistCompletedCoverTracks } from '../persist-tracks';
 
 export const dynamic = 'force-dynamic';
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest) {
           .update({
             status: 'failed',
             error_code: payload?.data?.errorCode || status,
-            error_message: payload?.data?.errorMessage || payload?.msg || '高级编曲生成失败',
+            error_message: getKieUserFacingErrorMessage(payload?.data?.errorMessage || payload?.msg) || '高级编曲生成失败',
             credits_consumed: 0,
             updated_at: new Date().toISOString(),
           } as any)

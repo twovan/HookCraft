@@ -22,6 +22,22 @@ interface KieApiResponse<T> {
   success?: boolean;
 }
 
+export function isKieProviderCreditsInsufficient(message?: string | null): boolean {
+  const normalized = (message || '').toLowerCase();
+  return (
+    normalized.includes('credits insufficient') ||
+    normalized.includes('current balance') ||
+    normalized.includes('top up to continue')
+  );
+}
+
+export function getKieUserFacingErrorMessage(message?: string | null): string | null {
+  if (isKieProviderCreditsInsufficient(message)) {
+    return '生成服务额度不足，当前不是你的 HookCraft 余额问题，请联系管理员处理后重试';
+  }
+  return message || null;
+}
+
 interface KieFileUploadData {
   fileUrl?: string;
   downloadUrl?: string;

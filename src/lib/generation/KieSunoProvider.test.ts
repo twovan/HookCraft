@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { KieSunoProvider } from './KieSunoProvider';
+import {
+  getKieUserFacingErrorMessage,
+  isKieProviderCreditsInsufficient,
+  KieSunoProvider,
+} from './KieSunoProvider';
 
 describe('KieSunoProvider vocal removal', () => {
   afterEach(() => {
@@ -52,5 +56,23 @@ describe('KieSunoProvider vocal removal', () => {
     expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toMatchObject({
       type: 'split_stem',
     });
+  });
+});
+
+describe('KieSunoProvider error normalization', () => {
+  it('detects provider account credit exhaustion messages', () => {
+    expect(isKieProviderCreditsInsufficient(
+      'Credits insufficient : Your current balance isn’t enough to run this request. Please top up to continue.',
+    )).toBe(true);
+  });
+
+  it('maps provider credit exhaustion to a service-side message', () => {
+    expect(getKieUserFacingErrorMessage(
+      'Credits insufficient : Your current balance isn’t enough to run this request.',
+    )).toBe('生成服务额度不足，当前不是你的 HookCraft 余额问题，请联系管理员处理后重试');
+  });
+
+  it('does not invent an error message when Kie has no error', () => {
+    expect(getKieUserFacingErrorMessage(null)).toBeNull();
   });
 });

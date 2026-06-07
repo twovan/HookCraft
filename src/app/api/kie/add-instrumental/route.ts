@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser } from '../../../../lib/supabase/auth-helpers';
 import { supabaseAdmin } from '../../../../lib/supabase/server';
-import { KieSunoProvider } from '../../../../lib/generation/KieSunoProvider';
+import { getKieUserFacingErrorMessage, isKieProviderCreditsInsufficient, KieSunoProvider } from '../../../../lib/generation/KieSunoProvider';
 import { CreditService } from '../../../../lib/credits/CreditService';
 import { getConsumeCreditsErrorMessage } from '../../../../lib/credits/consumeError';
 import type { KieSunoModel } from '../../../../types/kie';
@@ -166,12 +166,16 @@ export async function POST(req: NextRequest) {
         callBackUrl,
       });
     } catch (error: any) {
+      const rawMessage = error?.message || 'Add-instrumental task failed';
+      const errorMessage = getKieUserFacingErrorMessage(rawMessage) || rawMessage;
       await supabaseAdmin
         .from('generation_tasks')
         .update({
           status: 'failed',
-          error_code: 'KIE_ADD_INSTRUMENTAL_FAILED',
-          error_message: error?.message || 'Add-instrumental task failed',
+          error_code: isKieProviderCreditsInsufficient(rawMessage)
+            ? 'KIE_PROVIDER_CREDITS_INSUFFICIENT'
+            : 'KIE_ADD_INSTRUMENTAL_FAILED',
+          error_message: errorMessage,
           credits_consumed: 0,
           updated_at: new Date().toISOString(),
         } as any)
@@ -187,7 +191,10 @@ export async function POST(req: NextRequest) {
         .eq('id', batchId)
         .eq('user_id', user.id);
 
-      throw error;
+      return NextResponse.json(
+        { error: errorMessage, code: isKieProviderCreditsInsufficient(rawMessage) ? 'provider_credits_insufficient' : undefined },
+        { status: isKieProviderCreditsInsufficient(rawMessage) ? 503 : 500 }
+      );
     }
 
     const consumeResult = await creditService.consumeCredits(user.id, creditOperations);

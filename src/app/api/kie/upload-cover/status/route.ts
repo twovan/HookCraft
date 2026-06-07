@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser } from '../../../../../lib/supabase/auth-helpers';
-import { KieSunoProvider } from '../../../../../lib/generation/KieSunoProvider';
+import { getKieUserFacingErrorMessage, KieSunoProvider } from '../../../../../lib/generation/KieSunoProvider';
 import { supabaseAdmin } from '../../../../../lib/supabase/server';
 import { persistCompletedCoverTracks } from '../persist-tracks';
 
@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
           .update({
             status: 'failed',
             error_code: details.errorCode || details.status,
-            error_message: details.errorMessage || '高级编曲生成失败',
+            error_message: getKieUserFacingErrorMessage(details.errorMessage) || '高级编曲生成失败',
             credits_consumed: 0,
             updated_at: new Date().toISOString(),
           } as any)
@@ -97,7 +97,7 @@ export async function GET(req: NextRequest) {
       duration,
       tracks: playableTracks.length > 0 ? playableTracks : details.tracks,
       errorCode: details.errorCode,
-      errorMessage: details.errorMessage,
+      errorMessage: getKieUserFacingErrorMessage(details.errorMessage),
     });
   } catch (error: any) {
     console.error('[kie/upload-cover/status] Error:', error);
