@@ -180,9 +180,9 @@ export default function TemplatesPage() {
                 <span>进入工作台</span>
                 <span aria-hidden="true">→</span>
               </Link>
-              <HeroStat value={loading ? '同步中' : `${templates.length}`} label="个模板" />
-              <HeroStat value={producerCount > 0 ? `${producerCount}` : '认证'} label="签约制作人" />
-              <HeroStat value="可商用" label="安全可用授权" />
+              <HeroStat icon="templates" value={loading ? '同步中' : `${templates.length}`} label="个模板" />
+              <HeroStat icon="producer" value={producerCount > 0 ? `${producerCount}` : '认证'} label="签约制作人" />
+              <HeroStat icon="license" value="可商用" label="安全可用授权" />
             </div>
           </div>
           <div className="templates-hero-art" aria-hidden="true" />
@@ -350,12 +350,50 @@ export default function TemplatesPage() {
   );
 }
 
-function HeroStat({ value, label }: { value: string; label: string }) {
+type HeroStatIconName = 'templates' | 'producer' | 'license';
+
+function HeroStat({ icon, value, label }: { icon: HeroStatIconName; value: string; label: string }) {
   return (
     <div className="templates-hero-stat">
+      <span className="templates-hero-stat-icon" aria-hidden="true">
+        <HeroStatIcon name={icon} />
+      </span>
       <strong>{value}</strong>
       <span>{label}</span>
     </div>
+  );
+}
+
+function HeroStatIcon({ name }: { name: HeroStatIconName }) {
+  if (name === 'producer') {
+    return (
+      <svg viewBox="0 0 24 24" focusable="false">
+        <circle cx="9" cy="8" r="3.1" />
+        <path d="M3.7 18.6c.8-3.4 2.6-5 5.3-5s4.5 1.6 5.3 5" />
+        <path d="M16 6.2v8.5" />
+        <path d="M16 6.2l4.6-1.3v3.2L16 9.4" />
+        <circle cx="14.2" cy="16.1" r="1.8" />
+      </svg>
+    );
+  }
+
+  if (name === 'license') {
+    return (
+      <svg viewBox="0 0 24 24" focusable="false">
+        <path d="M12 3.8l7 2.5v5.2c0 4.4-2.6 7.2-7 8.8-4.4-1.6-7-4.4-7-8.8V6.3l7-2.5z" />
+        <path d="M9 12.1l2 2 4.3-5" />
+        <path d="M15.9 7.4v4.9" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" focusable="false">
+      <path d="M6.2 5.6h9.4a2.2 2.2 0 0 1 2.2 2.2v8.6" />
+      <path d="M4.2 8.1h9.4a2.2 2.2 0 0 1 2.2 2.2v8.1H6.4a2.2 2.2 0 0 1-2.2-2.2V8.1z" />
+      <path d="M8.2 13.2h3.8" />
+      <path d="M8.2 16h5.6" />
+    </svg>
   );
 }
 
@@ -556,14 +594,45 @@ const templatesStyles = `
   }
 
   .templates-hero-stat::before {
-    content: "";
+    content: none;
+  }
+
+  .templates-hero-stat-icon {
+    position: relative;
     width: 42px;
     height: 42px;
     grid-row: span 2;
+    display: grid;
+    place-items: center;
     border-radius: 50%;
     border: 1px solid rgba(206,255,53,.35);
-    background: rgba(206,255,53,.08);
-    box-shadow: inset 0 0 18px rgba(206,255,53,.08);
+    background:
+      radial-gradient(circle at 34% 28%, rgba(206,255,53,.22), transparent 42%),
+      rgba(206,255,53,.08);
+    box-shadow:
+      inset 0 0 18px rgba(206,255,53,.10),
+      0 0 22px rgba(206,255,53,.08);
+  }
+
+  .templates-hero-stat-icon::after {
+    content: "";
+    position: absolute;
+    inset: 7px;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,.06);
+  }
+
+  .templates-hero-stat-icon svg {
+    position: relative;
+    z-index: 1;
+    width: 23px;
+    height: 23px;
+    fill: none;
+    stroke: #ceff35;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    filter: drop-shadow(0 0 7px rgba(206,255,53,.38));
   }
 
   .templates-hero-stat::after {
