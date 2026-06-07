@@ -47,12 +47,15 @@ export async function PATCH(
 
     const { id } = await params;
     const body = await req.json();
-    const { displayName, bio, styleTags, avatarUrl, revenueShare } = body;
+    const { displayName, bio, styleTags, representativeWorks, useCases, collaborators, avatarUrl, revenueShare } = body;
 
     const updateData: any = { updated_at: new Date().toISOString() };
     if (displayName !== undefined) updateData.display_name = displayName;
     if (bio !== undefined) updateData.bio = bio;
     if (styleTags !== undefined) updateData.style_tags = styleTags;
+    if (representativeWorks !== undefined) updateData.representative_works = representativeWorks;
+    if (useCases !== undefined) updateData.use_cases = useCases;
+    if (collaborators !== undefined) updateData.collaborators = collaborators;
     if (avatarUrl !== undefined) updateData.avatar_url = avatarUrl;
     if (revenueShare !== undefined) updateData.revenue_share = parseFloat(revenueShare);
 

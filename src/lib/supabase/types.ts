@@ -527,6 +527,9 @@ export interface Database {
           avatar_url: string | null;
           bio: string | null;
           style_tags: string[];
+          representative_works: string[];
+          use_cases: string[];
+          collaborators: string[];
           total_downloads: number;
           is_featured: boolean;
           status: ProducerStatus;
@@ -541,6 +544,9 @@ export interface Database {
           avatar_url?: string | null;
           bio?: string | null;
           style_tags?: string[];
+          representative_works?: string[];
+          use_cases?: string[];
+          collaborators?: string[];
           total_downloads?: number;
           is_featured?: boolean;
           status?: ProducerStatus;
@@ -555,6 +561,9 @@ export interface Database {
           avatar_url?: string | null;
           bio?: string | null;
           style_tags?: string[];
+          representative_works?: string[];
+          use_cases?: string[];
+          collaborators?: string[];
           total_downloads?: number;
           is_featured?: boolean;
           status?: ProducerStatus;

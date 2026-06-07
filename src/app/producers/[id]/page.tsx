@@ -24,8 +24,8 @@ const gradients = [
   'linear-gradient(135deg, #f5c542 0%, #ceff35 42%, #15181f 100%)',
 ];
 
-const COLLABORATORS = ['张学友', '孙燕姿', '蔡依林', '林俊杰', '莫文蔚', '王心凌'];
-const USE_CASES = ['华语流行 Demo', '摇滚编曲', '抒情副歌', '商业广告', '唱作人小样'];
+const FALLBACK_COLLABORATORS = ['张学友', '孙燕姿', '蔡依林', '林俊杰', '莫文蔚', '王心凌'];
+const FALLBACK_USE_CASES = ['华语流行 Demo', '摇滚编曲', '抒情副歌', '商业广告', '唱作人小样'];
 
 function getGradient(name: string) {
   let hash = 0;
@@ -51,6 +51,10 @@ function getRepresentativeWorks(bio?: string) {
     .filter((item) => item.includes('—') || item.includes('-'))
     .slice(0, 10);
   return works.length > 0 ? works : ['遇见', 'Lydia', '白月光', '手心的蔷薇'];
+}
+
+function getDisplayList(items: string[] | undefined, fallback: string[]) {
+  return items && items.length > 0 ? items : fallback;
 }
 
 async function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit, timeout = 10000) {
@@ -183,7 +187,7 @@ export default function ProducerProfilePage() {
             <h2>制作人简介</h2>
             <p>{getBioIntro(producer.bio)}</p>
             <div className="chip-group">
-              {getRepresentativeWorks(producer.bio).map((work) => <span key={work}>{work}</span>)}
+              {getDisplayList(producer.representativeWorks, getRepresentativeWorks(producer.bio)).map((work) => <span key={work}>{work}</span>)}
             </div>
           </div>
 
@@ -191,12 +195,12 @@ export default function ProducerProfilePage() {
             <div className="section-kicker">FOR CREATORS</div>
             <h2>创作适用场景</h2>
             <div className="chip-group scenario">
-              {USE_CASES.map((item) => <span key={item}>{item}</span>)}
+              {getDisplayList(producer.useCases, FALLBACK_USE_CASES).map((item) => <span key={item}>{item}</span>)}
             </div>
 
             <h3>合作艺人</h3>
             <div className="collab-list">
-              {COLLABORATORS.map((name) => <span key={name}>{name}</span>)}
+              {getDisplayList(producer.collaborators, FALLBACK_COLLABORATORS).map((name) => <span key={name}>{name}</span>)}
             </div>
           </aside>
         </section>

@@ -14,6 +14,9 @@ interface Producer {
   avatarUrl?: string;
   bio?: string;
   expertiseTags: string[];
+  representativeWorks: string[];
+  useCases: string[];
+  collaborators: string[];
   revenueShare: number;
   status: string;
   templateCount: number;
@@ -40,6 +43,13 @@ interface ProducerStats {
   avgRevenueShare: number;
 }
 
+function splitListInput(value: string) {
+  return value
+    .split(/[,，\n]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 export default function AdminProducersPage() {
   const [producers, setProducers] = useState<Producer[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
@@ -64,7 +74,16 @@ export default function AdminProducersPage() {
   // Edit producer modal
   const [editOpen, setEditOpen] = useState(false);
   const [editingProducer, setEditingProducer] = useState<Producer | null>(null);
-  const [editForm, setEditForm] = useState({ name: '', bio: '', avatarUrl: '', expertiseTags: '', revenueShare: '70' });
+  const [editForm, setEditForm] = useState({
+    name: '',
+    bio: '',
+    avatarUrl: '',
+    expertiseTags: '',
+    representativeWorks: '',
+    useCases: '',
+    collaborators: '',
+    revenueShare: '70',
+  });
   const [updating, setUpdating] = useState(false);
 
   // Confirm dialog
@@ -173,6 +192,9 @@ export default function AdminProducersPage() {
       bio: producer.bio || '',
       avatarUrl: producer.avatarUrl || '',
       expertiseTags: (producer.expertiseTags || []).join(', '),
+      representativeWorks: (producer.representativeWorks || []).join(', '),
+      useCases: (producer.useCases || []).join(', '),
+      collaborators: (producer.collaborators || []).join(', '),
       revenueShare: String(Math.round((producer.revenueShare || 0.7) * 100)),
     });
     setEditOpen(true);
@@ -193,7 +215,10 @@ export default function AdminProducersPage() {
           displayName: editForm.name.trim(),
           bio: editForm.bio,
           avatarUrl: editForm.avatarUrl,
-          styleTags: editForm.expertiseTags.split(',').map((tag) => tag.trim()).filter(Boolean),
+          styleTags: splitListInput(editForm.expertiseTags),
+          representativeWorks: splitListInput(editForm.representativeWorks),
+          useCases: splitListInput(editForm.useCases),
+          collaborators: splitListInput(editForm.collaborators),
           revenueShare: parseFloat(editForm.revenueShare) / 100,
         }),
       });
@@ -577,6 +602,33 @@ export default function AdminProducersPage() {
               value={editForm.expertiseTags}
               onChange={(e) => setEditForm((f) => ({ ...f, expertiseTags: e.target.value }))}
               placeholder="电子, 流行, 嘻哈"
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>代表作品标签（逗号或换行分隔）</label>
+            <textarea
+              style={{ ...inputStyle, minHeight: 72, resize: 'vertical' }}
+              value={editForm.representativeWorks}
+              onChange={(e) => setEditForm((f) => ({ ...f, representativeWorks: e.target.value }))}
+              placeholder="飞儿乐团—眷恋，王心凌—羽毛，孙燕姿—需要你"
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>创作适用场景（逗号或换行分隔）</label>
+            <textarea
+              style={{ ...inputStyle, minHeight: 72, resize: 'vertical' }}
+              value={editForm.useCases}
+              onChange={(e) => setEditForm((f) => ({ ...f, useCases: e.target.value }))}
+              placeholder="华语流行 Demo，摇滚编曲，抒情副歌"
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>合作艺人（逗号或换行分隔）</label>
+            <textarea
+              style={{ ...inputStyle, minHeight: 72, resize: 'vertical' }}
+              value={editForm.collaborators}
+              onChange={(e) => setEditForm((f) => ({ ...f, collaborators: e.target.value }))}
+              placeholder="张学友，孙燕姿，蔡依林，林俊杰"
             />
           </div>
           <div>

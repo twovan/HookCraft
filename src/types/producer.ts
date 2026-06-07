@@ -7,6 +7,9 @@ export interface ProducerProfile {
   avatarUrl?: string;
   bio?: string;
   styleTags: string[];
+  representativeWorks: string[];
+  useCases: string[];
+  collaborators: string[];
   templateCount: number;
   totalDownloads: number;
   totalSales?: number;
