@@ -410,7 +410,7 @@ export default function StudioPageClient({
 
     setIsConfirming(true);
     try {
-      const res = await fetch(`/api/versions/${selectedVersionId}/select`, {
+      const res = await fetch(`/api/versions/${selectedVersionId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ batchId }),

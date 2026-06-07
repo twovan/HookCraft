@@ -53,8 +53,8 @@ export class DownloadService {
       return { success: false, error: '任务不存在或无权访问' };
     }
 
-    if (task.status !== 'selected') {
-      return { success: false, error: '只能下载已选中的版本，请先选择一个版本' };
+    if (task.status !== 'selected' && task.status !== 'completed') {
+      return { success: false, error: '只能下载已完成的版本' };
     }
 
     if (!task.audio_path) {

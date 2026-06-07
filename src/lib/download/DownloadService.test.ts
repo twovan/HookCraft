@@ -79,4 +79,44 @@ describe('DownloadService', () => {
     expect(mockFetch).toHaveBeenCalledWith(audioPath);
     expect(storageDownload).not.toHaveBeenCalled();
   });
+
+  it('allows downloading a completed task that has not been marked selected', async () => {
+    const audioPath = 'https://cdn.example.com/generated.mp3';
+    const { supabase } = createSupabaseMock(audioPath);
+    const taskSingle = vi.fn().mockResolvedValue({
+      data: {
+        id: 'task-1',
+        user_id: 'user-1',
+        status: 'completed',
+        audio_path: audioPath,
+        batch_id: 'batch-1',
+        version_number: 1,
+      },
+      error: null,
+    });
+
+    (supabase.from as any).mockImplementation((table: string) => {
+      if (table === 'generation_tasks') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({ single: taskSingle }),
+            }),
+          }),
+        };
+      }
+      return createSupabaseMock(audioPath).supabase.from(table);
+    });
+
+    mockFetch.mockResolvedValueOnce(new Response(new Uint8Array([4, 5, 6]), {
+      status: 200,
+      headers: { 'Content-Type': 'audio/mpeg' },
+    }));
+
+    const service = new DownloadService(supabase as any);
+    const result = await service.download('user-1', 'pro', 'task-1');
+
+    expect(result.success).toBe(true);
+    expect(result.audioBuffer).toEqual(Buffer.from([4, 5, 6]));
+  });
 });
