@@ -169,7 +169,7 @@ export default function TemplatesPage() {
 
   return (
     <main className="hc-shell templates-page">
-      <style>{templatesStyles}</style>
+      <style dangerouslySetInnerHTML={{ __html: templatesStyles }} />
       <div className="templates-market-shell">
         <section className="templates-hero" aria-labelledby="templates-title">
           <div className="templates-hero-copy">
