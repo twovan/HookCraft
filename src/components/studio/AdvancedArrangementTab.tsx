@@ -11,6 +11,7 @@ import { getTemplateAdvancedAnalysis, getTemplateAdvancedPrompt } from '@/lib/te
 
 type UploadStatus = 'idle' | 'validating' | 'ready' | 'error';
 type GenerateStatus = 'idle' | 'uploading' | 'queued' | 'generating' | 'completed' | 'error';
+type UploadPhase = 'idle' | 'signing' | 'uploading' | 'uploaded' | 'creating';
 
 const FIXED_MODEL = 'V5_5';
 const LYRIC_STRUCTURE_TAGS = ['[Intro]', '[Verse]', '[Pre Chorus]', '[Chorus]', '[Bridge]', '[Outro]', '[Interlude]', '[Hook]', '[Inst]'];
@@ -92,12 +93,15 @@ export default function AdvancedArrangementTab({
   const [taskId, setTaskId] = useState<string | null>(null);
   const [localTaskId, setLocalTaskId] = useState<string | null>(null);
   const [batchId, setBatchId] = useState<string | null>(null);
+  const [creationUrl, setCreationUrl] = useState<string | null>(null);
   const [remoteStatus, setRemoteStatus] = useState<string | null>(null);
   const [result, setResult] = useState<StatusResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pollCount, setPollCount] = useState(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [copiedLyrics, setCopiedLyrics] = useState(false);
+  const [uploadPhase, setUploadPhase] = useState<UploadPhase>('idle');
+  const [uploadProgress, setUploadProgress] = useState(0);
   const effectiveCustomMode = usesSelectedTemplate ? true : customMode;
   const effectiveStyle = lockedStyle ?? style;
   const effectiveTags = templateAdvancedTags;
@@ -153,12 +157,15 @@ export default function AdvancedArrangementTab({
     setTaskId(null);
     setLocalTaskId(null);
     setBatchId(null);
+    setCreationUrl(null);
     setRemoteStatus(null);
     setResult(null);
     setError(null);
     setPollCount(0);
     setElapsedSeconds(0);
     setCopiedLyrics(false);
+    setUploadPhase('idle');
+    setUploadProgress(0);
   }, []);
 
   const handleFileError = useCallback((message: string) => {
@@ -176,12 +183,15 @@ export default function AdvancedArrangementTab({
     setTaskId(null);
     setLocalTaskId(null);
     setBatchId(null);
+    setCreationUrl(null);
     setRemoteStatus(null);
     setResult(null);
     setError(null);
     setPollCount(0);
     setElapsedSeconds(0);
     setCopiedLyrics(false);
+    setUploadPhase('idle');
+    setUploadProgress(0);
   }, [stopPolling]);
 
   const insertLyricTag = useCallback((tag: string) => {
@@ -284,13 +294,21 @@ export default function AdvancedArrangementTab({
     setTaskId(null);
     setLocalTaskId(null);
     setBatchId(null);
+    setCreationUrl(null);
     setRemoteStatus(null);
     setPollCount(0);
     setElapsedSeconds(0);
     setCopiedLyrics(false);
+    setUploadPhase('signing');
+    setUploadProgress(0);
 
     try {
-      const uploadedAudio = await uploadAdvancedArrangementAudio(audioFile!);
+      const uploadedAudio = await uploadAdvancedArrangementAudio(audioFile!, ({ phase, percent }) => {
+        setUploadPhase(phase);
+        setUploadProgress(percent);
+      });
+      setUploadPhase('creating');
+      setUploadProgress(100);
       const formData = new FormData();
       formData.append('uploadedBucket', uploadedAudio.bucket);
       formData.append('uploadedPath', uploadedAudio.path);
@@ -331,10 +349,13 @@ export default function AdvancedArrangementTab({
       setTaskId(data.taskId);
       setLocalTaskId(data.localTaskId || null);
       setBatchId(data.batchId || null);
+      setCreationUrl(data.creationUrl || null);
       setGenerateStatus('queued');
+      setUploadPhase('idle');
       pollTask(data.taskId, data.localTaskId);
     } catch (err) {
       setGenerateStatus('error');
+      setUploadPhase('idle');
       setError(formatAdvancedArrangementError(err instanceof Error ? err.message : '高级编曲任务创建失败'));
     }
   }, [
@@ -415,15 +436,23 @@ export default function AdvancedArrangementTab({
 
   const progressPercent = generateStatus === 'completed'
     ? 100
-    : Math.min(92, Math.max(
-      generateStatus === 'uploading' ? 12 : generateStatus === 'queued' ? 24 : 38,
-      Math.round((elapsedSeconds / 360) * 92)
-    ));
+    : generateStatus === 'uploading'
+      ? Math.max(uploadPhase === 'signing' ? 3 : 5, Math.min(100, uploadProgress))
+      : Math.min(92, Math.max(
+        generateStatus === 'queued' ? 24 : 38,
+        Math.round((elapsedSeconds / 360) * 92)
+      ));
   const progressStage =
     generateStatus === 'completed'
       ? '生成完成，正在跳转到我的作品'
       : generateStatus === 'uploading'
-      ? '正在上传参考音频'
+        ? uploadPhase === 'signing'
+          ? '正在准备上传地址'
+          : uploadPhase === 'creating'
+            ? '音频已上传，正在创建生成任务'
+            : uploadPhase === 'uploaded'
+              ? '音频上传完成'
+              : '正在上传参考音频'
       : remoteStatus === 'TEXT_SUCCESS'
         ? '歌词与编曲方案已生成'
         : remoteStatus === 'FIRST_SUCCESS'
@@ -432,20 +461,39 @@ export default function AdvancedArrangementTab({
             ? '任务已提交，等待引擎接单'
             : '正在生成音频，请保持页面打开';
   const progressHint =
-    elapsedSeconds < 45
-      ? '通常需要几十秒到数分钟，页面会自动刷新结果。'
-      : elapsedSeconds < 180
-        ? '任务仍在处理，复杂音频会等待更久一些。'
-        : '仍在排队或生成中，我会持续自动查询。';
+    generateStatus === 'uploading'
+      ? uploadPhase === 'uploading'
+        ? '大文件上传时间取决于本地网络，上载完成后会自动创建生成任务。'
+        : uploadPhase === 'creating'
+          ? '上传已完成，正在把任务提交给生成引擎。'
+          : '正在建立安全上传通道，请稍候。'
+      : elapsedSeconds < 45
+        ? taskId
+          ? '任务已提交，可以离开页面；完成后可在我的作品查看。'
+          : '通常需要几十秒到数分钟，页面会自动刷新结果。'
+        : elapsedSeconds < 180
+          ? '任务仍在处理，复杂音频会等待更久一些；你也可以先去我的作品查看。'
+          : '仍在排队或生成中，我会持续自动查询；你可以离开页面稍后查看。';
   const progressText = remoteStatus
     ? STATUS_TEXT[remoteStatus] || remoteStatus
     : generateStatus === 'uploading'
-      ? '正在上传并创建任务'
+      ? uploadPhase === 'creating'
+        ? '正在创建任务'
+        : `正在上传 ${progressPercent}%`
       : generateStatus === 'queued'
         ? '任务已提交'
         : '正在生成';
 
   const progressDialogText = generateStatus === 'completed' ? '生成已完成' : progressText;
+  const progressDetailText = generateStatus === 'uploading'
+    ? uploadPhase === 'creating'
+      ? '上传已完成，正在创建生成任务'
+      : uploadPhase === 'signing'
+        ? '正在准备上传地址'
+        : `正在上传参考音频 · ${progressPercent}%`
+    : generateStatus === 'completed'
+      ? '作品已保存，即将进入我的作品'
+      : `${progressDialogText} · 已等待 ${elapsedSeconds}s · 第 ${pollCount} 次查询`;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -744,14 +792,31 @@ export default function AdvancedArrangementTab({
               <div style={{ ...progressBarFillStyle, width: `${progressPercent}%` }} />
             </div>
             <div style={{ color: '#9ca3af', fontSize: 12, marginTop: 8, lineHeight: 1.6 }}>
-              {generateStatus === 'completed'
-                ? '作品已保存，即将进入我的作品'
-                : `${progressDialogText} · 已等待 ${elapsedSeconds}s · 第 ${pollCount} 次查询`}
+              {progressDetailText}
             </div>
             <div style={{ color: '#6b7280', fontSize: 11, marginTop: 4, lineHeight: 1.6 }}>
               {taskId ? `任务 ID：${taskId}` : '正在准备任务，请保持页面打开'} · {progressHint}
             </div>
           </div>
+          {taskId && generateStatus !== 'completed' && (
+            <button
+              type="button"
+              onClick={() => router.push(creationUrl || '/account/creations')}
+              style={{
+                border: '1px solid rgba(206,255,53,0.32)',
+                background: 'rgba(206,255,53,0.1)',
+                color: 'var(--hc-lime)',
+                borderRadius: 10,
+                padding: '9px 12px',
+                fontSize: 12,
+                fontWeight: 800,
+                whiteSpace: 'nowrap',
+                cursor: 'pointer',
+              }}
+            >
+              去我的作品
+            </button>
+          )}
           <div style={{ display: 'none' }}>
             <div style={{ color: '#e8e8f0', fontSize: 14, fontWeight: 600 }}>{progressDialogText}</div>
             <div style={{ color: '#9ca3af', fontSize: 12, marginTop: 6 }}>

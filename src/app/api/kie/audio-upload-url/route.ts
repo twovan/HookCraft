@@ -49,6 +49,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       bucket: ADVANCED_ARRANGEMENT_AUDIO_BUCKET,
       path: data.path || path,
+      signedUrl: data.signedUrl,
       token: data.token,
     });
   } catch (error: any) {
