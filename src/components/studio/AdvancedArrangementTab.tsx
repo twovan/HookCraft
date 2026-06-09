@@ -459,7 +459,7 @@ export default function AdvancedArrangementTab({
           ? '首个音频版本已完成'
           : generateStatus === 'queued'
             ? '任务已提交，等待引擎接单'
-            : '正在生成音频，请保持页面打开';
+            : '正在生成音频，可稍后查看';
   const progressHint =
     generateStatus === 'uploading'
       ? uploadPhase === 'uploading'
