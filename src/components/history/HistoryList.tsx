@@ -213,7 +213,7 @@ export default function HistoryList({
           </div>
         </div>
 
-        <div className="history-list-scroll" style={{ maxHeight: showDetail ? '76vh' : 'none', overflowY: showDetail ? 'auto' : 'visible' }}>
+        <div className="history-list-scroll">
           {batches.map((batch) => {
             const songId = batch.taskId || batch.batchId;
             const isActive = expandedTaskId === songId;
