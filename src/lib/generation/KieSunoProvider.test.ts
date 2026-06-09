@@ -60,6 +60,27 @@ describe('KieSunoProvider vocal removal', () => {
 });
 
 describe('KieSunoProvider error normalization', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('reports non-JSON provider responses without exposing raw JSON parse errors', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('<html>gateway error</html>', {
+      status: 502,
+      headers: { 'Content-Type': 'text/html' },
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const provider = new KieSunoProvider({ apiKey: 'test-key' });
+
+    await expect(provider.addInstrumental({
+      uploadUrl: 'https://example.com/input.mp3',
+      title: 'demo',
+      tags: 'pop',
+      model: 'V5_5',
+    })).rejects.toThrow('Kie API returned non-JSON response (502, text/html)');
+  });
+
   it('detects provider account credit exhaustion messages', () => {
     expect(isKieProviderCreditsInsufficient(
       'Credits insufficient : Your current balance isn’t enough to run this request. Please top up to continue.',
@@ -70,6 +91,12 @@ describe('KieSunoProvider error normalization', () => {
     expect(getKieUserFacingErrorMessage(
       'Credits insufficient : Your current balance isn’t enough to run this request.',
     )).toBe('生成服务额度不足，当前不是你的 HookCraft 余额问题，请联系管理员处理后重试');
+  });
+
+  it('maps non-JSON provider responses to a service-side message', () => {
+    expect(getKieUserFacingErrorMessage(
+      'Kie API returned non-JSON response (502, text/html): <html>gateway error</html>',
+    )).toBe('生成服务响应异常，请稍后重试');
   });
 
   it('does not invent an error message when Kie has no error', () => {

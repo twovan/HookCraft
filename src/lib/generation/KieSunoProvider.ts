@@ -32,8 +32,13 @@ export function isKieProviderCreditsInsufficient(message?: string | null): boole
 }
 
 export function getKieUserFacingErrorMessage(message?: string | null): string | null {
+  const normalized = (message || '').toLowerCase();
+
   if (isKieProviderCreditsInsufficient(message)) {
     return '生成服务额度不足，当前不是你的 HookCraft 余额问题，请联系管理员处理后重试';
+  }
+  if (normalized.includes('non-json response') || normalized.includes('响应格式无效')) {
+    return '生成服务响应异常，请稍后重试';
   }
   return message || null;
 }
@@ -284,10 +289,14 @@ export class KieSunoProvider {
   }
 
   private async parseJson<T>(response: Response): Promise<T> {
+    const contentType = response.headers.get('content-type') || 'unknown';
+    const text = await response.text();
+
     try {
-      return await response.json();
+      return JSON.parse(text) as T;
     } catch {
-      throw new Error(`Kie API 响应格式无效 (${response.status})`);
+      const preview = text.replace(/\s+/g, ' ').trim().slice(0, 180) || 'empty response';
+      throw new Error(`Kie API returned non-JSON response (${response.status}, ${contentType}): ${preview}`);
     }
   }
 }

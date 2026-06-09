@@ -236,7 +236,7 @@ export default function AdvancedArrangementTab({
         const params = new URLSearchParams({ taskId: id });
         if (localId) params.set('localTaskId', localId);
         const res = await fetchAdvancedArrangementStatus(params);
-        const data = await res.json();
+        const data = await res.json().catch(() => ({ error: '服务响应异常，请稍后重试' }));
 
         if (!res.ok) {
           throw new Error(data.error || '查询任务状态失败');
@@ -317,7 +317,7 @@ export default function AdvancedArrangementTab({
       }
 
       const res = await createAdvancedArrangementTask(formData, isTemplateInstrumentalVariant);
-      const data = await res.json();
+      const data = await res.json().catch(() => ({ error: '服务响应异常，请稍后重试' }));
 
       if (!res.ok) {
         throw new Error(data.error || '高级编曲任务创建失败');
