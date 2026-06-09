@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
 import SyncedLyrics from '@/components/studio/SyncedLyrics';
+import { resolveDownloadErrorMessage } from '@/lib/download/downloadErrorMessage';
 
 interface BatchSummary {
   batchId: string;
@@ -81,6 +82,7 @@ export default function HistoryList({
   const [editName, setEditName] = useState('');
   const [batchNames, setBatchNames] = useState<Record<string, string>>({});
   const [audioTimes, setAudioTimes] = useState<Record<string, number>>({});
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   const audioRefs = useRef<Record<string, HTMLAudioElement>>({});
 
   const expandedBatch = batches.find((batch) => (batch.taskId || batch.batchId) === expandedTaskId);
@@ -111,23 +113,31 @@ export default function HistoryList({
 
   const handleDownload = async (taskId: string) => {
     setDownloadingTaskId(taskId);
+    setDownloadError(null);
     try {
       const res = await fetch('/api/download', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ taskId }),
       });
-      if (res.ok) {
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `creation-${taskId}.mp3`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null);
+        setDownloadError(resolveDownloadErrorMessage(payload, res.status));
+        return;
       }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `creation-${taskId}.mp3`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      setDownloadError('网络异常，下载请求没有发出或已中断，请稍后重试。');
     } finally {
       setDownloadingTaskId(null);
     }
@@ -342,6 +352,12 @@ export default function HistoryList({
 
           {expandedBatchDetail?.prompt && !expandedBatchDetail.templateName && (
             <div style={promptBoxStyle}>{expandedBatchDetail.prompt}</div>
+          )}
+
+          {downloadError && (
+            <div style={downloadErrorStyle} role="alert">
+              {downloadError}
+            </div>
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -770,6 +786,18 @@ const downloadButtonStyle: CSSProperties = {
   fontSize: 12,
   fontWeight: 900,
   cursor: 'pointer',
+};
+
+const downloadErrorStyle: CSSProperties = {
+  border: '1px solid rgba(255, 90, 61, 0.34)',
+  borderRadius: 12,
+  background: 'rgba(255, 90, 61, 0.1)',
+  color: '#ffb09f',
+  fontSize: 12,
+  fontWeight: 800,
+  lineHeight: 1.5,
+  padding: '10px 12px',
+  marginBottom: 14,
 };
 
 const selectedBadgeStyle: CSSProperties = {
