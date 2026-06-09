@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import HistoryList from '@/components/history/HistoryList';
+import { buildCreationsFetchKey } from '@/lib/history/creationsRefresh';
 
 interface BatchSummary {
   batchId: string;
@@ -64,6 +65,8 @@ async function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit, ti
 export default function CreationsPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+  const userId = user?.id;
+  const lastFetchKeyRef = useRef<string | null>(null);
   const [authTimedOut, setAuthTimedOut] = useState(false);
   const [expandParam] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -93,22 +96,27 @@ export default function CreationsPage() {
 
   useEffect(() => {
     if (authLoading && !authTimedOut) return;
-    if (!user) {
+    if (!userId) {
       router.replace('/login?redirectTo=/account/creations');
       return;
     }
     fetchBatches();
-  }, [authLoading, authTimedOut, user, range, page, router]);
+  }, [authLoading, authTimedOut, userId, range, page, router]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!userId) return;
     if (batches.length > 0 && expandParam && !expandedBatchId) {
       const matched = batches.find((batch) => batch.batchId === expandParam || batch.taskId === expandParam);
       handleExpand(matched?.taskId || expandParam, matched?.batchId || expandParam);
     }
-  }, [expandParam, batches, expandedBatchId, user]);
+  }, [expandParam, batches, expandedBatchId, userId]);
 
-  const fetchBatches = async () => {
+  const fetchBatches = async (options?: { force?: boolean }) => {
+    const fetchKey = buildCreationsFetchKey(userId, range, page);
+    if (!fetchKey) return;
+    if (!options?.force && lastFetchKeyRef.current === fetchKey) return;
+    lastFetchKeyRef.current = fetchKey;
+
     setLoading(true);
     setFetchError(null);
     try {
@@ -254,7 +262,7 @@ export default function CreationsPage() {
           <section className="error-panel" aria-live="polite">
             <strong>同步失败</strong>
             <p>{fetchError}</p>
-            <button type="button" className="hc-button hc-button-secondary" onClick={fetchBatches}>
+            <button type="button" className="hc-button hc-button-secondary" onClick={() => fetchBatches({ force: true })}>
               重新同步
             </button>
           </section>
