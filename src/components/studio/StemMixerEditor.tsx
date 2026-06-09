@@ -61,6 +61,7 @@ import {
   type StemExportStatusInput,
   type StemExportStatusTone,
 } from '@/lib/stems/stemExportStatus';
+import { encodeRenderedAudioInWorker } from '@/lib/stems/stemAudioEncodingWorkerClient';
 import { resolveStemExportSaveIntent } from '@/lib/stems/stemExportSaveIntent';
 import { clampStemTimecodeInput, formatStemTimecode, parseStemTimecode } from '@/lib/stems/stemTimecode';
 import { nudgeStemTrimEdge, resolveStemTrimControlValues, shiftStemTrimRange } from '@/lib/stems/stemTrackControls';
@@ -1452,82 +1453,8 @@ function safelySetPointerCapture(target: Element, pointerId: number) {
   }
 }
 
-function encodeWav(audioBuffer: AudioBuffer) {
-  const channelCount = audioBuffer.numberOfChannels;
-  const sampleRate = audioBuffer.sampleRate;
-  const bytesPerSample = 2;
-  const blockAlign = channelCount * bytesPerSample;
-  const dataLength = audioBuffer.length * blockAlign;
-  const buffer = new ArrayBuffer(44 + dataLength);
-  const view = new DataView(buffer);
-
-  const writeString = (offset: number, value: string) => {
-    for (let index = 0; index < value.length; index += 1) {
-      view.setUint8(offset + index, value.charCodeAt(index));
-    }
-  };
-
-  writeString(0, 'RIFF');
-  view.setUint32(4, 36 + dataLength, true);
-  writeString(8, 'WAVE');
-  writeString(12, 'fmt ');
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, channelCount, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * blockAlign, true);
-  view.setUint16(32, blockAlign, true);
-  view.setUint16(34, bytesPerSample * 8, true);
-  writeString(36, 'data');
-  view.setUint32(40, dataLength, true);
-
-  let offset = 44;
-  for (let sampleIndex = 0; sampleIndex < audioBuffer.length; sampleIndex += 1) {
-    for (let channelIndex = 0; channelIndex < channelCount; channelIndex += 1) {
-      const sample = Math.max(-1, Math.min(1, audioBuffer.getChannelData(channelIndex)[sampleIndex] || 0));
-      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
-      offset += bytesPerSample;
-    }
-  }
-
-  return new Blob([buffer], { type: 'audio/wav' });
-}
-
-function floatTo16BitPcm(samples: Float32Array) {
-  const pcm = new Int16Array(samples.length);
-  for (let index = 0; index < samples.length; index += 1) {
-    const sample = Math.max(-1, Math.min(1, samples[index] || 0));
-    pcm[index] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
-  }
-  return pcm;
-}
-
-async function encodeMp3(audioBuffer: AudioBuffer, kbps = 320) {
-  const lamejs = await import('lamejs');
-  const channelCount = Math.min(2, audioBuffer.numberOfChannels || 1);
-  const encoder = new lamejs.default.Mp3Encoder(channelCount, audioBuffer.sampleRate, kbps);
-  const left = floatTo16BitPcm(audioBuffer.getChannelData(0));
-  const right = channelCount > 1
-    ? floatTo16BitPcm(audioBuffer.getChannelData(1))
-    : undefined;
-  const chunks: Int8Array[] = [];
-  const blockSize = 1152;
-
-  for (let offset = 0; offset < left.length; offset += blockSize) {
-    const encoded = channelCount > 1 && right
-      ? encoder.encodeBuffer(left.subarray(offset, offset + blockSize), right.subarray(offset, offset + blockSize))
-      : encoder.encodeBuffer(left.subarray(offset, offset + blockSize));
-    if (encoded.length > 0) chunks.push(encoded);
-  }
-
-  const tail = encoder.flush();
-  if (tail.length > 0) chunks.push(tail);
-
-  return new Blob(chunks.map((chunk) => chunk.slice().buffer as ArrayBuffer), { type: 'audio/mpeg' });
-}
-
 async function encodeRenderedAudio(audioBuffer: AudioBuffer, fileType: 'MP3' | 'WAV') {
-  return fileType === 'MP3' ? encodeMp3(audioBuffer) : encodeWav(audioBuffer);
+  return encodeRenderedAudioInWorker(audioBuffer, fileType);
 }
 
 function getInitialWaveformDuration(stems: EditableStem[]) {
@@ -5862,7 +5789,11 @@ export default function StemMixerEditor({
         message: `正在渲染 ${exportableStems.length} 条轨道。`,
       });
       const rendered = await offlineContext.startRendering();
-      setExportStatusInput({ phase: 'encoding', fileType: outputFileType });
+      setExportStatusInput({
+        phase: 'encoding',
+        fileType: outputFileType,
+        message: `正在后台编码 ${outputFileType} 文件。`,
+      });
       const blob = await encodeRenderedAudio(rendered, outputFileType);
       const extension = outputFileType.toLowerCase();
       const fileName = `hookcraft-${exportModeFileLabel(allowedExportMode)}-${formatExportTimestamp(new Date())}.${extension}`;
@@ -5960,7 +5891,11 @@ export default function StemMixerEditor({
       });
 
       const rendered = await offlineContext.startRendering();
-      setExportStatusInput({ phase: 'encoding', fileType: outputFileType });
+      setExportStatusInput({
+        phase: 'encoding',
+        fileType: outputFileType,
+        message: `正在后台编码单轨 ${outputFileType} 文件。`,
+      });
       const blob = await encodeRenderedAudio(rendered, outputFileType);
       const extension = outputFileType.toLowerCase();
       const fileName = `hookcraft-${normalizeStemType(stem.type)}-${formatExportTimestamp(new Date())}.${extension}`;
@@ -6078,7 +6013,7 @@ export default function StemMixerEditor({
         setExportStatusInput({
           phase: 'encoding',
           fileType: outputFileType,
-          message: `正在编码 ${index + 1}/${readyStems.length}：“${getStemDisplayName(stem).zh}”。`,
+          message: `正在后台编码 ${index + 1}/${readyStems.length}：“${getStemDisplayName(stem).zh}”。`,
         });
         downloadBlob(
           await encodeRenderedAudio(rendered, outputFileType),
