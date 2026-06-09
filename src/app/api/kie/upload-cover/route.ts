@@ -4,15 +4,16 @@ import { supabaseAdmin } from '../../../../lib/supabase/server';
 import { getKieUserFacingErrorMessage, isKieProviderCreditsInsufficient, KieSunoProvider } from '../../../../lib/generation/KieSunoProvider';
 import { CreditService } from '../../../../lib/credits/CreditService';
 import { getConsumeCreditsErrorMessage } from '../../../../lib/credits/consumeError';
+import {
+  AdvancedArrangementAudioUploadError,
+  resolveAdvancedArrangementAudioUpload,
+} from '../../../../lib/kie/resolveAdvancedArrangementAudio';
 import type { KieSunoModel } from '../../../../types/kie';
 import type { CreditOperationType } from '../../../../types/credits';
 
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
-const ALLOWED_TYPES = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/wave'];
-const ALLOWED_EXTENSIONS = ['mp3', 'wav'];
-const MAX_FILE_SIZE = 100 * 1024 * 1024;
 const DEFAULT_MODEL: KieSunoModel = 'V5_5';
 const MODELS: KieSunoModel[] = ['V5_5', 'V5', 'V4_5PLUS', 'V4_5', 'V4'];
 
@@ -60,7 +61,6 @@ export async function POST(req: NextRequest) {
     }
 
     const formData = await req.formData();
-    const file = formData.get('file') as File | null;
     const prompt = String(formData.get('prompt') || '').trim();
     const style = String(formData.get('style') || '').trim();
     const title = String(formData.get('title') || '').trim();
@@ -70,21 +70,6 @@ export async function POST(req: NextRequest) {
     const instrumental = parseBoolean(formData.get('instrumental'), false);
     const modelRaw = String(formData.get('model') || DEFAULT_MODEL);
     const model = (MODELS.includes(modelRaw as KieSunoModel) ? modelRaw : DEFAULT_MODEL) as KieSunoModel;
-
-    if (!file) {
-      return NextResponse.json({ error: '请先上传参考音频' }, { status: 400 });
-    }
-
-    const extension = file.name.split('.').pop()?.toLowerCase() || '';
-    const hasAllowedMime = !file.type || file.type === 'application/octet-stream' || ALLOWED_TYPES.includes(file.type);
-    const hasAllowedExtension = ALLOWED_EXTENSIONS.includes(extension);
-    if (!hasAllowedMime || !hasAllowedExtension) {
-      return NextResponse.json({ error: '仅支持 MP3/WAV 音频文件' }, { status: 400 });
-    }
-
-    if (file.size > MAX_FILE_SIZE) {
-      return NextResponse.json({ error: '音频文件不能超过 100MB' }, { status: 400 });
-    }
 
     if (customMode) {
       if (!style) return NextResponse.json({ error: '自定义模式下请填写风格' }, { status: 400 });
@@ -115,7 +100,20 @@ export async function POST(req: NextRequest) {
     }
 
     const provider = new KieSunoProvider();
-    const uploadUrl = await provider.uploadAudioFile(file, user.id);
+    let uploadUrl: string;
+    try {
+      uploadUrl = await resolveAdvancedArrangementAudioUpload({
+        formData,
+        userId: user.id,
+        provider,
+        supabaseAdmin,
+      });
+    } catch (error: any) {
+      if (error instanceof AdvancedArrangementAudioUploadError) {
+        return NextResponse.json({ error: error.message }, { status: error.statusCode });
+      }
+      throw error;
+    }
     const batchId = createId('kie-batch');
     const localTaskId = createId('kie-task');
     const promptSummary = buildPromptSummary({ customMode, instrumental, title, style, prompt });

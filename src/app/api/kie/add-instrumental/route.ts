@@ -4,15 +4,16 @@ import { supabaseAdmin } from '../../../../lib/supabase/server';
 import { getKieUserFacingErrorMessage, isKieProviderCreditsInsufficient, KieSunoProvider } from '../../../../lib/generation/KieSunoProvider';
 import { CreditService } from '../../../../lib/credits/CreditService';
 import { getConsumeCreditsErrorMessage } from '../../../../lib/credits/consumeError';
+import {
+  AdvancedArrangementAudioUploadError,
+  resolveAdvancedArrangementAudioUpload,
+} from '../../../../lib/kie/resolveAdvancedArrangementAudio';
 import type { KieSunoModel } from '../../../../types/kie';
 import type { CreditOperationType } from '../../../../types/credits';
 
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
-const ALLOWED_TYPES = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/wave'];
-const ALLOWED_EXTENSIONS = ['mp3', 'wav'];
-const MAX_FILE_SIZE = 100 * 1024 * 1024;
 const DEFAULT_MODEL: KieSunoModel = 'V5_5';
 const MODELS: KieSunoModel[] = ['V5_5', 'V5', 'V4_5PLUS', 'V4_5', 'V4'];
 const DEFAULT_NEGATIVE_TAGS = 'low quality, distorted, clipping, harsh noise, off-key, messy arrangement';
@@ -52,28 +53,12 @@ export async function POST(req: NextRequest) {
     }
 
     const formData = await req.formData();
-    const file = formData.get('file') as File | null;
     const title = String(formData.get('title') || '').trim();
     const tags = String(formData.get('tags') || '').trim();
     const negativeTags = String(formData.get('negativeTags') || '').trim() || DEFAULT_NEGATIVE_TAGS;
     const templateId = String(formData.get('templateId') || '').trim() || null;
     const modelRaw = String(formData.get('model') || DEFAULT_MODEL);
     const model = (MODELS.includes(modelRaw as KieSunoModel) ? modelRaw : DEFAULT_MODEL) as KieSunoModel;
-
-    if (!file) {
-      return NextResponse.json({ error: '请先上传参考音频' }, { status: 400 });
-    }
-
-    const extension = file.name.split('.').pop()?.toLowerCase() || '';
-    const hasAllowedMime = !file.type || file.type === 'application/octet-stream' || ALLOWED_TYPES.includes(file.type);
-    const hasAllowedExtension = ALLOWED_EXTENSIONS.includes(extension);
-    if (!hasAllowedMime || !hasAllowedExtension) {
-      return NextResponse.json({ error: '仅支持 MP3/WAV 音频文件' }, { status: 400 });
-    }
-
-    if (file.size > MAX_FILE_SIZE) {
-      return NextResponse.json({ error: '音频文件不能超过 100MB' }, { status: 400 });
-    }
 
     if (!title) {
       return NextResponse.json({ error: '请填写歌曲名称' }, { status: 400 });
@@ -100,7 +85,20 @@ export async function POST(req: NextRequest) {
     }
 
     const provider = new KieSunoProvider();
-    const uploadUrl = await provider.uploadAudioFile(file, user.id);
+    let uploadUrl: string;
+    try {
+      uploadUrl = await resolveAdvancedArrangementAudioUpload({
+        formData,
+        userId: user.id,
+        provider,
+        supabaseAdmin,
+      });
+    } catch (error: any) {
+      if (error instanceof AdvancedArrangementAudioUploadError) {
+        return NextResponse.json({ error: error.message }, { status: error.statusCode });
+      }
+      throw error;
+    }
     const batchId = createId('kie-batch');
     const localTaskId = createId('kie-task');
     const promptSummary = buildPromptSummary({ title, tags, negativeTags });

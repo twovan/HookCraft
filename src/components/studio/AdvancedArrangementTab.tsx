@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import AudioUploader from './AudioUploader';
 import WaveformVisualizer from './WaveformVisualizer';
 import type { Template } from '@/types/template';
-import { createAdvancedArrangementTask, fetchAdvancedArrangementStatus } from '@/lib/studio/advancedArrangementClient';
+import { createAdvancedArrangementTask, fetchAdvancedArrangementStatus, uploadAdvancedArrangementAudio } from '@/lib/studio/advancedArrangementClient';
 import { getTemplateAdvancedAnalysis, getTemplateAdvancedPrompt } from '@/lib/template/advancedTemplateFields';
 
 type UploadStatus = 'idle' | 'validating' | 'ready' | 'error';
@@ -290,8 +290,13 @@ export default function AdvancedArrangementTab({
     setCopiedLyrics(false);
 
     try {
+      const uploadedAudio = await uploadAdvancedArrangementAudio(audioFile!);
       const formData = new FormData();
-      formData.append('file', audioFile!);
+      formData.append('uploadedBucket', uploadedAudio.bucket);
+      formData.append('uploadedPath', uploadedAudio.path);
+      formData.append('fileName', uploadedAudio.fileName);
+      formData.append('fileSize', String(uploadedAudio.size));
+      formData.append('contentType', uploadedAudio.contentType);
       formData.append('model', FIXED_MODEL);
       formData.append('title', (title.trim() || templateTitle).trim());
       formData.append('negativeTags', negativeTags.trim());
