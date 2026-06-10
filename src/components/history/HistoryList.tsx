@@ -724,8 +724,8 @@ const detailPanelStyle: CSSProperties = {
   borderRadius: 'var(--hc-radius-lg)',
   padding: 18,
   position: 'sticky',
-  top: 24,
-  maxHeight: '82vh',
+  top: 96,
+  maxHeight: 'calc(100vh - 120px)',
   overflowY: 'auto',
   boxShadow: 'var(--hc-shadow)',
 };
