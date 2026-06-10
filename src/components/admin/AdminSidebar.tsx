@@ -50,7 +50,6 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'AI 管理',
     items: [
       { label: 'AI 任务', icon: 'AI', href: '/admin/ai-tasks' },
-      { label: 'Style DNA', icon: 'SD', href: '/admin/style-dna' },
       { label: '生成歌曲', icon: 'SG', href: '/admin/generated-songs' },
       { label: 'Credits', icon: 'CR', href: '/admin/credits' },
       { label: 'AI 操作定价', icon: '¥', href: '/admin/credits/cost-rules' },
