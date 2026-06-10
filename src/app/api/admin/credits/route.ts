@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '../../../../lib/supabase/server';
 import { requireAdmin } from '../../../../lib/admin/auth';
+import { AdminConfigService } from '../../../../lib/admin/AdminConfigService';
+import { buildMonthlyQuotaMap } from '../../../../lib/admin/creditsOverview';
 
 /**
  * GET /api/admin/credits
@@ -11,10 +13,16 @@ export async function GET(req: NextRequest) {
     const { admin, response } = await requireAdmin(req);
     if (response) return response;
 
+    const configService = new AdminConfigService(supabaseAdmin);
+    const config = await configService.getCurrentConfig();
+    const monthlyQuotaMap = buildMonthlyQuotaMap(config.creditQuotas);
+
     // Get all credits records
-    const { data: credits } = await supabaseAdmin
+    const { data: credits, error: creditsError } = await supabaseAdmin
       .from('credits')
       .select('*');
+
+    if (creditsError) throw creditsError;
 
     const allCredits = credits || [];
 
@@ -47,7 +55,7 @@ export async function GET(req: NextRequest) {
     const tierBreakdown = Object.entries(tierGroups).map(([tier, data]) => ({
       tier,
       users: data.users,
-      monthlyQuota: tier === 'free' ? 3 : tier === 'pro' ? 50 : 200,
+      monthlyQuota: monthlyQuotaMap[tier as keyof typeof monthlyQuotaMap] ?? 0,
       totalIssued: data.totalIssued,
       totalConsumed: data.totalConsumed,
       avgUsage: data.users > 0 ? Math.round(data.totalConsumed / data.users) : 0,
