@@ -1,13 +1,9 @@
 'use client';
 
 import { useState, FormEvent } from 'react';
+import type React from 'react';
 import { useRouter } from 'next/navigation';
 
-/**
- * 管理后台登录页面
- * 设计参考: admin-prototype.html 中的 login-screen
- * 深色渐变背景 + 白色居中卡片 + HookCraft 品牌
- */
 export default function AdminLoginPage() {
   const router = useRouter();
   const [username, setUsername] = useState('');
@@ -45,31 +41,55 @@ export default function AdminLoginPage() {
   };
 
   return (
-    <div style={screenStyle}>
-      {/* 背景 */}
-      <div style={bgStyle} />
-      <div style={bgOverlayStyle} />
-
-      {/* 登录卡片 */}
-      <div style={cardStyle}>
-        {/* Logo */}
-        <div style={logoRowStyle}>
+    <main style={screenStyle}>
+      <section style={brandPanelStyle}>
+        <div style={brandHeaderStyle}>
           <div style={logoIconStyle}>H</div>
           <div>
             <div style={logoTextStyle}>HookCraft</div>
-            <div style={logoSubStyle}>管理后台</div>
+            <div style={logoSubStyle}>AI 音乐版权管理后台</div>
           </div>
         </div>
 
-        <div style={titleStyle}>欢迎回来</div>
-        <div style={subtitleStyle}>请登录管理员账号以继续</div>
+        <div style={heroCopyStyle}>
+          <div style={eyebrowStyle}>AI Risk & Workflow Control Room</div>
+          <h1 style={heroTitleStyle}>进入后台运行态控制室</h1>
+          <p style={heroTextStyle}>
+            管理 AI 生成任务、内容审核、敏感词风险、Credits 消耗与版权模板运营。
+          </p>
+        </div>
 
-        {/* 表单 */}
-        <form onSubmit={handleSubmit}>
-          <div style={fieldStyle}>
-            <label style={labelStyle}>管理员账号</label>
-            <div style={inputWrapStyle}>
-              <span style={inputIconStyle}>👤</span>
+        <div style={signalGridStyle}>
+          <div style={signalCardStyle}>
+            <span style={signalCodeStyle}>AUTH</span>
+            <strong>独立管理员认证</strong>
+            <small>admin_accounts + HttpOnly session</small>
+          </div>
+          <div style={signalCardStyle}>
+            <span style={signalCodeStyle}>RISK</span>
+            <strong>审核与风控入口</strong>
+            <small>登录后查看实时聚合数据</small>
+          </div>
+          <div style={signalCardStyle}>
+            <span style={signalCodeStyle}>OPS</span>
+            <strong>运营任务中枢</strong>
+            <small>模板、订单、生成任务统一管理</small>
+          </div>
+        </div>
+      </section>
+
+      <section style={loginPanelStyle} aria-label="管理员登录">
+        <div style={panelTopStyle}>
+          <span style={panelKickerStyle}>Secure Admin Access</span>
+          <h2 style={panelTitleStyle}>欢迎回来</h2>
+          <p style={panelTextStyle}>使用管理员账号登录，继续处理后台运营任务。</p>
+        </div>
+
+        <form onSubmit={handleSubmit} style={formStyle}>
+          <label style={fieldStyle}>
+            <span style={labelStyle}>管理员账号</span>
+            <span style={inputWrapStyle}>
+              <span style={inputBadgeStyle}>ID</span>
               <input
                 type="text"
                 value={username}
@@ -80,13 +100,13 @@ export default function AdminLoginPage() {
                 required
                 disabled={loading}
               />
-            </div>
-          </div>
+            </span>
+          </label>
 
-          <div style={fieldStyle}>
-            <label style={labelStyle}>密码</label>
-            <div style={inputWrapStyle}>
-              <span style={inputIconStyle}>🔒</span>
+          <label style={fieldStyle}>
+            <span style={labelStyle}>密码</span>
+            <span style={inputWrapStyle}>
+              <span style={inputBadgeStyle}>PW</span>
               <input
                 type="password"
                 value={password}
@@ -97,8 +117,8 @@ export default function AdminLoginPage() {
                 required
                 disabled={loading}
               />
-            </div>
-          </div>
+            </span>
+          </label>
 
           <div style={optionsRowStyle}>
             <label style={rememberLabelStyle}>
@@ -106,210 +126,319 @@ export default function AdminLoginPage() {
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                style={{ marginRight: 6, accentColor: '#D4A574' }}
+                style={checkboxStyle}
                 disabled={loading}
               />
               记住登录状态
             </label>
-            <a href="#" style={forgotLinkStyle} onClick={(e) => { e.preventDefault(); alert('请联系超级管理员重置密码'); }}>
+            <button
+              type="button"
+              style={forgotButtonStyle}
+              onClick={() => alert('请联系超级管理员重置密码')}
+              disabled={loading}
+            >
               忘记密码？
-            </a>
+            </button>
           </div>
+
+          {error && <div style={errorStyle}>{error}</div>}
 
           <button
             type="submit"
             disabled={loading}
             style={{
-              ...btnStyle,
-              ...(loading ? { opacity: 0.7, cursor: 'not-allowed' } : {}),
+              ...submitButtonStyle,
+              ...(loading ? submitButtonDisabledStyle : {}),
             }}
           >
-            {loading ? '⏳ 登录中...' : '登 录'}
+            {loading ? '登录中...' : '进入管理后台'}
           </button>
-
-          {error && <div style={errorStyle}>{error}</div>}
         </form>
 
-        {/* 页脚 */}
         <div style={footerStyle}>
-          <div style={footerTextStyle}>HookCraft 管理系统 v1.0</div>
-          <div style={footerTextStyle}>© 2026 HookCraft. All rights reserved.</div>
+          <span>HookCraft 管理系统 v1.0</span>
+          <span>© 2026 HookCraft. All rights reserved.</span>
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }
 
-/* ===== 样式（匹配原型图 admin-prototype.html） ===== */
-
 const screenStyle: React.CSSProperties = {
-  position: 'fixed',
-  inset: 0,
+  minHeight: '100vh',
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1.1fr) minmax(420px, 520px)',
+  background: '#07111d',
+  color: '#fff',
+  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+};
+
+const brandPanelStyle: React.CSSProperties = {
+  position: 'relative',
+  minHeight: '100vh',
+  padding: '44px 56px',
   display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  zIndex: 300,
+  flexDirection: 'column',
+  justifyContent: 'space-between',
+  background: 'linear-gradient(135deg, #0b1420 0%, #102033 54%, #0b3145 100%)',
+  overflow: 'hidden',
 };
 
-const bgStyle: React.CSSProperties = {
-  position: 'absolute',
-  inset: 0,
-  background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
-};
-
-const bgOverlayStyle: React.CSSProperties = {
-  position: 'absolute',
-  inset: 0,
-  background:
-    'radial-gradient(circle at 30% 40%, rgba(212,165,116,0.15) 0%, transparent 50%), radial-gradient(circle at 70% 60%, rgba(212,165,116,0.1) 0%, transparent 50%)',
-};
-
-const cardStyle: React.CSSProperties = {
+const brandHeaderStyle: React.CSSProperties = {
   position: 'relative',
   zIndex: 1,
-  background: '#fff',
-  borderRadius: 20,
-  width: 420,
-  padding: 40,
-  boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-  animation: 'loginSlideUp 0.5s ease',
-};
-
-const logoRowStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: 12,
-  marginBottom: 32,
 };
 
 const logoIconStyle: React.CSSProperties = {
-  width: 44,
-  height: 44,
-  background: 'linear-gradient(135deg, #D4A574, #c4956a)',
-  borderRadius: 12,
+  width: 40,
+  height: 40,
+  background: 'linear-gradient(135deg, #d7a56d, #b8793b)',
+  borderRadius: 8,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  fontSize: 20,
-  fontWeight: 700,
+  fontSize: 18,
+  fontWeight: 900,
   color: '#fff',
 };
 
 const logoTextStyle: React.CSSProperties = {
   fontSize: 20,
-  fontWeight: 700,
-  color: '#1a1a2e',
+  fontWeight: 900,
+  letterSpacing: 0,
 };
 
 const logoSubStyle: React.CSSProperties = {
   fontSize: 12,
-  color: '#999',
-  marginTop: 1,
+  color: 'rgba(255,255,255,0.58)',
+  marginTop: 3,
 };
 
-const titleStyle: React.CSSProperties = {
-  fontSize: 22,
-  fontWeight: 700,
-  color: '#1a1a2e',
-  marginBottom: 6,
+const heroCopyStyle: React.CSSProperties = {
+  position: 'relative',
+  zIndex: 1,
+  maxWidth: 620,
 };
 
-const subtitleStyle: React.CSSProperties = {
+const eyebrowStyle: React.CSSProperties = {
+  color: '#f3c17f',
+  fontSize: 12,
+  fontWeight: 900,
+  letterSpacing: 0.5,
+  marginBottom: 14,
+};
+
+const heroTitleStyle: React.CSSProperties = {
+  margin: 0,
+  fontSize: 44,
+  lineHeight: 1.08,
+  fontWeight: 900,
+  letterSpacing: 0,
+};
+
+const heroTextStyle: React.CSSProperties = {
+  margin: '18px 0 0',
+  maxWidth: 520,
+  color: 'rgba(255,255,255,0.68)',
+  fontSize: 15,
+  lineHeight: 1.8,
+};
+
+const signalGridStyle: React.CSSProperties = {
+  position: 'relative',
+  zIndex: 1,
+  display: 'grid',
+  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+  gap: 12,
+};
+
+const signalCardStyle: React.CSSProperties = {
+  minHeight: 112,
+  borderRadius: 8,
+  border: '1px solid rgba(255,255,255,0.1)',
+  background: 'rgba(255,255,255,0.06)',
+  padding: 16,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 8,
+};
+
+const signalCodeStyle: React.CSSProperties = {
+  width: 44,
+  height: 24,
+  borderRadius: 6,
+  background: 'rgba(243,193,127,0.12)',
+  color: '#f3c17f',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontSize: 10,
+  fontWeight: 900,
+};
+
+const loginPanelStyle: React.CSSProperties = {
+  minHeight: '100vh',
+  background: '#f8fafc',
+  color: '#0f172a',
+  padding: '56px 48px',
+  display: 'flex',
+  flexDirection: 'column',
+  justifyContent: 'center',
+  borderLeft: '1px solid rgba(255,255,255,0.08)',
+};
+
+const panelTopStyle: React.CSSProperties = {
+  marginBottom: 30,
+};
+
+const panelKickerStyle: React.CSSProperties = {
+  display: 'inline-flex',
+  height: 26,
+  alignItems: 'center',
+  padding: '0 10px',
+  borderRadius: 6,
+  background: '#fff7ed',
+  color: '#d97706',
+  fontSize: 11,
+  fontWeight: 900,
+};
+
+const panelTitleStyle: React.CSSProperties = {
+  margin: '16px 0 8px',
+  fontSize: 28,
+  lineHeight: 1.2,
+  fontWeight: 900,
+  letterSpacing: 0,
+};
+
+const panelTextStyle: React.CSSProperties = {
+  margin: 0,
+  color: '#64748b',
   fontSize: 14,
-  color: '#999',
-  marginBottom: 28,
+  lineHeight: 1.7,
+};
+
+const formStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 18,
 };
 
 const fieldStyle: React.CSSProperties = {
-  marginBottom: 20,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 8,
 };
 
 const labelStyle: React.CSSProperties = {
-  display: 'block',
+  color: '#334155',
   fontSize: 13,
-  fontWeight: 600,
-  color: '#555',
-  marginBottom: 6,
+  fontWeight: 800,
 };
 
 const inputWrapStyle: React.CSSProperties = {
+  height: 48,
   display: 'flex',
   alignItems: 'center',
   gap: 10,
-  border: '1.5px solid #e0e0e0',
-  borderRadius: 10,
-  padding: '0 14px',
-  transition: 'border-color 0.2s',
+  border: '1px solid #dbe3ef',
+  borderRadius: 8,
+  background: '#fff',
+  padding: '0 12px',
 };
 
-const inputIconStyle: React.CSSProperties = {
-  fontSize: 16,
-  color: '#bbb',
+const inputBadgeStyle: React.CSSProperties = {
+  width: 28,
+  height: 24,
+  borderRadius: 6,
+  background: '#f1f5f9',
+  color: '#64748b',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontSize: 10,
+  fontWeight: 900,
+  flexShrink: 0,
 };
 
 const inputStyle: React.CSSProperties = {
   flex: 1,
+  minWidth: 0,
   border: 'none',
   outline: 'none',
-  padding: '12px 0',
+  background: 'transparent',
+  color: '#0f172a',
   fontSize: 14,
   fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-  color: '#333',
-  background: 'transparent',
 };
 
 const optionsRowStyle: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
-  marginBottom: 24,
+  gap: 12,
 };
 
 const rememberLabelStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
+  color: '#475569',
   fontSize: 13,
-  color: '#666',
+  fontWeight: 700,
   cursor: 'pointer',
 };
 
-const forgotLinkStyle: React.CSSProperties = {
-  fontSize: 13,
-  color: '#D4A574',
-  textDecoration: 'none',
+const checkboxStyle: React.CSSProperties = {
+  marginRight: 8,
+  accentColor: '#d7a56d',
 };
 
-const btnStyle: React.CSSProperties = {
-  width: '100%',
-  padding: 14,
+const forgotButtonStyle: React.CSSProperties = {
   border: 'none',
-  borderRadius: 10,
-  background: 'linear-gradient(135deg, #D4A574, #c4956a)',
+  background: 'transparent',
+  color: '#b8793b',
+  fontSize: 13,
+  fontWeight: 800,
+  cursor: 'pointer',
+  padding: 0,
+};
+
+const submitButtonStyle: React.CSSProperties = {
+  height: 48,
+  border: 'none',
+  borderRadius: 8,
+  background: 'linear-gradient(135deg, #d7a56d, #b8793b)',
   color: '#fff',
   fontSize: 15,
-  fontWeight: 600,
+  fontWeight: 900,
   cursor: 'pointer',
   fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-  transition: 'all 0.2s',
+};
+
+const submitButtonDisabledStyle: React.CSSProperties = {
+  opacity: 0.72,
+  cursor: 'not-allowed',
 };
 
 const errorStyle: React.CSSProperties = {
-  marginTop: 16,
-  padding: '10px 14px',
+  padding: '10px 12px',
   borderRadius: 8,
-  background: '#fde8e8',
-  color: '#e74c3c',
+  border: '1px solid #fecaca',
+  background: '#fef2f2',
+  color: '#dc2626',
   fontSize: 13,
-  textAlign: 'center',
+  fontWeight: 700,
 };
 
 const footerStyle: React.CSSProperties = {
-  marginTop: 32,
-  textAlign: 'center',
-};
-
-const footerTextStyle: React.CSSProperties = {
+  marginTop: 34,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 6,
+  color: '#94a3b8',
   fontSize: 11,
-  color: '#ccc',
-  lineHeight: 1.8,
+  lineHeight: 1.5,
 };
