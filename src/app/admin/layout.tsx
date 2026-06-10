@@ -1,9 +1,9 @@
 'use client';
 
 import { ReactNode, useEffect, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import AdminTopBar from '@/components/admin/AdminTopBar';
-import { usePathname, useRouter } from 'next/navigation';
 
 const pageTitles: Record<string, { title: string; breadcrumb: string }> = {
   '/admin': { title: '数据看板', breadcrumb: '首页 / 概览' },
@@ -19,6 +19,9 @@ const pageTitles: Record<string, { title: string; breadcrumb: string }> = {
   '/admin/style-dna': { title: 'Style DNA 分析', breadcrumb: '首页 / AI 管理 / Style DNA' },
   '/admin/generated-songs': { title: '生成歌曲管理', breadcrumb: '首页 / AI 管理 / 生成歌曲' },
   '/admin/credits': { title: 'Credits 管理', breadcrumb: '首页 / AI 管理 / Credits' },
+  '/admin/credits/cost-rules': { title: 'AI 操作定价', breadcrumb: '首页 / AI 管理 / AI 操作定价' },
+  '/admin/credits/pricing': { title: '会员定价', breadcrumb: '首页 / AI 管理 / 会员定价' },
+  '/admin/credits/credits-pack': { title: 'Credits 套餐', breadcrumb: '首页 / AI 管理 / Credits 套餐' },
   '/admin/sensitive-words': { title: '敏感词管理', breadcrumb: '首页 / 内容管理 / 敏感词管理' },
   '/admin/settings': { title: '系统设置', breadcrumb: '首页 / 系统 / 系统设置' },
   '/admin/editor-features': { title: '编辑器开关', breadcrumb: '首页 / 系统 / 编辑器开关' },
@@ -35,13 +38,11 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const isLoginPage = pathname === '/admin/login';
 
   useEffect(() => {
-    // 登录页不需要检查认证
     if (isLoginPage) {
       setChecking(false);
       return;
     }
 
-    // 检查管理员会话
     const checkSession = async () => {
       try {
         const res = await fetch('/api/admin/auth/session');
@@ -60,21 +61,18 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     checkSession();
   }, [isLoginPage, router]);
 
-  // 登录页：不显示侧边栏和顶栏
   if (isLoginPage) {
     return <>{children}</>;
   }
 
-  // 检查中：显示加载状态
   if (checking) {
     return (
       <div style={loadingStyle}>
-        <div style={spinnerStyle}>加载中...</div>
+        <div style={loadingBoxStyle}>正在加载管理后台...</div>
       </div>
     );
   }
 
-  // 未认证：不渲染内容（正在跳转到登录页）
   if (!authenticated) {
     return null;
   }
@@ -96,8 +94,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
 const mainStyle: React.CSSProperties = {
   flex: 1,
-  marginLeft: 240,
-  background: '#f0f2f5',
+  marginLeft: 248,
+  background: '#f4f7fb',
   minHeight: '100vh',
   display: 'flex',
   flexDirection: 'column',
@@ -105,7 +103,7 @@ const mainStyle: React.CSSProperties = {
 
 const contentStyle: React.CSSProperties = {
   flex: 1,
-  padding: '24px 32px',
+  padding: 16,
 };
 
 const loadingStyle: React.CSSProperties = {
@@ -113,10 +111,14 @@ const loadingStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  background: '#f0f2f5',
+  background: '#0f172a',
 };
 
-const spinnerStyle: React.CSSProperties = {
-  fontSize: 16,
-  color: '#6b7280',
+const loadingBoxStyle: React.CSSProperties = {
+  padding: '14px 18px',
+  borderRadius: 8,
+  color: '#f8fafc',
+  background: 'rgba(255,255,255,0.08)',
+  border: '1px solid rgba(255,255,255,0.12)',
+  fontSize: 14,
 };

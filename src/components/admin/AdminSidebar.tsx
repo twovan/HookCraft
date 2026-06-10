@@ -8,7 +8,6 @@ interface NavItem {
   label: string;
   icon: string;
   href: string;
-  badge?: number;
 }
 
 interface NavSection {
@@ -20,50 +19,50 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: '概览',
     items: [
-      { label: '数据看板', icon: '📊', href: '/admin' },
+      { label: '数据看板', icon: 'DB', href: '/admin' },
     ],
   },
   {
     title: '内容管理',
     items: [
-      { label: '模板管理', icon: '🎵', href: '/admin/templates' },
-      { label: '内容审核', icon: '✅', href: '/admin/review' },
-      { label: '分类管理', icon: '📁', href: '/admin/categories' },
-      { label: '敏感词管理', icon: '🚫', href: '/admin/sensitive-words' },
+      { label: '模板管理', icon: 'TM', href: '/admin/templates' },
+      { label: '内容审核', icon: 'RV', href: '/admin/review' },
+      { label: '分类管理', icon: 'CT', href: '/admin/categories' },
+      { label: '敏感词管理', icon: 'SW', href: '/admin/sensitive-words' },
     ],
   },
   {
     title: '用户管理',
     items: [
-      { label: '用户列表', icon: '👥', href: '/admin/users' },
-      { label: '制作人', icon: '🎤', href: '/admin/producers' },
-      { label: '会员管理', icon: '💎', href: '/admin/membership' },
+      { label: '用户列表', icon: 'US', href: '/admin/users' },
+      { label: '制作人', icon: 'PR', href: '/admin/producers' },
+      { label: '会员管理', icon: 'MB', href: '/admin/membership' },
     ],
   },
   {
     title: '交易管理',
     items: [
-      { label: '订单管理', icon: '📋', href: '/admin/orders' },
-      { label: '收入结算', icon: '💰', href: '/admin/revenue' },
+      { label: '订单管理', icon: 'OD', href: '/admin/orders' },
+      { label: '收入结算', icon: 'RV', href: '/admin/revenue' },
     ],
   },
   {
     title: 'AI 管理',
     items: [
-      { label: 'AI 任务', icon: '🤖', href: '/admin/ai-tasks' },
-      { label: 'Style DNA', icon: '🧬', href: '/admin/style-dna' },
-      { label: '生成歌曲', icon: '♪', href: '/admin/generated-songs' },
-      { label: 'Credits', icon: '⚡', href: '/admin/credits' },
+      { label: 'AI 任务', icon: 'AI', href: '/admin/ai-tasks' },
+      { label: 'Style DNA', icon: 'SD', href: '/admin/style-dna' },
+      { label: '生成歌曲', icon: 'SG', href: '/admin/generated-songs' },
+      { label: 'Credits', icon: 'CR', href: '/admin/credits' },
       { label: 'AI 操作定价', icon: '¥', href: '/admin/credits/cost-rules' },
     ],
   },
   {
     title: '系统',
     items: [
-      { label: '系统设置', icon: '⚙️', href: '/admin/settings' },
-      { label: '编辑器开关', icon: '🎚️', href: '/admin/editor-features' },
-      { label: '操作日志', icon: '📝', href: '/admin/logs' },
-      { label: '敏感词检测日志', icon: '🛡️', href: '/admin/sensitivity-logs' },
+      { label: '系统设置', icon: 'ST', href: '/admin/settings' },
+      { label: '编辑器开关', icon: 'ED', href: '/admin/editor-features' },
+      { label: '操作日志', icon: 'LG', href: '/admin/logs' },
+      { label: '敏感词检测日志', icon: 'SL', href: '/admin/sensitivity-logs' },
     ],
   },
 ];
@@ -92,12 +91,10 @@ export default function AdminSidebar() {
           });
         }
       } catch {
-        // Ignore errors, use default
+        // Keep default admin info when the session endpoint is unavailable.
       }
     };
-    fetchAdminInfo();
 
-    // Fetch pending review count
     const fetchReviewCount = async () => {
       try {
         const res = await fetch('/api/admin/review?page=1&pageSize=1');
@@ -106,9 +103,11 @@ export default function AdminSidebar() {
           setReviewCount(data.stats?.pending || 0);
         }
       } catch {
-        // Ignore
+        // Badge count is non-critical.
       }
     };
+
+    fetchAdminInfo();
     fetchReviewCount();
   }, []);
 
@@ -133,19 +132,17 @@ export default function AdminSidebar() {
 
   return (
     <aside style={sidebarStyle}>
-      {/* Logo */}
       <div style={logoContainerStyle}>
         <div style={logoIconStyle}>H</div>
-        <div>
-          <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: 0.5 }}>HookCraft</div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>管理后台</div>
+        <div style={{ minWidth: 0 }}>
+          <div style={logoTextStyle}>HookCraft</div>
+          <div style={logoSubStyle}>管理后台</div>
         </div>
       </div>
 
-      {/* Navigation */}
-      <nav style={{ flex: 1, padding: '16px 0', overflowY: 'auto' }}>
+      <nav style={navStyle}>
         {NAV_SECTIONS.map((section) => (
-          <div key={section.title} style={{ padding: '0 16px', marginBottom: 8 }}>
+          <div key={section.title} style={sectionStyle}>
             <div style={sectionTitleStyle}>{section.title}</div>
             {section.items.map((item) => {
               const active = isActive(item.href);
@@ -158,11 +155,8 @@ export default function AdminSidebar() {
                     ...(active ? navItemActiveStyle : {}),
                   }}
                 >
-                  <span style={{ fontSize: 18, width: 22, textAlign: 'center' }}>{item.icon}</span>
-                  <span style={{ flex: 1 }}>{item.label}</span>
-                  {item.badge && item.badge > 0 && (
-                    <span style={badgeStyle}>{item.badge}</span>
-                  )}
+                  <span style={{ ...navIconStyle, ...(active ? navIconActiveStyle : {}) }}>{item.icon}</span>
+                  <span style={navLabelStyle}>{item.label}</span>
                   {item.href === '/admin/review' && reviewCount > 0 && (
                     <span style={badgeStyle}>{reviewCount}</span>
                   )}
@@ -173,14 +167,11 @@ export default function AdminSidebar() {
         ))}
       </nav>
 
-      {/* Admin user footer */}
       <div style={footerStyle}>
         <div style={avatarStyle}>{adminInfo.displayName.charAt(0)}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {adminInfo.displayName}
-          </div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>{adminInfo.role}</div>
+          <div style={adminNameStyle}>{adminInfo.displayName}</div>
+          <div style={adminRoleStyle}>{adminInfo.role}</div>
         </div>
         <button
           onClick={handleLogout}
@@ -189,7 +180,7 @@ export default function AdminSidebar() {
           title="退出登录"
           aria-label="退出登录"
         >
-          {loggingOut ? '...' : '↪'}
+          {loggingOut ? '...' : 'OUT'}
         </button>
       </div>
     </aside>
@@ -201,17 +192,19 @@ const sidebarStyle: React.CSSProperties = {
   left: 0,
   top: 0,
   bottom: 0,
-  width: 240,
-  background: '#1a1a2e',
+  width: 248,
+  background: 'linear-gradient(180deg, #0b1420 0%, #0f1f31 58%, #092133 100%)',
   color: '#fff',
   zIndex: 100,
   display: 'flex',
   flexDirection: 'column',
   overflow: 'hidden',
+  borderRight: '1px solid rgba(255,255,255,0.08)',
 };
 
 const logoContainerStyle: React.CSSProperties = {
-  padding: '20px 24px',
+  height: 72,
+  padding: '0 18px',
   borderBottom: '1px solid rgba(255,255,255,0.08)',
   display: 'flex',
   alignItems: 'center',
@@ -221,57 +214,110 @@ const logoContainerStyle: React.CSSProperties = {
 const logoIconStyle: React.CSSProperties = {
   width: 36,
   height: 36,
-  background: 'linear-gradient(135deg, #D4A574, #c4956a)',
-  borderRadius: 10,
+  background: 'linear-gradient(135deg, #d7a56d, #b8793b)',
+  borderRadius: 8,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
   fontSize: 18,
-  fontWeight: 700,
+  fontWeight: 800,
   color: '#fff',
+};
+
+const logoTextStyle: React.CSSProperties = {
+  fontSize: 17,
+  fontWeight: 800,
+  letterSpacing: 0,
+};
+
+const logoSubStyle: React.CSSProperties = {
+  fontSize: 11,
+  color: 'rgba(255,255,255,0.58)',
+  marginTop: 2,
+};
+
+const navStyle: React.CSSProperties = {
+  flex: 1,
+  padding: '14px 0',
+  overflowY: 'auto',
+};
+
+const sectionStyle: React.CSSProperties = {
+  padding: '0 10px',
+  marginBottom: 8,
 };
 
 const sectionTitleStyle: React.CSSProperties = {
   fontSize: 11,
-  fontWeight: 600,
-  color: 'rgba(255,255,255,0.35)',
-  textTransform: 'uppercase',
-  letterSpacing: 1,
-  padding: '8px 8px 4px',
+  fontWeight: 800,
+  color: 'rgba(255,255,255,0.38)',
+  letterSpacing: 0.6,
+  padding: '10px 10px 5px',
 };
 
 const navItemStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  gap: 12,
-  padding: '10px 16px',
-  margin: '2px 8px',
-  borderRadius: 8,
+  gap: 10,
+  minHeight: 38,
+  padding: '0 10px',
+  margin: '2px 0',
+  borderRadius: 7,
   cursor: 'pointer',
-  color: 'rgba(255,255,255,0.65)',
+  color: 'rgba(255,255,255,0.68)',
   fontSize: 13,
-  fontWeight: 500,
+  fontWeight: 650,
   textDecoration: 'none',
 };
 
 const navItemActiveStyle: React.CSSProperties = {
-  background: 'rgba(212,165,116,0.2)',
-  color: '#D4A574',
+  background: 'rgba(215,165,109,0.18)',
+  color: '#f3c17f',
+  boxShadow: 'inset 3px 0 0 #d7a56d',
+};
+
+const navIconStyle: React.CSSProperties = {
+  width: 24,
+  height: 24,
+  borderRadius: 6,
+  border: '1px solid rgba(255,255,255,0.12)',
+  background: 'rgba(255,255,255,0.04)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontSize: 10,
+  fontWeight: 900,
+  color: 'rgba(255,255,255,0.55)',
+  flexShrink: 0,
+};
+
+const navIconActiveStyle: React.CSSProperties = {
+  color: '#f3c17f',
+  borderColor: 'rgba(243,193,127,0.45)',
+  background: 'rgba(243,193,127,0.1)',
+};
+
+const navLabelStyle: React.CSSProperties = {
+  flex: 1,
+  minWidth: 0,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
 };
 
 const badgeStyle: React.CSSProperties = {
   background: '#ef4444',
   color: '#fff',
   fontSize: 10,
-  fontWeight: 700,
+  fontWeight: 800,
   padding: '2px 6px',
-  borderRadius: 10,
+  borderRadius: 999,
   minWidth: 18,
   textAlign: 'center',
 };
 
 const footerStyle: React.CSSProperties = {
-  padding: '16px 24px',
+  padding: 16,
   borderTop: '1px solid rgba(255,255,255,0.08)',
   display: 'flex',
   alignItems: 'center',
@@ -279,30 +325,41 @@ const footerStyle: React.CSSProperties = {
 };
 
 const avatarStyle: React.CSSProperties = {
-  width: 32,
-  height: 32,
+  width: 34,
+  height: 34,
   borderRadius: '50%',
-  background: 'linear-gradient(135deg, #D4A574, #c4956a)',
+  background: 'linear-gradient(135deg, #d7a56d, #b8793b)',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
   fontSize: 13,
-  fontWeight: 600,
+  fontWeight: 800,
   flexShrink: 0,
 };
 
+const adminNameStyle: React.CSSProperties = {
+  fontSize: 13,
+  fontWeight: 800,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+};
+
+const adminRoleStyle: React.CSSProperties = {
+  fontSize: 11,
+  color: 'rgba(255,255,255,0.52)',
+  marginTop: 2,
+};
+
 const logoutButtonStyle: React.CSSProperties = {
-  width: 28,
   height: 28,
+  minWidth: 40,
   borderRadius: 6,
-  border: '1px solid rgba(255,255,255,0.15)',
-  background: 'transparent',
-  color: 'rgba(255,255,255,0.5)',
-  fontSize: 14,
+  border: '1px solid rgba(255,255,255,0.14)',
+  background: 'rgba(255,255,255,0.04)',
+  color: 'rgba(255,255,255,0.62)',
+  fontSize: 10,
+  fontWeight: 800,
   cursor: 'pointer',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
   flexShrink: 0,
-  transition: 'all 0.2s',
 };

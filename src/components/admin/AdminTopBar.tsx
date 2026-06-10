@@ -10,28 +10,25 @@ export interface AdminTopBarProps {
 export default function AdminTopBar({ title, breadcrumb }: AdminTopBarProps) {
   return (
     <div style={topBarStyle}>
-      <div>
+      <div style={{ minWidth: 0 }}>
         <h1 style={titleStyle}>{title}</h1>
         <div style={breadcrumbStyle}>{breadcrumb}</div>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        {/* Search input */}
+      <div style={rightStyle}>
         <div style={searchContainerStyle}>
-          <span style={{ color: '#9ca3af', fontSize: 14 }}>🔍</span>
+          <span style={searchIconStyle}>SR</span>
           <input
             type="text"
-            placeholder="搜索模板、用户、订单..."
+            placeholder="搜索用户、订单、模板、歌曲..."
             style={searchInputStyle}
           />
         </div>
-        {/* Notification button */}
-        <button style={iconButtonStyle}>
-          <span style={{ fontSize: 18 }}>🔔</span>
+        <button style={iconButtonStyle} aria-label="通知">
+          NT
           <span style={redDotStyle} />
         </button>
-        {/* Message button */}
-        <button style={iconButtonStyle}>
-          <span style={{ fontSize: 18 }}>💬</span>
+        <button style={iconButtonStyle} aria-label="消息">
+          MS
         </button>
       </div>
     </div>
@@ -41,38 +38,52 @@ export default function AdminTopBar({ title, breadcrumb }: AdminTopBarProps) {
 const topBarStyle: React.CSSProperties = {
   position: 'sticky',
   top: 0,
-  height: 60,
-  background: '#fff',
-  borderBottom: '1px solid #f3f4f6',
+  height: 64,
+  background: '#101827',
+  borderBottom: '1px solid rgba(255,255,255,0.08)',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
-  padding: '0 32px',
+  padding: '0 24px',
   zIndex: 50,
+  color: '#fff',
 };
 
 const titleStyle: React.CSSProperties = {
   fontSize: 18,
-  fontWeight: 700,
-  color: '#1f2937',
+  fontWeight: 800,
+  color: '#fff',
   margin: 0,
   lineHeight: 1.2,
 };
 
 const breadcrumbStyle: React.CSSProperties = {
   fontSize: 12,
-  color: '#9ca3af',
-  marginTop: 2,
+  color: 'rgba(255,255,255,0.48)',
+  marginTop: 4,
+};
+
+const rightStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 12,
 };
 
 const searchContainerStyle: React.CSSProperties = {
+  height: 36,
   display: 'flex',
   alignItems: 'center',
   gap: 8,
-  padding: '6px 14px',
-  borderRadius: 8,
-  border: '1px solid #e5e7eb',
-  background: '#f9fafb',
+  padding: '0 12px',
+  borderRadius: 7,
+  border: '1px solid rgba(255,255,255,0.1)',
+  background: 'rgba(255,255,255,0.07)',
+};
+
+const searchIconStyle: React.CSSProperties = {
+  color: '#f3c17f',
+  fontSize: 10,
+  fontWeight: 900,
 };
 
 const searchInputStyle: React.CSSProperties = {
@@ -80,31 +91,34 @@ const searchInputStyle: React.CSSProperties = {
   outline: 'none',
   background: 'transparent',
   fontSize: 13,
-  width: 180,
+  width: 260,
   fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-  color: '#374151',
+  color: '#fff',
 };
 
 const iconButtonStyle: React.CSSProperties = {
   position: 'relative',
   width: 36,
   height: 36,
-  borderRadius: 8,
-  border: '1px solid #e5e7eb',
-  background: '#fff',
+  borderRadius: 7,
+  border: '1px solid rgba(255,255,255,0.1)',
+  background: 'rgba(255,255,255,0.07)',
+  color: 'rgba(255,255,255,0.72)',
   cursor: 'pointer',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
+  fontSize: 10,
+  fontWeight: 900,
 };
 
 const redDotStyle: React.CSSProperties = {
   position: 'absolute',
-  top: 6,
-  right: 6,
-  width: 8,
-  height: 8,
+  top: 7,
+  right: 7,
+  width: 7,
+  height: 7,
   borderRadius: '50%',
   background: '#ef4444',
-  border: '2px solid #fff',
+  border: '2px solid #101827',
 };
