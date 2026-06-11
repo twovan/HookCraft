@@ -10,4 +10,5 @@ TEST_ACCOUNTS.local.md
 .rewrite-backup/
 *.zip
 *.png
+.codex-*.log
 tsconfig.tsbuildinfo
