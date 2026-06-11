@@ -34,10 +34,17 @@ interface ExhaustedUser {
   exhaustedAt: string;
 }
 
+interface DailyTrendPoint {
+  date: string;
+  label: string;
+  consumed: number;
+}
+
 export default function AdminCreditsPage() {
   const [stats, setStats] = useState<CreditsStats>({ totalIssued: 0, totalConsumed: 0, consumptionRate: 0, exhaustedCount: 0, daysUntilReset: 0 });
   const [tierBreakdown, setTierBreakdown] = useState<TierBreakdown[]>([]);
   const [exhaustedUsers, setExhaustedUsers] = useState<ExhaustedUser[]>([]);
+  const [dailyTrend, setDailyTrend] = useState<DailyTrendPoint[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -53,6 +60,7 @@ export default function AdminCreditsPage() {
       setStats(result.stats);
       setTierBreakdown(result.tierBreakdown || []);
       setExhaustedUsers(result.exhaustedUsers || []);
+      setDailyTrend(result.dailyTrend || []);
     } catch {
       // ignore
     } finally {
@@ -65,6 +73,7 @@ export default function AdminCreditsPage() {
     pro: 'Pro',
     business: 'Business',
   };
+  const maxDailyConsumed = Math.max(...dailyTrend.map((day) => day.consumed), 1);
 
   const exhaustedColumns: Column<ExhaustedUser>[] = [
     {
@@ -175,12 +184,29 @@ export default function AdminCreditsPage() {
         </div>
       </div>
 
-      {/* Daily Consumption Trend (placeholder) */}
+      {/* Daily Consumption Trend */}
       <div style={{ ...tierCardStyle, marginTop: 16 }}>
         <h3 style={{ margin: '0 0 16px 0', fontSize: 16, fontWeight: 600, color: '#1f2937' }}>每日消耗趋势</h3>
-        <div style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: 13 }}>
-          📈 趋势图表（数据加载中...）
-        </div>
+        {dailyTrend.some((day) => day.consumed > 0) ? (
+          <div style={trendChartStyle}>
+            {dailyTrend.map((day) => (
+              <div key={day.date} style={trendBarItemStyle}>
+                <div style={trendValueStyle}>{day.consumed}</div>
+                <div style={trendBarTrackStyle}>
+                  <div
+                    style={{
+                      ...trendBarFillStyle,
+                      height: `${Math.max((day.consumed / maxDailyConsumed) * 100, day.consumed > 0 ? 8 : 0)}%`,
+                    }}
+                  />
+                </div>
+                <div style={trendLabelStyle}>{day.label}</div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={trendEmptyStyle}>近 7 天暂无 Credits 消耗</div>
+        )}
       </div>
 
       {/* Exhausted Users */}
@@ -267,6 +293,65 @@ const progressBarFillStyle: React.CSSProperties = {
   background: '#D4A574',
   borderRadius: 4,
   transition: 'width 0.3s ease',
+};
+
+const trendChartStyle: React.CSSProperties = {
+  height: 150,
+  display: 'grid',
+  gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
+  gap: 14,
+  alignItems: 'end',
+  padding: '6px 4px 0',
+};
+
+const trendBarItemStyle: React.CSSProperties = {
+  minWidth: 0,
+  height: '100%',
+  display: 'grid',
+  gridTemplateRows: '20px 1fr 18px',
+  gap: 6,
+  justifyItems: 'center',
+};
+
+const trendValueStyle: React.CSSProperties = {
+  color: '#6b7280',
+  fontSize: 12,
+  fontWeight: 600,
+  lineHeight: '20px',
+};
+
+const trendBarTrackStyle: React.CSSProperties = {
+  width: '100%',
+  maxWidth: 46,
+  height: '100%',
+  display: 'flex',
+  alignItems: 'flex-end',
+  borderRadius: 8,
+  background: '#f3f4f6',
+  overflow: 'hidden',
+};
+
+const trendBarFillStyle: React.CSSProperties = {
+  width: '100%',
+  borderRadius: '8px 8px 0 0',
+  background: 'linear-gradient(180deg, #E2B784 0%, #D4A574 100%)',
+  transition: 'height 0.3s ease',
+};
+
+const trendLabelStyle: React.CSSProperties = {
+  color: '#9ca3af',
+  fontSize: 11,
+  lineHeight: '18px',
+  whiteSpace: 'nowrap',
+};
+
+const trendEmptyStyle: React.CSSProperties = {
+  height: 120,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  color: '#9ca3af',
+  fontSize: 13,
 };
 
 const actionBtnStyle: React.CSSProperties = {

@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '../../../../lib/supabase/server';
 import { requireAdmin } from '../../../../lib/admin/auth';
 import { AdminConfigService } from '../../../../lib/admin/AdminConfigService';
-import { buildMonthlyQuotaMap } from '../../../../lib/admin/creditsOverview';
+import {
+  buildDailyCreditTrend,
+  buildMonthlyQuotaMap,
+  getDailyTrendStartDate,
+} from '../../../../lib/admin/creditsOverview';
 
 /**
  * GET /api/admin/credits
@@ -16,13 +20,23 @@ export async function GET(req: NextRequest) {
     const configService = new AdminConfigService(supabaseAdmin);
     const config = await configService.getCurrentConfig();
     const monthlyQuotaMap = buildMonthlyQuotaMap(config.creditQuotas);
+    const dailyTrendStart = getDailyTrendStartDate();
 
-    // Get all credits records
-    const { data: credits, error: creditsError } = await supabaseAdmin
-      .from('credits')
-      .select('*');
+    const [creditsResult, transactionsResult] = await Promise.all([
+      supabaseAdmin
+        .from('credits')
+        .select('*'),
+      supabaseAdmin
+        .from('credit_transactions')
+        .select('created_at, total_cost, operation_type')
+        .gte('created_at', dailyTrendStart.toISOString()),
+    ]);
+
+    const { data: credits, error: creditsError } = creditsResult;
+    const { data: transactions, error: transactionsError } = transactionsResult;
 
     if (creditsError) throw creditsError;
+    if (transactionsError) throw transactionsError;
 
     const allCredits = credits || [];
 
@@ -82,6 +96,7 @@ export async function GET(req: NextRequest) {
         daysUntilReset,
       },
       tierBreakdown,
+      dailyTrend: buildDailyCreditTrend(transactions || []),
       exhaustedUsers: exhaustedList,
     });
   } catch (error) {
