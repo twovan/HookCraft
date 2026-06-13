@@ -36,6 +36,7 @@ const WORKFLOW_STEPS = [
 const TEMPLATE_FILTERS = ['全部', '流行', 'R&B', '说唱', '摇滚', '电子'];
 const WAVE_COLORS = ['#a855f7', '#d9a441', '#bfff1f', '#2dd4bf', '#f472b6', '#f97316'];
 const WAVEFORM_PROFILE = [18, 26, 42, 66, 34, 22, 54, 80, 46, 28, 24, 62, 36, 20, 18, 30, 74, 88, 52, 24, 18, 20, 34, 58, 72, 48, 30, 22, 26, 64, 40, 18, 16, 22, 70, 92, 46, 20, 18, 24, 38, 56];
+const STUDIO_LITE_LOOP_START_SECONDS = 2.2;
 
 async function fetchWithTimeout(url: string, timeoutMs = 8000) {
   const controller = new AbortController();
@@ -50,6 +51,11 @@ async function fetchWithTimeout(url: string, timeoutMs = 8000) {
 function formatPrice(template: TemplateItem) {
   const price = template.price ? template.price / 100 : 0;
   return price > 0 ? `¥${price.toFixed(2)}` : '免费';
+}
+
+function restartStudioLiteLoop(video: HTMLVideoElement) {
+  video.currentTime = STUDIO_LITE_LOOP_START_SECONDS;
+  void video.play().catch(() => undefined);
 }
 
 function getProducerWorks(producer?: ProducerSummary) {
@@ -218,8 +224,9 @@ export default function HomePage() {
               className="studio-lite-video"
               autoPlay
               muted
-              loop
               playsInline
+              preload="auto"
+              onEnded={(event) => restartStudioLiteLoop(event.currentTarget)}
               poster="/showcase/hookcraft-console-perspective-alpha-poster.png"
             >
               <source src="/showcase/hookcraft-console-perspective-alpha.webm" type="video/webm" />
