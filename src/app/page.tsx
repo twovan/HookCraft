@@ -20,14 +20,10 @@ interface TemplateItem {
   producerName?: string;
 }
 
-const GENRE_CHANNELS = ['Chinese Pop', 'EDM', 'Hip-Hop', 'Lo-Fi', 'Rock', 'Jazz'];
-const TEMPLATE_FILTERS = ['全部', '流行', 'R&B', '说唱', '摇滚', '电子', '国风', '...'];
-const HERO_FEATURES = [
-  { title: '一站式创作', detail: '词曲编录混导出', icon: 'mix' },
-  { title: 'AI 加速创作', detail: '灵感到成品更快', icon: 'spark' },
-  { title: '可商用发布', detail: '版权清晰更安心', icon: 'safe' },
-];
-const WAVE_COLORS = ['#c084fc', '#ef4444', '#84cc16', '#2dd4bf', '#f472b6', '#f97316'];
+const GENRE_CHANNELS = ['Chinese POP', 'EDM', 'HIP-POP', 'ROCK', 'LO-FI', 'JAZZ'];
+const WORKFLOW_STEPS = ['灵感', 'HookCraft Original', 'Demo', 'Studio Lite', 'Leonard Finish', '发布'];
+const TEMPLATE_FILTERS = ['全部', '流行', 'R&B', '说唱', '摇滚', '电子'];
+const WAVE_COLORS = ['#a855f7', '#d9a441', '#bfff1f', '#2dd4bf', '#f472b6', '#f97316'];
 const WAVEFORM_PROFILE = [18, 26, 42, 66, 34, 22, 54, 80, 46, 28, 24, 62, 36, 20, 18, 30, 74, 88, 52, 24, 18, 20, 34, 58, 72, 48, 30, 22, 26, 64, 40, 18, 16, 22, 70, 92, 46, 20, 18, 24, 38, 56];
 
 async function fetchWithTimeout(url: string, timeoutMs = 8000) {
@@ -38,6 +34,16 @@ async function fetchWithTimeout(url: string, timeoutMs = 8000) {
   } finally {
     window.clearTimeout(timer);
   }
+}
+
+function formatPrice(template: TemplateItem) {
+  const price = template.price ? template.price / 100 : 0;
+  return price > 0 ? `¥${price.toFixed(2)}` : '免费';
+}
+
+function splitWorksFromTemplates(templates: TemplateItem[]) {
+  const names = templates.map((template) => template.name).filter(Boolean);
+  return names.length > 0 ? names.slice(0, 8) : ['新芭乐', '流行摇滚', '品位流行', '芭乐歌模板'];
 }
 
 export default function HomePage() {
@@ -79,924 +85,693 @@ export default function HomePage() {
     void fetchProducers();
   }, []);
 
-  const featuredTemplates = useMemo(() => templates.slice(0, 6), [templates]);
-  const newTemplates = useMemo(() => templates.slice(6, 10), [templates]);
-  const heroTemplate = featuredTemplates[0];
-  const producerShowcase = useMemo(() => {
-    const realProducers = featuredProducers.slice(0, 8).map((producer) => ({
-      id: producer.id,
-      name: producer.displayName,
-      meta: producer.styleTags.slice(0, 2).join(' / ') || `${producer.templateCount} 个模板`,
-      avatarUrl: producer.avatarUrl,
-      href: `/producers/${producer.id}`,
-    }));
-    return realProducers;
-  }, [featuredProducers]);
+  const originalTemplates = useMemo(() => templates.slice(0, 4), [templates]);
+  const producer = featuredProducers[0];
+  const producerWorks = useMemo(() => splitWorksFromTemplates(templates), [templates]);
+  const producerHref = producer ? `/producers/${producer.id}` : '/templates';
+  const producerName = producer?.displayName || 'Terence Teo';
+  const producerMeta = producer?.styleTags?.slice(0, 2).join(' / ') || '华语流行 / 摇滚编曲';
 
   return (
     <main className="hc-shell home-page">
       <style dangerouslySetInnerHTML={{ __html: homeStyles }} />
 
-      <section className="home-hero" aria-label="HookCraft AI 音乐创作">
+      <section className="home-hero" aria-label="HookCraft AI Demo 工作站">
         <div className="home-hero-bg" aria-hidden="true" />
-        <div className="home-hero-shade" aria-hidden="true" />
-        <div className="hc-container home-hero-content">
+        <div className="hc-container home-hero-inner">
           <div className="home-hero-copy">
-            <span className="home-eyebrow">新一代 AI 音乐工作站</span>
+            <span className="home-eyebrow">HOOKCRAFT ORIGINAL</span>
             <h1>
-              <span className="home-brand-line"><span>HookCraft</span> AI 音乐创作</span>
-              <small>从一个 Hook 开始<br />生成可发布的<span>华语成品 Demo</span></small>
+              华语音乐 AI Demo 工作站
+              <small>从灵感到可发布 Demo</small>
             </h1>
-            <p>
-              AI 编曲、人声克隆、混音母带、一键导出 WAV。
-            </p>
-            <div className="home-hero-actions">
-              <Link href="/studio" className="hc-button">进入工作台</Link>
-              <Link href="/templates" className="hc-button hc-button-secondary">探索模板</Link>
-            </div>
-            <div className="home-feature-row" aria-label="核心能力">
-              {HERO_FEATURES.map((item) => (
-                <span key={item.title}>
-                  <i className={`home-feature-icon ${item.icon}`} aria-hidden="true"><b /></i>
-                  <strong>{item.title}</strong>
-                  <em>{item.detail}</em>
-                </span>
-              ))}
+            <p className="home-route">生成 -&gt; 修改 -&gt; 优化 -&gt; 发布</p>
+          </div>
+
+          <div className="home-start-panel">
+            <span>CREATE A SONG</span>
+            <h2>在 HookCraft 完成一首歌</h2>
+            <p>从灵感到商业 Demo，支持 AI 生成、Studio Lite 修改、Leonard Finish 优化和商业提案导出。</p>
+            <div>
+              <Link href="/templates" className="hc-button hc-button-secondary">查看模板</Link>
+              <Link href="/studio" className="hc-button">开始创作</Link>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="hc-container home-section home-discovery">
-        <div className="home-section-head">
-          <div>
-            <h2 className="hc-section-title">精选模板 <span className="section-spark">✦</span></h2>
-            <p className="hc-section-kicker">从可套用的风格模板开始，比空白提示词更快接近成品。</p>
-          </div>
-          <Link href="/templates" className="home-text-link">查看全部模板 <span aria-hidden="true">→</span></Link>
-        </div>
-        <div className="home-filter-row" aria-label="模板分类">
-          {TEMPLATE_FILTERS.map((filter, index) => (
-            <Link
-              key={filter}
-              href={index === 0 ? '/templates' : `/templates?genre=${encodeURIComponent(filter)}`}
-              className={index === 0 ? 'active' : ''}
-            >
-              {filter}
-            </Link>
-          ))}
-        </div>
-
-        {loading ? (
-          <div className="home-template-grid home-template-strip" aria-label="模板加载中">
-            {Array.from({ length: 6 }).map((_, index) => (
-              <TemplateSkeleton key={index} index={index} />
-            ))}
-          </div>
-        ) : featuredTemplates.length === 0 ? (
-          <div className="home-empty">暂无模板，稍后再来看看。</div>
-        ) : (
-          <div className="home-template-grid home-template-strip">
-            {featuredTemplates.map((template) => (
-              <TemplateCard key={template.id} template={template} />
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section className="hc-container home-section home-producer-section">
-        <div className="home-section-head">
-          <div>
-            <h2 className="hc-section-title">知名制作人 <span className="section-badge">Pro</span></h2>
-            <p className="hc-section-kicker">他们正在使用 HookCraft 创作。</p>
-          </div>
-          <Link href="/templates" className="home-text-link">查看全部 <span aria-hidden="true">→</span></Link>
-        </div>
-        <div className="home-producer-strip">
-          {producerShowcase.map((producer) => (
-            <ProducerPill key={producer.id} producer={producer} />
+      <section className="hc-container home-section home-workflow" aria-label="HookCraft Workflow">
+        <SectionTitle eyebrow="HOOKCRAFT WORKFLOW" title="从灵感到发行的工作流" />
+        <div className="workflow-track">
+          {WORKFLOW_STEPS.map((step, index) => (
+            <div className="workflow-step" key={step}>
+              <span>{String(index + 1).padStart(2, '0')}</span>
+              <strong>{step}</strong>
+              {index < WORKFLOW_STEPS.length - 1 && <i aria-hidden="true" />}
+            </div>
           ))}
         </div>
       </section>
 
       <section className="hc-container home-section">
-        <div className="home-channel-band">
-          <div>
-            <h2 className="hc-section-title">按风格找灵感</h2>
-            <p className="hc-section-kicker">面向中文商业 Demo 的模板频道，适合副歌、广告歌、短视频和提案小样。</p>
+        <SectionTitle eyebrow="PRODUCER IN RESIDENCE" title="入驻音乐人" />
+        <div className="producer-spotlight">
+          <Link href={producerHref} className="producer-avatar" aria-label={`查看 ${producerName}`}>
+            {producer?.avatarUrl ? <Image src={producer.avatarUrl} alt={producerName} fill sizes="96px" /> : <span>{producerName.charAt(0)}</span>}
+          </Link>
+          <div className="producer-copy">
+            <h2>{producerName}</h2>
+            <p>张瑞成，新加坡籍音乐制作人、编曲家。长期为华语歌手提供编曲与 Demo 支持。</p>
+            <b>{producerMeta}</b>
           </div>
-          <div className="home-channel-list">
-            {GENRE_CHANNELS.map((genre) => (
-              <Link key={genre} href={`/templates?genre=${encodeURIComponent(genre)}`}>
-                {genre}
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {newTemplates.length > 0 && (
-        <section className="hc-container home-section">
-          <div className="home-section-head">
+          <div className="producer-works">
+            <span>代表作</span>
             <div>
-              <h2 className="hc-section-title">新品上架</h2>
-              <p className="hc-section-kicker">新模板保留原有购买、使用和创作入口。</p>
+              {producerWorks.map((work) => <em key={work}>{work}</em>)}
             </div>
           </div>
-          <div className="home-template-grid compact home-template-strip">
-            {newTemplates.map((template) => (
-              <TemplateCard key={template.id} template={template} />
+          <Link href={producerHref} className="producer-signature">
+            <strong>{producerName.split(' ')[0]} Signature Templates</strong>
+            <span aria-hidden="true">→</span>
+          </Link>
+        </div>
+      </section>
+
+      <section className="hc-container home-section">
+        <div className="home-section-line">
+          <SectionTitle eyebrow="HOOKCRAFT ORIGINAL" title="模板作品" />
+          <Link href="/templates" className="home-text-link">全部 &gt;</Link>
+        </div>
+
+        {loading ? (
+          <div className="template-row" aria-label="模板加载中">
+            {Array.from({ length: 4 }).map((_, index) => <TemplateSkeleton key={index} index={index} />)}
+          </div>
+        ) : originalTemplates.length === 0 ? (
+          <div className="home-empty">暂无模板，稍后再来看看。</div>
+        ) : (
+          <div className="template-row">
+            {originalTemplates.map((template) => <TemplateCard key={template.id} template={template} />)}
+          </div>
+        )}
+      </section>
+
+      <section className="hc-container home-section">
+        <div className="style-finder">
+          <h2>按风格找灵感</h2>
+          <div className="style-chip-grid">
+            {GENRE_CHANNELS.map((genre) => (
+              <Link key={genre} href={`/templates?genre=${encodeURIComponent(genre)}`}>{genre}</Link>
             ))}
           </div>
-        </section>
-      )}
-
-      <section className="hc-container home-section home-safe-band">
-        <div>
-          <h2 className="hc-section-title">商业创作需要可控流程</h2>
-          <p className="hc-section-kicker">
-            HookCraft 在生成前处理版权安全检查，生成后保留版本、下载和分轨编辑路径，
-            让 Demo 从灵感进入可管理的作品库。
-          </p>
         </div>
-        <Link href="/pricing" className="hc-button">查看会员与额度</Link>
+      </section>
+
+      <section className="hc-container home-section commercial-band">
+        <div>
+          <span>COMMERCIAL READY</span>
+          <h2>商业创作需要可控流程</h2>
+          <p>HookCraft 在生成前处理版权安全检查，生成后保留版本、下载和分轨编辑路径，让 Demo 从灵感进入可管理的作品库。</p>
+        </div>
+        <Link href="/pricing" className="hc-button hc-button-secondary">查看会员</Link>
       </section>
     </main>
+  );
+}
+
+function SectionTitle({ eyebrow, title }: { eyebrow: string; title: string }) {
+  return (
+    <div className="section-title">
+      <span>{eyebrow}</span>
+      <h2>{title}</h2>
+    </div>
   );
 }
 
 function TemplateSkeleton({ index }: { index: number }) {
   return (
     <article className="template-card template-card-skeleton">
-      <div className="template-skeleton-wave" style={{ '--wave-color': WAVE_COLORS[index % WAVE_COLORS.length] } as CSSProperties}>
-        {Array.from({ length: 38 }).map((_, bar) => (
+      <div className="template-wave" style={{ '--wave-color': WAVE_COLORS[index % WAVE_COLORS.length] } as CSSProperties}>
+        {Array.from({ length: 40 }).map((_, bar) => (
           <i key={bar} style={{ height: `${WAVEFORM_PROFILE[(bar + index * 5) % WAVEFORM_PROFILE.length]}%` }} />
         ))}
       </div>
       <div className="template-card-body">
-        <span className="template-skeleton-title" />
-        <span className="template-skeleton-meta" />
+        <span className="skeleton-line wide" />
+        <span className="skeleton-line" />
       </div>
     </article>
   );
 }
 
 function TemplateCard({ template }: { template: TemplateItem }) {
-  const tags = [template.genre, template.category === 'free_template' ? '免费' : '付费'].filter(Boolean);
-  const price = template.price ? Math.round(template.price / 100) : 0;
   const waveColor = WAVE_COLORS[Math.abs(template.name.length + template.id.length) % WAVE_COLORS.length];
   const waveOffset = Math.abs(template.name.length * 3 + template.id.length) % WAVEFORM_PROFILE.length;
-  const usageLabel = typeof template.salesCount === 'number' && template.salesCount > 0 ? `${template.salesCount} 次使用` : null;
+  const tags = [template.genre, formatPrice(template)].filter(Boolean);
 
   return (
     <article className="template-card" style={{ '--wave-color': waveColor } as CSSProperties}>
-      <Link href={`/templates/${template.id}`} className="template-wave-link" aria-label={`查看模板 ${template.name}`}>
-        <div className="template-wave">
-          {Array.from({ length: 46 }).map((_, index) => (
-            <i key={index} style={{ height: `${WAVEFORM_PROFILE[(index + waveOffset) % WAVEFORM_PROFILE.length]}%` }} />
-          ))}
-        </div>
+      <Link href={`/templates/${template.id}`} className="template-media" aria-label={`查看模板 ${template.name}`}>
+        {template.coverUrl ? (
+          <Image src={template.coverUrl} alt={template.name} fill sizes="(max-width: 720px) 100vw, 25vw" />
+        ) : (
+          <div className="template-wave">
+            {Array.from({ length: 46 }).map((_, index) => (
+              <i key={index} style={{ height: `${WAVEFORM_PROFILE[(index + waveOffset) % WAVEFORM_PROFILE.length]}%` }} />
+            ))}
+          </div>
+        )}
       </Link>
       <div className="template-card-body">
         <Link href={`/templates/${template.id}`} className="template-title">{template.name}</Link>
         <div className="template-tags">
           {tags.map((tag) => <span key={tag}>{tag}</span>)}
-          {usageLabel && <em>{usageLabel}</em>}
-        </div>
-        <div className="template-card-bottom">
-          <strong>{price > 0 ? `¥${price}` : '已包含'}</strong>
-          <Link href={`/studio?templateId=${template.id}`}>使用模板</Link>
         </div>
       </div>
     </article>
   );
 }
 
-function ProducerPill({ producer }: { producer: { name: string; meta: string; avatarUrl?: string; avatarIndex?: number; href: string } }) {
-  return (
-    <Link href={producer.href} className="home-producer-pill">
-      <span
-        className={`home-producer-avatar ${producer.avatarUrl ? '' : 'is-faux'}`}
-        style={!producer.avatarUrl ? { backgroundPosition: `-${(producer.avatarIndex ?? 0) * 50}px center` } : undefined}
-      >
-        {producer.avatarUrl ? (
-          <Image src={producer.avatarUrl} alt={producer.name} fill sizes="56px" />
-        ) : null}
-      </span>
-      <span>
-        <strong>{producer.name}</strong>
-        <em>{producer.meta}</em>
-      </span>
-    </Link>
-  );
-}
-
 const homeStyles = `
-  @keyframes home-meter-glow {
-    0%, 100% { opacity: .58; transform: scaleY(.78); }
-    50% { opacity: 1; transform: scaleY(1); }
-  }
-
   .home-page {
     position: relative;
-    padding-bottom: 88px;
+    padding-bottom: 96px;
     overflow: hidden;
-    background: #05080e;
+    background:
+      linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px),
+      #05070a;
+    background-size: 96px 96px;
   }
 
   .home-page::before {
     content: "";
     position: absolute;
-    left: 0;
-    right: 0;
-    top: 584px;
-    bottom: 0;
-    z-index: 0;
+    inset: 0;
     pointer-events: none;
-    border-top: 1px solid rgba(151, 165, 196, .13);
     background:
-      linear-gradient(180deg, rgba(14, 21, 28, .78), rgba(5, 8, 14, .94) 42%, rgba(5, 8, 14, 1)),
-      radial-gradient(circle at 82% 0%, rgba(82, 214, 198, .08), transparent 30%);
+      radial-gradient(circle at 16% 8%, rgba(206,255,53,.08), transparent 28%),
+      radial-gradient(circle at 78% 10%, rgba(128,74,255,.12), transparent 31%);
   }
 
   .home-hero {
     position: relative;
     z-index: 1;
-    min-height: 584px;
-    display: flex;
-    align-items: stretch;
+    min-height: 440px;
+    border-bottom: 1px solid rgba(255,255,255,.08);
     overflow: hidden;
   }
 
   .home-hero-bg {
     position: absolute;
-    inset: -14px -24px -10px 0;
-    background-image: url('/home-hero-studio.webp');
-    background-size: cover;
-    background-position: 66% 44%;
-    transform: scale(1.035);
-  }
-
-  .home-hero-shade {
-    position: absolute;
     inset: 0;
     background:
-      linear-gradient(90deg, rgba(5, 8, 14, .96) 0%, rgba(5, 8, 14, .74) 30%, rgba(5, 8, 14, .08) 58%, rgba(5, 8, 14, .18) 100%),
-      linear-gradient(180deg, rgba(5, 8, 14, 0), rgba(5, 8, 14, .45) 74%, rgba(5, 8, 14, .92));
+      linear-gradient(90deg, rgba(5,7,10,.94), rgba(5,7,10,.72) 45%, rgba(5,7,10,.92)),
+      url('/home-hero-studio.webp') center / cover;
+    opacity: .95;
   }
 
-  .home-hero-content {
+  .home-hero-inner {
     position: relative;
     z-index: 1;
+    min-height: 440px;
     display: grid;
-    grid-template-columns: minmax(0, 650px) minmax(360px, 1fr);
+    grid-template-columns: minmax(0, 1.05fr) minmax(360px, .58fr);
+    gap: 64px;
     align-items: center;
-    gap: 56px;
-    min-height: 584px;
-    padding-top: 18px;
-    padding-bottom: 18px;
+    padding-top: 52px;
+    padding-bottom: 54px;
   }
 
-  .home-hero-copy {
-    max-width: 690px;
-    padding-top: 0;
-    transform: translateY(-42px);
-  }
-
-  .home-eyebrow {
-    display: inline-flex;
-    align-items: center;
-    min-height: 28px;
-    padding: 0 10px;
-    border-radius: 999px;
-    border: 1px solid rgba(206, 255, 53, .28);
-    background: rgba(9, 13, 21, .42);
+  .home-eyebrow,
+  .section-title span,
+  .commercial-band span {
+    display: block;
     color: var(--hc-lime);
     font-size: 12px;
-    font-weight: 860;
+    font-weight: 900;
+    line-height: 1;
   }
 
   .home-hero-copy h1 {
-    margin: 12px 0 0;
-    max-width: 780px;
+    margin: 16px 0 0;
+    color: #f7f8f2;
     font-family: var(--hc-font-display);
-    font-size: clamp(31px, 3.25vw, 50px);
-    line-height: 1.08;
+    max-width: 880px;
+    font-size: clamp(38px, 4.2vw, 62px);
     font-weight: 950;
+    line-height: 1.02;
     letter-spacing: 0;
-    color: #f8fafc;
-    text-wrap: balance;
-  }
-
-  .home-brand-line {
-    display: block;
-    white-space: nowrap;
-  }
-
-  .home-brand-line span {
-    color: var(--hc-lime);
-    font-size: clamp(52px, 5.25vw, 80px);
-    line-height: .95;
   }
 
   .home-hero-copy h1 small {
     display: block;
-    margin-top: 8px;
-    color: #f8fafc;
-    font-size: clamp(30px, 3.15vw, 48px);
-    line-height: 1.12;
-    font-weight: 940;
+    margin-top: 24px;
+    color: rgba(247,248,242,.92);
+    font-size: clamp(30px, 3vw, 44px);
+    font-weight: 860;
+    line-height: 1.08;
   }
 
-  .home-hero-copy h1 small span {
-    font-size: inherit;
-    line-height: inherit;
-    color: var(--hc-lime);
-  }
-
-  .home-hero-copy p {
-    max-width: 640px;
-    margin: 12px 0 0;
-    color: #b9c3d4;
-    font-size: 17px;
-    line-height: 1.55;
-    text-wrap: pretty;
-  }
-
-  .home-hero-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    margin-top: 18px;
-  }
-
-  .home-feature-row {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 26px;
-    margin-top: 18px;
-    color: #9ca8ba;
-    font-size: 12px;
+  .home-route {
+    margin: 28px 0 0;
+    color: rgba(247,248,242,.72);
+    font-size: 22px;
     font-weight: 760;
   }
 
-  .home-feature-row span {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
+  .home-start-panel {
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 20px;
+    background: rgba(12,15,20,.74);
+    padding: 30px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
+    backdrop-filter: blur(18px);
   }
 
-  .home-feature-icon {
-    position: relative;
-    width: 30px;
-    height: 30px;
-    border: 1px solid rgba(151, 165, 196, .32);
-    border-radius: 7px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-style: normal;
-    color: #dcefff;
+  .home-start-panel h2 {
+    margin: 10px 0 0;
+    color: #f7f8f2;
+    font-size: 26px;
+    line-height: 1.18;
   }
 
-  .home-feature-icon::before,
-  .home-feature-icon::after,
-  .home-feature-icon b {
-    content: "";
-    position: absolute;
-    display: block;
+  .home-start-panel p {
+    margin: 18px 0 0;
+    color: rgba(225,229,217,.72);
+    font-size: 15px;
+    line-height: 1.7;
   }
 
-  .home-feature-icon.mix::before,
-  .home-feature-icon.mix::after,
-  .home-feature-icon.mix b {
-    width: 13px;
-    height: 1px;
-    left: 8px;
-    border-radius: 999px;
-    background: currentColor;
-    box-shadow: 0 0 8px rgba(206, 255, 53, .12);
-  }
-
-  .home-feature-icon.mix::before { top: 10px; }
-  .home-feature-icon.mix b { top: 15px; width: 10px; }
-  .home-feature-icon.mix::after { top: 20px; width: 15px; }
-
-  .home-feature-icon.spark::before {
-    width: 12px;
-    height: 12px;
-    border: 1px solid currentColor;
-    transform: rotate(45deg);
-    border-radius: 3px;
-  }
-
-  .home-feature-icon.spark::after {
-    width: 4px;
-    height: 4px;
-    right: 7px;
-    top: 7px;
-    border-radius: 999px;
-    background: var(--hc-lime);
-  }
-
-  .home-feature-icon.safe::before {
-    width: 13px;
-    height: 15px;
-    border: 1px solid currentColor;
-    border-radius: 8px 8px 6px 6px;
-    clip-path: polygon(50% 0, 100% 22%, 88% 100%, 12% 100%, 0 22%);
-  }
-
-  .home-feature-icon.safe::after {
-    width: 5px;
-    height: 8px;
-    border-right: 1px solid var(--hc-lime);
-    border-bottom: 1px solid var(--hc-lime);
-    transform: rotate(38deg);
-    top: 9px;
-    left: 12px;
-  }
-
-  .home-feature-row strong {
-    color: #dfe7f3;
-    font-size: 12px;
-    font-weight: 860;
-  }
-
-  .home-feature-row em {
-    color: #7f8aa0;
-    font-style: normal;
-    font-size: 11px;
-    font-weight: 700;
+  .home-start-panel div {
+    display: flex;
+    gap: 14px;
+    margin-top: 30px;
   }
 
   .home-section {
     position: relative;
     z-index: 1;
-    padding-top: 20px;
+    padding-top: 54px;
   }
 
-  .home-discovery {
-    padding-top: 22px;
+  .section-title {
+    margin-bottom: 22px;
   }
 
-  .home-section-head {
+  .section-title h2 {
+    margin: 8px 0 0;
+    color: #f7f8f2;
+    font-size: 30px;
+    line-height: 1.12;
+    letter-spacing: 0;
+  }
+
+  .home-section-line {
     display: flex;
     align-items: end;
     justify-content: space-between;
     gap: 24px;
-    margin-bottom: 10px;
-  }
-
-  .hc-section-title {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .section-spark {
-    color: var(--hc-lime);
-    font-size: .72em;
-    line-height: 1;
-    transform: translateY(-5px);
-  }
-
-  .section-badge {
-    display: inline-flex;
-    align-items: center;
-    min-height: 18px;
-    border-radius: 4px;
-    border: 1px solid rgba(206, 255, 53, .35);
-    background: rgba(206, 255, 53, .1);
-    color: var(--hc-lime);
-    padding: 0 6px;
-    font-size: 10px;
-    font-weight: 900;
-    line-height: 1;
-  }
-
-  .home-filter-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-bottom: 12px;
-  }
-
-  .home-filter-row a {
-    min-height: 28px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 6px;
-    border: 1px solid rgba(100, 113, 143, .28);
-    background: rgba(8, 12, 20, .66);
-    color: #b8c2d5;
-    padding: 0 14px;
-    text-decoration: none;
-    font-size: 12px;
-    font-weight: 820;
-  }
-
-  .home-filter-row a.active {
-    border-color: rgba(206, 255, 53, .5);
-    background: var(--hc-lime);
-    color: #08090c;
   }
 
   .home-text-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
     color: var(--hc-lime);
     text-decoration: none;
-    font-size: 14px;
-    font-weight: 820;
-    white-space: nowrap;
+    font-weight: 900;
   }
 
-  .home-text-link span {
-    font-size: 15px;
-    transform: translateY(-1px);
+  .workflow-track {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0;
+    align-items: start;
   }
 
-  .home-empty {
-    border: 1px dashed rgba(100, 113, 143, .28);
-    border-radius: 8px;
-    background: rgba(8, 12, 20, .52);
-    color: #9ca3af;
-    padding: 28px;
+  .workflow-step {
+    position: relative;
+    min-width: 0;
+    display: grid;
+    justify-items: center;
+    gap: 12px;
+    color: rgba(247,248,242,.78);
     text-align: center;
   }
 
-  .home-template-grid {
+  .workflow-step span {
+    width: 58px;
+    height: 58px;
+    border: 1px solid rgba(255,255,255,.18);
+    border-radius: 999px;
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 16px;
+    place-items: center;
+    background: rgba(12,15,20,.72);
+    color: var(--hc-lime);
+    font-size: 14px;
+    font-weight: 900;
   }
 
-  .home-template-strip {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-    gap: 18px;
+  .workflow-step strong {
+    min-height: 42px;
+    font-size: 15px;
+    line-height: 1.3;
   }
 
-  .template-card {
-    min-width: 0;
-    border: 1px solid rgba(100, 113, 143, .22);
-    border-radius: 8px;
-    background: rgba(10, 14, 22, .74);
-    overflow: hidden;
-    transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
-    box-shadow: none;
+  .workflow-step i {
+    position: absolute;
+    left: calc(50% + 38px);
+    top: 28px;
+    width: calc(100% - 76px);
+    height: 1px;
+    background: linear-gradient(90deg, rgba(206,255,53,.66), rgba(255,255,255,.22));
   }
 
-  .template-card:hover {
-    transform: translateY(-3px);
-    border-color: rgba(206, 255, 53, .32);
-    background: rgba(14, 19, 30, .88);
-  }
-
-  .template-card-skeleton {
-    pointer-events: none;
-  }
-
-  .template-skeleton-wave {
-    height: 46px;
-    display: flex;
-    align-items: center;
-    gap: 1.5px;
-    padding: 8px 10px;
-    border-bottom: 1px solid rgba(100, 113, 143, .18);
-    background: color-mix(in srgb, var(--wave-color, #8b5cf6) 20%, rgba(8, 12, 20, .9));
-  }
-
-  .template-skeleton-wave i {
-    flex: 1;
-    border-radius: 999px;
-    background: var(--wave-color, #8b5cf6);
-    opacity: .72;
-    min-width: 2px;
-  }
-
-  .template-skeleton-title,
-  .template-skeleton-meta {
-    display: block;
-    border-radius: 999px;
-    background: rgba(151, 165, 196, .18);
-  }
-
-  .template-skeleton-title {
-    width: 56%;
-    height: 12px;
-  }
-
-  .template-skeleton-meta {
-    width: 38%;
-    height: 9px;
-    margin-top: 10px;
-  }
-
-  .template-wave-link {
-    position: relative;
-    display: block;
-    color: inherit;
-    text-decoration: none;
-  }
-
-  .template-wave {
-    position: relative;
-    height: 46px;
-    display: flex;
-    align-items: center;
-    gap: 1.5px;
-    padding: 8px 9px;
-    border-bottom: 1px solid rgba(100, 113, 143, .18);
-    background: color-mix(in srgb, var(--wave-color, #8b5cf6) 19%, rgba(8, 12, 20, .92));
-  }
-
-  .template-wave::after {
+  .workflow-step i::after {
     content: "";
     position: absolute;
-    left: 9px;
-    right: 9px;
-    top: 50%;
-    height: 1px;
-    background: color-mix(in srgb, var(--wave-color, #8b5cf6) 34%, transparent);
-    opacity: .42;
+    right: -2px;
+    top: -4px;
+    border-left: 8px solid rgba(206,255,53,.82);
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
   }
 
-  .template-wave i {
-    flex: 1;
+  .producer-spotlight {
+    display: grid;
+    grid-template-columns: 104px minmax(180px, .58fr) minmax(300px, 1fr) 310px;
+    gap: 28px;
+    align-items: center;
+    border-top: 1px solid rgba(255,255,255,.12);
+    border-bottom: 1px solid rgba(255,255,255,.12);
+    padding: 32px 0;
+  }
+
+  .producer-avatar {
+    position: relative;
+    width: 96px;
+    height: 96px;
     border-radius: 999px;
-    background: var(--wave-color, #8b5cf6);
-    opacity: .82;
-    min-width: 1px;
-    z-index: 1;
-  }
-
-  .template-card-body {
-    padding: 7px 10px 8px;
-  }
-
-  .template-title {
-    display: block;
-    color: #f8fafc;
+    overflow: hidden;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(255,255,255,.18);
+    background: rgba(206,255,53,.1);
+    color: var(--hc-lime);
+    font-size: 34px;
+    font-weight: 950;
     text-decoration: none;
+  }
+
+  .producer-avatar img {
+    object-fit: cover;
+  }
+
+  .producer-copy h2 {
+    margin: 0;
+    color: #f7f8f2;
+    font-size: 28px;
+    line-height: 1.1;
+  }
+
+  .producer-copy p {
+    margin: 10px 0 0;
+    color: rgba(225,229,217,.72);
+    font-size: 14px;
+    line-height: 1.55;
+  }
+
+  .producer-copy b {
+    display: block;
+    margin-top: 12px;
+    color: var(--hc-lime);
     font-size: 12px;
-    line-height: 1.35;
+  }
+
+  .producer-works span {
+    color: #f7f8f2;
+    font-size: 13px;
     font-weight: 900;
+  }
+
+  .producer-works div {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 18px;
+    margin-top: 12px;
+  }
+
+  .producer-works em {
+    min-width: 0;
+    color: rgba(225,229,217,.7);
+    font-size: 12px;
+    font-style: normal;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .template-producer {
-    display: inline-block;
-    margin-top: 2px;
-    color: #8f9ab2;
+  .producer-signature {
+    min-height: 76px;
+    border-radius: 999px;
+    background: rgba(206,255,53,.16);
+    border: 1px solid rgba(206,255,53,.35);
+    color: #f7f8f2;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 0 26px 0 30px;
     text-decoration: none;
-    font-size: 11px;
-    font-weight: 720;
+    transition: transform .18s ease, background .18s ease;
+  }
+
+  .producer-signature:hover {
+    transform: translateY(-2px);
+    background: rgba(206,255,53,.22);
+  }
+
+  .producer-signature strong {
+    font-size: 20px;
+    line-height: 1.12;
+  }
+
+  .producer-signature span {
+    color: var(--hc-lime);
+    font-size: 30px;
+  }
+
+  .template-row {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 26px;
+  }
+
+  .template-card {
+    min-width: 0;
+  }
+
+  .template-card:hover .template-media {
+    border-color: rgba(206,255,53,.42);
+  }
+
+  .template-media,
+  .template-wave {
+    position: relative;
+    height: 126px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 18px;
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--wave-color, #8b5cf6) 22%, rgba(8, 12, 20, .92));
+    transition: border-color .18s ease;
+  }
+
+  .template-media img {
+    object-fit: cover;
+  }
+
+  .template-wave i {
+    flex: 1;
+    min-width: 2px;
+    border-radius: 999px;
+    background: var(--wave-color, #8b5cf6);
+    opacity: .86;
+  }
+
+  .template-card-body {
+    padding-top: 14px;
+  }
+
+  .template-title {
+    color: #f7f8f2;
+    text-decoration: none;
+    font-size: 19px;
+    line-height: 1.25;
+    font-weight: 950;
   }
 
   .template-tags {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
-    align-items: center;
-    margin-top: 6px;
+    gap: 8px;
+    margin-top: 12px;
   }
 
   .template-tags span {
-    border-radius: 999px;
-    background: rgba(255, 255, 255, .055);
-    color: #98a2b3;
-    padding: 2px 6px;
-    font-size: 10px;
-    font-weight: 800;
-  }
-
-  .template-tags em {
-    color: #7f8aa0;
-    font-style: normal;
-    font-size: 9px;
-    font-weight: 740;
-    white-space: nowrap;
-  }
-
-  .template-card-bottom {
-    display: none;
+    min-width: 64px;
+    min-height: 28px;
+    padding: 0 12px;
+    border: 1px solid rgba(255,255,255,.18);
+    border-radius: 6px;
+    display: inline-flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 12px;
+    justify-content: center;
+    color: rgba(247,248,242,.78);
+    font-size: 12px;
+    font-weight: 820;
+  }
+
+  .skeleton-line {
+    display: block;
+    width: 42%;
+    height: 12px;
+    border-radius: 999px;
+    background: rgba(255,255,255,.14);
     margin-top: 10px;
   }
 
-  .template-card-bottom strong {
-    color: var(--hc-lime);
-    font-size: 13px;
+  .skeleton-line.wide {
+    width: 70%;
+    height: 16px;
+    margin-top: 0;
   }
 
-  .template-card-bottom a {
-    min-height: 30px;
-    display: inline-flex;
-    align-items: center;
-    border-radius: 7px;
-    background: rgba(206, 255, 53, .08);
-    border: 1px solid rgba(206, 255, 53, .2);
-    color: #e3ff9a;
-    text-decoration: none;
-    padding: 0 10px;
-    font-size: 11px;
-    font-weight: 900;
-    white-space: nowrap;
-  }
-
-  .home-producer-section {
-    padding-top: 18px;
-    padding-bottom: 42px;
-  }
-
-  .home-producer-strip {
-    display: grid;
-    grid-template-columns: repeat(8, minmax(0, 1fr));
-    gap: 20px;
-  }
-
-  .home-producer-pill {
-    min-width: 0;
-    display: grid;
-    grid-template-columns: 50px minmax(0, 1fr);
-    gap: 11px;
-    align-items: center;
-    color: #f8fafc;
-    text-decoration: none;
-  }
-
-  .home-producer-avatar {
-    position: relative;
-    width: 50px;
-    height: 50px;
-    border-radius: 999px;
-    overflow: hidden;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: linear-gradient(135deg, rgba(206,255,53,.26), rgba(82,214,198,.16));
-    border: 1px solid rgba(151, 165, 196, .22);
-    color: var(--hc-lime);
-    font-size: 18px;
-    font-weight: 900;
-  }
-
-  .home-producer-avatar.is-faux {
-    background-image: url('/home-producer-avatars.webp');
-    background-repeat: no-repeat;
-    background-size: auto 50px;
-    border-color: rgba(206, 255, 53, .18);
-    box-shadow: inset 0 -12px 22px rgba(0, 0, 0, .22);
-  }
-
-  .home-producer-avatar img {
-    object-fit: cover;
-  }
-
-  .home-producer-pill strong {
-    display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: #f4f7ff;
-    font-size: 12px;
-    font-weight: 860;
-  }
-
-  .home-producer-pill em {
-    display: block;
-    margin-top: 3px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: #7f8aa0;
-    font-style: normal;
-    font-size: 10px;
-  }
-
-  .home-channel-band,
-  .home-safe-band {
-    border: 1px solid rgba(100, 113, 143, .22);
+  .home-empty {
+    border: 1px dashed rgba(255,255,255,.16);
     border-radius: 8px;
-    background: rgba(8, 12, 20, .58);
-    padding: 26px;
-    display: grid;
-    grid-template-columns: minmax(0, .9fr) minmax(340px, 1fr);
-    gap: 28px;
-    align-items: center;
-    box-shadow: none;
+    color: rgba(247,248,242,.66);
+    padding: 32px;
+    text-align: center;
   }
 
-  .home-channel-list {
+  .style-finder {
+    display: grid;
+    grid-template-columns: minmax(260px, .8fr) minmax(0, 1fr);
+    gap: 44px;
+    align-items: center;
+    border: 1px solid rgba(255,255,255,.14);
+    border-radius: 10px;
+    padding: 36px 42px;
+    background: rgba(12,15,20,.58);
+  }
+
+  .style-finder h2,
+  .commercial-band h2 {
+    margin: 0;
+    color: #f7f8f2;
+    font-size: 34px;
+    line-height: 1.1;
+  }
+
+  .style-chip-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
+    gap: 14px;
   }
 
-  .home-channel-list a {
-    min-height: 50px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  .style-chip-grid a {
+    min-height: 44px;
+    border: 1px solid rgba(255,255,255,.18);
     border-radius: 7px;
-    border: 1px solid rgba(100, 113, 143, .22);
-    background: rgba(12, 17, 27, .62);
-    color: #eef2ff;
+    display: grid;
+    place-items: center;
+    color: rgba(247,248,242,.82);
     text-decoration: none;
     font-size: 14px;
-    font-weight: 850;
+    font-weight: 900;
+    background: rgba(255,255,255,.035);
   }
 
-  .home-safe-band {
+  .commercial-band {
+    margin-top: 22px;
+    display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    margin-top: 68px;
+    gap: 32px;
+    align-items: center;
+    border: 1px solid rgba(255,255,255,.14);
+    border-radius: 10px;
+    padding: 48px 58px;
+    background:
+      linear-gradient(90deg, rgba(206,255,53,.1), rgba(255,255,255,.05)),
+      rgba(18,20,24,.88);
+  }
+
+  .commercial-band p {
+    max-width: 780px;
+    margin: 18px 0 0;
+    color: rgba(225,229,217,.72);
+    font-size: 15px;
+    line-height: 1.7;
   }
 
   @media (max-width: 1100px) {
-    .home-hero-content,
-    .home-channel-band,
-    .home-safe-band {
+    .home-hero-inner,
+    .producer-spotlight,
+    .style-finder,
+    .commercial-band {
       grid-template-columns: 1fr;
     }
 
-    .home-hero-content {
-      align-items: end;
-      gap: 28px;
-    }
-
-    .home-hero-console {
-      max-width: 560px;
-    }
-
-    .home-template-grid {
+    .template-row {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .home-template-strip {
+    .workflow-track {
       grid-template-columns: repeat(3, minmax(0, 1fr));
+      row-gap: 28px;
     }
 
-    .home-producer-strip {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+    .workflow-step i {
+      display: none;
     }
   }
 
   @media (max-width: 720px) {
-    .home-hero {
+    .home-hero,
+    .home-hero-inner {
       min-height: auto;
     }
 
-    .home-hero-bg {
-      background-position: 58% center;
+    .home-hero-inner {
+      padding-top: 58px;
+      padding-bottom: 42px;
+      gap: 32px;
     }
 
-    .home-hero-content {
-      min-height: auto;
-      padding-top: 64px;
-      padding-bottom: 34px;
-    }
-
-    .home-hero-copy {
-      padding-bottom: 0;
-      transform: none;
-    }
-
-    .home-hero-copy p {
-      font-size: 15px;
-    }
-
-    .home-hero-console {
-      display: none;
-    }
-
-    .home-template-grid,
-    .home-channel-list {
-      grid-template-columns: 1fr;
-    }
-
-    .home-producer-strip {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .home-section-head {
-      align-items: start;
+    .home-start-panel div,
+    .home-section-line {
+      align-items: stretch;
       flex-direction: column;
     }
 
-    .home-safe-band {
-      margin-top: 52px;
+    .workflow-track,
+    .template-row,
+    .producer-works div,
+    .style-chip-grid {
+      grid-template-columns: 1fr;
     }
 
-    .home-safe-band .hc-button {
-      width: 100%;
+    .producer-spotlight,
+    .style-finder,
+    .commercial-band {
+      padding-left: 22px;
+      padding-right: 22px;
+    }
+
+    .producer-signature {
+      min-height: 64px;
     }
   }
 `;

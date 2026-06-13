@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import type { CSSProperties, MouseEvent } from 'react';
 import { useParams } from 'next/navigation';
 import type { ProducerCollaboratorWorks, ProducerProfile } from '@/types/producer';
 
@@ -15,6 +16,21 @@ interface TemplateItem {
   previewUrl?: string;
   price?: number;
   salesCount?: number;
+}
+
+interface CollaboratorCloudStyle extends CSSProperties {
+  '--cloud-x': string;
+  '--cloud-y': string;
+  '--cloud-w': string;
+  '--cloud-font': string;
+  '--cloud-speed': string;
+  '--cloud-delay': string;
+  '--orbit-x': string;
+  '--orbit-y': string;
+  '--orbit-x2': string;
+  '--orbit-y2': string;
+  '--mx': string;
+  '--my': string;
 }
 
 const FALLBACK_TAGS = ['华语流行 Demo', '摇滚编曲', '抒情副歌', '商业广告', '唱作人小样'];
@@ -100,6 +116,46 @@ function getFallbackCoverBackground(name: string): string {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
   }
   return FALLBACK_COVERS[Math.abs(hash) % FALLBACK_COVERS.length];
+}
+
+function getStableHash(input: string) {
+  let hash = 0;
+  for (let i = 0; i < input.length; i += 1) {
+    hash = ((hash << 5) - hash) + input.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+function getRange(seed: number, salt: number, min: number, max: number) {
+  const normalized = ((seed * (salt + 17)) % 997) / 997;
+  return min + normalized * (max - min);
+}
+
+function getCollaboratorCloudStyle(name: string, index: number, total: number): CollaboratorCloudStyle {
+  const seed = getStableHash(`${name}-${index}`);
+  const rows = Math.max(1, Math.ceil(total / 2));
+  const row = Math.floor(index / 2);
+  const column = index % 2;
+  const rowStep = rows === 1 ? 0 : 68 / (rows - 1);
+  const x = (column === 0 ? 8 : 49) + getRange(seed, 1, -1.8, 1.8);
+  const y = 10 + (row * rowStep) + getRange(seed, 2, -1.8, 1.8);
+  const wideName = name.length >= 4;
+
+  return {
+    '--cloud-x': `${Math.max(6, Math.min(51, x)).toFixed(1)}%`,
+    '--cloud-y': `${Math.max(8, Math.min(78, y)).toFixed(1)}%`,
+    '--cloud-w': `${getRange(seed, 3, wideName ? 40 : 35, wideName ? 43 : 41).toFixed(1)}%`,
+    '--cloud-font': `${getRange(seed, 4, wideName ? 12 : 13, wideName ? 14 : 16).toFixed(1)}px`,
+    '--cloud-speed': `${getRange(seed, 5, 8.5, 14).toFixed(1)}s`,
+    '--cloud-delay': `${(getRange(seed, 6, -8, 0)).toFixed(1)}s`,
+    '--orbit-x': `${getRange(seed, 7, -8, 8).toFixed(1)}px`,
+    '--orbit-y': `${getRange(seed, 8, -7, 7).toFixed(1)}px`,
+    '--orbit-x2': `${getRange(seed, 9, -10, 10).toFixed(1)}px`,
+    '--orbit-y2': `${getRange(seed, 10, -8, 8).toFixed(1)}px`,
+    '--mx': '0px',
+    '--my': '0px',
+  };
 }
 
 function isUsableImageUrl(url?: string) {
@@ -240,7 +296,22 @@ export default function ProducerProfilePage() {
     return producer.collaborators;
   }, [producer]);
 
+  const cloudCollaborators = useMemo(() => collaborators.slice(0, 14), [collaborators]);
+
   const collaboratorWorks = useMemo(() => producer?.collaboratorWorks || [], [producer]);
+
+  const handleCollaboratorMove = (event: MouseEvent<HTMLButtonElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = (event.clientX - rect.left - (rect.width / 2)) * 0.14;
+    const y = (event.clientY - rect.top - (rect.height / 2)) * 0.2;
+    event.currentTarget.style.setProperty('--mx', `${x.toFixed(1)}px`);
+    event.currentTarget.style.setProperty('--my', `${y.toFixed(1)}px`);
+  };
+
+  const handleCollaboratorLeave = (event: MouseEvent<HTMLButtonElement>) => {
+    event.currentTarget.style.setProperty('--mx', '0px');
+    event.currentTarget.style.setProperty('--my', '0px');
+  };
 
   const styleTags = useMemo(() => {
     if (!producer || producer.styleTags.length === 0) return FALLBACK_TAGS;
@@ -359,10 +430,17 @@ export default function ProducerProfilePage() {
               </div>
             ) : (
               <div className="collaborator-cloud">
-                {collaborators.slice(0, 18).map((name) => {
+                {cloudCollaborators.map((name, index) => {
                   const works = getCollaboratorWorks(name, representativeWorks, collaboratorWorks);
                   return (
-                    <button type="button" className="collaborator-chip" key={name}>
+                    <button
+                      type="button"
+                      className="collaborator-chip"
+                      key={name}
+                      onMouseMove={handleCollaboratorMove}
+                      onMouseLeave={handleCollaboratorLeave}
+                      style={getCollaboratorCloudStyle(name, index, cloudCollaborators.length)}
+                    >
                       {name}
                       <span className="hover-card" role="tooltip">
                         <b>{name} 相关作品</b>
@@ -816,37 +894,67 @@ function ProducerStyles() {
 
       .collaborator-cloud {
         position: relative;
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 8px;
-        padding: 6px 0 8px;
+        height: clamp(330px, calc(100vh - 350px), 462px);
+        min-height: 330px;
+        overflow: visible;
+        border-radius: 16px;
       }
 
       .collaborator-chip {
-        position: relative;
-        min-height: 36px;
+        position: absolute;
+        left: var(--cloud-x);
+        top: var(--cloud-y);
+        z-index: 1;
+        width: var(--cloud-w);
+        min-height: 42px;
+        padding: 0 12px;
         border: 1px solid rgba(255,255,255,.1);
         border-radius: 999px;
-        background: rgba(255,255,255,.04);
+        background:
+          radial-gradient(circle at 50% 0, rgba(206,255,53,.08), transparent 55%),
+          rgba(255,255,255,.045);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 10px 24px rgba(0,0,0,.16);
         color: var(--hc-text);
-        font-size: 13px;
-        font-weight: 800;
+        font-size: var(--cloud-font);
+        font-weight: 900;
+        line-height: 1;
+        white-space: nowrap;
         cursor: default;
-        transition: transform .16s ease, background .16s ease, border-color .16s ease, color .16s ease;
+        transform: translate3d(var(--mx), var(--my), 0);
+        animation: collaboratorFloat var(--cloud-speed) ease-in-out var(--cloud-delay) infinite alternate;
+        transition: background .16s ease, border-color .16s ease, box-shadow .16s ease, color .16s ease;
+        will-change: transform;
       }
 
       .collaborator-chip:hover {
         z-index: 40;
-        transform: translateY(-2px);
         border-color: rgba(206,255,53,.42);
-        background: rgba(206,255,53,.12);
+        background:
+          radial-gradient(circle at 50% 0, rgba(206,255,53,.2), transparent 58%),
+          rgba(206,255,53,.12);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 16px 38px rgba(0,0,0,.28), 0 0 0 4px rgba(206,255,53,.05);
         color: var(--hc-lime);
+      }
+
+      @keyframes collaboratorFloat {
+        0% {
+          transform: translate3d(calc(var(--mx) - var(--orbit-x)), calc(var(--my) + var(--orbit-y)), 0);
+        }
+        28% {
+          transform: translate3d(calc(var(--mx) + var(--orbit-x2)), calc(var(--my) - var(--orbit-y)), 0);
+        }
+        58% {
+          transform: translate3d(calc(var(--mx) + var(--orbit-x)), calc(var(--my) + var(--orbit-y2)), 0);
+        }
+        100% {
+          transform: translate3d(calc(var(--mx) - var(--orbit-x2)), calc(var(--my) - var(--orbit-y2)), 0);
+        }
       }
 
       .hover-card {
         position: absolute;
         z-index: 50;
-        left: calc(100% + 12px);
+        left: calc(100% + 10px);
         top: 50%;
         width: 198px;
         padding: 12px 14px;
@@ -878,6 +986,12 @@ function ProducerStyles() {
       .collaborator-chip:hover .hover-card {
         opacity: 1;
         transform: translate(0, -50%);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .collaborator-chip {
+          animation: none;
+        }
       }
 
       .hover-card b {
