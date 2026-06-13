@@ -28,6 +28,7 @@ export interface ProducerSummary {
   displayName: string;
   avatarUrl?: string;
   styleTags: string[];
+  representativeWorks?: string[];
   templateCount: number;
 }
 

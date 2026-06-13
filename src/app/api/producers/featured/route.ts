@@ -14,7 +14,7 @@ export async function GET() {
 
     const { data: producers, error } = await supabase
       .from('producers')
-      .select('id, display_name, avatar_url, style_tags')
+      .select('id, display_name, avatar_url, style_tags, representative_works')
       .eq('status', 'active')
       .eq('is_featured', true)
       .limit(6);
@@ -48,6 +48,7 @@ export async function GET() {
       displayName: p.display_name,
       avatarUrl: p.avatar_url,
       styleTags: p.style_tags || [],
+      representativeWorks: p.representative_works || [],
       templateCount: templateCounts[p.id] || 0,
     }));
 

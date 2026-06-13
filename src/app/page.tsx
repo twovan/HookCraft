@@ -5,6 +5,10 @@ import Link from 'next/link';
 import type { CSSProperties } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import type { ProducerSummary } from '@/types/producer';
+import {
+  TERENCE_REPRESENTATIVE_WORKS,
+  formatRepresentativeWorkLabel,
+} from '@/lib/producer/terenceRepresentativeWorks';
 
 interface TemplateItem {
   id: string;
@@ -41,9 +45,13 @@ function formatPrice(template: TemplateItem) {
   return price > 0 ? `¥${price.toFixed(2)}` : '免费';
 }
 
-function splitWorksFromTemplates(templates: TemplateItem[]) {
-  const names = templates.map((template) => template.name).filter(Boolean);
-  return names.length > 0 ? names.slice(0, 8) : ['新芭乐', '流行摇滚', '品位流行', '芭乐歌模板'];
+function getProducerWorks(producer?: ProducerSummary) {
+  const works = producer?.representativeWorks?.filter(Boolean) ?? [];
+  const fallbackWorks = TERENCE_REPRESENTATIVE_WORKS.map((work) => `${work.artist} - ${work.title}`);
+
+  return (works.length > 0 ? works : fallbackWorks)
+    .slice(0, 8)
+    .map((work) => formatRepresentativeWorkLabel(work));
 }
 
 export default function HomePage() {
@@ -87,7 +95,7 @@ export default function HomePage() {
 
   const originalTemplates = useMemo(() => templates.slice(0, 4), [templates]);
   const producer = featuredProducers[0];
-  const producerWorks = useMemo(() => splitWorksFromTemplates(templates), [templates]);
+  const producerWorks = useMemo(() => getProducerWorks(producer), [producer]);
   const producerHref = producer ? `/producers/${producer.id}` : '/templates';
   const producerName = producer?.displayName || 'Terence Teo';
   const producerMeta = producer?.styleTags?.slice(0, 2).join(' / ') || '华语流行 / 摇滚编曲';
