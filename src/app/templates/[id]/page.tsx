@@ -208,7 +208,7 @@ export default function TemplateDetailPage() {
           <aside className="cover-panel">
             <div className="cover-frame">
               {template.coverUrl ? (
-                <Image src={template.coverUrl} alt={template.name} fill style={{ objectFit: 'cover' }} sizes="(max-width: 900px) 100vw, 45vw" />
+                <Image src={template.coverUrl} alt={template.name} fill priority style={{ objectFit: 'cover' }} sizes="(max-width: 900px) 100vw, 430px" />
               ) : (
                 <div className="gradient-cover" style={{ background: gradient }} />
               )}
@@ -339,11 +339,11 @@ function TemplateDetailStyles() {
           radial-gradient(circle at 92% 18%, rgba(82, 214, 198, 0.09), transparent 320px),
           var(--hc-bg);
         color: var(--hc-text);
-        padding: 42px 22px 72px;
+        padding: 32px 22px 68px;
       }
 
       .detail-container {
-        max-width: 1240px;
+        max-width: 1120px;
         margin: 0 auto;
       }
 
@@ -351,9 +351,9 @@ function TemplateDetailStyles() {
         display: flex;
         align-items: center;
         gap: 10px;
-        margin-bottom: 24px;
+        margin-bottom: 18px;
         color: var(--hc-muted);
-        font-size: 13px;
+        font-size: 12px;
         overflow: hidden;
         white-space: nowrap;
       }
@@ -371,8 +371,8 @@ function TemplateDetailStyles() {
 
       .hero-grid {
         display: grid;
-        grid-template-columns: minmax(300px, 0.88fr) minmax(0, 1.12fr);
-        gap: 34px;
+        grid-template-columns: minmax(320px, 430px) minmax(0, 1fr);
+        gap: 28px;
         align-items: start;
       }
 
@@ -380,17 +380,28 @@ function TemplateDetailStyles() {
         position: sticky;
         top: 98px;
         display: grid;
-        gap: 14px;
+        gap: 12px;
+        max-width: 430px;
       }
 
       .cover-frame {
         position: relative;
         aspect-ratio: 1 / 1;
         border: 1px solid var(--hc-line);
-        border-radius: var(--hc-radius-lg);
+        border-radius: 14px;
         overflow: hidden;
         background: var(--hc-panel);
-        box-shadow: var(--hc-shadow);
+        box-shadow: 0 20px 70px rgba(0, 0, 0, 0.34);
+      }
+
+      .cover-frame::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+          linear-gradient(180deg, rgba(0,0,0,0) 52%, rgba(0,0,0,.45)),
+          radial-gradient(circle at 50% 52%, transparent 0 32%, rgba(0,0,0,.18) 70%);
+        pointer-events: none;
       }
 
       .gradient-cover {
@@ -403,6 +414,7 @@ function TemplateDetailStyles() {
         left: 18px;
         right: 18px;
         bottom: 18px;
+        z-index: 1;
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -415,26 +427,26 @@ function TemplateDetailStyles() {
         border: 1px solid rgba(255, 255, 255, 0.32);
         background: rgba(0, 0, 0, 0.3);
         border-radius: 999px;
-        padding: 7px 12px;
-        font-size: 12px;
+        padding: 6px 10px;
+        font-size: 11px;
         font-weight: 800;
       }
 
       .cover-overlay strong {
         color: var(--hc-lime);
-        font-size: 30px;
+        font-size: 26px;
       }
 
       .signal-strip {
-        height: 70px;
+        height: 54px;
         display: grid;
         grid-template-columns: repeat(32, 1fr);
         align-items: end;
-        gap: 4px;
-        padding: 14px;
-        border-radius: var(--hc-radius);
+        gap: 3px;
+        padding: 10px 12px;
+        border-radius: 12px;
         border: 1px solid var(--hc-line);
-        background: rgba(24, 26, 34, 0.72);
+        background: rgba(18, 20, 27, 0.74);
       }
 
       .signal-strip span {
@@ -445,17 +457,19 @@ function TemplateDetailStyles() {
       }
 
       .detail-stack h1 {
-        margin: 12px 0 14px;
-        font-size: clamp(34px, 5vw, 64px);
-        line-height: 0.96;
+        margin: 10px 0 10px;
+        max-width: 720px;
+        font-size: clamp(30px, 4.2vw, 48px);
+        line-height: 1.02;
         letter-spacing: 0;
       }
 
       .lead {
-        margin: 0 0 22px;
+        margin: 0 0 18px;
+        max-width: 680px;
         color: var(--hc-muted);
-        font-size: 16px;
-        line-height: 1.9;
+        font-size: 14px;
+        line-height: 1.7;
       }
 
       .label-row {
@@ -470,8 +484,8 @@ function TemplateDetailStyles() {
         background: rgba(206, 255, 53, 0.1);
         color: var(--hc-lime);
         border-radius: 999px;
-        padding: 6px 10px;
-        font-size: 11px;
+        padding: 5px 9px;
+        font-size: 10px;
         font-weight: 900;
         text-transform: uppercase;
       }
@@ -491,29 +505,38 @@ function TemplateDetailStyles() {
         align-items: center;
         justify-content: space-between;
         gap: 18px;
-        border-radius: var(--hc-radius-lg);
-        padding: 22px;
-        margin-bottom: 14px;
+        border-radius: 14px;
+        padding: 16px 18px;
+        margin-bottom: 12px;
+        background:
+          linear-gradient(135deg, rgba(24, 26, 34, .96), rgba(16, 18, 24, .92)),
+          radial-gradient(circle at 86% 26%, rgba(206, 255, 53, .12), transparent 210px);
       }
 
       .price {
         color: var(--hc-lime);
-        font-size: 38px;
+        font-size: 30px;
         font-weight: 950;
         line-height: 1;
       }
 
       .action-panel p {
-        margin: 8px 0 0;
+        margin: 6px 0 0;
         color: var(--hc-muted);
-        font-size: 13px;
+        font-size: 12px;
       }
 
       .action-buttons {
         display: flex;
-        gap: 10px;
+        gap: 8px;
         flex-wrap: wrap;
         justify-content: flex-end;
+      }
+
+      .action-buttons .hc-button {
+        min-height: 38px;
+        padding: 10px 18px;
+        font-size: 12px;
       }
 
       .message {
@@ -539,12 +562,13 @@ function TemplateDetailStyles() {
       .info-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 12px;
+        gap: 10px;
       }
 
       .info-cell {
-        border-radius: var(--hc-radius);
-        padding: 16px;
+        border-radius: 12px;
+        padding: 13px 14px;
+        background: rgba(20, 22, 29, 0.78);
       }
 
       .info-cell span,
@@ -553,7 +577,7 @@ function TemplateDetailStyles() {
       .state-kicker {
         display: block;
         color: var(--hc-muted);
-        font-size: 11px;
+        font-size: 10px;
         font-weight: 900;
         letter-spacing: .08em;
         text-transform: uppercase;
@@ -561,25 +585,31 @@ function TemplateDetailStyles() {
 
       .info-cell strong {
         display: block;
-        margin-top: 8px;
+        margin-top: 7px;
         color: var(--hc-text);
-        font-size: 15px;
+        font-size: 14px;
       }
 
       .producer-card {
         display: flex;
         align-items: center;
         gap: 12px;
-        margin-top: 12px;
-        border-radius: var(--hc-radius);
-        padding: 14px;
+        margin-top: 10px;
+        border-radius: 12px;
+        padding: 12px 14px;
         color: inherit;
         text-decoration: none;
+        transition: border-color .18s ease, transform .18s ease;
+      }
+
+      .producer-card:hover {
+        border-color: rgba(206, 255, 53, 0.32);
+        transform: translateY(-1px);
       }
 
       .producer-avatar {
-        width: 44px;
-        height: 44px;
+        width: 38px;
+        height: 38px;
         border-radius: 50%;
         display: grid;
         place-items: center;
@@ -604,32 +634,32 @@ function TemplateDetailStyles() {
 
       .producer-card b {
         color: var(--hc-lime);
-        font-size: 12px;
+        font-size: 11px;
         white-space: nowrap;
       }
 
       .related-section {
-        margin-top: 72px;
+        margin-top: 54px;
       }
 
       .section-heading {
-        margin-bottom: 20px;
+        margin-bottom: 16px;
       }
 
       .section-heading h2 {
         margin: 6px 0 0;
-        font-size: 28px;
+        font-size: 24px;
       }
 
       .related-grid {
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 16px;
+        gap: 14px;
       }
 
       .related-card {
         display: block;
-        border-radius: var(--hc-radius);
+        border-radius: 12px;
         overflow: hidden;
         color: inherit;
         text-decoration: none;
@@ -645,14 +675,14 @@ function TemplateDetailStyles() {
       }
 
       .related-body {
-        padding: 14px;
+        padding: 12px;
       }
 
       .related-body strong {
         display: block;
-        margin: 12px 0 8px;
+        margin: 10px 0 7px;
         color: var(--hc-text);
-        font-size: 15px;
+        font-size: 14px;
       }
 
       .related-body b {
@@ -712,6 +742,8 @@ function TemplateDetailStyles() {
         .cover-panel {
           position: relative;
           top: auto;
+          width: min(100%, 380px);
+          margin: 0 auto;
         }
 
         .action-panel {
@@ -730,13 +762,17 @@ function TemplateDetailStyles() {
       }
 
       @media (max-width: 560px) {
+        .cover-panel {
+          width: min(100%, 340px);
+        }
+
         .info-grid,
         .related-grid {
           grid-template-columns: 1fr;
         }
 
         .detail-stack h1 {
-          font-size: 36px;
+          font-size: 32px;
         }
       }
     `}</style>
