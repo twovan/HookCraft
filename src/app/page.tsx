@@ -863,13 +863,19 @@ const homeStyles = `
 
   @keyframes studio-lite-perspective-loop {
     0%,
+    6%,
+    90%,
     100% {
-      transform: translateX(var(--studio-video-x)) perspective(1200px) rotateX(1.8deg) rotateY(-6deg) scale(.985);
+      transform: translateX(var(--studio-video-x)) perspective(1200px) rotateX(4deg) rotateY(-16deg) scale(.94);
     }
 
     22%,
-    72% {
+    60% {
       transform: translateX(var(--studio-video-x)) perspective(1200px) rotateX(0deg) rotateY(0deg) scale(1);
+    }
+
+    78% {
+      transform: translateX(var(--studio-video-x)) perspective(1200px) rotateX(3deg) rotateY(-11deg) scale(.965);
     }
   }
 
