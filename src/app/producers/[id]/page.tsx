@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
-import type { ProducerProfile } from '@/types/producer';
+import type { ProducerCollaboratorWorks, ProducerProfile } from '@/types/producer';
 
 interface TemplateItem {
   id: string;
@@ -85,19 +85,6 @@ const FALLBACK_COLLABORATORS = [
   '周传雄',
 ];
 
-const COLLABORATOR_WORKS: Record<string, string[]> = {
-  林俊杰: ['她说', '一千年以后', '江南', '关键词'],
-  飞儿乐团: ['Lydia', '我们的爱', '千年之恋', '月牙湾'],
-  孙燕姿: ['遇见', '需要你', '第一天', '眼泪成诗'],
-  蔡健雅: ['原点', '达尔文', '空白格', '红色高跟鞋'],
-  萧敬腾: ['原谅我', '王妃', '新不了情', '只能想念你'],
-  张学友: ['白月光', '如果这都不算爱', '一千个伤心的理由', '吻别'],
-  蔡依林: ['柠檬草的味道', '倒带', '说爱你', '天空'],
-  王心凌: ['第一次爱的人', '睫毛弯弯', '爱你', '彩虹的微笑'],
-  梁咏琪: ['短发', '胆小鬼', '花火', '爱的代价'],
-  周传雄: ['黄昏', '寂寞沙洲冷', '冬天的秘密', '青花'],
-};
-
 const FALLBACK_COVERS = [
   'radial-gradient(circle at 24% 24%, rgba(255,120,198,.42), transparent 28%), linear-gradient(135deg, #22152d 0%, #331044 42%, #071016 100%)',
   'radial-gradient(circle at 50% 10%, rgba(245,197,66,.45), transparent 30%), linear-gradient(135deg, #2a1508 0%, #784115 48%, #08090c 100%)',
@@ -145,8 +132,13 @@ function getRepresentativeWorks(producer: ProducerProfile) {
   return works.length > 0 ? works : FALLBACK_REPRESENTATIVE_WORKS;
 }
 
-function getCollaboratorWorks(name: string, representativeWorks: string[]) {
-  if (COLLABORATOR_WORKS[name]) return COLLABORATOR_WORKS[name];
+function getCollaboratorWorks(
+  name: string,
+  representativeWorks: string[],
+  collaboratorWorks: ProducerCollaboratorWorks[],
+) {
+  const configured = collaboratorWorks.find((item) => item.name === name);
+  if (configured && configured.works.length > 0) return configured.works;
 
   const matched = representativeWorks
     .filter((work) => work.includes(name))
@@ -165,7 +157,7 @@ function formatDate(dateStr: string) {
 function formatPrice(template: TemplateItem) {
   if (template.category === 'free_template') return '免费';
   const price = template.price ? template.price / 100 : 0;
-  return price > 0 ? `¥${price.toFixed(2)}` : '待定价';
+  return price > 0 ? `¥${price.toFixed(2)}` : '免费';
 }
 
 async function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit, timeout = 10000) {
@@ -247,6 +239,8 @@ export default function ProducerProfilePage() {
     if (!producer || producer.collaborators.length === 0) return FALLBACK_COLLABORATORS;
     return producer.collaborators;
   }, [producer]);
+
+  const collaboratorWorks = useMemo(() => producer?.collaboratorWorks || [], [producer]);
 
   const styleTags = useMemo(() => {
     if (!producer || producer.styleTags.length === 0) return FALLBACK_TAGS;
@@ -348,13 +342,15 @@ export default function ProducerProfilePage() {
 
             {activeInfoTab === 'works' ? (
               <div className="works-list-frame" aria-label="代表作列表">
-                <div className={representativeWorks.length > 8 ? 'works-track is-rolling' : 'works-track'}>
-                  {scrollingRepresentativeWorks.map((work, index) => (
-                    <div className="work-row" key={`${work}-${index}`}>
-                      <span>{String((index % representativeWorks.length) + 1).padStart(2, '0')}</span>
-                      <strong>{work}</strong>
-                    </div>
-                  ))}
+                <div className="works-mask">
+                  <div className={representativeWorks.length > 8 ? 'works-track is-rolling' : 'works-track'}>
+                    {scrollingRepresentativeWorks.map((work, index) => (
+                      <div className="work-row" key={`${work}-${index}`}>
+                        <span>{String((index % representativeWorks.length) + 1).padStart(2, '0')}</span>
+                        <strong>{work}</strong>
+                      </div>
+                    ))}
+                  </div>
                 </div>
                 <div className="works-count">
                   <span>{representativeWorks.length} 首代表作</span>
@@ -364,7 +360,7 @@ export default function ProducerProfilePage() {
             ) : (
               <div className="collaborator-cloud">
                 {collaborators.slice(0, 18).map((name) => {
-                  const works = getCollaboratorWorks(name, representativeWorks);
+                  const works = getCollaboratorWorks(name, representativeWorks, collaboratorWorks);
                   return (
                     <button type="button" className="collaborator-chip" key={name}>
                       {name}
@@ -724,6 +720,11 @@ function ProducerStyles() {
         height: clamp(360px, calc(100vh - 320px), 506px);
         overflow: hidden;
         border-radius: 12px;
+      }
+
+      .works-mask {
+        height: calc(100% - 34px);
+        overflow: hidden;
         -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 26px, #000 calc(100% - 52px), transparent 100%);
         mask-image: linear-gradient(180deg, transparent 0, #000 26px, #000 calc(100% - 52px), transparent 100%);
       }
@@ -757,9 +758,9 @@ function ProducerStyles() {
         display: flex;
         justify-content: space-between;
         gap: 8px;
-        padding: 12px 4px 2px;
-        background: linear-gradient(180deg, transparent, rgba(12,14,18,.96) 44%);
-        color: var(--hc-text-weak);
+        padding: 9px 4px 2px;
+        background: linear-gradient(180deg, rgba(12,14,18,0), rgba(12,14,18,.98) 52%);
+        color: rgba(168,170,163,.78);
         font-size: 10px;
         font-weight: 800;
       }

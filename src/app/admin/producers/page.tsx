@@ -6,6 +6,11 @@ import DataTable, { Column } from '@/components/admin/DataTable';
 import Tag from '@/components/admin/Tag';
 import ConfirmDialog from '@/components/admin/ConfirmDialog';
 import FormModal from '@/components/admin/FormModal';
+import {
+  formatCollaboratorWorksInput,
+  parseCollaboratorWorksInput,
+} from '@/lib/producer/collaboratorWorks';
+import type { ProducerCollaboratorWorks } from '@/types/producer';
 
 interface Producer {
   id: string;
@@ -17,6 +22,7 @@ interface Producer {
   representativeWorks: string[];
   useCases: string[];
   collaborators: string[];
+  collaboratorWorks: ProducerCollaboratorWorks[];
   revenueShare: number;
   status: string;
   templateCount: number;
@@ -82,6 +88,7 @@ export default function AdminProducersPage() {
     representativeWorks: '',
     useCases: '',
     collaborators: '',
+    collaboratorWorks: '',
     revenueShare: '70',
   });
   const [updating, setUpdating] = useState(false);
@@ -195,6 +202,7 @@ export default function AdminProducersPage() {
       representativeWorks: (producer.representativeWorks || []).join(', '),
       useCases: (producer.useCases || []).join(', '),
       collaborators: (producer.collaborators || []).join(', '),
+      collaboratorWorks: formatCollaboratorWorksInput(producer.collaboratorWorks),
       revenueShare: String(Math.round((producer.revenueShare || 0.7) * 100)),
     });
     setEditOpen(true);
@@ -219,6 +227,7 @@ export default function AdminProducersPage() {
           representativeWorks: splitListInput(editForm.representativeWorks),
           useCases: splitListInput(editForm.useCases),
           collaborators: splitListInput(editForm.collaborators),
+          collaboratorWorks: parseCollaboratorWorksInput(editForm.collaboratorWorks),
           revenueShare: parseFloat(editForm.revenueShare) / 100,
         }),
       });
@@ -630,6 +639,18 @@ export default function AdminProducersPage() {
               onChange={(e) => setEditForm((f) => ({ ...f, collaborators: e.target.value }))}
               placeholder="张学友，孙燕姿，蔡依林，林俊杰"
             />
+          </div>
+          <div>
+            <label style={labelStyle}>歌星代表作（一行一个歌星）</label>
+            <textarea
+              style={{ ...inputStyle, minHeight: 108, resize: 'vertical' }}
+              value={editForm.collaboratorWorks}
+              onChange={(e) => setEditForm((f) => ({ ...f, collaboratorWorks: e.target.value }))}
+              placeholder={'孙燕姿：遇见、需要你、第一天\n林俊杰：她说、水仙、黑夜问白天'}
+            />
+            <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
+              用中文冒号分隔歌星和作品，作品之间用顿号、逗号或中文逗号分隔。
+            </div>
           </div>
           <div>
             <label style={labelStyle}>分成比例 (%)</label>

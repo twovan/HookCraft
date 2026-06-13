@@ -46,7 +46,7 @@ function formatPrice(template: TemplateItem, isPurchased: boolean) {
   if (isPurchased) return '已购';
   if (template.category === 'free_template') return '免费';
   const price = template.price ? Math.round(template.price / 100) : 0;
-  return price > 0 ? `¥${price}` : '待定价';
+  return price > 0 ? `¥${price}` : '免费';
 }
 
 function isUsableImageUrl(url?: string) {

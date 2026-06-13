@@ -1,5 +1,10 @@
 // types/producer.ts - 音乐老师/制作人类型定义
 
+export interface ProducerCollaboratorWorks {
+  name: string;
+  works: string[];
+}
+
 /** 制作人完整信息 */
 export interface ProducerProfile {
   id: string;
@@ -10,6 +15,7 @@ export interface ProducerProfile {
   representativeWorks: string[];
   useCases: string[];
   collaborators: string[];
+  collaboratorWorks: ProducerCollaboratorWorks[];
   templateCount: number;
   totalDownloads: number;
   totalSales?: number;

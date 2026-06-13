@@ -82,6 +82,7 @@ export async function GET(req: NextRequest) {
         representativeWorks: p.representative_works || [],
         useCases: p.use_cases || [],
         collaborators: p.collaborators || [],
+        collaboratorWorks: p.collaborator_works || [],
         revenueShare: Number(p.revenue_share) || 0.7,
         status: 'active',
         templateCount: templateStats[p.id] || 0,

@@ -14,6 +14,7 @@ export type ConfigType = 'credit_quota' | 'cost_rule' | 'pricing' | 'credits_pac
 export type AccessStatus = 'accessible' | 'upgrade_required';
 export type StyleDnaJobStatus = 'pending' | 'analyzing' | 'aggregating' | 'prompt_ready' | 'generating' | 'completed' | 'failed';
 export type StyleDnaSourceTrackStatus = 'pending' | 'analyzing' | 'completed' | 'failed';
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 // Database 接口定义
 export interface Database {
@@ -530,6 +531,7 @@ export interface Database {
           representative_works: string[];
           use_cases: string[];
           collaborators: string[];
+          collaborator_works: Json;
           total_downloads: number;
           is_featured: boolean;
           status: ProducerStatus;
@@ -547,6 +549,7 @@ export interface Database {
           representative_works?: string[];
           use_cases?: string[];
           collaborators?: string[];
+          collaborator_works?: Json;
           total_downloads?: number;
           is_featured?: boolean;
           status?: ProducerStatus;
@@ -564,6 +567,7 @@ export interface Database {
           representative_works?: string[];
           use_cases?: string[];
           collaborators?: string[];
+          collaborator_works?: Json;
           total_downloads?: number;
           is_featured?: boolean;
           status?: ProducerStatus;

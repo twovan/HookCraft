@@ -10,6 +10,7 @@ import type {
   ProducerTemplatesQuery,
 } from '../../types/producer';
 import { toAppError } from '../supabase/errors';
+import { normalizeCollaboratorWorks } from './collaboratorWorks';
 
 /**
  * ProducerService - 音乐老师/制作人服务
@@ -71,6 +72,7 @@ export class ProducerService {
       representativeWorks: producer.representative_works ?? [],
       useCases: producer.use_cases ?? [],
       collaborators: producer.collaborators ?? [],
+      collaboratorWorks: normalizeCollaboratorWorks(producer.collaborator_works),
       templateCount: templateCount ?? 0,
       totalDownloads: producer.total_downloads,
       totalSales,
