@@ -5,6 +5,12 @@ import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, MouseEvent } from 'react';
 import { useParams } from 'next/navigation';
 import type { ProducerCollaboratorWorks, ProducerProfile } from '@/types/producer';
+import {
+  TERENCE_REPRESENTATIVE_WORKS,
+  formatRepresentativeWorkLabel,
+  getRepresentativeWorkDetail,
+  type RepresentativeWorkDetail,
+} from '@/lib/producer/terenceRepresentativeWorks';
 
 interface TemplateItem {
   id: string;
@@ -35,58 +41,7 @@ interface CollaboratorCloudStyle extends CSSProperties {
 
 const FALLBACK_TAGS = ['华语流行 Demo', '摇滚编曲', '抒情副歌', '商业广告', '唱作人小样'];
 
-const FALLBACK_REPRESENTATIVE_WORKS = [
-  '飞儿乐团 - Lydia',
-  '孙燕姿 - 需要你',
-  '蔡健雅 - 原点',
-  '林俊杰 - 她说',
-  '萧敬腾 - 原谅我',
-  '梁咏琪 - 短发',
-  '张学友 - 白月光',
-  '孙燕姿 - 遇见',
-  '蔡依林 - 柠檬草的味道',
-  '林俊杰 - 一千年以后',
-  '王心凌 - 第一次爱的人',
-  '周传雄 - 黄昏',
-  '孙燕姿 - 天使的指纹',
-  '蔡淳佳 - 依恋',
-  '黄小琥 - 重来',
-  '林俊杰 - 零度的亲吻',
-  '薛之谦 - 深深爱过你',
-  '梁咏琪 - 原来爱情那么伤',
-  '张杰 - 云还在歌唱',
-  '肖战 - 沧海一声笑',
-  '孙燕姿 - 同类',
-  '林俊杰 - 黑夜问白天',
-  '欧阳菲菲 - 感恩的心',
-  '张学友 - 你好毒',
-  '孙燕姿 - 在，也不见',
-  '孙燕姿 - 眼泪成诗',
-  '孙燕姿 - 愚人的国度',
-  '蔡依林 - 说爱你',
-  '陈晓东 - 比我幸福',
-  '孙燕姿 - Hey Jude',
-  '萧煌奇 - 末班车',
-  '孙燕姿 - 原来你什么都不要',
-  '那英 - 一笑而过',
-  '谢霆锋 - 谢谢你的爱1999',
-  '张信哲 - 白月光',
-  '孙燕姿 - 雨天',
-  '莫文蔚 - 爱',
-  '飞儿乐团 - Lydia',
-  '叶倩文 - 爱的可能',
-  '梁咏琪 - 短发',
-  '孙燕姿 - 半句再见',
-  '孙燕姿 - 第一天',
-  '徐怀钰 - 分飞',
-  '飞儿乐团 - 千年之恋',
-  '汪苏泷 - 年轮',
-  '王心凌 - 第一次爱的人',
-  '周传雄 - 关不上的窗',
-  '飞儿乐团 - 我们的爱',
-  '林俊杰 - 学不会',
-  '周传雄 - 寂寞沙洲冷',
-];
+const FALLBACK_REPRESENTATIVE_WORKS = TERENCE_REPRESENTATIVE_WORKS.map((work) => `${work.artist} - ${work.title}`);
 
 const FALLBACK_COLLABORATORS = [
   '林俊杰',
@@ -236,6 +191,7 @@ export default function ProducerProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
   const [activeInfoTab, setActiveInfoTab] = useState<'works' | 'collaborators'>('works');
+  const [activeWorkDetail, setActiveWorkDetail] = useState<RepresentativeWorkDetail | null>(null);
   const [searchText, setSearchText] = useState('');
   const [freeOnly, setFreeOnly] = useState(false);
 
@@ -280,16 +236,28 @@ export default function ProducerProfilePage() {
 
   const representativeWorks = useMemo(() => {
     if (!producer) return FALLBACK_REPRESENTATIVE_WORKS;
-    const uniqueWorks = [...getRepresentativeWorks(producer), ...FALLBACK_REPRESENTATIVE_WORKS].filter((work, index, list) => (
-      list.indexOf(work) === index
-    ));
-    return uniqueWorks.slice(0, 50);
+    const seenWorks = new Set<string>();
+    const uniqueWorks = [...getRepresentativeWorks(producer), ...FALLBACK_REPRESENTATIVE_WORKS].filter((work) => {
+      const key = formatRepresentativeWorkLabel(work);
+      if (seenWorks.has(key)) return false;
+      seenWorks.add(key);
+      return true;
+    });
+    return uniqueWorks.slice(0, 51);
   }, [producer]);
 
   const scrollingRepresentativeWorks = useMemo(() => {
     if (representativeWorks.length <= 8) return representativeWorks;
     return [...representativeWorks, ...representativeWorks];
   }, [representativeWorks]);
+
+  const handleWorkEnter = (work: string) => {
+    setActiveWorkDetail(getRepresentativeWorkDetail(work));
+  };
+
+  const handleWorkLeave = () => {
+    setActiveWorkDetail(null);
+  };
 
   const collaborators = useMemo(() => {
     if (!producer || producer.collaborators.length === 0) return FALLBACK_COLLABORATORS;
@@ -416,13 +384,28 @@ export default function ProducerProfilePage() {
                 <div className="works-mask">
                   <div className={representativeWorks.length > 8 ? 'works-track is-rolling' : 'works-track'}>
                     {scrollingRepresentativeWorks.map((work, index) => (
-                      <div className="work-row" key={`${work}-${index}`}>
+                      <button
+                        type="button"
+                        className="work-row"
+                        key={`${work}-${index}`}
+                        onMouseEnter={() => handleWorkEnter(work)}
+                        onFocus={() => handleWorkEnter(work)}
+                        onMouseLeave={handleWorkLeave}
+                        onBlur={handleWorkLeave}
+                      >
                         <span>{String((index % representativeWorks.length) + 1).padStart(2, '0')}</span>
-                        <strong>{work}</strong>
-                      </div>
+                        <strong>{formatRepresentativeWorkLabel(work)}</strong>
+                      </button>
                     ))}
                   </div>
                 </div>
+                {activeWorkDetail && (
+                  <div className="work-intro-card" aria-live="polite">
+                    <span>{activeWorkDetail.artist}</span>
+                    <strong>{activeWorkDetail.title}</strong>
+                    <p>{activeWorkDetail.intro}</p>
+                  </div>
+                )}
                 <div className="works-count">
                   <span>{representativeWorks.length} 首代表作</span>
                   <span>悬停暂停</span>
@@ -752,7 +735,7 @@ function ProducerStyles() {
       .producer-side-panel {
         position: sticky;
         top: 96px;
-        z-index: 20;
+        z-index: 90;
         border-radius: 14px;
         padding: 16px;
       }
@@ -851,6 +834,58 @@ function ProducerStyles() {
         color: var(--hc-lime);
       }
 
+      .work-intro-card {
+        position: absolute;
+        z-index: 70;
+        left: calc(100% + 14px);
+        top: 112px;
+        width: 286px;
+        padding: 14px 16px 15px;
+        border: 1px solid rgba(255,255,255,.14);
+        border-radius: 14px;
+        background: rgba(5,6,8,.94);
+        box-shadow: 0 22px 56px rgba(0,0,0,.46);
+        color: var(--hc-text);
+        pointer-events: none;
+      }
+
+      .work-intro-card::before {
+        content: "";
+        position: absolute;
+        left: -7px;
+        top: 26px;
+        width: 12px;
+        height: 12px;
+        background: rgba(5,6,8,.94);
+        border-left: 1px solid rgba(255,255,255,.14);
+        border-bottom: 1px solid rgba(255,255,255,.14);
+        transform: rotate(45deg);
+      }
+
+      .work-intro-card span {
+        display: block;
+        color: var(--hc-lime);
+        font-size: 10px;
+        font-weight: 900;
+        line-height: 1;
+      }
+
+      .work-intro-card strong {
+        display: block;
+        margin-top: 7px;
+        color: #f7f8f2;
+        font-size: 15px;
+        line-height: 1.25;
+        font-weight: 900;
+      }
+
+      .work-intro-card p {
+        margin: 9px 0 0;
+        color: rgba(225,229,217,.76);
+        font-size: 12px;
+        line-height: 1.75;
+      }
+
       .works-list-frame::-webkit-scrollbar {
         width: 0;
       }
@@ -865,16 +900,24 @@ function ProducerStyles() {
         grid-template-columns: 30px minmax(0, 1fr);
         gap: 8px;
         align-items: center;
+        width: 100%;
         min-height: 34px;
         padding: 6px 8px;
+        border: 0;
         border-radius: 9px;
+        background: transparent;
         color: var(--hc-muted);
+        font: inherit;
+        text-align: left;
+        cursor: default;
         transition: background .18s ease, color .18s ease;
       }
 
-      .work-row:hover {
+      .work-row:hover,
+      .work-row:focus-visible {
         background: rgba(206,255,53,.08);
         color: var(--hc-text);
+        outline: none;
       }
 
       .work-row span {
@@ -1260,6 +1303,18 @@ function ProducerStyles() {
         .producer-side-panel {
           position: relative;
           top: 0;
+        }
+
+        .work-intro-card {
+          left: 16px;
+          right: 16px;
+          top: auto;
+          bottom: 44px;
+          width: auto;
+        }
+
+        .work-intro-card::before {
+          display: none;
         }
 
         .template-grid {
