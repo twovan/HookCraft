@@ -25,7 +25,14 @@ interface TemplateItem {
 }
 
 const GENRE_CHANNELS = ['Chinese POP', 'EDM', 'HIP-POP', 'ROCK', 'LO-FI', 'JAZZ'];
-const WORKFLOW_STEPS = ['灵感', 'HookCraft Original', 'Demo', 'Studio Lite', 'Leonard Finish', '发布'];
+const WORKFLOW_STEPS = [
+  { label: '灵感', icon: 'spark' },
+  { label: 'HookCraft Original', icon: 'wave' },
+  { label: 'Demo', icon: 'play' },
+  { label: 'Studio Lite', icon: 'sliders' },
+  { label: 'Leonard Finish', icon: 'master' },
+  { label: '发布', icon: 'send' },
+] as const;
 const TEMPLATE_FILTERS = ['全部', '流行', 'R&B', '说唱', '摇滚', '电子'];
 const WAVE_COLORS = ['#a855f7', '#d9a441', '#bfff1f', '#2dd4bf', '#f472b6', '#f97316'];
 const WAVEFORM_PROFILE = [18, 26, 42, 66, 34, 22, 54, 80, 46, 28, 24, 62, 36, 20, 18, 30, 74, 88, 52, 24, 18, 20, 34, 58, 72, 48, 30, 22, 26, 64, 40, 18, 16, 22, 70, 92, 46, 20, 18, 24, 38, 56];
@@ -132,9 +139,11 @@ export default function HomePage() {
         <SectionTitle eyebrow="HOOKCRAFT WORKFLOW" title="从灵感到发行的工作流" />
         <div className="workflow-track">
           {WORKFLOW_STEPS.map((step, index) => (
-            <div className="workflow-step" key={step}>
-              <span>{String(index + 1).padStart(2, '0')}</span>
-              <strong>{step}</strong>
+            <div className="workflow-step" key={step.label}>
+              <span>
+                <WorkflowIcon name={step.icon} />
+              </span>
+              <strong>{step.label}</strong>
               {index < WORKFLOW_STEPS.length - 1 && <i aria-hidden="true" />}
             </div>
           ))}
@@ -185,6 +194,41 @@ export default function HomePage() {
       </section>
 
       <section className="hc-container home-section">
+        <div className="studio-lite-showcase">
+          <div className="studio-lite-copy">
+            <span className="studio-lite-kicker">Studio Lite</span>
+
+            <div className="studio-lite-feature">
+              <h3>专业编辑器 <span aria-hidden="true">&gt;</span></h3>
+              <p>12类专业分轨结果，解锁 WAV 和高级制作功能。</p>
+              <small>多分轨结果 高级制作 WAV/批量导出</small>
+            </div>
+
+            <div className="studio-lite-feature">
+              <h3>基础编辑器 <span aria-hidden="true">&gt;</span></h3>
+              <p>2轨: 人声+伴奏，支持完整片段编辑，导出 MP3。</p>
+              <small>人声+伴奏 片段剪辑 MP3导出</small>
+            </div>
+
+            <Link href="/studio" className="studio-lite-cta">立即体验</Link>
+          </div>
+
+          <div className="studio-lite-video-wrap" aria-label="Studio Lite 编辑器演示">
+            <video
+              className="studio-lite-video"
+              autoPlay
+              muted
+              loop
+              playsInline
+              poster="/showcase/hookcraft-console-perspective-alpha-poster.png"
+            >
+              <source src="/showcase/hookcraft-console-perspective-alpha.webm" type="video/webm" />
+            </video>
+          </div>
+        </div>
+      </section>
+
+      <section className="hc-container home-section">
         <div className="style-finder">
           <h2>按风格找灵感</h2>
           <div className="style-chip-grid">
@@ -213,6 +257,19 @@ function SectionTitle({ eyebrow, title }: { eyebrow: string; title: string }) {
       <span>{eyebrow}</span>
       <h2>{title}</h2>
     </div>
+  );
+}
+
+function WorkflowIcon({ name }: { name: (typeof WORKFLOW_STEPS)[number]['icon'] }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      {name === 'spark' && <path d="M12 3l1.7 5.1L19 10l-5.3 1.9L12 17l-1.7-5.1L5 10l5.3-1.9L12 3Z" />}
+      {name === 'wave' && <path d="M3 13c2.1 0 2.1-5 4.2-5s2.1 8 4.2 8 2.1-8 4.2-8 2.1 5 5.4 5" />}
+      {name === 'play' && <path d="M8 6v12l10-6L8 6Z" />}
+      {name === 'sliders' && <path d="M5 7h9M18 7h1M5 12h2M11 12h8M5 17h11M20 17h-1M14 5v4M7 10v4M16 15v4" />}
+      {name === 'master' && <path d="M4 15c3.5-6 6.5-6 10 0M7 18c2-3 4-3 6 0M15 6l5 5M20 6l-5 5" />}
+      {name === 'send' && <path d="M4 12 20 5l-6 15-3-6-7-2Z" />}
+    </svg>
   );
 }
 
@@ -294,9 +351,21 @@ const homeStyles = `
     position: absolute;
     inset: 0;
     background:
-      linear-gradient(90deg, rgba(5,7,10,.94), rgba(5,7,10,.72) 45%, rgba(5,7,10,.92)),
+      radial-gradient(circle at 68% 34%, rgba(206,255,53,.36), transparent 18%),
+      radial-gradient(circle at 74% 45%, rgba(255,255,255,.2), transparent 16%),
+      linear-gradient(90deg, rgba(5,7,10,.94), rgba(5,7,10,.62) 45%, rgba(5,7,10,.9)),
       url('/home-hero-studio.webp') center / cover;
     opacity: .95;
+  }
+
+  .home-hero::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(115deg, transparent 54%, rgba(206,255,53,.18) 55%, transparent 66%);
+    mix-blend-mode: screen;
+    opacity: .78;
   }
 
   .home-hero-inner {
@@ -397,12 +466,18 @@ const homeStyles = `
 
   .home-section-line {
     display: flex;
-    align-items: end;
+    align-items: flex-start;
     justify-content: space-between;
     gap: 24px;
+    margin-bottom: 22px;
+  }
+
+  .home-section-line .section-title {
+    margin-bottom: 0;
   }
 
   .home-text-link {
+    margin-top: 8px;
     color: var(--hc-lime);
     text-decoration: none;
     font-weight: 900;
@@ -423,6 +498,7 @@ const homeStyles = `
     gap: 12px;
     color: rgba(247,248,242,.78);
     text-align: center;
+    transition: color .18s ease, transform .18s ease;
   }
 
   .workflow-step span {
@@ -436,6 +512,28 @@ const homeStyles = `
     color: var(--hc-lime);
     font-size: 14px;
     font-weight: 900;
+    transition: background .18s ease, border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+  }
+
+  .workflow-step svg {
+    width: 24px;
+    height: 24px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.9;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .workflow-step:hover {
+    color: #f7f8f2;
+    transform: translateY(-3px);
+  }
+
+  .workflow-step:hover span {
+    border-color: rgba(206,255,53,.62);
+    background: rgba(206,255,53,.16);
+    box-shadow: 0 0 0 6px rgba(206,255,53,.07), 0 16px 34px rgba(0,0,0,.28);
   }
 
   .workflow-step strong {
@@ -664,6 +762,103 @@ const homeStyles = `
     text-align: center;
   }
 
+  .studio-lite-showcase {
+    display: grid;
+    grid-template-columns: minmax(280px, .34fr) minmax(0, .66fr);
+    align-items: center;
+    gap: clamp(28px, 4vw, 72px);
+    min-height: 360px;
+    padding: 34px 40px 30px;
+    border: 1px solid rgba(255,255,255,.13);
+    border-radius: 10px;
+    background:
+      linear-gradient(90deg, rgba(12,15,20,.86), rgba(12,15,20,.42) 48%, rgba(12,15,20,.08)),
+      radial-gradient(circle at 72% 48%, rgba(206,255,53,.1), transparent 34%);
+    overflow: hidden;
+  }
+
+  .studio-lite-copy {
+    min-width: 0;
+  }
+
+  .studio-lite-kicker {
+    display: block;
+    color: #f7f8f2;
+    font-size: 28px;
+    font-weight: 950;
+    line-height: 1;
+  }
+
+  .studio-lite-feature {
+    margin-top: 30px;
+  }
+
+  .studio-lite-feature h3 {
+    margin: 0;
+    color: #f7f8f2;
+    font-size: 22px;
+    line-height: 1.12;
+  }
+
+  .studio-lite-feature h3 span {
+    color: var(--hc-lime);
+  }
+
+  .studio-lite-feature p {
+    margin: 14px 0 0;
+    color: rgba(225,229,217,.78);
+    font-size: 15px;
+    line-height: 1.45;
+  }
+
+  .studio-lite-feature small {
+    display: block;
+    margin-top: 6px;
+    color: rgba(247,248,242,.55);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .studio-lite-cta {
+    min-height: 46px;
+    margin-top: 30px;
+    border: 1px solid rgba(255,255,255,.42);
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #f7f8f2;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 920;
+    background: rgba(255,255,255,.05);
+    transition: background .18s ease, border-color .18s ease, color .18s ease, transform .18s ease;
+  }
+
+  .studio-lite-cta:hover {
+    transform: translateY(-2px);
+    border-color: rgba(206,255,53,.68);
+    background: rgba(206,255,53,.16);
+    color: var(--hc-lime);
+  }
+
+  .studio-lite-video-wrap {
+    position: relative;
+    min-height: 340px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .studio-lite-video {
+    display: block;
+    width: min(1040px, 118%);
+    max-width: none;
+    height: auto;
+    transform: translateX(4%);
+    filter: drop-shadow(0 26px 54px rgba(0,0,0,.38));
+  }
+
   .style-finder {
     display: grid;
     grid-template-columns: minmax(260px, .8fr) minmax(0, 1fr);
@@ -700,6 +895,15 @@ const homeStyles = `
     font-size: 14px;
     font-weight: 900;
     background: rgba(255,255,255,.035);
+    transition: transform .18s ease, background .18s ease, border-color .18s ease, color .18s ease, box-shadow .18s ease;
+  }
+
+  .style-chip-grid a:hover {
+    transform: translateY(-2px);
+    border-color: rgba(206,255,53,.58);
+    background: rgba(206,255,53,.13);
+    color: #f7f8f2;
+    box-shadow: 0 12px 28px rgba(0,0,0,.24);
   }
 
   .commercial-band {
@@ -727,9 +931,23 @@ const homeStyles = `
   @media (max-width: 1100px) {
     .home-hero-inner,
     .producer-spotlight,
+    .studio-lite-showcase,
     .style-finder,
     .commercial-band {
       grid-template-columns: 1fr;
+    }
+
+    .studio-lite-showcase {
+      padding: 30px 24px;
+    }
+
+    .studio-lite-video-wrap {
+      min-height: 260px;
+    }
+
+    .studio-lite-video {
+      width: 110%;
+      transform: none;
     }
 
     .template-row {
@@ -764,6 +982,14 @@ const homeStyles = `
       flex-direction: column;
     }
 
+    .home-section-line {
+      gap: 12px;
+    }
+
+    .home-text-link {
+      margin-top: 0;
+    }
+
     .workflow-track,
     .template-row,
     .producer-works div,
@@ -772,10 +998,24 @@ const homeStyles = `
     }
 
     .producer-spotlight,
+    .studio-lite-showcase,
     .style-finder,
     .commercial-band {
       padding-left: 22px;
       padding-right: 22px;
+    }
+
+    .studio-lite-kicker {
+      font-size: 26px;
+    }
+
+    .studio-lite-video-wrap {
+      min-height: 210px;
+      margin: 0 -16px;
+    }
+
+    .studio-lite-video {
+      width: 118%;
     }
 
     .producer-signature {
