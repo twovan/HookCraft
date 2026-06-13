@@ -63,6 +63,12 @@ function normalizeTitle(title: string) {
   return title.replace(/\s+/g, '').replace(/[()]/g, (match) => (match === '(' ? '（' : '）'));
 }
 
+function findRepresentativeWorkByTitle(title: string) {
+  const normalizedTitle = normalizeTitle(title);
+
+  return TERENCE_REPRESENTATIVE_WORKS.find((item) => normalizeTitle(item.title) === normalizedTitle) ?? null;
+}
+
 export function parseRepresentativeWorkLabel(work: string) {
   const normalized = work.replace(/\s*[—–-]\s*/g, '—').trim();
   const [artist, ...titleParts] = normalized.split('—');
@@ -76,9 +82,8 @@ export function parseRepresentativeWorkLabel(work: string) {
 
 export function getRepresentativeWorkDetail(work: string) {
   const parsed = parseRepresentativeWorkLabel(work);
-  const parsedTitle = normalizeTitle(parsed.title);
 
-  return TERENCE_REPRESENTATIVE_WORKS.find((item) => normalizeTitle(item.title) === parsedTitle) ?? null;
+  return findRepresentativeWorkByTitle(parsed.title) ?? findRepresentativeWorkByTitle(parsed.artist);
 }
 
 export function formatRepresentativeWorkLabel(work: string) {

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import type { CSSProperties, MouseEvent } from 'react';
+import type { CSSProperties, FocusEvent, MouseEvent } from 'react';
 import { useParams } from 'next/navigation';
 import type { ProducerCollaboratorWorks, ProducerProfile } from '@/types/producer';
 import {
@@ -192,6 +192,7 @@ export default function ProducerProfilePage() {
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
   const [activeInfoTab, setActiveInfoTab] = useState<'works' | 'collaborators'>('works');
   const [activeWorkDetail, setActiveWorkDetail] = useState<RepresentativeWorkDetail | null>(null);
+  const [workIntroPosition, setWorkIntroPosition] = useState({ x: 0, y: 0 });
   const [searchText, setSearchText] = useState('');
   const [freeOnly, setFreeOnly] = useState(false);
 
@@ -251,8 +252,26 @@ export default function ProducerProfilePage() {
     return [...representativeWorks, ...representativeWorks];
   }, [representativeWorks]);
 
-  const handleWorkEnter = (work: string) => {
+  const updateWorkIntroPosition = (clientX: number, clientY: number) => {
+    setWorkIntroPosition({
+      x: Math.max(16, Math.min(clientX + 18, window.innerWidth - 326)),
+      y: Math.max(16, Math.min(clientY + 18, window.innerHeight - 180)),
+    });
+  };
+
+  const handleWorkEnter = (work: string, event: MouseEvent<HTMLButtonElement>) => {
     setActiveWorkDetail(getRepresentativeWorkDetail(work));
+    updateWorkIntroPosition(event.clientX, event.clientY);
+  };
+
+  const handleWorkFocus = (work: string, event: FocusEvent<HTMLButtonElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setActiveWorkDetail(getRepresentativeWorkDetail(work));
+    updateWorkIntroPosition(rect.right, rect.top);
+  };
+
+  const handleWorkMove = (event: MouseEvent<HTMLButtonElement>) => {
+    updateWorkIntroPosition(event.clientX, event.clientY);
   };
 
   const handleWorkLeave = () => {
@@ -388,8 +407,10 @@ export default function ProducerProfilePage() {
                         type="button"
                         className="work-row"
                         key={`${work}-${index}`}
-                        onMouseEnter={() => handleWorkEnter(work)}
-                        onFocus={() => handleWorkEnter(work)}
+                        title={getRepresentativeWorkDetail(work)?.intro}
+                        onMouseOver={(event) => handleWorkEnter(work, event)}
+                        onMouseMove={handleWorkMove}
+                        onFocus={(event) => handleWorkFocus(work, event)}
                         onMouseLeave={handleWorkLeave}
                         onBlur={handleWorkLeave}
                       >
@@ -400,7 +421,14 @@ export default function ProducerProfilePage() {
                   </div>
                 </div>
                 {activeWorkDetail && (
-                  <div className="work-intro-card" aria-live="polite">
+                  <div
+                    className="work-intro-card"
+                    aria-live="polite"
+                    style={{
+                      '--work-intro-x': `${workIntroPosition.x}px`,
+                      '--work-intro-y': `${workIntroPosition.y}px`,
+                    } as CSSProperties}
+                  >
                     <span>{activeWorkDetail.artist}</span>
                     <strong>{activeWorkDetail.title}</strong>
                     <p>{activeWorkDetail.intro}</p>
@@ -835,10 +863,10 @@ function ProducerStyles() {
       }
 
       .work-intro-card {
-        position: absolute;
-        z-index: 70;
-        left: calc(100% + 14px);
-        top: 112px;
+        position: fixed;
+        z-index: 1000;
+        left: var(--work-intro-x);
+        top: var(--work-intro-y);
         width: 286px;
         padding: 14px 16px 15px;
         border: 1px solid rgba(255,255,255,.14);
@@ -850,16 +878,7 @@ function ProducerStyles() {
       }
 
       .work-intro-card::before {
-        content: "";
-        position: absolute;
-        left: -7px;
-        top: 26px;
-        width: 12px;
-        height: 12px;
-        background: rgba(5,6,8,.94);
-        border-left: 1px solid rgba(255,255,255,.14);
-        border-bottom: 1px solid rgba(255,255,255,.14);
-        transform: rotate(45deg);
+        display: none;
       }
 
       .work-intro-card span {
@@ -1309,7 +1328,7 @@ function ProducerStyles() {
           left: 16px;
           right: 16px;
           top: auto;
-          bottom: 44px;
+          bottom: 72px;
           width: auto;
         }
 
