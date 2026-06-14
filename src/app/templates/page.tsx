@@ -859,6 +859,9 @@ const templatesStyles = `
 
   .template-market-card {
     min-width: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
     border: 1px solid rgba(255,255,255,.13);
     border-radius: 8px;
@@ -924,18 +927,24 @@ const templatesStyles = `
   }
 
   .template-market-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
     padding: 18px 16px 16px;
   }
 
   .template-market-title {
-    display: block;
-    min-height: 52px;
+    display: -webkit-box;
+    min-height: 66px;
     color: #f7f4ed;
     text-decoration: none;
-    font-size: 21px;
-    line-height: 1.24;
+    font-size: 18px;
+    line-height: 1.22;
     font-weight: 930;
     letter-spacing: 0;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
   }
 
   .template-market-title:hover {
@@ -1014,7 +1023,8 @@ const templatesStyles = `
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    margin-top: 16px;
+    margin-top: auto;
+    padding-top: 16px;
   }
 
   .template-market-bottom strong {
