@@ -296,7 +296,6 @@ export default function ProducerProfilePage() {
                       onMouseLeave={handleWorkLeave}
                       onBlur={handleWorkLeave}
                     >
-                      <span>{String((index % representativeWorks.length) + 1).padStart(2, '0')}</span>
                       <strong>{formatRepresentativeWorkLabel(work)}</strong>
                     </button>
                   ))}
@@ -311,8 +310,8 @@ export default function ProducerProfilePage() {
                     '--work-intro-y': `${workIntroPosition.y}px`,
                   } as CSSProperties}
                 >
+                  <strong>{activeWorkDetail.title.startsWith('《') && activeWorkDetail.title.endsWith('》') ? activeWorkDetail.title : `《${activeWorkDetail.title}》`}</strong>
                   <span>{activeWorkDetail.artist}</span>
-                  <strong>{activeWorkDetail.title}</strong>
                   <p>{activeWorkDetail.intro}</p>
                 </div>
               )}
@@ -787,6 +786,7 @@ function ProducerStyles() {
 
       .work-intro-card span {
         display: block;
+        margin-top: 7px;
         color: var(--hc-lime);
         font-size: 10px;
         font-weight: 900;
@@ -795,7 +795,6 @@ function ProducerStyles() {
 
       .work-intro-card strong {
         display: block;
-        margin-top: 7px;
         color: #f7f8f2;
         font-size: 15px;
         line-height: 1.25;
@@ -819,13 +818,11 @@ function ProducerStyles() {
       }
 
       .work-row {
-        display: grid;
-        grid-template-columns: 30px minmax(0, 1fr);
-        gap: 8px;
+        display: block;
         align-items: center;
         width: 100%;
         min-height: 34px;
-        padding: 6px 8px;
+        padding: 6px 10px;
         border: 0;
         border-radius: 9px;
         background: transparent;
@@ -843,13 +840,8 @@ function ProducerStyles() {
         outline: none;
       }
 
-      .work-row span {
-        color: var(--hc-text-weak);
-        font-size: 10px;
-        font-weight: 850;
-      }
-
       .work-row strong {
+        display: block;
         min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
