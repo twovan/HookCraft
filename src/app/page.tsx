@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ProducerSummary } from '@/types/producer';
 import {
   TERENCE_REPRESENTATIVE_WORKS,
@@ -36,7 +36,6 @@ const WORKFLOW_STEPS = [
 const TEMPLATE_FILTERS = ['全部', '流行', 'R&B', '说唱', '摇滚', '电子'];
 const WAVE_COLORS = ['#a855f7', '#d9a441', '#bfff1f', '#2dd4bf', '#f472b6', '#f97316'];
 const WAVEFORM_PROFILE = [18, 26, 42, 66, 34, 22, 54, 80, 46, 28, 24, 62, 36, 20, 18, 30, 74, 88, 52, 24, 18, 20, 34, 58, 72, 48, 30, 22, 26, 64, 40, 18, 16, 22, 70, 92, 46, 20, 18, 24, 38, 56];
-const STUDIO_INTRO_VIDEO = '/showcase/hookcraft-console-perspective-intro.webm';
 const STUDIO_LOOP_VIDEO = '/showcase/hookcraft-console-perspective-loop.webm';
 async function fetchWithTimeout(url: string, timeoutMs = 8000) {
   const controller = new AbortController();
@@ -66,8 +65,6 @@ export default function HomePage() {
   const [templates, setTemplates] = useState<TemplateItem[]>([]);
   const [featuredProducers, setFeaturedProducers] = useState<ProducerSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [studioIntroDone, setStudioIntroDone] = useState(false);
-  const studioVideoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
     async function fetchTemplates() {
@@ -86,14 +83,6 @@ export default function HomePage() {
 
     void fetchTemplates();
   }, []);
-
-  useEffect(() => {
-    if (!studioIntroDone) return;
-    const video = studioVideoRef.current;
-    if (!video) return;
-    video.loop = true;
-    void video.play().catch(() => undefined);
-  }, [studioIntroDone]);
 
   useEffect(() => {
     async function fetchProducers() {
@@ -227,23 +216,14 @@ export default function HomePage() {
           <div className="studio-lite-video-wrap" aria-label="Studio Lite 编辑器演示">
             <div className="studio-lite-video-stage">
               <video
-                key={studioIntroDone ? 'studio-loop' : 'studio-intro'}
-                ref={studioVideoRef}
                 className="studio-lite-video"
-                src={studioIntroDone ? STUDIO_LOOP_VIDEO : STUDIO_INTRO_VIDEO}
+                src={STUDIO_LOOP_VIDEO}
                 autoPlay
                 muted
-                loop={studioIntroDone}
+                loop
                 playsInline
                 preload="auto"
                 poster="/showcase/hookcraft-console-perspective-alpha-poster.png"
-                onEnded={() => setStudioIntroDone(true)}
-                onError={() => setStudioIntroDone(true)}
-                onLoadedData={(event) => {
-                  if (studioIntroDone) {
-                    void event.currentTarget.play().catch(() => undefined);
-                  }
-                }}
               />
             </div>
           </div>
