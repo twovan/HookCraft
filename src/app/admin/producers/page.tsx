@@ -21,7 +21,6 @@ interface Producer {
   expertiseTags: string[];
   representativeWorks: string[];
   useCases: string[];
-  collaborators: string[];
   collaboratorWorks: ProducerCollaboratorWorks[];
   revenueShare: number;
   status: string;
@@ -56,6 +55,51 @@ function splitListInput(value: string) {
     .filter(Boolean);
 }
 
+function previewListInput(value: string, limit = 4) {
+  return splitListInput(value).slice(0, limit);
+}
+
+function FormField({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label style={labelStyle}>{label}</label>
+      {children}
+      {hint && <div style={fieldHintStyle}>{hint}</div>}
+    </div>
+  );
+}
+
+function EditSection({
+  eyebrow,
+  title,
+  description,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section style={editSectionStyle}>
+      <div style={editSectionHeaderStyle}>
+        <span style={editSectionEyebrowStyle}>{eyebrow}</span>
+        <h4 style={editSectionTitleStyle}>{title}</h4>
+        <p style={editSectionDescriptionStyle}>{description}</p>
+      </div>
+      <div style={editSectionFieldsStyle}>{children}</div>
+    </section>
+  );
+}
+
 export default function AdminProducersPage() {
   const [producers, setProducers] = useState<Producer[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
@@ -87,7 +131,6 @@ export default function AdminProducersPage() {
     expertiseTags: '',
     representativeWorks: '',
     useCases: '',
-    collaborators: '',
     collaboratorWorks: '',
     revenueShare: '70',
   });
@@ -201,7 +244,6 @@ export default function AdminProducersPage() {
       expertiseTags: (producer.expertiseTags || []).join(', '),
       representativeWorks: (producer.representativeWorks || []).join(', '),
       useCases: (producer.useCases || []).join(', '),
-      collaborators: (producer.collaborators || []).join(', '),
       collaboratorWorks: formatCollaboratorWorksInput(producer.collaboratorWorks),
       revenueShare: String(Math.round((producer.revenueShare || 0.7) * 100)),
     });
@@ -226,7 +268,6 @@ export default function AdminProducersPage() {
           styleTags: splitListInput(editForm.expertiseTags),
           representativeWorks: splitListInput(editForm.representativeWorks),
           useCases: splitListInput(editForm.useCases),
-          collaborators: splitListInput(editForm.collaborators),
           collaboratorWorks: parseCollaboratorWorksInput(editForm.collaboratorWorks),
           revenueShare: parseFloat(editForm.revenueShare) / 100,
         }),
@@ -584,93 +625,140 @@ export default function AdminProducersPage() {
         onSubmit={handleUpdateProducer}
         submitLabel="保存"
         loading={updating}
+        maxWidth={1040}
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div>
-            <label style={labelStyle}>姓名 *</label>
-            <input
-              style={inputStyle}
-              value={editForm.name}
-              onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
-              placeholder="制作人姓名"
-            />
-          </div>
-          <div>
-            <label style={labelStyle}>头像 URL</label>
-            <input
-              style={inputStyle}
-              value={editForm.avatarUrl}
-              onChange={(e) => setEditForm((f) => ({ ...f, avatarUrl: e.target.value }))}
-              placeholder="https://..."
-            />
-          </div>
-          <div>
-            <label style={labelStyle}>专长标签（逗号分隔）</label>
-            <input
-              style={inputStyle}
-              value={editForm.expertiseTags}
-              onChange={(e) => setEditForm((f) => ({ ...f, expertiseTags: e.target.value }))}
-              placeholder="电子, 流行, 嘻哈"
-            />
-          </div>
-          <div>
-            <label style={labelStyle}>代表作品标签（逗号或换行分隔）</label>
-            <textarea
-              style={{ ...inputStyle, minHeight: 72, resize: 'vertical' }}
-              value={editForm.representativeWorks}
-              onChange={(e) => setEditForm((f) => ({ ...f, representativeWorks: e.target.value }))}
-              placeholder="飞儿乐团—眷恋，王心凌—羽毛，孙燕姿—需要你"
-            />
-          </div>
-          <div>
-            <label style={labelStyle}>创作适用场景（逗号或换行分隔）</label>
-            <textarea
-              style={{ ...inputStyle, minHeight: 72, resize: 'vertical' }}
-              value={editForm.useCases}
-              onChange={(e) => setEditForm((f) => ({ ...f, useCases: e.target.value }))}
-              placeholder="华语流行 Demo，摇滚编曲，抒情副歌"
-            />
-          </div>
-          <div>
-            <label style={labelStyle}>合作艺人（逗号或换行分隔）</label>
-            <textarea
-              style={{ ...inputStyle, minHeight: 72, resize: 'vertical' }}
-              value={editForm.collaborators}
-              onChange={(e) => setEditForm((f) => ({ ...f, collaborators: e.target.value }))}
-              placeholder="张学友，孙燕姿，蔡依林，林俊杰"
-            />
-          </div>
-          <div>
-            <label style={labelStyle}>歌星代表作（一行一个歌星）</label>
-            <textarea
-              style={{ ...inputStyle, minHeight: 108, resize: 'vertical' }}
-              value={editForm.collaboratorWorks}
-              onChange={(e) => setEditForm((f) => ({ ...f, collaboratorWorks: e.target.value }))}
-              placeholder={'孙燕姿：遇见、需要你、第一天\n林俊杰：她说、水仙、黑夜问白天'}
-            />
-            <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
-              用中文冒号分隔歌星和作品，作品之间用顿号、逗号或中文逗号分隔。
+        <div style={editModalLayoutStyle}>
+          <aside style={profilePreviewStyle}>
+            <div style={profilePreviewHeaderStyle}>
+              <div style={profileAvatarStyle}>
+                {editForm.avatarUrl ? (
+                  <img src={editForm.avatarUrl} alt="" style={profileAvatarImageStyle} />
+                ) : (
+                  <span>{editForm.name.trim().charAt(0) || '制'}</span>
+                )}
+              </div>
+              <div>
+                <span style={previewEyebrowStyle}>ARTIST PAGE</span>
+                <h4 style={previewNameStyle}>{editForm.name || '未命名制作人'}</h4>
+                <p style={previewMetaStyle}>{editForm.revenueShare || 0}% 分成 · {editingProducer?.templateCount || 0} 个模板</p>
+              </div>
             </div>
-          </div>
-          <div>
-            <label style={labelStyle}>分成比例 (%)</label>
-            <input
-              style={inputStyle}
-              type="number"
-              min={0}
-              max={100}
-              value={editForm.revenueShare}
-              onChange={(e) => setEditForm((f) => ({ ...f, revenueShare: e.target.value }))}
-            />
-          </div>
-          <div>
-            <label style={labelStyle}>简介</label>
-            <textarea
-              style={{ ...inputStyle, minHeight: 88, resize: 'vertical' }}
-              value={editForm.bio}
-              onChange={(e) => setEditForm((f) => ({ ...f, bio: e.target.value }))}
-              placeholder="制作人介绍、风格说明等"
-            />
+            <p style={previewBioStyle}>{editForm.bio || '简介会显示在艺术家主页顶部，用来介绍制作人背景、风格和代表合作。'}</p>
+            <div style={previewGroupStyle}>
+              <span style={previewGroupLabelStyle}>风格标签</span>
+              <div style={chipRowStyle}>
+                {previewListInput(editForm.expertiseTags).map((tag) => <span key={tag} style={previewChipStyle}>{tag}</span>)}
+                {previewListInput(editForm.expertiseTags).length === 0 && <span style={previewEmptyStyle}>暂无标签</span>}
+              </div>
+            </div>
+            <div style={previewGroupStyle}>
+              <span style={previewGroupLabelStyle}>代表作</span>
+              <ul style={previewWorkListStyle}>
+                {previewListInput(editForm.representativeWorks, 5).map((work, index) => (
+                  <li key={`${work}-${index}`} style={previewWorkItemStyle}>
+                    <span style={previewWorkIndexStyle}>{String(index + 1).padStart(2, '0')}</span>
+                    {work}
+                  </li>
+                ))}
+                {previewListInput(editForm.representativeWorks).length === 0 && (
+                  <li style={previewWorkItemStyle}>
+                    <span style={previewWorkIndexStyle}>--</span>
+                    暂无代表作
+                  </li>
+                )}
+              </ul>
+            </div>
+          </aside>
+
+          <div style={editFormPanelStyle}>
+            <EditSection
+              eyebrow="PROFILE"
+              title="基础资料"
+              description="控制艺术家主页顶部身份、头像、简介和后台结算比例。"
+            >
+              <div style={twoColumnGridStyle}>
+                <FormField label="姓名 *">
+                  <input
+                    style={inputStyle}
+                    value={editForm.name}
+                    onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                    placeholder="制作人姓名"
+                  />
+                </FormField>
+                <FormField label="分成比例 (%)" hint="仅用于后台结算，前台不直接展示收益规则。">
+                  <input
+                    style={inputStyle}
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={editForm.revenueShare}
+                    onChange={(e) => setEditForm((f) => ({ ...f, revenueShare: e.target.value }))}
+                  />
+                </FormField>
+              </div>
+              <FormField label="头像 URL" hint="支持站内路径或 https 图片链接，会同步到模板卡片和艺术家主页。">
+                <input
+                  style={inputStyle}
+                  value={editForm.avatarUrl}
+                  onChange={(e) => setEditForm((f) => ({ ...f, avatarUrl: e.target.value }))}
+                  placeholder="https://..."
+                />
+              </FormField>
+              <FormField label="简介">
+                <textarea
+                  style={{ ...inputStyle, minHeight: 112, resize: 'vertical' }}
+                  value={editForm.bio}
+                  onChange={(e) => setEditForm((f) => ({ ...f, bio: e.target.value }))}
+                  placeholder="制作人介绍、风格说明等"
+                />
+              </FormField>
+            </EditSection>
+
+            <EditSection
+              eyebrow="STORE FRONT"
+              title="前台展示内容"
+              description="这些内容会组成艺术家页的标签、适用场景和左侧代表作列表。"
+            >
+              <FormField label="风格标签（逗号或换行分隔）" hint="例如：华语流行 Demo，摇滚编曲，抒情副歌。">
+                <textarea
+                  style={{ ...inputStyle, minHeight: 72, resize: 'vertical' }}
+                  value={editForm.expertiseTags}
+                  onChange={(e) => setEditForm((f) => ({ ...f, expertiseTags: e.target.value }))}
+                  placeholder="电子, 流行, 嘻哈"
+                />
+              </FormField>
+              <FormField label="创作适用场景（逗号或换行分隔）" hint="用于艺术家主页顶部的适用场景标签。">
+                <textarea
+                  style={{ ...inputStyle, minHeight: 72, resize: 'vertical' }}
+                  value={editForm.useCases}
+                  onChange={(e) => setEditForm((f) => ({ ...f, useCases: e.target.value }))}
+                  placeholder="华语流行 Demo，摇滚编曲，抒情副歌"
+                />
+              </FormField>
+              <FormField label="代表作品（逗号或换行分隔）" hint="建议使用「歌曲 - 艺人」或「艺人 - 歌曲」格式，便于前台悬停卡片匹配。">
+                <textarea
+                  style={{ ...inputStyle, minHeight: 132, resize: 'vertical' }}
+                  value={editForm.representativeWorks}
+                  onChange={(e) => setEditForm((f) => ({ ...f, representativeWorks: e.target.value }))}
+                  placeholder={'飞儿乐团 - 眷恋\n王心凌 - 羽毛\n孙燕姿 - 需要你'}
+                />
+              </FormField>
+            </EditSection>
+
+            <EditSection
+              eyebrow="CREDITS"
+              title="艺人合作关系"
+              description="维护每位艺人的代表作品，供艺术家资料和后续展示模块复用。"
+            >
+              <FormField label="歌星代表作（一行一个歌星）" hint="用中文冒号分隔歌星和作品，作品之间用顿号、逗号或中文逗号分隔。">
+                <textarea
+                  style={{ ...inputStyle, minHeight: 140, resize: 'vertical' }}
+                  value={editForm.collaboratorWorks}
+                  onChange={(e) => setEditForm((f) => ({ ...f, collaboratorWorks: e.target.value }))}
+                  placeholder={'孙燕姿：遇见、需要你、第一天\n林俊杰：她说、水仙、黑夜问白天'}
+                />
+              </FormField>
+            </EditSection>
           </div>
         </div>
       </FormModal>
@@ -699,6 +787,202 @@ const statsGridStyle: React.CSSProperties = {
   gridTemplateColumns: 'repeat(4, 1fr)',
   gap: 16,
   marginBottom: 16,
+};
+
+const editModalLayoutStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '280px minmax(0, 1fr)',
+  gap: 20,
+  alignItems: 'start',
+};
+
+const profilePreviewStyle: React.CSSProperties = {
+  position: 'sticky',
+  top: 0,
+  padding: 18,
+  borderRadius: 14,
+  border: '1px solid #e5e7eb',
+  background: 'linear-gradient(180deg, #111827 0%, #1f2937 100%)',
+  color: '#fff',
+};
+
+const profilePreviewHeaderStyle: React.CSSProperties = {
+  display: 'flex',
+  gap: 12,
+  alignItems: 'center',
+  marginBottom: 14,
+};
+
+const profileAvatarStyle: React.CSSProperties = {
+  width: 56,
+  height: 56,
+  borderRadius: '50%',
+  overflow: 'hidden',
+  flexShrink: 0,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  background: 'rgba(212,165,116,0.18)',
+  border: '1px solid rgba(212,165,116,0.42)',
+  color: '#D4A574',
+  fontSize: 22,
+  fontWeight: 800,
+};
+
+const profileAvatarImageStyle: React.CSSProperties = {
+  width: '100%',
+  height: '100%',
+  objectFit: 'cover',
+};
+
+const previewEyebrowStyle: React.CSSProperties = {
+  display: 'block',
+  marginBottom: 4,
+  color: '#D4A574',
+  fontSize: 10,
+  fontWeight: 800,
+  letterSpacing: '0.08em',
+};
+
+const previewNameStyle: React.CSSProperties = {
+  margin: 0,
+  fontSize: 18,
+  lineHeight: 1.2,
+};
+
+const previewMetaStyle: React.CSSProperties = {
+  margin: '5px 0 0',
+  color: '#d1d5db',
+  fontSize: 12,
+};
+
+const previewBioStyle: React.CSSProperties = {
+  margin: '0 0 16px',
+  color: '#e5e7eb',
+  fontSize: 12,
+  lineHeight: 1.7,
+};
+
+const previewGroupStyle: React.CSSProperties = {
+  paddingTop: 14,
+  borderTop: '1px solid rgba(255,255,255,0.12)',
+  marginTop: 14,
+};
+
+const previewGroupLabelStyle: React.CSSProperties = {
+  display: 'block',
+  marginBottom: 8,
+  color: '#9ca3af',
+  fontSize: 11,
+  fontWeight: 700,
+};
+
+const chipRowStyle: React.CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 6,
+};
+
+const previewChipStyle: React.CSSProperties = {
+  padding: '4px 8px',
+  borderRadius: 999,
+  background: 'rgba(212,165,116,0.14)',
+  color: '#f5d2aa',
+  fontSize: 11,
+  fontWeight: 700,
+};
+
+const previewEmptyStyle: React.CSSProperties = {
+  color: '#9ca3af',
+  fontSize: 12,
+};
+
+const previewWorkListStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 8,
+  margin: 0,
+  padding: 0,
+  listStyle: 'none',
+  color: '#f9fafb',
+  fontSize: 12,
+  lineHeight: 1.45,
+};
+
+const previewWorkItemStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '28px minmax(0, 1fr)',
+  gap: 8,
+  alignItems: 'baseline',
+};
+
+const previewWorkIndexStyle: React.CSSProperties = {
+  color: '#9ca3af',
+  fontSize: 11,
+  fontWeight: 800,
+};
+
+const editFormPanelStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 16,
+};
+
+const editSectionStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '180px minmax(0, 1fr)',
+  gap: 18,
+  padding: 18,
+  border: '1px solid #e5e7eb',
+  borderRadius: 14,
+  background: '#fff',
+};
+
+const editSectionHeaderStyle: React.CSSProperties = {
+  borderRight: '1px solid #f3f4f6',
+  paddingRight: 16,
+};
+
+const editSectionEyebrowStyle: React.CSSProperties = {
+  display: 'block',
+  marginBottom: 6,
+  color: '#D4A574',
+  fontSize: 10,
+  fontWeight: 800,
+  letterSpacing: '0.08em',
+};
+
+const editSectionTitleStyle: React.CSSProperties = {
+  margin: 0,
+  color: '#111827',
+  fontSize: 15,
+  fontWeight: 700,
+};
+
+const editSectionDescriptionStyle: React.CSSProperties = {
+  margin: '8px 0 0',
+  color: '#6b7280',
+  fontSize: 12,
+  lineHeight: 1.6,
+};
+
+const editSectionFieldsStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 14,
+};
+
+const twoColumnGridStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr) 140px',
+  gap: 12,
+};
+
+const fieldHintStyle: React.CSSProperties = {
+  marginTop: 5,
+  color: '#9ca3af',
+  fontSize: 11,
+  lineHeight: 1.5,
 };
 
 const sectionHeaderStyle: React.CSSProperties = {

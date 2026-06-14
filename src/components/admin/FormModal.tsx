@@ -9,6 +9,7 @@ export interface FormModalProps {
   onSubmit: () => void;
   submitLabel?: string;
   loading?: boolean;
+  maxWidth?: number;
   children: React.ReactNode;
 }
 
@@ -19,13 +20,14 @@ export default function FormModal({
   onSubmit,
   submitLabel = '提交',
   loading = false,
+  maxWidth,
   children,
 }: FormModalProps) {
   if (!open) return null;
 
   return (
     <div style={overlayStyle} onClick={onClose}>
-      <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+      <div style={{ ...modalStyle, maxWidth: maxWidth ?? modalStyle.maxWidth }} onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div style={headerStyle}>
           <h3 style={titleStyle}>{title}</h3>

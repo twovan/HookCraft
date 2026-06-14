@@ -260,7 +260,7 @@ export default function ProducerProfilePage() {
 
               <div className="hero-meta">
                 <Stat value="1500+" label="作品" />
-                <Stat value={producer.templateCount || 4} label="模板" />
+                <Stat value={producer.templateCount ?? templates.length} label="模板" />
                 <Stat value={formatDate(producer.joinedAt)} label="入驻" />
               </div>
             </div>
@@ -273,7 +273,7 @@ export default function ProducerProfilePage() {
 
         <section className="producer-workspace">
           <aside className="producer-side-panel">
-            <div className="works-panel-heading">
+            <div className="section-heading works-panel-heading">
               <div>
                 <span>REPRESENTATIVE WORKS</span>
                 <h2>代表作</h2>
@@ -324,7 +324,7 @@ export default function ProducerProfilePage() {
           </aside>
 
           <section className="template-area">
-            <div className="template-heading">
+            <div className="section-heading template-heading">
               <div>
                 <span>PRODUCER TEMPLATES</span>
                 <h2>模板作品</h2>
@@ -648,30 +648,31 @@ function ProducerStyles() {
         color: var(--hc-lime);
       }
 
-      .works-panel-heading {
+      .section-heading {
         display: flex;
         align-items: end;
         justify-content: space-between;
         gap: 14px;
-        margin-bottom: 16px;
-        padding: 2px 2px 14px;
+        min-height: 74px;
+        margin-bottom: 14px;
+        padding: 0 2px 14px;
         border-bottom: 1px solid rgba(255,255,255,.08);
       }
 
-      .works-panel-heading span {
+      .section-heading span {
         display: block;
         color: var(--hc-lime);
-        font-size: 10px;
+        font-size: 11px;
         font-weight: 900;
         letter-spacing: .08em;
         line-height: 1;
       }
 
-      .works-panel-heading h2 {
+      .section-heading h2 {
         margin: 6px 0 0;
         color: var(--hc-text);
-        font-size: 25px;
-        line-height: 1.08;
+        font-size: 24px;
+        line-height: 1.12;
         font-weight: 950;
       }
 
@@ -841,25 +842,7 @@ function ProducerStyles() {
       }
 
       .template-heading {
-        display: flex;
-        justify-content: space-between;
-        align-items: end;
         gap: 18px;
-        margin-bottom: 14px;
-      }
-
-      .template-heading span {
-        color: var(--hc-lime);
-        font-size: 11px;
-        font-weight: 900;
-        letter-spacing: .08em;
-      }
-
-      .template-heading h2 {
-        margin: 5px 0 0;
-        color: var(--hc-text);
-        font-size: 24px;
-        line-height: 1.12;
       }
 
       .template-tools {
