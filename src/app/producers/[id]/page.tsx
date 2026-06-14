@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, FocusEvent, MouseEvent } from 'react';
 import { useParams } from 'next/navigation';
-import type { ProducerCollaboratorWorks, ProducerProfile } from '@/types/producer';
+import type { ProducerProfile } from '@/types/producer';
 import {
   TERENCE_REPRESENTATIVE_WORKS,
   formatRepresentativeWorkLabel,
@@ -24,37 +24,9 @@ interface TemplateItem {
   salesCount?: number;
 }
 
-interface CollaboratorCloudStyle extends CSSProperties {
-  '--cloud-x': string;
-  '--cloud-y': string;
-  '--cloud-w': string;
-  '--cloud-font': string;
-  '--cloud-speed': string;
-  '--cloud-delay': string;
-  '--orbit-x': string;
-  '--orbit-y': string;
-  '--orbit-x2': string;
-  '--orbit-y2': string;
-  '--mx': string;
-  '--my': string;
-}
-
 const FALLBACK_TAGS = ['华语流行 Demo', '摇滚编曲', '抒情副歌', '商业广告', '唱作人小样'];
 
 const FALLBACK_REPRESENTATIVE_WORKS = TERENCE_REPRESENTATIVE_WORKS.map((work) => `${work.artist} - ${work.title}`);
-
-const FALLBACK_COLLABORATORS = [
-  '林俊杰',
-  '飞儿乐团',
-  '孙燕姿',
-  '蔡健雅',
-  '萧敬腾',
-  '张学友',
-  '蔡依林',
-  '王心凌',
-  '梁咏琪',
-  '周传雄',
-];
 
 const FALLBACK_COVERS = [
   'radial-gradient(circle at 24% 24%, rgba(255,120,198,.42), transparent 28%), linear-gradient(135deg, #22152d 0%, #331044 42%, #071016 100%)',
@@ -71,46 +43,6 @@ function getFallbackCoverBackground(name: string): string {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
   }
   return FALLBACK_COVERS[Math.abs(hash) % FALLBACK_COVERS.length];
-}
-
-function getStableHash(input: string) {
-  let hash = 0;
-  for (let i = 0; i < input.length; i += 1) {
-    hash = ((hash << 5) - hash) + input.charCodeAt(i);
-    hash |= 0;
-  }
-  return Math.abs(hash);
-}
-
-function getRange(seed: number, salt: number, min: number, max: number) {
-  const normalized = ((seed * (salt + 17)) % 997) / 997;
-  return min + normalized * (max - min);
-}
-
-function getCollaboratorCloudStyle(name: string, index: number, total: number): CollaboratorCloudStyle {
-  const seed = getStableHash(`${name}-${index}`);
-  const rows = Math.max(1, Math.ceil(total / 2));
-  const row = Math.floor(index / 2);
-  const column = index % 2;
-  const rowStep = rows === 1 ? 0 : 68 / (rows - 1);
-  const x = (column === 0 ? 8 : 49) + getRange(seed, 1, -1.8, 1.8);
-  const y = 10 + (row * rowStep) + getRange(seed, 2, -1.8, 1.8);
-  const wideName = name.length >= 4;
-
-  return {
-    '--cloud-x': `${Math.max(6, Math.min(51, x)).toFixed(1)}%`,
-    '--cloud-y': `${Math.max(8, Math.min(78, y)).toFixed(1)}%`,
-    '--cloud-w': `${getRange(seed, 3, wideName ? 40 : 35, wideName ? 43 : 41).toFixed(1)}%`,
-    '--cloud-font': `${getRange(seed, 4, wideName ? 12 : 13, wideName ? 14 : 16).toFixed(1)}px`,
-    '--cloud-speed': `${getRange(seed, 5, 8.5, 14).toFixed(1)}s`,
-    '--cloud-delay': `${(getRange(seed, 6, -8, 0)).toFixed(1)}s`,
-    '--orbit-x': `${getRange(seed, 7, -8, 8).toFixed(1)}px`,
-    '--orbit-y': `${getRange(seed, 8, -7, 7).toFixed(1)}px`,
-    '--orbit-x2': `${getRange(seed, 9, -10, 10).toFixed(1)}px`,
-    '--orbit-y2': `${getRange(seed, 10, -8, 8).toFixed(1)}px`,
-    '--mx': '0px',
-    '--my': '0px',
-  };
 }
 
 function isUsableImageUrl(url?: string) {
@@ -143,23 +75,6 @@ function getRepresentativeWorks(producer: ProducerProfile) {
   return works.length > 0 ? works : FALLBACK_REPRESENTATIVE_WORKS;
 }
 
-function getCollaboratorWorks(
-  name: string,
-  representativeWorks: string[],
-  collaboratorWorks: ProducerCollaboratorWorks[],
-) {
-  const configured = collaboratorWorks.find((item) => item.name === name);
-  if (configured && configured.works.length > 0) return configured.works;
-
-  const matched = representativeWorks
-    .filter((work) => work.includes(name))
-    .map((work) => work.replace(name, '').replace(/^[\s\-—–]+/, '').trim())
-    .filter(Boolean)
-    .slice(0, 4);
-
-  return matched.length > 0 ? matched : representativeWorks.slice(0, 4);
-}
-
 function formatDate(dateStr: string) {
   const d = new Date(dateStr);
   return d.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long' });
@@ -190,7 +105,6 @@ export default function ProducerProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
-  const [activeInfoTab, setActiveInfoTab] = useState<'works' | 'collaborators'>('works');
   const [activeWorkDetail, setActiveWorkDetail] = useState<RepresentativeWorkDetail | null>(null);
   const [workIntroPosition, setWorkIntroPosition] = useState({ x: 0, y: 0 });
   const [searchText, setSearchText] = useState('');
@@ -278,28 +192,6 @@ export default function ProducerProfilePage() {
     setActiveWorkDetail(null);
   };
 
-  const collaborators = useMemo(() => {
-    if (!producer || producer.collaborators.length === 0) return FALLBACK_COLLABORATORS;
-    return producer.collaborators;
-  }, [producer]);
-
-  const cloudCollaborators = useMemo(() => collaborators.slice(0, 14), [collaborators]);
-
-  const collaboratorWorks = useMemo(() => producer?.collaboratorWorks || [], [producer]);
-
-  const handleCollaboratorMove = (event: MouseEvent<HTMLButtonElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    const x = (event.clientX - rect.left - (rect.width / 2)) * 0.14;
-    const y = (event.clientY - rect.top - (rect.height / 2)) * 0.2;
-    event.currentTarget.style.setProperty('--mx', `${x.toFixed(1)}px`);
-    event.currentTarget.style.setProperty('--my', `${y.toFixed(1)}px`);
-  };
-
-  const handleCollaboratorLeave = (event: MouseEvent<HTMLButtonElement>) => {
-    event.currentTarget.style.setProperty('--mx', '0px');
-    event.currentTarget.style.setProperty('--my', '0px');
-  };
-
   const styleTags = useMemo(() => {
     if (!producer || producer.styleTags.length === 0) return FALLBACK_TAGS;
     return producer.styleTags;
@@ -384,84 +276,52 @@ export default function ProducerProfilePage() {
             <div className="side-tabs" role="tablist" aria-label="制作人信息">
               <button
                 type="button"
-                className={activeInfoTab === 'works' ? 'active' : ''}
-                onClick={() => setActiveInfoTab('works')}
+                className="active"
               >
                 代表作
               </button>
-              <button
-                type="button"
-                className={activeInfoTab === 'collaborators' ? 'active' : ''}
-                onClick={() => setActiveInfoTab('collaborators')}
-              >
-                合作艺人
-              </button>
             </div>
 
-            {activeInfoTab === 'works' ? (
-              <div className="works-list-frame" aria-label="代表作列表">
-                <div className="works-mask">
-                  <div className={representativeWorks.length > 8 ? 'works-track is-rolling' : 'works-track'}>
-                    {scrollingRepresentativeWorks.map((work, index) => (
-                      <button
-                        type="button"
-                        className="work-row"
-                        key={`${work}-${index}`}
-                        title={getRepresentativeWorkDetail(work)?.intro}
-                        onMouseOver={(event) => handleWorkEnter(work, event)}
-                        onMouseMove={handleWorkMove}
-                        onFocus={(event) => handleWorkFocus(work, event)}
-                        onMouseLeave={handleWorkLeave}
-                        onBlur={handleWorkLeave}
-                      >
-                        <span>{String((index % representativeWorks.length) + 1).padStart(2, '0')}</span>
-                        <strong>{formatRepresentativeWorkLabel(work)}</strong>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                {activeWorkDetail && (
-                  <div
-                    className="work-intro-card"
-                    aria-live="polite"
-                    style={{
-                      '--work-intro-x': `${workIntroPosition.x}px`,
-                      '--work-intro-y': `${workIntroPosition.y}px`,
-                    } as CSSProperties}
-                  >
-                    <span>{activeWorkDetail.artist}</span>
-                    <strong>{activeWorkDetail.title}</strong>
-                    <p>{activeWorkDetail.intro}</p>
-                  </div>
-                )}
-                <div className="works-count">
-                  <span>{representativeWorks.length} 首代表作</span>
-                  <span>悬停暂停</span>
-                </div>
-              </div>
-            ) : (
-              <div className="collaborator-cloud">
-                {cloudCollaborators.map((name, index) => {
-                  const works = getCollaboratorWorks(name, representativeWorks, collaboratorWorks);
-                  return (
+            <div className="works-list-frame" aria-label="代表作列表">
+              <div className="works-mask">
+                <div className={representativeWorks.length > 8 ? 'works-track is-rolling' : 'works-track'}>
+                  {scrollingRepresentativeWorks.map((work, index) => (
                     <button
                       type="button"
-                      className="collaborator-chip"
-                      key={name}
-                      onMouseMove={handleCollaboratorMove}
-                      onMouseLeave={handleCollaboratorLeave}
-                      style={getCollaboratorCloudStyle(name, index, cloudCollaborators.length)}
+                      className="work-row"
+                      key={`${work}-${index}`}
+                      title={getRepresentativeWorkDetail(work)?.intro}
+                      onMouseOver={(event) => handleWorkEnter(work, event)}
+                      onMouseMove={handleWorkMove}
+                      onFocus={(event) => handleWorkFocus(work, event)}
+                      onMouseLeave={handleWorkLeave}
+                      onBlur={handleWorkLeave}
                     >
-                      {name}
-                      <span className="hover-card" role="tooltip">
-                        <b>{name} 相关作品</b>
-                        {works.map((work) => <em key={work}>{work}</em>)}
-                      </span>
+                      <span>{String((index % representativeWorks.length) + 1).padStart(2, '0')}</span>
+                      <strong>{formatRepresentativeWorkLabel(work)}</strong>
                     </button>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
-            )}
+              {activeWorkDetail && (
+                <div
+                  className="work-intro-card"
+                  aria-live="polite"
+                  style={{
+                    '--work-intro-x': `${workIntroPosition.x}px`,
+                    '--work-intro-y': `${workIntroPosition.y}px`,
+                  } as CSSProperties}
+                >
+                  <span>{activeWorkDetail.artist}</span>
+                  <strong>{activeWorkDetail.title}</strong>
+                  <p>{activeWorkDetail.intro}</p>
+                </div>
+              )}
+              <div className="works-count">
+                <span>{representativeWorks.length} 首代表作</span>
+                <span>悬停暂停</span>
+              </div>
+            </div>
           </aside>
 
           <section className="template-area">
@@ -954,123 +814,6 @@ function ProducerStyles() {
         font-weight: 750;
       }
 
-      .collaborator-cloud {
-        position: relative;
-        height: clamp(330px, calc(100vh - 350px), 462px);
-        min-height: 330px;
-        overflow: visible;
-        border-radius: 16px;
-      }
-
-      .collaborator-chip {
-        position: absolute;
-        left: var(--cloud-x);
-        top: var(--cloud-y);
-        z-index: 1;
-        width: var(--cloud-w);
-        min-height: 42px;
-        padding: 0 12px;
-        border: 1px solid rgba(255,255,255,.1);
-        border-radius: 999px;
-        background:
-          radial-gradient(circle at 50% 0, rgba(206,255,53,.08), transparent 55%),
-          rgba(255,255,255,.045);
-        box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 10px 24px rgba(0,0,0,.16);
-        color: var(--hc-text);
-        font-size: var(--cloud-font);
-        font-weight: 900;
-        line-height: 1;
-        white-space: nowrap;
-        cursor: default;
-        transform: translate3d(var(--mx), var(--my), 0);
-        animation: collaboratorFloat var(--cloud-speed) ease-in-out var(--cloud-delay) infinite alternate;
-        transition: background .16s ease, border-color .16s ease, box-shadow .16s ease, color .16s ease;
-        will-change: transform;
-      }
-
-      .collaborator-chip:hover {
-        z-index: 40;
-        border-color: rgba(206,255,53,.42);
-        background:
-          radial-gradient(circle at 50% 0, rgba(206,255,53,.2), transparent 58%),
-          rgba(206,255,53,.12);
-        box-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 16px 38px rgba(0,0,0,.28), 0 0 0 4px rgba(206,255,53,.05);
-        color: var(--hc-lime);
-      }
-
-      @keyframes collaboratorFloat {
-        0% {
-          transform: translate3d(calc(var(--mx) - var(--orbit-x)), calc(var(--my) + var(--orbit-y)), 0);
-        }
-        28% {
-          transform: translate3d(calc(var(--mx) + var(--orbit-x2)), calc(var(--my) - var(--orbit-y)), 0);
-        }
-        58% {
-          transform: translate3d(calc(var(--mx) + var(--orbit-x)), calc(var(--my) + var(--orbit-y2)), 0);
-        }
-        100% {
-          transform: translate3d(calc(var(--mx) - var(--orbit-x2)), calc(var(--my) - var(--orbit-y2)), 0);
-        }
-      }
-
-      .hover-card {
-        position: absolute;
-        z-index: 50;
-        left: calc(100% + 10px);
-        top: 50%;
-        width: 198px;
-        padding: 12px 14px;
-        border: 1px solid rgba(255,255,255,.14);
-        border-radius: 12px;
-        background: rgba(5,6,8,.92);
-        box-shadow: 0 20px 48px rgba(0,0,0,.42);
-        color: var(--hc-text);
-        opacity: 0;
-        pointer-events: none;
-        transform: translate(8px, -50%);
-        transition: opacity .16s ease, transform .16s ease;
-        text-align: left;
-      }
-
-      .hover-card::before {
-        content: "";
-        position: absolute;
-        left: -7px;
-        top: 50%;
-        width: 12px;
-        height: 12px;
-        background: rgba(5,6,8,.92);
-        border-left: 1px solid rgba(255,255,255,.14);
-        border-bottom: 1px solid rgba(255,255,255,.14);
-        transform: translateY(-50%) rotate(45deg);
-      }
-
-      .collaborator-chip:hover .hover-card {
-        opacity: 1;
-        transform: translate(0, -50%);
-      }
-
-      @media (prefers-reduced-motion: reduce) {
-        .collaborator-chip {
-          animation: none;
-        }
-      }
-
-      .hover-card b {
-        display: block;
-        margin-bottom: 8px;
-        color: var(--hc-lime);
-        font-size: 11px;
-      }
-
-      .hover-card em {
-        display: block;
-        color: var(--hc-muted);
-        font-size: 11px;
-        font-style: normal;
-        line-height: 1.8;
-      }
-
       .template-heading {
         display: flex;
         justify-content: space-between;
@@ -1368,21 +1111,6 @@ function ProducerStyles() {
           grid-template-columns: 1fr;
         }
 
-        .hover-card {
-          left: 50%;
-          top: calc(100% + 10px);
-          transform: translate(-50%, 8px);
-        }
-
-        .hover-card::before {
-          left: 50%;
-          top: -7px;
-          transform: translateX(-50%) rotate(135deg);
-        }
-
-        .collaborator-chip:hover .hover-card {
-          transform: translate(-50%, 0);
-        }
       }
     ` }} />
   );
