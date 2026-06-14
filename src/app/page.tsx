@@ -218,28 +218,18 @@ export default function HomePage() {
           <div className="studio-lite-video-wrap" aria-label="Studio Lite 编辑器演示">
             <div className="studio-lite-video-stage">
               <video
-                className={`studio-lite-video studio-lite-video-loop${studioIntroDone ? ' is-visible' : ''}`}
+                key={studioIntroDone ? 'studio-loop' : 'studio-intro'}
+                className="studio-lite-video"
+                src={studioIntroDone ? STUDIO_LOOP_VIDEO : STUDIO_INTRO_VIDEO}
                 autoPlay
                 muted
-                loop
-                playsInline
-                preload="auto"
-                poster="/showcase/hookcraft-console-perspective-alpha-poster.png"
-              >
-                <source src={STUDIO_LOOP_VIDEO} type="video/webm" />
-              </video>
-              <video
-                className={`studio-lite-video studio-lite-video-intro${studioIntroDone ? ' is-hidden' : ''}`}
-                autoPlay
-                muted
+                loop={studioIntroDone}
                 playsInline
                 preload="auto"
                 poster="/showcase/hookcraft-console-perspective-alpha-poster.png"
                 onEnded={() => setStudioIntroDone(true)}
                 onError={() => setStudioIntroDone(true)}
-              >
-                <source src={STUDIO_INTRO_VIDEO} type="video/webm" />
-              </video>
+              />
             </div>
           </div>
         </div>
@@ -869,7 +859,7 @@ const homeStyles = `
 
   .studio-lite-video-stage {
     --studio-video-x: 4%;
-    display: grid;
+    display: block;
     width: min(1040px, 118%);
     max-width: none;
     transform: translateX(var(--studio-video-x));
@@ -877,26 +867,10 @@ const homeStyles = `
   }
 
   .studio-lite-video {
-    grid-area: 1 / 1;
     display: block;
     width: 100%;
     max-width: none;
     height: auto;
-    opacity: 1;
-    transition: opacity .28s ease;
-  }
-
-  .studio-lite-video-loop {
-    opacity: 0;
-  }
-
-  .studio-lite-video-loop.is-visible {
-    opacity: 1;
-  }
-
-  .studio-lite-video-intro.is-hidden {
-    opacity: 0;
-    pointer-events: none;
   }
 
   .style-finder {
