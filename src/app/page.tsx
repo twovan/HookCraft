@@ -36,6 +36,8 @@ const WORKFLOW_STEPS = [
 const TEMPLATE_FILTERS = ['全部', '流行', 'R&B', '说唱', '摇滚', '电子'];
 const WAVE_COLORS = ['#a855f7', '#d9a441', '#bfff1f', '#2dd4bf', '#f472b6', '#f97316'];
 const WAVEFORM_PROFILE = [18, 26, 42, 66, 34, 22, 54, 80, 46, 28, 24, 62, 36, 20, 18, 30, 74, 88, 52, 24, 18, 20, 34, 58, 72, 48, 30, 22, 26, 64, 40, 18, 16, 22, 70, 92, 46, 20, 18, 24, 38, 56];
+const STUDIO_INTRO_VIDEO = '/showcase/hookcraft-console-perspective-intro.webm';
+const STUDIO_LOOP_VIDEO = '/showcase/hookcraft-console-perspective-loop.webm';
 async function fetchWithTimeout(url: string, timeoutMs = 8000) {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
@@ -64,6 +66,7 @@ export default function HomePage() {
   const [templates, setTemplates] = useState<TemplateItem[]>([]);
   const [featuredProducers, setFeaturedProducers] = useState<ProducerSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [studioIntroDone, setStudioIntroDone] = useState(false);
 
   useEffect(() => {
     async function fetchTemplates() {
@@ -213,17 +216,31 @@ export default function HomePage() {
           </div>
 
           <div className="studio-lite-video-wrap" aria-label="Studio Lite 编辑器演示">
-            <video
-              className="studio-lite-video"
-              autoPlay
-              muted
-              loop
-              playsInline
-              preload="auto"
-              poster="/showcase/hookcraft-console-perspective-alpha-poster.png"
-            >
-              <source src="/showcase/hookcraft-console-perspective-alpha.webm" type="video/webm" />
-            </video>
+            <div className="studio-lite-video-stage">
+              <video
+                className={`studio-lite-video studio-lite-video-loop${studioIntroDone ? ' is-visible' : ''}`}
+                autoPlay
+                muted
+                loop
+                playsInline
+                preload="auto"
+                poster="/showcase/hookcraft-console-perspective-alpha-poster.png"
+              >
+                <source src={STUDIO_LOOP_VIDEO} type="video/webm" />
+              </video>
+              <video
+                className={`studio-lite-video studio-lite-video-intro${studioIntroDone ? ' is-hidden' : ''}`}
+                autoPlay
+                muted
+                playsInline
+                preload="auto"
+                poster="/showcase/hookcraft-console-perspective-alpha-poster.png"
+                onEnded={() => setStudioIntroDone(true)}
+                onError={() => setStudioIntroDone(true)}
+              >
+                <source src={STUDIO_INTRO_VIDEO} type="video/webm" />
+              </video>
+            </div>
           </div>
         </div>
       </section>
@@ -850,14 +867,36 @@ const homeStyles = `
     justify-content: center;
   }
 
-  .studio-lite-video {
+  .studio-lite-video-stage {
     --studio-video-x: 4%;
-    display: block;
+    display: grid;
     width: min(1040px, 118%);
     max-width: none;
-    height: auto;
     transform: translateX(var(--studio-video-x));
     filter: drop-shadow(0 26px 54px rgba(0,0,0,.38));
+  }
+
+  .studio-lite-video {
+    grid-area: 1 / 1;
+    display: block;
+    width: 100%;
+    max-width: none;
+    height: auto;
+    opacity: 1;
+    transition: opacity .28s ease;
+  }
+
+  .studio-lite-video-loop {
+    opacity: 0;
+  }
+
+  .studio-lite-video-loop.is-visible {
+    opacity: 1;
+  }
+
+  .studio-lite-video-intro.is-hidden {
+    opacity: 0;
+    pointer-events: none;
   }
 
   .style-finder {
@@ -946,7 +985,7 @@ const homeStyles = `
       min-height: 260px;
     }
 
-    .studio-lite-video {
+    .studio-lite-video-stage {
       --studio-video-x: 0%;
       width: 110%;
     }
@@ -1015,7 +1054,7 @@ const homeStyles = `
       margin: 0 -16px;
     }
 
-    .studio-lite-video {
+    .studio-lite-video-stage {
       width: 118%;
     }
 
