@@ -856,27 +856,8 @@ const homeStyles = `
     width: min(1040px, 118%);
     max-width: none;
     height: auto;
-    transform-origin: 50% 58%;
-    animation: studio-lite-perspective-loop 8s ease-in-out infinite;
+    transform: translateX(var(--studio-video-x));
     filter: drop-shadow(0 26px 54px rgba(0,0,0,.38));
-  }
-
-  @keyframes studio-lite-perspective-loop {
-    0%,
-    6%,
-    90%,
-    100% {
-      transform: translateX(var(--studio-video-x)) perspective(1200px) rotateX(4deg) rotateY(-16deg) scale(.94);
-    }
-
-    22%,
-    60% {
-      transform: translateX(var(--studio-video-x)) perspective(1200px) rotateX(0deg) rotateY(0deg) scale(1);
-    }
-
-    78% {
-      transform: translateX(var(--studio-video-x)) perspective(1200px) rotateX(3deg) rotateY(-11deg) scale(.965);
-    }
   }
 
   .style-finder {
