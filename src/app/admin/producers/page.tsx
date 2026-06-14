@@ -6,11 +6,6 @@ import DataTable, { Column } from '@/components/admin/DataTable';
 import Tag from '@/components/admin/Tag';
 import ConfirmDialog from '@/components/admin/ConfirmDialog';
 import FormModal from '@/components/admin/FormModal';
-import {
-  formatCollaboratorWorksInput,
-  parseCollaboratorWorksInput,
-} from '@/lib/producer/collaboratorWorks';
-import type { ProducerCollaboratorWorks } from '@/types/producer';
 
 interface Producer {
   id: string;
@@ -21,7 +16,6 @@ interface Producer {
   expertiseTags: string[];
   representativeWorks: string[];
   useCases: string[];
-  collaboratorWorks: ProducerCollaboratorWorks[];
   revenueShare: number;
   status: string;
   templateCount: number;
@@ -53,6 +47,15 @@ function splitListInput(value: string) {
     .split(/[,，\n]/)
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+async function getResponseErrorMessage(res: Response, fallback: string) {
+  try {
+    const data = await res.json();
+    return typeof data?.error === 'string' ? data.error : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 function previewListInput(value: string, limit = 4) {
@@ -131,7 +134,6 @@ export default function AdminProducersPage() {
     expertiseTags: '',
     representativeWorks: '',
     useCases: '',
-    collaboratorWorks: '',
     revenueShare: '70',
   });
   const [updating, setUpdating] = useState(false);
@@ -244,7 +246,6 @@ export default function AdminProducersPage() {
       expertiseTags: (producer.expertiseTags || []).join(', '),
       representativeWorks: (producer.representativeWorks || []).join(', '),
       useCases: (producer.useCases || []).join(', '),
-      collaboratorWorks: formatCollaboratorWorksInput(producer.collaboratorWorks),
       revenueShare: String(Math.round((producer.revenueShare || 0.7) * 100)),
     });
     setEditOpen(true);
@@ -268,16 +269,15 @@ export default function AdminProducersPage() {
           styleTags: splitListInput(editForm.expertiseTags),
           representativeWorks: splitListInput(editForm.representativeWorks),
           useCases: splitListInput(editForm.useCases),
-          collaboratorWorks: parseCollaboratorWorksInput(editForm.collaboratorWorks),
           revenueShare: parseFloat(editForm.revenueShare) / 100,
         }),
       });
-      if (!res.ok) throw new Error('更新失败');
+      if (!res.ok) throw new Error(await getResponseErrorMessage(res, '更新失败'));
       setEditOpen(false);
       setEditingProducer(null);
       await fetchData();
-    } catch {
-      alert('更新失败，请重试');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '更新失败，请重试');
     } finally {
       setUpdating(false);
     }
@@ -745,20 +745,6 @@ export default function AdminProducersPage() {
               </FormField>
             </EditSection>
 
-            <EditSection
-              eyebrow="CREDITS"
-              title="艺人合作关系"
-              description="维护每位艺人的代表作品，供艺术家资料和后续展示模块复用。"
-            >
-              <FormField label="歌星代表作（一行一个歌星）" hint="用中文冒号分隔歌星和作品，作品之间用顿号、逗号或中文逗号分隔。">
-                <textarea
-                  style={{ ...inputStyle, minHeight: 140, resize: 'vertical' }}
-                  value={editForm.collaboratorWorks}
-                  onChange={(e) => setEditForm((f) => ({ ...f, collaboratorWorks: e.target.value }))}
-                  placeholder={'孙燕姿：遇见、需要你、第一天\n林俊杰：她说、水仙、黑夜问白天'}
-                />
-              </FormField>
-            </EditSection>
           </div>
         </div>
       </FormModal>
