@@ -63,6 +63,7 @@ export async function GET(req: NextRequest) {
       homepageHero: settingsMap.homepage_hero || {
         backgroundImageUrl: '/home-hero-studio.webp',
         history: ['/home-hero-studio.webp'],
+        overlayEnabled: true,
       },
       studioTabs: await readStudioTabSettings(supabaseAdmin),
       stemEditorFeatures: await readStemEditorFeatureSettings(supabaseAdmin),

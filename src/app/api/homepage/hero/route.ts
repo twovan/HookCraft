@@ -14,14 +14,15 @@ export async function GET() {
 
     if (error && !isMissingPlatformSettingsError(error)) throw error;
 
-    const settings = data?.setting_value as { backgroundImageUrl?: unknown } | undefined;
+    const settings = data?.setting_value as { backgroundImageUrl?: unknown; overlayEnabled?: unknown } | undefined;
     const backgroundImageUrl = typeof settings?.backgroundImageUrl === 'string' && settings.backgroundImageUrl.trim()
       ? settings.backgroundImageUrl
       : DEFAULT_BACKGROUND_IMAGE_URL;
+    const overlayEnabled = typeof settings?.overlayEnabled === 'boolean' ? settings.overlayEnabled : true;
 
-    return NextResponse.json({ backgroundImageUrl });
+    return NextResponse.json({ backgroundImageUrl, overlayEnabled });
   } catch (error) {
     console.error('[Homepage Hero Settings GET Error]', error);
-    return NextResponse.json({ backgroundImageUrl: DEFAULT_BACKGROUND_IMAGE_URL });
+    return NextResponse.json({ backgroundImageUrl: DEFAULT_BACKGROUND_IMAGE_URL, overlayEnabled: true });
   }
 }

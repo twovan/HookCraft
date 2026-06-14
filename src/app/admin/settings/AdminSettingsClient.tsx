@@ -44,6 +44,7 @@ interface ReviewSettings {
 interface HomepageHeroSettings {
   backgroundImageUrl: string;
   history: string[];
+  overlayEnabled: boolean;
 }
 
 const STEM_EDITOR_FEATURE_GROUPS = [
@@ -146,12 +147,17 @@ function normalizeHomepageHeroSettings(value: Partial<HomepageHeroSettings> | un
     DEFAULT_HOME_HERO_BACKGROUND_URL,
   ].filter((item): item is string => typeof item === 'string' && item.trim().length > 0))).slice(0, 8);
 
-  return { backgroundImageUrl, history };
+  return {
+    backgroundImageUrl,
+    history,
+    overlayEnabled: typeof value?.overlayEnabled === 'boolean' ? value.overlayEnabled : true,
+  };
 }
 
 function updateHeroHistory(settings: HomepageHeroSettings, backgroundImageUrl: string): HomepageHeroSettings {
   const nextUrl = backgroundImageUrl.trim() || DEFAULT_HOME_HERO_BACKGROUND_URL;
   return {
+    ...settings,
     backgroundImageUrl: nextUrl,
     history: Array.from(new Set([nextUrl, ...settings.history, DEFAULT_HOME_HERO_BACKGROUND_URL])).slice(0, 8),
   };
@@ -496,7 +502,7 @@ export default function AdminSettingsClient({ view = 'system' }: { view?: 'syste
               style={{
                 ...heroPreviewStyle,
                 backgroundImage: homepageHero.backgroundImageUrl.trim()
-                  ? `linear-gradient(90deg, rgba(5,7,10,.88), rgba(5,7,10,.35)), url("${homepageHero.backgroundImageUrl.replace(/"/g, '\\"')}")`
+                  ? `${homepageHero.overlayEnabled ? 'linear-gradient(90deg, rgba(5,7,10,.88), rgba(5,7,10,.35)), ' : ''}url("${homepageHero.backgroundImageUrl.replace(/"/g, '\\"')}")`
                   : undefined,
               }}
             >
@@ -515,6 +521,17 @@ export default function AdminSettingsClient({ view = 'system' }: { view?: 'syste
                 />
                 <div style={hintStyle}>建议上传 1920px 宽左右的 WebP/JPG，优先压到 1MB 内，最大 5MB。上传会自动压缩为 WebP。</div>
               </div>
+              <label style={heroToggleStyle}>
+                <input
+                  type="checkbox"
+                  checked={homepageHero.overlayEnabled}
+                  onChange={(e) => setHomepageHero((p) => ({ ...p, overlayEnabled: e.target.checked }))}
+                />
+                <span>
+                  <strong>显示背景蒙层</strong>
+                  <small>关闭后首页首屏直接展示原始背景图。</small>
+                </span>
+              </label>
               <div style={heroActionRowStyle}>
                 <label style={heroUploadButtonStyle}>
                   {saving === 'homepage_hero_upload' ? '压缩上传中...' : '上传并压缩'}
@@ -802,6 +819,19 @@ const heroActionRowStyle: React.CSSProperties = {
   gap: 10,
   flexWrap: 'wrap',
   alignItems: 'center',
+};
+
+const heroToggleStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 10,
+  padding: '10px 12px',
+  borderRadius: 10,
+  border: '1px solid #eef0f3',
+  background: '#f9fafb',
+  color: '#374151',
+  fontSize: 13,
+  cursor: 'pointer',
 };
 
 const heroUploadButtonStyle: React.CSSProperties = {

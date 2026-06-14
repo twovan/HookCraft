@@ -72,6 +72,7 @@ export default function HomePage() {
   const [templates, setTemplates] = useState<TemplateItem[]>([]);
   const [featuredProducers, setFeaturedProducers] = useState<ProducerSummary[]>([]);
   const [heroBackgroundUrl, setHeroBackgroundUrl] = useState(DEFAULT_HOME_HERO_BACKGROUND_URL);
+  const [heroOverlayEnabled, setHeroOverlayEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -100,6 +101,9 @@ export default function HomePage() {
           const data = await res.json();
           if (typeof data.backgroundImageUrl === 'string' && data.backgroundImageUrl.trim()) {
             setHeroBackgroundUrl(data.backgroundImageUrl);
+          }
+          if (typeof data.overlayEnabled === 'boolean') {
+            setHeroOverlayEnabled(data.overlayEnabled);
           }
         }
       } catch {
@@ -138,7 +142,11 @@ export default function HomePage() {
       <style dangerouslySetInnerHTML={{ __html: homeStyles }} />
 
       <section className="home-hero" aria-label="HookCraft AI Demo 工作站">
-        <div className="home-hero-bg" aria-hidden="true" style={getHomeHeroBackgroundStyle(heroBackgroundUrl)} />
+        <div
+          className={`home-hero-bg${heroOverlayEnabled ? ' has-overlay' : ''}`}
+          aria-hidden="true"
+          style={getHomeHeroBackgroundStyle(heroBackgroundUrl)}
+        />
         <div className="hc-container home-hero-inner">
           <div className="home-hero-copy">
             <span className="home-eyebrow">HOOKCRAFT ORIGINAL</span>
@@ -380,12 +388,16 @@ const homeStyles = `
   .home-hero-bg {
     position: absolute;
     inset: 0;
+    background: var(--home-hero-bg, url('/home-hero-studio.webp')) center / cover;
+    opacity: .95;
+  }
+
+  .home-hero-bg.has-overlay {
     background:
       radial-gradient(circle at 68% 34%, rgba(206,255,53,.36), transparent 18%),
       radial-gradient(circle at 74% 45%, rgba(255,255,255,.2), transparent 16%),
       linear-gradient(90deg, rgba(5,7,10,.94), rgba(5,7,10,.62) 45%, rgba(5,7,10,.9)),
       var(--home-hero-bg, url('/home-hero-studio.webp')) center / cover;
-    opacity: .95;
   }
 
   .home-hero::after {
