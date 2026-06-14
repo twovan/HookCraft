@@ -133,8 +133,8 @@ const STEM_EDITOR_FEATURE_GROUPS = [
 
 const DEFAULT_HOME_HERO_BACKGROUND_URL = '/home-hero-studio.webp';
 const HERO_IMAGE_MAX_EDGE = 1920;
-const HERO_IMAGE_TARGET_BYTES = 800 * 1024;
-const HERO_IMAGE_MAX_BYTES = 1024 * 1024;
+const HERO_IMAGE_TARGET_BYTES = 1200 * 1024;
+const HERO_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
 function normalizeHomepageHeroSettings(value: Partial<HomepageHeroSettings> | undefined): HomepageHeroSettings {
   const backgroundImageUrl = typeof value?.backgroundImageUrl === 'string' && value.backgroundImageUrl.trim()
@@ -513,7 +513,7 @@ export default function AdminSettingsClient({ view = 'system' }: { view?: 'syste
                   onChange={(e) => setHomepageHero((p) => ({ ...p, backgroundImageUrl: e.target.value }))}
                   placeholder="/home-hero-studio.webp 或 https://..."
                 />
-                <div style={hintStyle}>建议上传 1920px 宽左右的 WebP/JPG，目标小于 500KB，最大 1MB。上传会自动压缩为 WebP。</div>
+                <div style={hintStyle}>建议上传 1920px 宽左右的 WebP/JPG，优先压到 1MB 内，最大 5MB。上传会自动压缩为 WebP。</div>
               </div>
               <div style={heroActionRowStyle}>
                 <label style={heroUploadButtonStyle}>
@@ -533,18 +533,32 @@ export default function AdminSettingsClient({ view = 'system' }: { view?: 'syste
                 <button
                   type="button"
                   onClick={() => setHomepageHero((p) => updateHeroHistory(p, DEFAULT_HOME_HERO_BACKGROUND_URL))}
-                  style={secondaryBtnStyle}
+                  style={{ ...secondaryBtnStyle, marginTop: 0 }}
                 >
                   恢复默认图
+                </button>
+                <button
+                  onClick={() => {
+                    const next = updateHeroHistory(homepageHero, homepageHero.backgroundImageUrl);
+                    setHomepageHero(next);
+                    void saveSection('homepage_hero', next);
+                  }}
+                  disabled={saving === 'homepage_hero'}
+                  style={{ ...saveBtnStyle, marginTop: 0 }}
+                >
+                  {saving === 'homepage_hero' ? '保存中...' : '保存首页视觉'}
                 </button>
               </div>
               {heroUploadStatus && <div style={hintStyle}>{heroUploadStatus}</div>}
             </div>
           </div>
           <div style={heroHistorySectionStyle}>
-            <label style={labelStyle}>历史背景图</label>
+            <div style={heroHistoryHeaderStyle}>
+              <label style={{ ...labelStyle, marginBottom: 0 }}>历史背景图</label>
+              <span>最多保留 8 张，点击缩略图可恢复到预览，再保存生效。</span>
+            </div>
             <div style={heroHistoryGridStyle}>
-              {homepageHero.history.map((url) => (
+              {homepageHero.history.map((url, index) => (
                 <button
                   key={url}
                   type="button"
@@ -556,22 +570,14 @@ export default function AdminSettingsClient({ view = 'system' }: { view?: 'syste
                   title={url}
                 >
                   <span style={{ ...heroHistoryPreviewStyle, backgroundImage: `url("${url.replace(/"/g, '\\"')}")` }} />
-                  <strong>{url === DEFAULT_HOME_HERO_BACKGROUND_URL ? '默认图' : '历史图'}</strong>
+                  <span style={heroHistoryMetaStyle}>
+                    <strong>{url === DEFAULT_HOME_HERO_BACKGROUND_URL ? '默认图' : `历史 ${index + 1}`}</strong>
+                    <small>{homepageHero.backgroundImageUrl === url ? '使用中' : '点击恢复'}</small>
+                  </span>
                 </button>
               ))}
             </div>
           </div>
-          <button
-            onClick={() => {
-              const next = updateHeroHistory(homepageHero, homepageHero.backgroundImageUrl);
-              setHomepageHero(next);
-              void saveSection('homepage_hero', next);
-            }}
-            disabled={saving === 'homepage_hero'}
-            style={saveBtnStyle}
-          >
-            {saving === 'homepage_hero' ? '保存中...' : '保存首页视觉'}
-          </button>
         </div>
         <div style={cardStyle}>
           <h3 style={cardTitleStyle}>Studio Tab 设置</h3>
@@ -783,7 +789,8 @@ const heroPreviewStyle: React.CSSProperties = {
 const heroControlPanelStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
-  justifyContent: 'space-between',
+  justifyContent: 'flex-start',
+  gap: 12,
   padding: 16,
   borderRadius: 12,
   border: '1px solid #e5e7eb',
@@ -820,6 +827,16 @@ const heroHistorySectionStyle: React.CSSProperties = {
   borderTop: '1px solid #eef0f3',
 };
 
+const heroHistoryHeaderStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 12,
+  marginBottom: 10,
+  color: '#9ca3af',
+  fontSize: 12,
+};
+
 const heroHistoryGridStyle: React.CSSProperties = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fill, minmax(132px, 1fr))',
@@ -843,6 +860,16 @@ const heroHistoryPreviewStyle: React.CSSProperties = {
   backgroundColor: '#111827',
   backgroundSize: 'cover',
   backgroundPosition: 'center',
+};
+
+const heroHistoryMetaStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 6,
+  padding: '8px 10px',
+  color: '#374151',
+  fontSize: 12,
 };
 
 const checkboxLabelStyle: React.CSSProperties = {

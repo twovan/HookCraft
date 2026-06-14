@@ -3,7 +3,7 @@ import { requireAdmin } from '../../../../../../lib/admin/auth';
 import { supabaseAdmin } from '../../../../../../lib/supabase/server';
 
 const SITE_ASSETS_BUCKET = 'site-assets';
-const MAX_HERO_IMAGE_SIZE = 1024 * 1024;
+const MAX_HERO_IMAGE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 function getExtension(type: string): string {
@@ -14,7 +14,14 @@ function getExtension(type: string): string {
 
 async function ensureSiteAssetsBucket() {
   const { data: bucket } = await supabaseAdmin.storage.getBucket(SITE_ASSETS_BUCKET);
-  if (bucket) return;
+  if (bucket) {
+    await supabaseAdmin.storage.updateBucket(SITE_ASSETS_BUCKET, {
+      public: true,
+      fileSizeLimit: MAX_HERO_IMAGE_SIZE,
+      allowedMimeTypes: Array.from(ALLOWED_TYPES),
+    });
+    return;
+  }
 
   await supabaseAdmin.storage.createBucket(SITE_ASSETS_BUCKET, {
     public: true,
@@ -39,7 +46,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (file.size > MAX_HERO_IMAGE_SIZE) {
-    return NextResponse.json({ error: '图片压缩后仍超过 1MB，请降低尺寸或质量后重试' }, { status: 400 });
+    return NextResponse.json({ error: '图片压缩后仍超过 5MB，请降低尺寸或质量后重试' }, { status: 400 });
   }
 
   await ensureSiteAssetsBucket();
