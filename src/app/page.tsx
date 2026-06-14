@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ProducerSummary } from '@/types/producer';
 import {
   TERENCE_REPRESENTATIVE_WORKS,
@@ -67,6 +67,7 @@ export default function HomePage() {
   const [featuredProducers, setFeaturedProducers] = useState<ProducerSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [studioIntroDone, setStudioIntroDone] = useState(false);
+  const studioVideoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
     async function fetchTemplates() {
@@ -85,6 +86,14 @@ export default function HomePage() {
 
     void fetchTemplates();
   }, []);
+
+  useEffect(() => {
+    if (!studioIntroDone) return;
+    const video = studioVideoRef.current;
+    if (!video) return;
+    video.loop = true;
+    void video.play().catch(() => undefined);
+  }, [studioIntroDone]);
 
   useEffect(() => {
     async function fetchProducers() {
@@ -219,6 +228,7 @@ export default function HomePage() {
             <div className="studio-lite-video-stage">
               <video
                 key={studioIntroDone ? 'studio-loop' : 'studio-intro'}
+                ref={studioVideoRef}
                 className="studio-lite-video"
                 src={studioIntroDone ? STUDIO_LOOP_VIDEO : STUDIO_INTRO_VIDEO}
                 autoPlay
@@ -229,6 +239,11 @@ export default function HomePage() {
                 poster="/showcase/hookcraft-console-perspective-alpha-poster.png"
                 onEnded={() => setStudioIntroDone(true)}
                 onError={() => setStudioIntroDone(true)}
+                onLoadedData={(event) => {
+                  if (studioIntroDone) {
+                    void event.currentTarget.play().catch(() => undefined);
+                  }
+                }}
               />
             </div>
           </div>
