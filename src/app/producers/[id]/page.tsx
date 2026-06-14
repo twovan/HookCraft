@@ -649,6 +649,7 @@ function ProducerStyles() {
       }
 
       .section-heading {
+        position: relative;
         display: flex;
         align-items: end;
         justify-content: space-between;
@@ -668,6 +669,15 @@ function ProducerStyles() {
         line-height: 1;
       }
 
+      .works-panel-heading > div {
+        min-width: 0;
+        padding-right: 54px;
+      }
+
+      .works-panel-heading span {
+        white-space: nowrap;
+      }
+
       .section-heading h2 {
         margin: 6px 0 0;
         color: var(--hc-text);
@@ -677,6 +687,9 @@ function ProducerStyles() {
       }
 
       .works-panel-heading b {
+        position: absolute;
+        right: 2px;
+        bottom: 18px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
