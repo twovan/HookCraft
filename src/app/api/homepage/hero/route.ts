@@ -4,6 +4,8 @@ import { isMissingPlatformSettingsError } from '../../../../lib/studio/StudioTab
 
 const DEFAULT_BACKGROUND_IMAGE_URL = '/home-hero-studio.webp';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const { data, error } = await supabaseAdmin
