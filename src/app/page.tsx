@@ -36,7 +36,8 @@ const WORKFLOW_STEPS = [
 const TEMPLATE_FILTERS = ['全部', '流行', 'R&B', '说唱', '摇滚', '电子'];
 const WAVE_COLORS = ['#a855f7', '#d9a441', '#bfff1f', '#2dd4bf', '#f472b6', '#f97316'];
 const WAVEFORM_PROFILE = [18, 26, 42, 66, 34, 22, 54, 80, 46, 28, 24, 62, 36, 20, 18, 30, 74, 88, 52, 24, 18, 20, 34, 58, 72, 48, 30, 22, 26, 64, 40, 18, 16, 22, 70, 92, 46, 20, 18, 24, 38, 56];
-const STUDIO_SHOWCASE_VIDEO = '/showcase/hookcraft-homepage-showcase.mp4';
+const STUDIO_SHOWCASE_WEBM = '/showcase/hookcraft-homepage-showcase.webm';
+const STUDIO_SHOWCASE_MP4 = '/showcase/hookcraft-homepage-showcase.mp4';
 async function fetchWithTimeout(url: string, timeoutMs = 8000) {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
@@ -217,13 +218,16 @@ export default function HomePage() {
             <div className="studio-lite-video-stage">
               <video
                 className="studio-lite-video"
-                src={STUDIO_SHOWCASE_VIDEO}
                 autoPlay
                 muted
                 loop
                 playsInline
                 preload="auto"
-              />
+                poster="/showcase/hookcraft-homepage-showcase-poster.png"
+              >
+                <source src={STUDIO_SHOWCASE_WEBM} type="video/webm" />
+                <source src={STUDIO_SHOWCASE_MP4} type="video/mp4" />
+              </video>
             </div>
           </div>
         </div>
