@@ -41,6 +41,11 @@ interface ReviewSettings {
   notificationMethods: string[];
 }
 
+interface HomepageHeroSettings {
+  backgroundImageUrl: string;
+  history: string[];
+}
+
 const STEM_EDITOR_FEATURE_GROUPS = [
   {
     group: 'modes',
@@ -126,6 +131,82 @@ const STEM_EDITOR_FEATURE_GROUPS = [
   },
 ] as const;
 
+const DEFAULT_HOME_HERO_BACKGROUND_URL = '/home-hero-studio.webp';
+const HERO_IMAGE_MAX_EDGE = 1920;
+const HERO_IMAGE_TARGET_BYTES = 800 * 1024;
+const HERO_IMAGE_MAX_BYTES = 1024 * 1024;
+
+function normalizeHomepageHeroSettings(value: Partial<HomepageHeroSettings> | undefined): HomepageHeroSettings {
+  const backgroundImageUrl = typeof value?.backgroundImageUrl === 'string' && value.backgroundImageUrl.trim()
+    ? value.backgroundImageUrl
+    : DEFAULT_HOME_HERO_BACKGROUND_URL;
+  const history = Array.from(new Set([
+    backgroundImageUrl,
+    ...(Array.isArray(value?.history) ? value.history : []),
+    DEFAULT_HOME_HERO_BACKGROUND_URL,
+  ].filter((item): item is string => typeof item === 'string' && item.trim().length > 0))).slice(0, 8);
+
+  return { backgroundImageUrl, history };
+}
+
+function updateHeroHistory(settings: HomepageHeroSettings, backgroundImageUrl: string): HomepageHeroSettings {
+  const nextUrl = backgroundImageUrl.trim() || DEFAULT_HOME_HERO_BACKGROUND_URL;
+  return {
+    backgroundImageUrl: nextUrl,
+    history: Array.from(new Set([nextUrl, ...settings.history, DEFAULT_HOME_HERO_BACKGROUND_URL])).slice(0, 8),
+  };
+}
+
+function formatBytes(bytes: number) {
+  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(2)}MB`;
+  return `${Math.round(bytes / 1024)}KB`;
+}
+
+function loadImageFromFile(file: File): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('图片读取失败，请换一张图片重试'));
+    };
+    image.src = url;
+  });
+}
+
+async function compressHeroImage(file: File): Promise<File> {
+  if (!file.type.startsWith('image/')) throw new Error('请选择图片文件');
+
+  const image = await loadImageFromFile(file);
+  const scale = Math.min(1, HERO_IMAGE_MAX_EDGE / Math.max(image.naturalWidth, image.naturalHeight));
+  const width = Math.max(1, Math.round(image.naturalWidth * scale));
+  const height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('当前浏览器不支持图片压缩');
+  context.drawImage(image, 0, 0, width, height);
+
+  const qualities = [0.82, 0.76, 0.68, 0.6, 0.52];
+  for (const quality of qualities) {
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/webp', quality));
+    if (!blob) continue;
+    if (blob.size <= HERO_IMAGE_TARGET_BYTES || quality === qualities[qualities.length - 1]) {
+      if (blob.size > HERO_IMAGE_MAX_BYTES) {
+        throw new Error(`图片压缩后仍有 ${formatBytes(blob.size)}，请换一张更小的图片`);
+      }
+      return new File([blob], 'homepage-hero.webp', { type: 'image/webp' });
+    }
+  }
+
+  throw new Error('图片压缩失败，请重试');
+}
+
 function countEnabledFeatures(settings: StemEditorFeatureSettings[keyof StemEditorFeatureSettings]) {
   return STEM_EDITOR_FEATURE_GROUPS.reduce((total, group) => (
     total + group.items.filter(([key]) => Boolean((settings as any)[group.group][key])).length
@@ -141,6 +222,8 @@ export default function AdminSettingsClient({ view = 'system' }: { view?: 'syste
   const [transaction, setTransaction] = useState<TransactionSettings>({ commissionRate: 30, minWithdrawalAmount: 100, settlementCycleDays: 30, enabledPaymentMethods: [] });
   const [ai, setAI] = useState<AISettings>({ modelVersion: '', maxConcurrentGenerations: 10, generationTimeoutSeconds: 300, creditsResetSchedule: '' });
   const [review, setReview] = useState<ReviewSettings>({ trustedProducerAutoApprove: false, aiContentSafetyPreCheck: true, reviewTimeoutReminderHours: 24, notificationMethods: [] });
+  const [homepageHero, setHomepageHero] = useState<HomepageHeroSettings>(normalizeHomepageHeroSettings(undefined));
+  const [heroUploadStatus, setHeroUploadStatus] = useState('');
   const [studioTabs, setStudioTabs] = useState<StudioTabSettings>(DEFAULT_STUDIO_TAB_SETTINGS);
   const [stemEditorFeatures, setStemEditorFeatures] = useState<StemEditorFeatureSettings>(DEFAULT_STEM_EDITOR_FEATURE_SETTINGS);
   const [loading, setLoading] = useState(true);
@@ -159,6 +242,7 @@ export default function AdminSettingsClient({ view = 'system' }: { view?: 'syste
       setTransaction(data.transaction);
       setAI(data.aiGeneration);
       setReview(data.review);
+      setHomepageHero(normalizeHomepageHeroSettings(data.homepageHero));
       setStudioTabs(data.studioTabs || DEFAULT_STUDIO_TAB_SETTINGS);
       setStemEditorFeatures(normalizeStemEditorFeatureSettings(data.stemEditorFeatures));
     } catch {
@@ -182,6 +266,34 @@ export default function AdminSettingsClient({ view = 'system' }: { view?: 'syste
       setTimeout(() => setToast(''), 3000);
     } catch (error) {
       alert(error instanceof Error ? error.message : '保存失败，请重试');
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  async function uploadHeroBackground(file: File | undefined) {
+    if (!file) return;
+    setSaving('homepage_hero_upload');
+    setHeroUploadStatus('正在压缩图片...');
+    try {
+      const compressed = await compressHeroImage(file);
+      setHeroUploadStatus(`已压缩到 ${formatBytes(compressed.size)}，正在上传...`);
+      const formData = new FormData();
+      formData.append('heroImage', compressed);
+      const res = await fetch('/api/admin/settings/homepage-hero/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || '上传失败');
+
+      const next = updateHeroHistory(homepageHero, data.backgroundImageUrl);
+      setHomepageHero(next);
+      await saveSection('homepage_hero', next);
+      setHeroUploadStatus(`上传完成：${formatBytes(compressed.size)}`);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : '上传失败，请重试');
+      setHeroUploadStatus('');
     } finally {
       setSaving(null);
     }
@@ -377,6 +489,90 @@ export default function AdminSettingsClient({ view = 'system' }: { view?: 'syste
             {saving === 'review' ? '保存中...' : '保存设置'}
           </button>
         </div>
+        <div style={heroManagerCardStyle}>
+          <h3 style={cardTitleStyle}>首页视觉</h3>
+          <div style={heroManagerLayoutStyle}>
+            <div
+              style={{
+                ...heroPreviewStyle,
+                backgroundImage: homepageHero.backgroundImageUrl.trim()
+                  ? `linear-gradient(90deg, rgba(5,7,10,.88), rgba(5,7,10,.35)), url("${homepageHero.backgroundImageUrl.replace(/"/g, '\\"')}")`
+                  : undefined,
+              }}
+            >
+              <span>HOOKCRAFT ORIGINAL</span>
+              <strong>华语音乐 AI Demo 工作站</strong>
+              <small>首页首屏背景预览</small>
+            </div>
+            <div style={heroControlPanelStyle}>
+              <div style={formGroupStyle}>
+                <label style={labelStyle}>首页首屏背景图 URL</label>
+                <input
+                  style={inputStyle}
+                  value={homepageHero.backgroundImageUrl}
+                  onChange={(e) => setHomepageHero((p) => ({ ...p, backgroundImageUrl: e.target.value }))}
+                  placeholder="/home-hero-studio.webp 或 https://..."
+                />
+                <div style={hintStyle}>建议上传 1920px 宽左右的 WebP/JPG，目标小于 500KB，最大 1MB。上传会自动压缩为 WebP。</div>
+              </div>
+              <div style={heroActionRowStyle}>
+                <label style={heroUploadButtonStyle}>
+                  {saving === 'homepage_hero_upload' ? '压缩上传中...' : '上传并压缩'}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    disabled={saving === 'homepage_hero_upload'}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      void uploadHeroBackground(file);
+                      e.currentTarget.value = '';
+                    }}
+                    style={{ display: 'none' }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setHomepageHero((p) => updateHeroHistory(p, DEFAULT_HOME_HERO_BACKGROUND_URL))}
+                  style={secondaryBtnStyle}
+                >
+                  恢复默认图
+                </button>
+              </div>
+              {heroUploadStatus && <div style={hintStyle}>{heroUploadStatus}</div>}
+            </div>
+          </div>
+          <div style={heroHistorySectionStyle}>
+            <label style={labelStyle}>历史背景图</label>
+            <div style={heroHistoryGridStyle}>
+              {homepageHero.history.map((url) => (
+                <button
+                  key={url}
+                  type="button"
+                  onClick={() => setHomepageHero((p) => updateHeroHistory(p, url))}
+                  style={{
+                    ...heroHistoryButtonStyle,
+                    borderColor: homepageHero.backgroundImageUrl === url ? '#D4A574' : '#e5e7eb',
+                  }}
+                  title={url}
+                >
+                  <span style={{ ...heroHistoryPreviewStyle, backgroundImage: `url("${url.replace(/"/g, '\\"')}")` }} />
+                  <strong>{url === DEFAULT_HOME_HERO_BACKGROUND_URL ? '默认图' : '历史图'}</strong>
+                </button>
+              ))}
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              const next = updateHeroHistory(homepageHero, homepageHero.backgroundImageUrl);
+              setHomepageHero(next);
+              void saveSection('homepage_hero', next);
+            }}
+            disabled={saving === 'homepage_hero'}
+            style={saveBtnStyle}
+          >
+            {saving === 'homepage_hero' ? '保存中...' : '保存首页视觉'}
+          </button>
+        </div>
         <div style={cardStyle}>
           <h3 style={cardTitleStyle}>Studio Tab 设置</h3>
           <div style={formGroupStyle}>
@@ -547,6 +743,106 @@ const inputStyle: React.CSSProperties = {
   outline: 'none',
   fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
   boxSizing: 'border-box',
+};
+
+const hintStyle: React.CSSProperties = {
+  marginTop: 6,
+  color: '#9ca3af',
+  fontSize: 12,
+  lineHeight: 1.5,
+};
+
+const heroManagerCardStyle: React.CSSProperties = {
+  ...cardStyle,
+  gridColumn: '1 / -1',
+  background: 'linear-gradient(135deg, #fffdf8 0%, #ffffff 48%, #f8fafc 100%)',
+};
+
+const heroManagerLayoutStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+  gap: 18,
+  alignItems: 'stretch',
+};
+
+const heroPreviewStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  justifyContent: 'center',
+  minHeight: 214,
+  padding: '26px 28px',
+  borderRadius: 12,
+  border: '1px solid rgba(17,24,39,.18)',
+  backgroundColor: '#111827',
+  backgroundSize: 'cover',
+  backgroundPosition: 'center',
+  color: '#fff',
+  boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.08)',
+};
+
+const heroControlPanelStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  justifyContent: 'space-between',
+  padding: 16,
+  borderRadius: 12,
+  border: '1px solid #e5e7eb',
+  background: '#fff',
+};
+
+const heroActionRowStyle: React.CSSProperties = {
+  display: 'flex',
+  gap: 10,
+  flexWrap: 'wrap',
+  alignItems: 'center',
+};
+
+const heroUploadButtonStyle: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '8px 16px',
+  borderRadius: 8,
+  border: 'none',
+  background: '#D4A574',
+  color: '#fff',
+  fontSize: 13,
+  fontWeight: 600,
+  cursor: 'pointer',
+  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+  marginTop: 0,
+  minHeight: 36,
+};
+
+const heroHistorySectionStyle: React.CSSProperties = {
+  marginTop: 18,
+  paddingTop: 16,
+  borderTop: '1px solid #eef0f3',
+};
+
+const heroHistoryGridStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fill, minmax(132px, 1fr))',
+  gap: 10,
+};
+
+const heroHistoryButtonStyle: React.CSSProperties = {
+  padding: 0,
+  overflow: 'hidden',
+  borderRadius: 10,
+  border: '2px solid #e5e7eb',
+  background: '#fff',
+  cursor: 'pointer',
+  textAlign: 'left',
+  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+};
+
+const heroHistoryPreviewStyle: React.CSSProperties = {
+  display: 'block',
+  height: 64,
+  backgroundColor: '#111827',
+  backgroundSize: 'cover',
+  backgroundPosition: 'center',
 };
 
 const checkboxLabelStyle: React.CSSProperties = {

@@ -60,6 +60,10 @@ export async function GET(req: NextRequest) {
         reviewTimeoutReminderHours: 24,
         notificationMethods: ['in_app', 'email'],
       },
+      homepageHero: settingsMap.homepage_hero || {
+        backgroundImageUrl: '/home-hero-studio.webp',
+        history: ['/home-hero-studio.webp'],
+      },
       studioTabs: await readStudioTabSettings(supabaseAdmin),
       stemEditorFeatures: await readStemEditorFeatureSettings(supabaseAdmin),
     };
@@ -87,7 +91,7 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: '参数不完整' }, { status: 400 });
     }
 
-    const validSections = ['basic', 'transaction', 'ai_generation', 'review', 'studio_tabs', 'stem_editor_features'];
+    const validSections = ['basic', 'transaction', 'ai_generation', 'review', 'homepage_hero', 'studio_tabs', 'stem_editor_features'];
     if (!validSections.includes(section)) {
       return NextResponse.json({ error: '无效的设置分类' }, { status: 400 });
     }
@@ -131,6 +135,11 @@ export async function PUT(req: NextRequest) {
       }, { onConflict: 'setting_key' });
 
     if (error) throw error;
+
+    if (section === 'homepage_hero') {
+      revalidatePath('/');
+      revalidatePath('/api/homepage/hero');
+    }
 
     // Log operation
     const { error: logError } = await supabaseAdmin.from('operation_logs').insert({

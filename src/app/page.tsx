@@ -38,6 +38,7 @@ const WAVE_COLORS = ['#a855f7', '#d9a441', '#bfff1f', '#2dd4bf', '#f472b6', '#f9
 const WAVEFORM_PROFILE = [18, 26, 42, 66, 34, 22, 54, 80, 46, 28, 24, 62, 36, 20, 18, 30, 74, 88, 52, 24, 18, 20, 34, 58, 72, 48, 30, 22, 26, 64, 40, 18, 16, 22, 70, 92, 46, 20, 18, 24, 38, 56];
 const STUDIO_SHOWCASE_WEBM = '/showcase/hookcraft-homepage-showcase.webm';
 const STUDIO_SHOWCASE_MP4 = '/showcase/hookcraft-homepage-showcase.mp4';
+const DEFAULT_HOME_HERO_BACKGROUND_URL = '/home-hero-studio.webp';
 async function fetchWithTimeout(url: string, timeoutMs = 8000) {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
@@ -62,9 +63,15 @@ function getProducerWorks(producer?: ProducerSummary) {
     .map((work) => formatRepresentativeWorkLabel(work));
 }
 
+function getHomeHeroBackgroundStyle(backgroundImageUrl: string): CSSProperties {
+  const safeUrl = backgroundImageUrl.trim() || DEFAULT_HOME_HERO_BACKGROUND_URL;
+  return { '--home-hero-bg': `url("${safeUrl.replace(/"/g, '\\"')}")` } as CSSProperties;
+}
+
 export default function HomePage() {
   const [templates, setTemplates] = useState<TemplateItem[]>([]);
   const [featuredProducers, setFeaturedProducers] = useState<ProducerSummary[]>([]);
+  const [heroBackgroundUrl, setHeroBackgroundUrl] = useState(DEFAULT_HOME_HERO_BACKGROUND_URL);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -83,6 +90,24 @@ export default function HomePage() {
     }
 
     void fetchTemplates();
+  }, []);
+
+  useEffect(() => {
+    async function fetchHeroSettings() {
+      try {
+        const res = await fetchWithTimeout('/api/homepage/hero', 5000);
+        if (res.ok) {
+          const data = await res.json();
+          if (typeof data.backgroundImageUrl === 'string' && data.backgroundImageUrl.trim()) {
+            setHeroBackgroundUrl(data.backgroundImageUrl);
+          }
+        }
+      } catch {
+        // Keep the default homepage background when settings are unavailable.
+      }
+    }
+
+    void fetchHeroSettings();
   }, []);
 
   useEffect(() => {
@@ -113,7 +138,7 @@ export default function HomePage() {
       <style dangerouslySetInnerHTML={{ __html: homeStyles }} />
 
       <section className="home-hero" aria-label="HookCraft AI Demo 工作站">
-        <div className="home-hero-bg" aria-hidden="true" />
+        <div className="home-hero-bg" aria-hidden="true" style={getHomeHeroBackgroundStyle(heroBackgroundUrl)} />
         <div className="hc-container home-hero-inner">
           <div className="home-hero-copy">
             <span className="home-eyebrow">HOOKCRAFT ORIGINAL</span>
@@ -359,7 +384,7 @@ const homeStyles = `
       radial-gradient(circle at 68% 34%, rgba(206,255,53,.36), transparent 18%),
       radial-gradient(circle at 74% 45%, rgba(255,255,255,.2), transparent 16%),
       linear-gradient(90deg, rgba(5,7,10,.94), rgba(5,7,10,.62) 45%, rgba(5,7,10,.9)),
-      url('/home-hero-studio.webp') center / cover;
+      var(--home-hero-bg, url('/home-hero-studio.webp')) center / cover;
     opacity: .95;
   }
 
