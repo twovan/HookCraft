@@ -627,6 +627,10 @@ function ProducerStyles() {
         padding: 16px;
       }
 
+      .template-area {
+        padding-top: 16px;
+      }
+
       .filter-row button {
         border: 1px solid rgba(255,255,255,.12);
         border-radius: 999px;
@@ -1087,6 +1091,10 @@ function ProducerStyles() {
         .producer-side-panel {
           position: relative;
           top: 0;
+        }
+
+        .template-area {
+          padding-top: 0;
         }
 
         .work-intro-card {
