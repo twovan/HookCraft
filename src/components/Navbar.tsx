@@ -184,8 +184,10 @@ export default function Navbar() {
           user ? (
             <div ref={dropdownRef} style={{ position: 'relative' }}>
               {/* Avatar button */}
-              <button
-                onClick={() => setShowDropdown(!showDropdown)}
+              <Link
+                href="/account"
+                aria-label="进入账户"
+                onClick={() => setShowDropdown(false)}
                 onMouseEnter={() => setShowDropdown(true)}
                 style={{
                   width: 36,
@@ -205,6 +207,7 @@ export default function Navbar() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   transition: 'all 0.2s',
+                  textDecoration: 'none',
                 }}
               >
                 {avatarUrl ? (
@@ -212,7 +215,7 @@ export default function Navbar() {
                 ) : (
                   avatarInitial
                 )}
-              </button>
+              </Link>
 
               {/* Dropdown */}
               {showDropdown && (

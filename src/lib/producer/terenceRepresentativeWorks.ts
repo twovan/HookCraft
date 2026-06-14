@@ -91,6 +91,7 @@ export function formatRepresentativeWorkLabel(work: string) {
   const detail = getRepresentativeWorkDetail(work);
   const title = detail?.title || parsed.title;
   const artist = detail?.artist || parsed.artist;
+  const wrappedTitle = title.startsWith('《') && title.endsWith('》') ? title : `《${title}》`;
 
-  return artist ? `${title} - ${artist}` : title;
+  return artist ? `${wrappedTitle} - ${artist}` : wrappedTitle;
 }
