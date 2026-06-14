@@ -273,13 +273,12 @@ export default function ProducerProfilePage() {
 
         <section className="producer-workspace">
           <aside className="producer-side-panel">
-            <div className="side-tabs" role="tablist" aria-label="制作人信息">
-              <button
-                type="button"
-                className="active"
-              >
-                代表作
-              </button>
+            <div className="works-panel-heading">
+              <div>
+                <span>REPRESENTATIVE WORKS</span>
+                <h2>代表作</h2>
+              </div>
+              <b>{representativeWorks.length}</b>
             </div>
 
             <div className="works-list-frame" aria-label="代表作列表">
@@ -628,14 +627,6 @@ function ProducerStyles() {
         padding: 16px;
       }
 
-      .side-tabs {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 7px;
-        margin-bottom: 14px;
-      }
-
-      .side-tabs button,
       .filter-row button {
         border: 1px solid rgba(255,255,255,.12);
         border-radius: 999px;
@@ -646,22 +637,57 @@ function ProducerStyles() {
         transition: background .18s ease, border-color .18s ease, color .18s ease, transform .18s ease;
       }
 
-      .side-tabs button {
-        padding: 9px 10px;
-        font-size: 13px;
-      }
-
-      .side-tabs button:hover,
       .filter-row button:hover {
         color: var(--hc-text);
         border-color: rgba(206,255,53,.24);
       }
 
-      .side-tabs button.active,
       .filter-row button.active {
         background: rgba(206,255,53,.13);
         border-color: rgba(206,255,53,.42);
         color: var(--hc-lime);
+      }
+
+      .works-panel-heading {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 14px;
+        margin-bottom: 16px;
+        padding: 2px 2px 14px;
+        border-bottom: 1px solid rgba(255,255,255,.08);
+      }
+
+      .works-panel-heading span {
+        display: block;
+        color: var(--hc-lime);
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: .08em;
+        line-height: 1;
+      }
+
+      .works-panel-heading h2 {
+        margin: 6px 0 0;
+        color: var(--hc-text);
+        font-size: 25px;
+        line-height: 1.08;
+        font-weight: 950;
+      }
+
+      .works-panel-heading b {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 42px;
+        height: 32px;
+        padding: 0 10px;
+        border: 1px solid rgba(206,255,53,.32);
+        border-radius: 999px;
+        background: rgba(206,255,53,.1);
+        color: var(--hc-lime);
+        font-size: 13px;
+        font-weight: 950;
       }
 
       .works-list-frame {
