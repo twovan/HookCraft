@@ -836,7 +836,7 @@ const accountStyles = `
 
       .account-studio-shell {
         display: grid;
-        grid-template-columns: 270px minmax(0, 1fr);
+        grid-template-columns: 246px minmax(0, 1fr);
         min-height: calc(100vh - 70px);
       }
 
@@ -849,22 +849,22 @@ const accountStyles = `
         background:
           linear-gradient(180deg, rgba(16, 19, 25, 0.96), rgba(8, 10, 13, 0.96)),
           var(--hc-bg-soft);
-        padding: 30px 30px 28px;
+        padding: 24px 22px 22px;
       }
 
       .rail-title {
         display: flex;
         align-items: center;
-        gap: 14px;
-        margin-bottom: 28px;
+        gap: 10px;
+        margin-bottom: 22px;
         color: var(--hc-text);
-        font-size: 23px;
+        font-size: 19px;
         font-weight: 900;
       }
 
       .rail-title span {
         width: 5px;
-        height: 26px;
+        height: 22px;
         border-radius: 999px;
         background: var(--hc-lime);
         box-shadow: 0 0 18px rgba(206, 255, 53, 0.45);
@@ -874,7 +874,7 @@ const accountStyles = `
         display: grid;
         justify-items: center;
         gap: 9px;
-        margin-bottom: 18px;
+        margin-bottom: 14px;
         cursor: pointer;
       }
 
@@ -883,8 +883,8 @@ const accountStyles = `
       }
 
       .rail-avatar-ring {
-        width: 112px;
-        height: 112px;
+        width: 88px;
+        height: 88px;
         display: grid;
         place-items: center;
         overflow: hidden;
@@ -893,9 +893,9 @@ const accountStyles = `
         background:
           linear-gradient(135deg, var(--hc-lime), var(--hc-cyan));
         color: #08090c;
-        font-size: 38px;
+        font-size: 30px;
         font-weight: 950;
-        box-shadow: 0 0 0 6px rgba(206, 255, 53, 0.06), 0 24px 46px rgba(0, 0, 0, 0.34);
+        box-shadow: 0 0 0 5px rgba(206, 255, 53, 0.06), 0 18px 34px rgba(0, 0, 0, 0.3);
       }
 
       .rail-avatar-ring img {
@@ -911,12 +911,12 @@ const accountStyles = `
 
       .rail-identity {
         text-align: center;
-        margin-bottom: 17px;
+        margin-bottom: 14px;
       }
 
       .rail-identity h2 {
         margin: 0 0 6px;
-        font-size: 29px;
+        font-size: 22px;
         letter-spacing: 0;
       }
 
@@ -932,9 +932,9 @@ const accountStyles = `
         align-items: center;
         justify-content: center;
         gap: 10px;
-        margin: 0 auto 28px;
+        margin: 0 auto 22px;
         width: fit-content;
-        padding: 9px 14px;
+        padding: 7px 11px;
         border: 1px solid rgba(206, 255, 53, 0.24);
         border-radius: 8px;
         background: rgba(206, 255, 53, 0.08);
@@ -956,8 +956,8 @@ const accountStyles = `
 
       .rail-nav {
         display: grid;
-        gap: 6px;
-        margin: 0 -30px 18px;
+        gap: 4px;
+        margin: 0 -22px 15px;
       }
 
       .rail-nav button {
@@ -965,7 +965,7 @@ const accountStyles = `
         border: 0;
         background: transparent;
         color: var(--hc-text-muted);
-        padding: 16px 30px;
+        padding: 12px 22px;
         text-align: left;
         font: inherit;
         font-size: 15px;
@@ -989,11 +989,11 @@ const accountStyles = `
       }
 
       .rail-panel {
-        min-height: 118px;
+        min-height: 104px;
         border-top: 1px solid rgba(255, 255, 255, 0.12);
         border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-        padding: 17px 0;
-        margin-bottom: 18px;
+        padding: 14px 0;
+        margin-bottom: 15px;
       }
 
       .rail-summary span,
@@ -1007,8 +1007,8 @@ const accountStyles = `
 
       .rail-summary strong {
         display: block;
-        font-size: 24px;
-        margin-bottom: 10px;
+        font-size: 21px;
+        margin-bottom: 9px;
       }
 
       .rail-progress,
@@ -1089,7 +1089,7 @@ const accountStyles = `
         border: 0;
         background: transparent;
         color: #ff5a3d;
-        padding: 14px 0;
+        padding: 11px 0;
         text-align: left;
         font: inherit;
         font-size: 15px;
@@ -1099,14 +1099,14 @@ const accountStyles = `
 
       .account-main {
         min-width: 0;
-        padding: 28px 30px 52px;
+        padding: 24px 26px 46px;
         background:
           radial-gradient(circle at 58% 2%, rgba(82, 214, 198, 0.13), transparent 310px),
           linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 210px);
       }
 
       .account-main > * {
-        width: min(1420px, 100%);
+        width: min(1180px, 100%);
         margin-left: auto;
         margin-right: auto;
       }
@@ -1115,8 +1115,8 @@ const accountStyles = `
         display: flex;
         align-items: flex-end;
         justify-content: space-between;
-        gap: 18px;
-        margin-bottom: 22px;
+        gap: 16px;
+        margin-bottom: 18px;
       }
 
       .account-main-head span,
@@ -1130,8 +1130,8 @@ const accountStyles = `
       }
 
       .account-main-head h1 {
-        margin: 0 0 8px;
-        font-size: 34px;
+        margin: 0 0 7px;
+        font-size: 28px;
         line-height: 1;
         letter-spacing: 0;
       }
@@ -1151,7 +1151,7 @@ const accountStyles = `
         background:
           linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015)),
           rgba(10, 13, 17, 0.88);
-        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.26);
+        box-shadow: 0 18px 44px rgba(0, 0, 0, 0.24);
       }
 
       .payment-alert {
@@ -1194,7 +1194,7 @@ const accountStyles = `
       .credits-cockpit {
         position: relative;
         overflow: hidden;
-        padding: 20px 22px 18px;
+        padding: 16px 18px 16px;
       }
 
       .credits-cockpit::before {
@@ -1209,13 +1209,13 @@ const accountStyles = `
 
       .section-heading {
         position: relative;
-        padding-bottom: 14px;
+        padding-bottom: 11px;
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
       }
 
       .section-heading span {
         color: var(--hc-lime);
-        font-size: 24px;
+        font-size: 19px;
         font-weight: 950;
       }
 
@@ -1223,14 +1223,14 @@ const accountStyles = `
       .preview-cockpit {
         position: relative;
         display: grid;
-        grid-template-columns: 1fr 280px 1fr 1.1fr;
+        grid-template-columns: 1fr 220px 1fr 1.1fr;
         align-items: center;
-        gap: 28px;
-        min-height: 176px;
+        gap: 22px;
+        min-height: 142px;
       }
 
       .preview-cockpit {
-        grid-template-columns: 180px 1fr;
+        grid-template-columns: 160px 1fr;
       }
 
       .metric-tile {
@@ -1241,14 +1241,14 @@ const accountStyles = `
       .usage-mini span {
         display: block;
         color: var(--hc-text-muted);
-        font-size: 14px;
+        font-size: 13px;
         font-weight: 800;
-        margin-bottom: 9px;
+        margin-bottom: 7px;
       }
 
       .metric-tile strong {
         display: block;
-        font-size: 40px;
+        font-size: 32px;
         line-height: 0.95;
       }
 
@@ -1263,27 +1263,27 @@ const accountStyles = `
 
       .metric-tile small {
         display: block;
-        margin-top: 8px;
+        margin-top: 6px;
         color: var(--hc-text-muted);
       }
 
       .radial-meter {
-        width: 256px;
-        height: 256px;
+        width: 196px;
+        height: 196px;
         display: grid;
         place-items: center;
         justify-self: center;
         border-radius: 50%;
         background:
           conic-gradient(from -28deg, var(--hc-lime) 0deg, var(--hc-cyan) var(--usage-angle), rgba(255, 255, 255, 0.1) var(--usage-angle), rgba(255, 255, 255, 0.1) 360deg);
-        box-shadow: 0 0 42px rgba(82, 214, 198, 0.16);
+        box-shadow: 0 0 32px rgba(82, 214, 198, 0.15);
       }
 
       .radial-meter::before {
         content: "";
         position: absolute;
-        width: 222px;
-        height: 222px;
+        width: 170px;
+        height: 170px;
         border-radius: 50%;
         background: #080a0d;
         box-shadow: inset 0 0 34px rgba(255, 255, 255, 0.07);
@@ -1293,8 +1293,8 @@ const accountStyles = `
         position: relative;
         display: grid;
         place-items: center;
-        width: 178px;
-        height: 178px;
+        width: 132px;
+        height: 132px;
         border: 1px solid rgba(255, 255, 255, 0.12);
         border-radius: 50%;
         text-align: center;
@@ -1302,19 +1302,19 @@ const accountStyles = `
 
       .radial-core span {
         color: var(--hc-text);
-        font-size: 17px;
+        font-size: 13px;
         font-weight: 800;
       }
 
       .radial-core strong {
-        margin-top: -12px;
-        font-size: clamp(54px, 7vw, 76px);
+        margin-top: -7px;
+        font-size: clamp(38px, 5vw, 54px);
         line-height: 0.95;
         letter-spacing: 0;
       }
 
       .radial-core small {
-        margin-top: -12px;
+        margin-top: -7px;
         color: var(--hc-text-muted);
         font-size: 14px;
       }
@@ -1322,14 +1322,14 @@ const accountStyles = `
       .usage-mini strong {
         display: block;
         color: var(--hc-lime);
-        font-size: 36px;
+        font-size: 29px;
         line-height: 1;
-        margin-bottom: 12px;
+        margin-bottom: 10px;
       }
 
       .usage-mini small {
         color: var(--hc-text);
-        font-size: 20px;
+        font-size: 16px;
       }
 
       .usage-mini p {
@@ -1341,25 +1341,25 @@ const accountStyles = `
       .account-mid-grid {
         display: grid;
         grid-template-columns: minmax(0, 1.8fr) minmax(310px, 0.9fr);
-        gap: 14px;
-        margin-top: 14px;
+        gap: 12px;
+        margin-top: 12px;
       }
 
       .studio-panel {
-        padding: 18px 20px;
+        padding: 15px 16px;
       }
 
       .panel-head {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 14px;
-        margin-bottom: 16px;
+        gap: 12px;
+        margin-bottom: 13px;
       }
 
       .panel-head h2 {
         margin: 0;
-        font-size: 21px;
+        font-size: 18px;
       }
 
       .segmented {
@@ -1393,8 +1393,8 @@ const accountStyles = `
         display: flex;
         align-items: flex-end;
         gap: 9px;
-        height: 190px;
-        padding: 14px 4px 0;
+        height: 160px;
+        padding: 12px 4px 0;
         background:
           linear-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px) 0 14px / 100% 43px;
       }
@@ -1451,7 +1451,7 @@ const accountStyles = `
 
       .plan-card {
         display: grid;
-        gap: 16px;
+        gap: 13px;
       }
 
       .plan-title {
@@ -1463,7 +1463,7 @@ const accountStyles = `
 
       .plan-title strong {
         color: var(--hc-text);
-        font-size: 23px;
+        font-size: 19px;
       }
 
       .plan-title span {
@@ -1516,7 +1516,7 @@ const accountStyles = `
       }
 
       .ledger-panel {
-        margin-top: 14px;
+        margin-top: 12px;
       }
 
       .ledger-panel .panel-head button {
@@ -1536,8 +1536,8 @@ const accountStyles = `
         grid-template-columns: 1.2fr 1fr 0.9fr 0.9fr 0.8fr;
         gap: 12px;
         align-items: center;
-        min-height: 42px;
-        padding: 0 14px;
+        min-height: 38px;
+        padding: 0 12px;
         border-top: 1px solid rgba(255, 255, 255, 0.07);
         color: var(--hc-text);
         font-size: 13px;
@@ -1571,7 +1571,7 @@ const accountStyles = `
       }
 
       .chart-empty {
-        min-height: 190px;
+        min-height: 160px;
       }
 
       .muted-text {
@@ -1581,7 +1581,7 @@ const accountStyles = `
 
       .account-state {
         width: min(520px, calc(100vw - 40px));
-        padding: 30px;
+        padding: 24px;
         text-align: center;
       }
 
@@ -1626,7 +1626,7 @@ const accountStyles = `
 
       @media (max-width: 1080px) {
         .account-studio-shell {
-          grid-template-columns: 230px minmax(0, 1fr);
+          grid-template-columns: 222px minmax(0, 1fr);
         }
 
         .account-rail {
@@ -1694,8 +1694,8 @@ const accountStyles = `
 
         .radial-meter {
           grid-column: auto;
-          width: min(260px, 80vw);
-          height: min(260px, 80vw);
+          width: min(220px, 76vw);
+          height: min(220px, 76vw);
         }
 
         .plan-card dl {
