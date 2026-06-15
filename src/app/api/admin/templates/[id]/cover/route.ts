@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '../../../../../../lib/supabase/server';
 import { requireAdmin } from '../../../../../../lib/admin/auth';
-import { uploadTemplateAsset, getPublicCoverUrl } from '../../../../../../lib/supabase/storage';
+import {
+  MAX_PUBLIC_IMAGE_UPLOAD_BYTES,
+  TEMPLATE_ASSETS_BUCKET,
+  TEMPLATE_COVER_IMAGE_MIME_TYPES,
+  getPublicImageExtension,
+  isPublicImageMimeType,
+  uploadPublicImageAsset,
+} from '@/lib/assets/publicAssetUpload.server';
 
 /**
  * POST /api/admin/templates/[id]/cover
@@ -24,32 +31,25 @@ export async function POST(
       return NextResponse.json({ error: '请选择封面图片' }, { status: 400 });
     }
 
-    // Validate file type
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-    if (!validTypes.includes(file.type)) {
+    if (!isPublicImageMimeType(file.type, TEMPLATE_COVER_IMAGE_MIME_TYPES)) {
       return NextResponse.json({ error: '仅支持 JPG、PNG、WebP、GIF 格式' }, { status: 400 });
     }
 
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
+    if (file.size > MAX_PUBLIC_IMAGE_UPLOAD_BYTES) {
       return NextResponse.json({ error: '图片大小不能超过 5MB' }, { status: 400 });
     }
 
-    // Upload to Supabase Storage
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const ext = file.name.split('.').pop() || 'jpg';
-    const filename = `cover.${ext}`;
-
-    const path = await uploadTemplateAsset(id, 'cover', buffer, filename);
-    const coverUrl = getPublicCoverUrl(path);
-
-    // 添加时间戳参数避免 CDN/浏览器缓存旧图片
-    const coverUrlWithCacheBust = `${coverUrl}?t=${Date.now()}`;
+    const asset = await uploadPublicImageAsset(file, {
+      bucket: TEMPLATE_ASSETS_BUCKET,
+      path: `templates/${id}/cover/cover.${getPublicImageExtension(file.type)}`,
+      allowedMimeTypes: TEMPLATE_COVER_IMAGE_MIME_TYPES,
+      cacheBustParam: 't',
+    });
 
     // Update template record with cover URL
     const { data: updateData, error: updateError } = await supabaseAdmin
       .from('templates')
-      .update({ cover_url: coverUrlWithCacheBust })
+      .update({ cover_url: asset.publicUrl })
       .eq('id', id)
       .select('id, cover_url')
       .single();
@@ -71,7 +71,7 @@ export async function POST(
       target_id: id,
     });
 
-    return NextResponse.json({ coverUrl: coverUrlWithCacheBust, success: true });
+    return NextResponse.json({ coverUrl: asset.publicUrl, success: true });
   } catch (error) {
     console.error('[Admin Template Cover Upload Error]', error);
     return NextResponse.json({ error: '封面上传失败，请重试' }, { status: 500 });

@@ -13,6 +13,7 @@ import {
   getAdvancedAnalysisStatus,
   getAdvancedPrompt,
 } from '@/lib/template/advancedTemplateFields';
+import { compressImageForUpload } from '@/lib/image/browserCompression';
 
 interface TemplateItem {
   id: string;
@@ -412,8 +413,12 @@ export default function AdminTemplatesPage() {
       // Upload cover if selected
       if (coverFile && templateId) {
         setUploadProgress({ current: 0, total: 1, status: '上传封面...' });
+        const compressedCoverFile = await compressImageForUpload(coverFile, {
+          maxBytes: 5 * 1024 * 1024,
+          outputName: 'template-cover.webp',
+        });
         const coverFormData = new FormData();
-        coverFormData.append('cover', coverFile);
+        coverFormData.append('cover', compressedCoverFile);
         const coverRes = await fetch(`/api/admin/templates/${templateId}/cover`, {
           method: 'POST',
           body: coverFormData,

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchWithAuth } from '@/lib/fetchWithAuth';
 import { getAvatarInitial } from '@/lib/account/profile';
+import { compressImageForUpload } from '@/lib/image/browserCompression';
 import { supabase } from '@/lib/supabase/client';
 
 type ProfileData = {
@@ -92,8 +93,12 @@ export default function ProfileSettings() {
     setProfileMessage(null);
 
     try {
+      const compressedFile = await compressImageForUpload(file, {
+        maxBytes: 2 * 1024 * 1024,
+        outputName: 'avatar.webp',
+      });
       const formData = new FormData();
-      formData.append('avatar', file);
+      formData.append('avatar', compressedFile);
 
       const res = await fetchWithAuth('/api/account/avatar', {
         method: 'POST',
@@ -109,8 +114,8 @@ export default function ProfileSettings() {
       setProfile((current) => current ? { ...current, avatarUrl: data.avatarUrl } : current);
       await refreshUser();
       setProfileMessage('头像已更新');
-    } catch {
-      setProfileError('网络连接失败，请稍后重试');
+    } catch (error) {
+      setProfileError(error instanceof Error ? error.message : '网络连接失败，请稍后重试');
     } finally {
       setUploadingAvatar(false);
     }

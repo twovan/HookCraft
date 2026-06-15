@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '../../../../../../lib/admin/auth';
 import {
   MAX_PUBLIC_IMAGE_UPLOAD_BYTES,
+  getPublicImageExtension,
   isPublicImageMimeType,
   uploadPublicImageAsset,
 } from '@/lib/assets/publicAssetUpload.server';
@@ -26,7 +27,9 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const asset = await uploadPublicImageAsset(file, 'homepage', 'hero');
+    const asset = await uploadPublicImageAsset(file, {
+      path: `homepage/hero-${Date.now()}.${getPublicImageExtension(file.type)}`,
+    });
     return NextResponse.json({
       backgroundImageUrl: asset.publicUrl,
       size: asset.size,

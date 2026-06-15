@@ -7,6 +7,7 @@ import { useMembershipStore } from '@/store/membershipStore';
 import { useCreditStore } from '@/store/creditStore';
 import { fetchWithAuth } from '@/lib/fetchWithAuth';
 import { getAvatarInitial } from '@/lib/account/profile';
+import { compressImageForUpload } from '@/lib/image/browserCompression';
 import { supabase } from '@/lib/supabase/client';
 import { TIER_CONFIGS } from '@/config/tierConfig';
 import type { PaymentRecord } from '@/types/payment';
@@ -290,8 +291,12 @@ export default function AccountPage() {
     setProfileMessage(null);
 
     try {
+      const compressedFile = await compressImageForUpload(file, {
+        maxBytes: 2 * 1024 * 1024,
+        outputName: 'avatar.webp',
+      });
       const formData = new FormData();
-      formData.append('avatar', file);
+      formData.append('avatar', compressedFile);
 
       const res = await fetchWithAuth('/api/account/avatar', {
         method: 'POST',
@@ -307,8 +312,8 @@ export default function AccountPage() {
       setProfile((current) => (current ? { ...current, avatarUrl: data.avatarUrl } : current));
       await refreshUser();
       setProfileMessage('头像已更新');
-    } catch {
-      setProfileError('网络连接失败，请稍后重试');
+    } catch (error) {
+      setProfileError(error instanceof Error ? error.message : '网络连接失败，请稍后重试');
     } finally {
       setUploadingAvatar(false);
     }

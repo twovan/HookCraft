@@ -4,6 +4,14 @@ import { uploadTemplateAsset } from '../../../../lib/supabase/storage';
 import { resolveActiveProducerId } from '../../../../lib/producer/resolveActiveProducerId';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import {
+  MAX_PUBLIC_IMAGE_UPLOAD_BYTES,
+  TEMPLATE_ASSETS_BUCKET,
+  TEMPLATE_COVER_IMAGE_MIME_TYPES,
+  getPublicImageExtension,
+  isPublicImageMimeType,
+  uploadPublicImageAsset,
+} from '@/lib/assets/publicAssetUpload.server';
 
 async function getUser() {
   const cookieStore = await cookies();
@@ -92,13 +100,13 @@ export async function POST(req: NextRequest) {
     // Upload cover if provided
     let coverUrl: string | null = null;
     if (coverFile) {
-      const validImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-      if (validImageTypes.includes(coverFile.type) && coverFile.size <= 5 * 1024 * 1024) {
-        const coverBuffer = Buffer.from(await coverFile.arrayBuffer());
-        const coverExt = coverFile.name.split('.').pop() || 'jpg';
-        const coverPath = await uploadTemplateAsset(templateId, 'cover', coverBuffer, `cover.${coverExt}`);
-        const { data: coverUrlData } = supabaseAdmin.storage.from('template-assets').getPublicUrl(coverPath);
-        coverUrl = coverUrlData.publicUrl;
+      if (isPublicImageMimeType(coverFile.type, TEMPLATE_COVER_IMAGE_MIME_TYPES) && coverFile.size <= MAX_PUBLIC_IMAGE_UPLOAD_BYTES) {
+        const asset = await uploadPublicImageAsset(coverFile, {
+          bucket: TEMPLATE_ASSETS_BUCKET,
+          path: `templates/${templateId}/cover/cover.${getPublicImageExtension(coverFile.type)}`,
+          allowedMimeTypes: TEMPLATE_COVER_IMAGE_MIME_TYPES,
+        });
+        coverUrl = asset.publicUrl;
       }
     }
 

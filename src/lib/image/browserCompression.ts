@@ -6,6 +6,13 @@ export interface CompressImageToWebpOptions {
   outputName?: string;
 }
 
+export interface CompressImageForUploadOptions {
+  maxBytes: number;
+  outputName: string;
+  maxEdge?: number;
+  targetBytes?: number;
+}
+
 export function formatBytes(bytes: number) {
   if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(2)}MB`;
   return `${Math.round(bytes / 1024)}KB`;
@@ -54,4 +61,15 @@ export async function compressImageToWebp(file: File, options: CompressImageToWe
   }
 
   throw new Error('图片压缩失败，请重试');
+}
+
+export async function compressImageForUpload(file: File, options: CompressImageForUploadOptions): Promise<File> {
+  if (file.type === 'image/gif') return file;
+
+  return compressImageToWebp(file, {
+    maxEdge: options.maxEdge ?? 1920,
+    targetBytes: options.targetBytes ?? 1200 * 1024,
+    maxBytes: options.maxBytes,
+    outputName: options.outputName,
+  });
 }

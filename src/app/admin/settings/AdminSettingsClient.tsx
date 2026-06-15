@@ -18,7 +18,7 @@ import {
   updateHomepageHeroHistory,
   type HomepageHeroSettings,
 } from '@/lib/homepage/heroSettings';
-import { compressImageToWebp, formatBytes } from '@/lib/image/browserCompression';
+import { compressImageForUpload, formatBytes } from '@/lib/image/browserCompression';
 
 interface BasicSettings {
   platformName: string;
@@ -138,7 +138,7 @@ const HERO_IMAGE_TARGET_BYTES = 1200 * 1024;
 const HERO_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
 async function compressHeroImage(file: File): Promise<File> {
-  return compressImageToWebp(file, {
+  return compressImageForUpload(file, {
     maxEdge: HERO_IMAGE_MAX_EDGE,
     targetBytes: HERO_IMAGE_TARGET_BYTES,
     maxBytes: HERO_IMAGE_MAX_BYTES,

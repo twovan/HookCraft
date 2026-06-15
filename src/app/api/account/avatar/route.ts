@@ -1,26 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateAvatarFile } from '@/lib/account/profile';
+import {
+  AVATAR_ASSETS_BUCKET,
+  getPublicImageExtension,
+  uploadPublicImageAsset,
+} from '@/lib/assets/publicAssetUpload.server';
 import { getAuthUser } from '@/lib/supabase/auth-helpers';
 import { supabaseAdmin } from '@/lib/supabase/server';
-
-const AVATAR_BUCKET = 'avatars';
-
-function getExtension(type: string): string {
-  if (type === 'image/png') return 'png';
-  if (type === 'image/webp') return 'webp';
-  return 'jpg';
-}
-
-async function ensureAvatarBucket() {
-  const { data: bucket } = await supabaseAdmin.storage.getBucket(AVATAR_BUCKET);
-  if (bucket) return;
-
-  await supabaseAdmin.storage.createBucket(AVATAR_BUCKET, {
-    public: true,
-    fileSizeLimit: 2 * 1024 * 1024,
-    allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
-  });
-}
 
 export async function POST(req: NextRequest) {
   const user = await getAuthUser();
@@ -41,24 +27,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: validation.error }, { status: 400 });
   }
 
-  await ensureAvatarBucket();
-
-  const extension = getExtension(file.type);
-  const path = `${user.id}/avatar.${extension}`;
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const { error: uploadError } = await supabaseAdmin.storage
-    .from(AVATAR_BUCKET)
-    .upload(path, buffer, {
-      contentType: file.type,
-      upsert: true,
+  let avatarUrl: string;
+  try {
+    const asset = await uploadPublicImageAsset(file, {
+      bucket: AVATAR_ASSETS_BUCKET,
+      path: `${user.id}/avatar.${getPublicImageExtension(file.type)}`,
+      maxBytes: 2 * 1024 * 1024,
     });
-
-  if (uploadError) {
+    avatarUrl = asset.publicUrl;
+  } catch {
     return NextResponse.json({ error: '头像上传失败，请稍后重试' }, { status: 500 });
   }
-
-  const { data } = supabaseAdmin.storage.from(AVATAR_BUCKET).getPublicUrl(path);
-  const avatarUrl = `${data.publicUrl}?v=${Date.now()}`;
   const { data: latestData, error: latestError } = await supabaseAdmin.auth.admin.getUserById(user.id);
 
   if (latestError || !latestData.user) {

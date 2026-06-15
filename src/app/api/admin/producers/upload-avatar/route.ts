@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '../../../../../lib/supabase/server';
 import { requireAdmin } from '../../../../../lib/admin/auth';
+import {
+  AVATAR_ASSETS_BUCKET,
+  MAX_PUBLIC_IMAGE_UPLOAD_BYTES,
+  getPublicImageExtension,
+  isPublicImageMimeType,
+  uploadPublicImageAsset,
+} from '@/lib/assets/publicAssetUpload.server';
 
 /**
  * POST /api/admin/producers/upload-avatar
@@ -23,43 +29,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '缺少制作人ID' }, { status: 400 });
     }
 
-    // Ensure bucket exists
-    const { data: buckets } = await supabaseAdmin.storage.listBuckets();
-    const hasBucket = buckets?.some(b => b.name === 'avatars');
-    if (!hasBucket) {
-      await supabaseAdmin.storage.createBucket('avatars', {
-        public: true,
-        fileSizeLimit: 5 * 1024 * 1024, // 5MB
-        allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
-      });
+    if (!isPublicImageMimeType(file.type)) {
+      return NextResponse.json({ error: '仅支持 JPG、PNG、WebP 图片' }, { status: 400 });
     }
 
-    // Upload file
-    const ext = file.name.split('.').pop() || 'jpg';
-    const fileName = `${producerId}-${Date.now()}.${ext}`;
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = new Uint8Array(arrayBuffer);
-
-    const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
-      .from('avatars')
-      .upload(fileName, buffer, {
-        contentType: file.type,
-        upsert: true,
-      });
-
-    if (uploadError) {
-      console.error('[Avatar Upload] error:', uploadError.message);
-      return NextResponse.json({ error: `上传失败: ${uploadError.message}` }, { status: 500 });
+    if (file.size > MAX_PUBLIC_IMAGE_UPLOAD_BYTES) {
+      return NextResponse.json({ error: '图片大小不能超过 5MB' }, { status: 400 });
     }
 
-    // Get public URL
-    const { data: urlData } = supabaseAdmin.storage
-      .from('avatars')
-      .getPublicUrl(fileName);
+    const asset = await uploadPublicImageAsset(file, {
+      bucket: AVATAR_ASSETS_BUCKET,
+      path: `${producerId}-${Date.now()}.${getPublicImageExtension(file.type)}`,
+    });
 
     return NextResponse.json({
       success: true,
-      url: urlData.publicUrl,
+      url: asset.publicUrl,
     });
   } catch (error: any) {
     console.error('[Avatar Upload Error]', error?.message || error);

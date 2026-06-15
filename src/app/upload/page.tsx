@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
+import { compressImageForUpload } from '@/lib/image/browserCompression';
 
 export default function UploadPage() {
   const { user, loading: authLoading } = useAuth();
@@ -63,7 +64,13 @@ export default function UploadPage() {
       formData.append('category', category);
       formData.append('price', String(price));
       formData.append('audio', audioFile);
-      if (coverFile) formData.append('cover', coverFile);
+      if (coverFile) {
+        const compressedCoverFile = await compressImageForUpload(coverFile, {
+          maxBytes: 5 * 1024 * 1024,
+          outputName: 'template-cover.webp',
+        });
+        formData.append('cover', compressedCoverFile);
+      }
 
       const res = await fetch('/api/templates/upload', {
         method: 'POST',
