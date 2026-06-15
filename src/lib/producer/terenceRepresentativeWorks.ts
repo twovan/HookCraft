@@ -60,7 +60,10 @@ export const TERENCE_REPRESENTATIVE_WORKS: RepresentativeWorkDetail[] = [
 ];
 
 function normalizeTitle(title: string) {
-  return title.replace(/\s+/g, '').replace(/[()]/g, (match) => (match === '(' ? '（' : '）'));
+  return title
+    .replace(/[《》]/g, '')
+    .replace(/\s+/g, '')
+    .replace(/[()]/g, (match) => (match === '(' ? '（' : '）'));
 }
 
 function findRepresentativeWorkByTitle(title: string) {
@@ -89,8 +92,9 @@ export function getRepresentativeWorkDetail(work: string) {
 export function formatRepresentativeWorkLabel(work: string) {
   const parsed = parseRepresentativeWorkLabel(work);
   const detail = getRepresentativeWorkDetail(work);
+  const hasExplicitArtist = /\s*[—–-]\s*/.test(work);
   const title = detail?.title || parsed.title;
-  const artist = detail?.artist || parsed.artist;
+  const artist = hasExplicitArtist ? detail?.artist || parsed.artist : '';
   const wrappedTitle = title.startsWith('《') && title.endsWith('》') ? title : `《${title}》`;
 
   return artist ? `${wrappedTitle} - ${artist}` : wrappedTitle;
