@@ -5,6 +5,7 @@ import Link from 'next/link';
 import type { CSSProperties } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import type { ProducerSummary } from '@/types/producer';
+import { DEFAULT_HOME_HERO_BACKGROUND_URL } from '@/lib/homepage/heroSettings';
 import {
   TERENCE_REPRESENTATIVE_WORKS,
   formatRepresentativeWorkLabel,
@@ -38,7 +39,6 @@ const WAVE_COLORS = ['#a855f7', '#d9a441', '#bfff1f', '#2dd4bf', '#f472b6', '#f9
 const WAVEFORM_PROFILE = [18, 26, 42, 66, 34, 22, 54, 80, 46, 28, 24, 62, 36, 20, 18, 30, 74, 88, 52, 24, 18, 20, 34, 58, 72, 48, 30, 22, 26, 64, 40, 18, 16, 22, 70, 92, 46, 20, 18, 24, 38, 56];
 const STUDIO_SHOWCASE_WEBM = '/showcase/hookcraft-homepage-showcase.webm';
 const STUDIO_SHOWCASE_MP4 = '/showcase/hookcraft-homepage-showcase.mp4';
-const DEFAULT_HOME_HERO_BACKGROUND_URL = '/home-hero-studio.webp';
 async function fetchWithTimeout(url: string, timeoutMs = 8000) {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);

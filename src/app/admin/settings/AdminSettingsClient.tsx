@@ -12,6 +12,13 @@ import {
   normalizeStemEditorFeatureSettings,
   type StemEditorFeatureSettings,
 } from '@/config/stemEditorFeatures';
+import {
+  DEFAULT_HOME_HERO_BACKGROUND_URL,
+  normalizeHomepageHeroSettings,
+  updateHomepageHeroHistory,
+  type HomepageHeroSettings,
+} from '@/lib/homepage/heroSettings';
+import { compressImageToWebp, formatBytes } from '@/lib/image/browserCompression';
 
 interface BasicSettings {
   platformName: string;
@@ -39,12 +46,6 @@ interface ReviewSettings {
   aiContentSafetyPreCheck: boolean;
   reviewTimeoutReminderHours: number;
   notificationMethods: string[];
-}
-
-interface HomepageHeroSettings {
-  backgroundImageUrl: string;
-  history: string[];
-  overlayEnabled: boolean;
 }
 
 const STEM_EDITOR_FEATURE_GROUPS = [
@@ -132,85 +133,17 @@ const STEM_EDITOR_FEATURE_GROUPS = [
   },
 ] as const;
 
-const DEFAULT_HOME_HERO_BACKGROUND_URL = '/home-hero-studio.webp';
 const HERO_IMAGE_MAX_EDGE = 1920;
 const HERO_IMAGE_TARGET_BYTES = 1200 * 1024;
 const HERO_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
-function normalizeHomepageHeroSettings(value: Partial<HomepageHeroSettings> | undefined): HomepageHeroSettings {
-  const backgroundImageUrl = typeof value?.backgroundImageUrl === 'string' && value.backgroundImageUrl.trim()
-    ? value.backgroundImageUrl
-    : DEFAULT_HOME_HERO_BACKGROUND_URL;
-  const history = Array.from(new Set([
-    backgroundImageUrl,
-    ...(Array.isArray(value?.history) ? value.history : []),
-    DEFAULT_HOME_HERO_BACKGROUND_URL,
-  ].filter((item): item is string => typeof item === 'string' && item.trim().length > 0))).slice(0, 8);
-
-  return {
-    backgroundImageUrl,
-    history,
-    overlayEnabled: typeof value?.overlayEnabled === 'boolean' ? value.overlayEnabled : true,
-  };
-}
-
-function updateHeroHistory(settings: HomepageHeroSettings, backgroundImageUrl: string): HomepageHeroSettings {
-  const nextUrl = backgroundImageUrl.trim() || DEFAULT_HOME_HERO_BACKGROUND_URL;
-  return {
-    ...settings,
-    backgroundImageUrl: nextUrl,
-    history: Array.from(new Set([nextUrl, ...settings.history, DEFAULT_HOME_HERO_BACKGROUND_URL])).slice(0, 8),
-  };
-}
-
-function formatBytes(bytes: number) {
-  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(2)}MB`;
-  return `${Math.round(bytes / 1024)}KB`;
-}
-
-function loadImageFromFile(file: File): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const image = new Image();
-    image.onload = () => {
-      URL.revokeObjectURL(url);
-      resolve(image);
-    };
-    image.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error('图片读取失败，请换一张图片重试'));
-    };
-    image.src = url;
-  });
-}
-
 async function compressHeroImage(file: File): Promise<File> {
-  if (!file.type.startsWith('image/')) throw new Error('请选择图片文件');
-
-  const image = await loadImageFromFile(file);
-  const scale = Math.min(1, HERO_IMAGE_MAX_EDGE / Math.max(image.naturalWidth, image.naturalHeight));
-  const width = Math.max(1, Math.round(image.naturalWidth * scale));
-  const height = Math.max(1, Math.round(image.naturalHeight * scale));
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const context = canvas.getContext('2d');
-  if (!context) throw new Error('当前浏览器不支持图片压缩');
-  context.drawImage(image, 0, 0, width, height);
-
-  const qualities = [0.82, 0.76, 0.68, 0.6, 0.52];
-  for (const quality of qualities) {
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/webp', quality));
-    if (!blob) continue;
-    if (blob.size <= HERO_IMAGE_TARGET_BYTES || quality === qualities[qualities.length - 1]) {
-      if (blob.size > HERO_IMAGE_MAX_BYTES) {
-        throw new Error(`图片压缩后仍有 ${formatBytes(blob.size)}，请换一张更小的图片`);
-      }
-      return new File([blob], 'homepage-hero.webp', { type: 'image/webp' });
-    }
-  }
-
-  throw new Error('图片压缩失败，请重试');
+  return compressImageToWebp(file, {
+    maxEdge: HERO_IMAGE_MAX_EDGE,
+    targetBytes: HERO_IMAGE_TARGET_BYTES,
+    maxBytes: HERO_IMAGE_MAX_BYTES,
+    outputName: 'homepage-hero.webp',
+  });
 }
 
 function countEnabledFeatures(settings: StemEditorFeatureSettings[keyof StemEditorFeatureSettings]) {
@@ -293,7 +226,7 @@ export default function AdminSettingsClient({ view = 'system' }: { view?: 'syste
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error || '上传失败');
 
-      const next = updateHeroHistory(homepageHero, data.backgroundImageUrl);
+      const next = updateHomepageHeroHistory(homepageHero, data.backgroundImageUrl);
       setHomepageHero(next);
       await saveSection('homepage_hero', next);
       setHeroUploadStatus(`上传完成：${formatBytes(compressed.size)}`);
@@ -549,14 +482,14 @@ export default function AdminSettingsClient({ view = 'system' }: { view?: 'syste
                 </label>
                 <button
                   type="button"
-                  onClick={() => setHomepageHero((p) => updateHeroHistory(p, DEFAULT_HOME_HERO_BACKGROUND_URL))}
+                  onClick={() => setHomepageHero((p) => updateHomepageHeroHistory(p, DEFAULT_HOME_HERO_BACKGROUND_URL))}
                   style={{ ...secondaryBtnStyle, marginTop: 0 }}
                 >
                   恢复默认图
                 </button>
                 <button
                   onClick={() => {
-                    const next = updateHeroHistory(homepageHero, homepageHero.backgroundImageUrl);
+                    const next = updateHomepageHeroHistory(homepageHero, homepageHero.backgroundImageUrl);
                     setHomepageHero(next);
                     void saveSection('homepage_hero', next);
                   }}
@@ -579,7 +512,7 @@ export default function AdminSettingsClient({ view = 'system' }: { view?: 'syste
                 <button
                   key={url}
                   type="button"
-                  onClick={() => setHomepageHero((p) => updateHeroHistory(p, url))}
+                  onClick={() => setHomepageHero((p) => updateHomepageHeroHistory(p, url))}
                   style={{
                     ...heroHistoryButtonStyle,
                     borderColor: homepageHero.backgroundImageUrl === url ? '#D4A574' : '#e5e7eb',

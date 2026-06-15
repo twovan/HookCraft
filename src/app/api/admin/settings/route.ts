@@ -12,6 +12,7 @@ import {
   readStemEditorFeatureSettings,
   writeStemEditorFeatureSettings,
 } from '../../../../lib/studio/StemEditorFeatureSettingsStore';
+import { normalizeHomepageHeroSettings } from '../../../../lib/homepage/heroSettings';
 
 /**
  * GET /api/admin/settings
@@ -60,11 +61,7 @@ export async function GET(req: NextRequest) {
         reviewTimeoutReminderHours: 24,
         notificationMethods: ['in_app', 'email'],
       },
-      homepageHero: settingsMap.homepage_hero || {
-        backgroundImageUrl: '/home-hero-studio.webp',
-        history: ['/home-hero-studio.webp'],
-        overlayEnabled: true,
-      },
+      homepageHero: normalizeHomepageHeroSettings(settingsMap.homepage_hero),
       studioTabs: await readStudioTabSettings(supabaseAdmin),
       stemEditorFeatures: await readStemEditorFeatureSettings(supabaseAdmin),
     };
@@ -125,7 +122,9 @@ export async function PUT(req: NextRequest) {
     // Upsert the setting
     const settingValue = section === 'studio_tabs'
       ? normalizeStudioTabSettings(value)
-      : value;
+      : section === 'homepage_hero'
+        ? normalizeHomepageHeroSettings(value)
+        : value;
 
     const { error } = await supabaseAdmin
       .from('platform_settings')
