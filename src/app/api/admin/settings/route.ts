@@ -13,6 +13,10 @@ import {
   writeStemEditorFeatureSettings,
 } from '../../../../lib/studio/StemEditorFeatureSettingsStore';
 import { normalizeHomepageHeroSettings } from '../../../../lib/homepage/heroSettings';
+import {
+  CONTENT_PAGE_SLUGS,
+  normalizeContentPagesSettings,
+} from '../../../../lib/contentPages';
 
 /**
  * GET /api/admin/settings
@@ -62,6 +66,7 @@ export async function GET(req: NextRequest) {
         notificationMethods: ['in_app', 'email'],
       },
       homepageHero: normalizeHomepageHeroSettings(settingsMap.homepage_hero),
+      contentPages: normalizeContentPagesSettings(settingsMap.content_pages),
       studioTabs: await readStudioTabSettings(supabaseAdmin),
       stemEditorFeatures: await readStemEditorFeatureSettings(supabaseAdmin),
     };
@@ -89,7 +94,7 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: '参数不完整' }, { status: 400 });
     }
 
-    const validSections = ['basic', 'transaction', 'ai_generation', 'review', 'homepage_hero', 'studio_tabs', 'stem_editor_features'];
+    const validSections = ['basic', 'transaction', 'ai_generation', 'review', 'homepage_hero', 'content_pages', 'studio_tabs', 'stem_editor_features'];
     if (!validSections.includes(section)) {
       return NextResponse.json({ error: '无效的设置分类' }, { status: 400 });
     }
@@ -124,7 +129,9 @@ export async function PUT(req: NextRequest) {
       ? normalizeStudioTabSettings(value)
       : section === 'homepage_hero'
         ? normalizeHomepageHeroSettings(value)
-        : value;
+        : section === 'content_pages'
+          ? normalizeContentPagesSettings(value)
+          : value;
 
     const { error } = await supabaseAdmin
       .from('platform_settings')
@@ -139,6 +146,10 @@ export async function PUT(req: NextRequest) {
     if (section === 'homepage_hero') {
       revalidatePath('/');
       revalidatePath('/api/homepage/hero');
+    }
+
+    if (section === 'content_pages') {
+      CONTENT_PAGE_SLUGS.forEach((slug) => revalidatePath(`/${slug}`));
     }
 
     // Log operation

@@ -18,6 +18,13 @@ import {
   updateHomepageHeroHistory,
   type HomepageHeroSettings,
 } from '@/lib/homepage/heroSettings';
+import {
+  CONTENT_PAGE_SLUGS,
+  DEFAULT_CONTENT_PAGES,
+  normalizeContentPagesSettings,
+  type ContentPageSlug,
+  type ContentPagesSettings,
+} from '@/lib/contentPages';
 import { compressImageForUpload, formatBytes } from '@/lib/image/browserCompression';
 
 interface BasicSettings {
@@ -162,6 +169,8 @@ export default function AdminSettingsClient({ view = 'system' }: { view?: 'syste
   const [ai, setAI] = useState<AISettings>({ modelVersion: '', maxConcurrentGenerations: 10, generationTimeoutSeconds: 300, creditsResetSchedule: '' });
   const [review, setReview] = useState<ReviewSettings>({ trustedProducerAutoApprove: false, aiContentSafetyPreCheck: true, reviewTimeoutReminderHours: 24, notificationMethods: [] });
   const [homepageHero, setHomepageHero] = useState<HomepageHeroSettings>(normalizeHomepageHeroSettings(undefined));
+  const [contentPages, setContentPages] = useState<ContentPagesSettings>(DEFAULT_CONTENT_PAGES);
+  const [activeContentPage, setActiveContentPage] = useState<ContentPageSlug>('terms');
   const [heroUploadStatus, setHeroUploadStatus] = useState('');
   const [studioTabs, setStudioTabs] = useState<StudioTabSettings>(DEFAULT_STUDIO_TAB_SETTINGS);
   const [stemEditorFeatures, setStemEditorFeatures] = useState<StemEditorFeatureSettings>(DEFAULT_STEM_EDITOR_FEATURE_SETTINGS);
@@ -182,6 +191,7 @@ export default function AdminSettingsClient({ view = 'system' }: { view?: 'syste
       setAI(data.aiGeneration);
       setReview(data.review);
       setHomepageHero(normalizeHomepageHeroSettings(data.homepageHero));
+      setContentPages(normalizeContentPagesSettings(data.contentPages));
       setStudioTabs(data.studioTabs || DEFAULT_STUDIO_TAB_SETTINGS);
       setStemEditorFeatures(normalizeStemEditorFeatureSettings(data.stemEditorFeatures));
     } catch {
@@ -253,6 +263,20 @@ export default function AdminSettingsClient({ view = 'system' }: { view?: 'syste
       notificationMethods: prev.notificationMethods.includes(method)
         ? prev.notificationMethods.filter((m) => m !== method)
         : [...prev.notificationMethods, method],
+    }));
+  }
+
+  function updateContentPage(
+    slug: ContentPageSlug,
+    field: 'eyebrow' | 'title' | 'summary' | 'updatedAt' | 'body',
+    value: string,
+  ) {
+    setContentPages((prev) => ({
+      ...prev,
+      [slug]: {
+        ...prev[slug],
+        [field]: value,
+      },
     }));
   }
 
@@ -526,6 +550,115 @@ export default function AdminSettingsClient({ view = 'system' }: { view?: 'syste
                   </span>
                 </button>
               ))}
+            </div>
+          </div>
+        </div>
+        <div style={contentManagerCardStyle}>
+          <div style={contentManagerHeaderStyle}>
+            <div>
+              <p style={contentEyebrowStyle}>Content Pages</p>
+              <h3 style={contentTitleStyle}>页脚内容页面</h3>
+              <p style={contentDescriptionStyle}>
+                管理页脚中的法律与支持页面。正文支持简单格式：使用 “## 标题” 分段，使用 “- ” 创建列表。
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setContentPages(DEFAULT_CONTENT_PAGES);
+                setActiveContentPage('terms');
+              }}
+              disabled={saving === 'content_pages'}
+              style={{ ...secondaryBtnStyle, marginTop: 0 }}
+            >
+              恢复默认文案
+            </button>
+          </div>
+
+          <div style={contentEditorLayoutStyle}>
+            <div style={contentPageListStyle}>
+              {CONTENT_PAGE_SLUGS.map((slug) => {
+                const page = contentPages[slug];
+                const active = activeContentPage === slug;
+                return (
+                  <button
+                    key={slug}
+                    type="button"
+                    onClick={() => setActiveContentPage(slug)}
+                    style={contentPageButtonStyle(active)}
+                  >
+                    <strong>{page.navTitle}</strong>
+                    <span>{page.group === 'legal' ? '法律' : '支持'}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div style={contentEditorPanelStyle}>
+              <div style={contentFieldGridStyle}>
+                <div style={formGroupStyle}>
+                  <label style={labelStyle}>眉标</label>
+                  <input
+                    style={inputStyle}
+                    value={contentPages[activeContentPage].eyebrow}
+                    onChange={(e) => updateContentPage(activeContentPage, 'eyebrow', e.target.value)}
+                  />
+                </div>
+                <div style={formGroupStyle}>
+                  <label style={labelStyle}>更新日期</label>
+                  <input
+                    style={inputStyle}
+                    value={contentPages[activeContentPage].updatedAt}
+                    onChange={(e) => updateContentPage(activeContentPage, 'updatedAt', e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div style={formGroupStyle}>
+                <label style={labelStyle}>页面标题</label>
+                <input
+                  style={inputStyle}
+                  value={contentPages[activeContentPage].title}
+                  onChange={(e) => updateContentPage(activeContentPage, 'title', e.target.value)}
+                />
+              </div>
+
+              <div style={formGroupStyle}>
+                <label style={labelStyle}>页面摘要</label>
+                <textarea
+                  style={{ ...inputStyle, minHeight: 74, resize: 'vertical' }}
+                  value={contentPages[activeContentPage].summary}
+                  onChange={(e) => updateContentPage(activeContentPage, 'summary', e.target.value)}
+                />
+              </div>
+
+              <div style={formGroupStyle}>
+                <label style={labelStyle}>正文</label>
+                <textarea
+                  style={{ ...inputStyle, minHeight: 320, resize: 'vertical', lineHeight: 1.7 }}
+                  value={contentPages[activeContentPage].body}
+                  onChange={(e) => updateContentPage(activeContentPage, 'body', e.target.value)}
+                />
+                <div style={hintStyle}>示例：## 使用说明；列表项以 - 开头。保存后会同步到前台对应页面。</div>
+              </div>
+
+              <div style={contentActionsStyle}>
+                <a
+                  href={`/${activeContentPage}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={contentPreviewLinkStyle}
+                >
+                  预览前台页面
+                </a>
+                <button
+                  onClick={() => saveSection('content_pages', contentPages)}
+                  disabled={saving === 'content_pages'}
+                  style={{ ...saveBtnStyle, marginTop: 0 }}
+                >
+                  {saving === 'content_pages' ? '保存中...' : '保存内容页面'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -862,6 +995,105 @@ const secondaryBtnStyle: React.CSSProperties = {
   background: '#f3f4f6',
   color: '#374151',
   border: '1px solid #e5e7eb',
+};
+
+const contentManagerCardStyle: React.CSSProperties = {
+  ...cardStyle,
+  gridColumn: '1 / -1',
+  padding: 0,
+  overflow: 'hidden',
+  background: '#fbfaf7',
+};
+
+const contentManagerHeaderStyle: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  gap: 18,
+  padding: '22px 24px',
+  borderBottom: '1px solid #e7e2d8',
+  background: 'linear-gradient(135deg, #fffdf8 0%, #f7efe4 100%)',
+};
+
+const contentEyebrowStyle: React.CSSProperties = {
+  margin: '0 0 6px',
+  color: '#b45309',
+  fontSize: 12,
+  fontWeight: 800,
+  letterSpacing: 0,
+};
+
+const contentTitleStyle: React.CSSProperties = {
+  margin: 0,
+  color: '#1f2937',
+  fontSize: 20,
+  fontWeight: 800,
+};
+
+const contentDescriptionStyle: React.CSSProperties = {
+  margin: '10px 0 0',
+  maxWidth: 680,
+  color: '#5f6470',
+  fontSize: 13,
+  lineHeight: 1.7,
+};
+
+const contentEditorLayoutStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '220px minmax(0, 1fr)',
+  gap: 18,
+  padding: 24,
+};
+
+const contentPageListStyle: React.CSSProperties = {
+  display: 'grid',
+  alignContent: 'start',
+  gap: 8,
+};
+
+function contentPageButtonStyle(active: boolean): React.CSSProperties {
+  return {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    minHeight: 44,
+    padding: '10px 12px',
+    borderRadius: 8,
+    border: active ? '1px solid #D4A574' : '1px solid #e7e2d8',
+    background: active ? '#fff7ed' : '#fff',
+    color: active ? '#92400e' : '#374151',
+    cursor: 'pointer',
+    textAlign: 'left',
+    fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+  };
+}
+
+const contentEditorPanelStyle: React.CSSProperties = {
+  border: '1px solid #e7e2d8',
+  borderRadius: 8,
+  background: '#fff',
+  padding: 18,
+};
+
+const contentFieldGridStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '1fr 180px',
+  gap: 12,
+};
+
+const contentActionsStyle: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'flex-end',
+  alignItems: 'center',
+  gap: 10,
+};
+
+const contentPreviewLinkStyle: React.CSSProperties = {
+  ...secondaryBtnStyle,
+  marginTop: 0,
+  display: 'inline-flex',
+  alignItems: 'center',
+  textDecoration: 'none',
 };
 
 const editorManagerCardStyle: React.CSSProperties = {
