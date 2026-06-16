@@ -160,7 +160,6 @@ export default function AudioUploader({
             <p style={titleStyle}>拖入参考音频，或点击选择文件</p>
             <p style={hintStyle}>{requirementText}</p>
           </div>
-          <span style={actionPillStyle}>选择音频</span>
         </div>
       )}
 

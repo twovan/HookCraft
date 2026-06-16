@@ -147,23 +147,6 @@ export default function TemplateSelector({
                 </div>
               )}
 
-              {cardVariant === 'workbench' && (
-                <div style={waveformStyle(template.id)}>
-                  {Array.from({ length: 34 }).map((_, barIndex) => (
-                    <span
-                      key={`${template.id}-wave-${barIndex}`}
-                      style={{
-                        height: `${18 + ((barIndex * 17 + template.name.length * 9) % 42)}%`,
-                        width: 2,
-                        borderRadius: 99,
-                        background: 'currentColor',
-                        flex: '1 1 0',
-                      }}
-                    />
-                  ))}
-                </div>
-              )}
-
               <div style={cardInfoStyle}>
                 <div style={templateNameStyle}>{template.name}</div>
                 <div style={templateGenreStyle}>{template.genre}</div>
@@ -246,23 +229,6 @@ function cardStyle(cardVariant: TemplateSelectorProps['cardVariant']): React.CSS
   overflow: 'hidden',
   padding: 0,
   transition: 'border-color .2s ease, box-shadow .2s ease, opacity .2s ease',
-  };
-}
-
-function waveformStyle(seed: string): React.CSSProperties {
-  const colors = ['#26d7ba', '#a76cff', '#ff7a1a', '#e757a9', '#c9ff2d'];
-  const color = colors[seed.length % colors.length];
-  return {
-    position: 'absolute',
-    left: 13,
-    right: 13,
-    top: 18,
-    height: 38,
-    display: 'flex',
-    alignItems: 'center',
-    gap: 3,
-    color,
-    opacity: 0.95,
   };
 }
 
