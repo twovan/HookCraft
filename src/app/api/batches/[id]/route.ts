@@ -2,9 +2,86 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '../../../../lib/supabase/server';
 import { getAuthUser } from '../../../../lib/supabase/auth-helpers';
 import { loadStemCacheByTaskId } from '@/lib/stems/stemCacheLookup';
+import { getKieUserFacingErrorMessage, KieSunoProvider } from '@/lib/generation/KieSunoProvider';
+import { persistCompletedCoverTracks } from '@/app/api/kie/upload-cover/persist-tracks';
+
+const KIE_FAILED_STATUSES = new Set([
+  'CREATE_TASK_FAILED',
+  'GENERATE_AUDIO_FAILED',
+  'CALLBACK_EXCEPTION',
+  'SENSITIVE_WORD_ERROR',
+]);
 
 function canEditSong(task: any) {
   return task.status === 'completed' && typeof task.model_id === 'string' && task.model_id.includes('kie');
+}
+
+function getKieTaskId(task: any) {
+  return typeof task.raw_audio_path === 'string' && task.raw_audio_path.startsWith('kie:')
+    ? task.raw_audio_path.slice('kie:'.length)
+    : null;
+}
+
+async function refreshKieTasksIfNeeded(tasks: any[], userId: string) {
+  const pendingKieTasks = tasks.filter((task) => getKieTaskId(task) && !task.audio_path);
+
+  if (pendingKieTasks.length === 0) {
+    return false;
+  }
+
+  let changed = false;
+  let provider: KieSunoProvider;
+  try {
+    provider = new KieSunoProvider();
+  } catch (error) {
+    console.warn('[batches/detail] Kie provider unavailable while refreshing history:', error);
+    return false;
+  }
+
+  for (const task of pendingKieTasks) {
+    const providerTaskId = getKieTaskId(task);
+    if (!providerTaskId) continue;
+
+    try {
+      const details = await provider.getTaskDetails(providerTaskId);
+      if (details.status === 'SUCCESS') {
+        const result = await persistCompletedCoverTracks({
+          localTaskId: task.id,
+          userId,
+          tracks: details.tracks,
+        });
+        changed = changed || result.savedCount > 0;
+      } else if (KIE_FAILED_STATUSES.has(details.status)) {
+        await supabaseAdmin
+          .from('generation_tasks')
+          .update({
+            status: 'failed',
+            error_code: details.errorCode || details.status,
+            error_message: getKieUserFacingErrorMessage(details.errorMessage) || '音乐生成失败',
+            credits_consumed: 0,
+            updated_at: new Date().toISOString(),
+          } as any)
+          .eq('id', task.id)
+          .eq('user_id', userId);
+
+        if (task.batch_id) {
+          await supabaseAdmin
+            .from('generation_batches')
+            .update({
+              status: 'failed',
+              updated_at: new Date().toISOString(),
+            } as any)
+            .eq('id', task.batch_id)
+            .eq('user_id', userId);
+        }
+        changed = true;
+      }
+    } catch (error) {
+      console.warn('[batches/detail] Kie history refresh failed:', error);
+    }
+  }
+
+  return changed;
 }
 
 /**
@@ -45,7 +122,7 @@ export async function GET(
     }
 
     // Query all related generation_tasks
-    const { data: tasks, error: tasksError } = await supabaseAdmin
+    let { data: tasks, error: tasksError } = await supabaseAdmin
       .from('generation_tasks')
       .select('*')
       .eq('batch_id', batchId)
@@ -57,6 +134,18 @@ export async function GET(
         { error: '查询版本详情失败' },
         { status: 500 }
       );
+    }
+
+    if (await refreshKieTasksIfNeeded(tasks ?? [], user.id)) {
+      const refreshed = await supabaseAdmin
+        .from('generation_tasks')
+        .select('*')
+        .eq('batch_id', batchId)
+        .order('version_number', { ascending: true });
+
+      if (!refreshed.error) {
+        tasks = refreshed.data;
+      }
     }
 
     const stemCacheByTaskId = await loadStemCacheByTaskId(supabaseAdmin, user.id, tasks ?? []);

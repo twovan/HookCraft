@@ -426,7 +426,9 @@ export default function HistoryList({
                       style={{ width: '100%', height: 36, marginTop: 12 }}
                     />
                   ) : (
-                    <div style={{ marginTop: 12, color: 'var(--hc-muted)', fontSize: 13 }}>音频加载中...</div>
+                    <div style={{ marginTop: 12, color: 'var(--hc-muted)', fontSize: 13 }}>
+                      音频生成中，页面会自动刷新...
+                    </div>
                   )}
 
                   {version.lyrics ? (

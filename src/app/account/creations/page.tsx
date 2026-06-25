@@ -160,17 +160,9 @@ export default function CreationsPage() {
     closeExpandedDetail();
   };
 
-  const handleExpand = async (taskId: string, batchId?: string) => {
-    const targetBatchId = batchId || batches.find((b) => b.taskId === taskId)?.batchId || taskId;
-    if (expandedTaskId === taskId) {
-      closeExpandedDetail();
-      return;
-    }
-
-    setExpandedBatchId(targetBatchId);
-    setExpandedTaskId(taskId);
+  const fetchExpandedDetail = async (taskId: string, batchId: string) => {
     try {
-      const res = await fetchWithTimeout(`/api/batches/${targetBatchId}`);
+      const res = await fetchWithTimeout(`/api/batches/${batchId}`);
       if (res.ok) {
         const data = await res.json();
         const versions = data.versions || [];
@@ -185,6 +177,34 @@ export default function CreationsPage() {
       setExpandedBatchDetail(undefined);
     }
   };
+
+  const handleExpand = async (taskId: string, batchId?: string) => {
+    const targetBatchId = batchId || batches.find((b) => b.taskId === taskId)?.batchId || taskId;
+    if (expandedTaskId === taskId) {
+      closeExpandedDetail();
+      return;
+    }
+
+    setExpandedBatchId(targetBatchId);
+    setExpandedTaskId(taskId);
+    await fetchExpandedDetail(taskId, targetBatchId);
+  };
+
+  useEffect(() => {
+    if (!expandedBatchId || !expandedTaskId || !expandedVersions) return;
+
+    const needsAudioRefresh = expandedVersions.some((version) =>
+      !version.audioUrl && version.status !== 'failed'
+    );
+    if (!needsAudioRefresh) return;
+
+    const timer = window.setInterval(() => {
+      void fetchExpandedDetail(expandedTaskId, expandedBatchId);
+      void fetchBatches({ force: true });
+    }, 6000);
+
+    return () => window.clearInterval(timer);
+  }, [expandedBatchId, expandedTaskId, expandedVersions]);
 
   const handleReCreate = (taskId: string) => {
     const batch = batches.find((b) => b.taskId === taskId || b.batchId === taskId);
