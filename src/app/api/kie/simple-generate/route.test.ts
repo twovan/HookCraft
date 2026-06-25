@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => {
   const CreditService = vi.fn(function () {
     return { hasEnoughCredits, consumeCredits };
   });
+  const readStudioTabSettings = vi.fn();
   const inserts: Array<{ table: string; values: Record<string, unknown> }> = [];
   const updates: SupabaseUpdate[] = [];
   const events: string[] = [];
@@ -56,6 +57,7 @@ const mocks = vi.hoisted(() => {
     hasEnoughCredits,
     consumeCredits,
     CreditService,
+    readStudioTabSettings,
     from,
     inserts,
     updates,
@@ -88,6 +90,10 @@ vi.mock('@/lib/credits/consumeError', () => ({
   getConsumeCreditsErrorMessage: () => 'Credits 扣减失败，请重试',
 }));
 
+vi.mock('@/lib/studio/StudioTabSettingsStore', () => ({
+  readStudioTabSettings: mocks.readStudioTabSettings,
+}));
+
 function createRequest(body: Record<string, unknown>) {
   return new NextRequest('http://localhost/api/kie/simple-generate', {
     method: 'POST',
@@ -104,6 +110,10 @@ describe('/api/kie/simple-generate', () => {
     mocks.events.length = 0;
     mocks.updateResults.length = 0;
     mocks.getAuthUser.mockResolvedValue({ id: 'user-1' });
+    mocks.readStudioTabSettings.mockResolvedValue({
+      visibleTabs: ['simple'],
+      defaultTab: 'simple',
+    });
     mocks.hasEnoughCredits.mockResolvedValue(true);
     mocks.consumeCredits.mockImplementation(() => {
       mocks.events.push('consumeCredits');
@@ -120,6 +130,21 @@ describe('/api/kie/simple-generate', () => {
     expect(body.error).toBe('请输入生成描述');
     expect(mocks.KieSunoProvider).not.toHaveBeenCalled();
     expect(mocks.generateMusic).not.toHaveBeenCalled();
+  });
+
+  it('rejects requests when simple mode is disabled in Studio settings', async () => {
+    mocks.readStudioTabSettings.mockResolvedValue({
+      visibleTabs: ['templateArrangement'],
+      defaultTab: 'templateArrangement',
+    });
+
+    const res = await POST(createRequest({ prompt: 'ambient pop hook' }));
+    const body = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(body.error).toBe('简单模式暂未开放');
+    expect(mocks.KieSunoProvider).not.toHaveBeenCalled();
+    expect(mocks.inserts).toHaveLength(0);
   });
 
   it('marks task and batch failed when consuming credits throws after provider success', async () => {

@@ -8,6 +8,7 @@ import {
   isKieProviderCreditsInsufficient,
   KieSunoProvider,
 } from '@/lib/generation/KieSunoProvider';
+import { readStudioTabSettings } from '@/lib/studio/StudioTabSettingsStore';
 import type { CreditOperationType } from '@/types/credits';
 import type { KieSunoModel } from '@/types/kie';
 
@@ -62,6 +63,11 @@ export async function POST(req: NextRequest) {
     const instrumental = body.instrumental === true;
     const modelRaw = String(body.model || DEFAULT_MODEL);
     const model = (MODELS.includes(modelRaw as KieSunoModel) ? modelRaw : DEFAULT_MODEL) as KieSunoModel;
+
+    const studioTabSettings = await readStudioTabSettings(supabaseAdmin);
+    if (!studioTabSettings.visibleTabs.includes('simple')) {
+      return NextResponse.json({ error: '简单模式暂未开放' }, { status: 403 });
+    }
 
     if (!prompt) {
       return NextResponse.json({ error: '请输入生成描述' }, { status: 400 });
