@@ -12,8 +12,16 @@ const mocks = vi.hoisted(() => {
   const generateMusic = vi.fn();
   const getTaskDetails = vi.fn();
   const persistCompletedCoverTracks = vi.fn();
+  const checkSensitivity = vi.fn();
+  const logSensitivity = vi.fn();
   const KieSunoProvider = vi.fn(function () {
     return { generateMusic, getTaskDetails };
+  });
+  const SensitivityFilterService = vi.fn(function () {
+    return { check: checkSensitivity };
+  });
+  const SensitivityLogService = vi.fn(function () {
+    return { log: logSensitivity };
   });
   const hasEnoughCredits = vi.fn();
   const consumeCredits = vi.fn();
@@ -57,7 +65,11 @@ const mocks = vi.hoisted(() => {
     generateMusic,
     getTaskDetails,
     persistCompletedCoverTracks,
+    checkSensitivity,
+    logSensitivity,
     KieSunoProvider,
+    SensitivityFilterService,
+    SensitivityLogService,
     hasEnoughCredits,
     consumeCredits,
     CreditService,
@@ -90,6 +102,14 @@ vi.mock('@/app/api/kie/upload-cover/persist-tracks', () => ({
   persistCompletedCoverTracks: mocks.persistCompletedCoverTracks,
 }));
 
+vi.mock('@/lib/sensitivity/SensitivityFilterService', () => ({
+  SensitivityFilterService: mocks.SensitivityFilterService,
+}));
+
+vi.mock('@/lib/sensitivity/SensitivityLogService', () => ({
+  SensitivityLogService: mocks.SensitivityLogService,
+}));
+
 vi.mock('@/lib/credits/CreditService', () => ({
   CreditService: mocks.CreditService,
 }));
@@ -113,6 +133,7 @@ function createRequest(body: Record<string, unknown>) {
 describe('/api/kie/simple-generate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env.GEMINI_API_KEY = 'test-gemini-key';
     mocks.inserts.length = 0;
     mocks.updates.length = 0;
     mocks.events.length = 0;
@@ -130,6 +151,19 @@ describe('/api/kie/simple-generate', () => {
     mocks.generateMusic.mockResolvedValue({ taskId: 'kie-task-1' });
     mocks.getTaskDetails.mockResolvedValue({ taskId: 'kie-task-1', status: 'PENDING', tracks: [] });
     mocks.persistCompletedCoverTracks.mockResolvedValue({ batchId: 'batch-1', savedCount: 0 });
+    mocks.checkSensitivity.mockResolvedValue({
+      passed: true,
+      resultType: 'pass',
+      descriptionResult: { type: 'pass', detectedWords: [] },
+      lyricsResult: null,
+      rewrittenPrompt: null,
+      rewrittenPromptCn: null,
+      styleTags: null,
+      styleTagsCn: null,
+      blockedWords: null,
+      durationMs: 1,
+    });
+    mocks.logSensitivity.mockResolvedValue(undefined);
   });
 
   it('rejects an empty prompt before creating a KIE task', async () => {
@@ -140,6 +174,61 @@ describe('/api/kie/simple-generate', () => {
     expect(body.error).toBe('请输入生成描述');
     expect(mocks.KieSunoProvider).not.toHaveBeenCalled();
     expect(mocks.generateMusic).not.toHaveBeenCalled();
+  });
+
+  it('blocks unsafe prompts before creating generation records', async () => {
+    mocks.checkSensitivity.mockResolvedValue({
+      passed: false,
+      resultType: 'block',
+      descriptionResult: {
+        type: 'block',
+        detectedWords: [{ word: 'forbidden', category: 'forbidden', source: 'local' }],
+      },
+      lyricsResult: null,
+      rewrittenPrompt: null,
+      rewrittenPromptCn: null,
+      styleTags: null,
+      styleTagsCn: null,
+      blockedWords: ['forbidden'],
+      durationMs: 2,
+    });
+
+    const res = await POST(createRequest({ prompt: 'forbidden prompt' }));
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.code).toBe('sensitivity_blocked');
+    expect(mocks.hasEnoughCredits).not.toHaveBeenCalled();
+    expect(mocks.KieSunoProvider).not.toHaveBeenCalled();
+    expect(mocks.inserts).toHaveLength(0);
+  });
+
+  it('requires confirmation for prompts that need sensitivity rewriting', async () => {
+    mocks.checkSensitivity.mockResolvedValue({
+      passed: false,
+      resultType: 'rewrite',
+      descriptionResult: {
+        type: 'rewrite',
+        detectedWords: [{ word: 'artist', category: 'celebrity', source: 'gemini' }],
+      },
+      lyricsResult: null,
+      rewrittenPrompt: 'upbeat pop with bright synths',
+      rewrittenPromptCn: '明亮合成器流行',
+      styleTags: ['pop'],
+      styleTagsCn: ['流行'],
+      blockedWords: null,
+      durationMs: 3,
+    });
+
+    const res = await POST(createRequest({ prompt: 'make it like artist' }));
+    const body = await res.json();
+
+    expect(res.status).toBe(409);
+    expect(body.code).toBe('sensitivity_rewrite_required');
+    expect(body.rewrittenPrompt).toBe('upbeat pop with bright synths');
+    expect(mocks.hasEnoughCredits).not.toHaveBeenCalled();
+    expect(mocks.KieSunoProvider).not.toHaveBeenCalled();
+    expect(mocks.inserts).toHaveLength(0);
   });
 
   it('rejects requests when simple mode is disabled in Studio settings', async () => {

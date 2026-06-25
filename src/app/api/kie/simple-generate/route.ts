@@ -9,9 +9,12 @@ import {
   KieSunoProvider,
 } from '@/lib/generation/KieSunoProvider';
 import { readStudioTabSettings } from '@/lib/studio/StudioTabSettingsStore';
+import { SensitivityFilterService } from '@/lib/sensitivity/SensitivityFilterService';
+import { SensitivityLogService } from '@/lib/sensitivity/SensitivityLogService';
 import { persistCompletedCoverTracks } from '@/app/api/kie/upload-cover/persist-tracks';
 import type { CreditOperationType } from '@/types/credits';
 import type { KieSunoModel } from '@/types/kie';
+import type { DetectedWord, SensitivityCheckResult } from '@/types/sensitivity';
 
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
@@ -26,6 +29,94 @@ function createId(prefix: string): string {
 
 function hasPlayableTrack(tracks: Array<{ audioUrl?: string; streamAudioUrl?: string }>) {
   return tracks.some((track) => track.audioUrl || track.streamAudioUrl);
+}
+
+function determineDetectionSource(
+  detectedWords: DetectedWord[]
+): 'local' | 'gemini' | 'both' {
+  if (detectedWords.length === 0) return 'local';
+
+  const hasLocal = detectedWords.some((word) => word.source === 'local');
+  const hasGemini = detectedWords.some((word) => word.source === 'gemini');
+
+  if (hasLocal && hasGemini) return 'both';
+  return hasGemini ? 'gemini' : 'local';
+}
+
+async function checkSimplePromptSafety(input: {
+  userId: string;
+  prompt: string;
+}): Promise<
+  | { ok: true }
+  | {
+      ok: false;
+      status: number;
+      body: Record<string, unknown>;
+    }
+> {
+  const geminiApiKey = process.env.GEMINI_API_KEY;
+  if (!geminiApiKey || geminiApiKey === 'your_api_key_here') {
+    return {
+      ok: false,
+      status: 500,
+      body: { error: '内容安全服务配置异常，请稍后重试' },
+    };
+  }
+
+  const filterService = new SensitivityFilterService({
+    supabase: supabaseAdmin,
+    geminiApiKey,
+  });
+  const result: SensitivityCheckResult = await filterService.check({
+    description: input.prompt,
+  });
+
+  const detectedWords: DetectedWord[] = [
+    ...(result.descriptionResult?.detectedWords ?? []),
+    ...(result.lyricsResult?.detectedWords ?? []),
+  ];
+
+  new SensitivityLogService(supabaseAdmin).log({
+    userId: input.userId,
+    inputDescription: input.prompt,
+    resultType: result.resultType,
+    detectedWords,
+    rewrittenPrompt: result.rewrittenPrompt ?? undefined,
+    styleTags: result.styleTags ?? undefined,
+    detectionSource: determineDetectionSource(detectedWords),
+    durationMs: result.durationMs,
+  }).catch((error) => {
+    console.error('[kie/simple-generate] Sensitivity log failed:', error);
+  });
+
+  if (result.resultType === 'block') {
+    return {
+      ok: false,
+      status: 400,
+      body: {
+        error: '内容安全检查未通过，请修改描述后重试',
+        code: 'sensitivity_blocked',
+        blockedWords: result.blockedWords,
+      },
+    };
+  }
+
+  if (result.resultType === 'rewrite') {
+    return {
+      ok: false,
+      status: 409,
+      body: {
+        error: '内容需要改写后确认，请使用改写后的描述重试',
+        code: 'sensitivity_rewrite_required',
+        rewrittenPrompt: result.rewrittenPrompt,
+        rewrittenPromptCn: result.rewrittenPromptCn,
+        styleTags: result.styleTags,
+        styleTagsCn: result.styleTagsCn,
+      },
+    };
+  }
+
+  return { ok: true };
 }
 
 async function markSimpleGenerationFailed(input: {
@@ -80,6 +171,11 @@ export async function POST(req: NextRequest) {
 
     if (prompt.length > 500) {
       return NextResponse.json({ error: '生成描述不能超过 500 个字符' }, { status: 400 });
+    }
+
+    const safetyResult = await checkSimplePromptSafety({ userId: user.id, prompt });
+    if (!safetyResult.ok) {
+      return NextResponse.json(safetyResult.body, { status: safetyResult.status });
     }
 
     const creditService = new CreditService(supabaseAdmin);
