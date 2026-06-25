@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>HookCraft Logo Motion</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        background: #f7f7fb;
+      }
+
+      body {
+        min-height: 100vh;
+        margin: 0;
+        display: grid;
+        place-items: center;
+        background:
+          radial-gradient(circle at 50% 34%, rgba(112, 69, 255, 0.12), transparent 34rem),
+          #f7f7fb;
+      }
+
+      .preview {
+        width: min(70vw, 360px);
+        display: grid;
+        place-items: center;
+      }
+
+      object {
+        display: block;
+        width: 100%;
+        max-width: 228px;
+        aspect-ratio: 114 / 141;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="preview" aria-label="HookCraft logo motion preview">
+      <object type="image/svg+xml" data="./logo.svg" aria-label="HookCraft animated logo"></object>
+    </main>
+  </body>
+</html>
