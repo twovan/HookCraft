@@ -52,6 +52,24 @@ interface VersionDetail {
 type TimeRange = '7d' | '30d' | 'all';
 const PAGE_SIZE = 20;
 
+function areVersionDetailsEqual(
+  current: VersionDetail[] | undefined,
+  next: VersionDetail[]
+) {
+  if (!current || current.length !== next.length) return false;
+
+  return current.every((version, index) => {
+    const nextVersion = next[index];
+    return (
+      version.taskId === nextVersion.taskId &&
+      version.status === nextVersion.status &&
+      version.audioUrl === nextVersion.audioUrl &&
+      version.durationSeconds === nextVersion.durationSeconds &&
+      version.lyrics === nextVersion.lyrics
+    );
+  });
+}
+
 async function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit, timeout = 10000) {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), timeout);
@@ -67,6 +85,8 @@ export default function CreationsPage() {
   const { user, loading: authLoading } = useAuth();
   const userId = user?.id;
   const lastFetchKeyRef = useRef<string | null>(null);
+  const expandedSelectionRef = useRef<{ taskId: string; batchId: string } | null>(null);
+  const detailRequestSeqRef = useRef(0);
   const [authTimedOut, setAuthTimedOut] = useState(false);
   const [expandParam] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -140,6 +160,8 @@ export default function CreationsPage() {
   };
 
   const closeExpandedDetail = () => {
+    expandedSelectionRef.current = null;
+    detailRequestSeqRef.current += 1;
     setExpandedBatchId(undefined);
     setExpandedTaskId(undefined);
     setExpandedVersions(undefined);
@@ -161,18 +183,36 @@ export default function CreationsPage() {
   };
 
   const fetchExpandedDetail = async (taskId: string, batchId: string) => {
+    const requestSeq = ++detailRequestSeqRef.current;
     try {
       const res = await fetchWithTimeout(`/api/batches/${batchId}`);
+      const currentSelection = expandedSelectionRef.current;
+      if (
+        requestSeq !== detailRequestSeqRef.current ||
+        currentSelection?.taskId !== taskId ||
+        currentSelection?.batchId !== batchId
+      ) {
+        return;
+      }
+
       if (res.ok) {
         const data = await res.json();
-        const versions = data.versions || [];
-        setExpandedVersions(versions.filter((version: VersionDetail) => version.taskId === taskId));
+        const versions = (data.versions || []).filter((version: VersionDetail) => version.taskId === taskId);
+        setExpandedVersions((current) => areVersionDetailsEqual(current, versions) ? current : versions);
         setExpandedBatchDetail({
           templateName: data.batch?.templateName,
           prompt: data.batch?.promptSummary,
         });
       }
     } catch {
+      const currentSelection = expandedSelectionRef.current;
+      if (
+        requestSeq !== detailRequestSeqRef.current ||
+        currentSelection?.taskId !== taskId ||
+        currentSelection?.batchId !== batchId
+      ) {
+        return;
+      }
       setExpandedVersions([]);
       setExpandedBatchDetail(undefined);
     }
@@ -185,8 +225,11 @@ export default function CreationsPage() {
       return;
     }
 
+    expandedSelectionRef.current = { taskId, batchId: targetBatchId };
     setExpandedBatchId(targetBatchId);
     setExpandedTaskId(taskId);
+    setExpandedVersions(undefined);
+    setExpandedBatchDetail(undefined);
     await fetchExpandedDetail(taskId, targetBatchId);
   };
 
@@ -200,7 +243,6 @@ export default function CreationsPage() {
 
     const timer = window.setInterval(() => {
       void fetchExpandedDetail(expandedTaskId, expandedBatchId);
-      void fetchBatches({ force: true });
     }, 6000);
 
     return () => window.clearInterval(timer);
