@@ -155,7 +155,9 @@ export default function StudioPageClient({
       if (!res.ok) return;
       const data = normalizeStudioTabSettings(await res.json());
       setStudioTabSettings(data);
-      setActiveTab(data.defaultTab);
+      setActiveTab((current) => (
+        data.visibleTabs.includes(current) ? current : data.defaultTab
+      ));
     } catch {
       // Keep local defaults if Studio settings cannot be loaded.
     }
