@@ -126,7 +126,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: errorMessage }, { status: providerCreditsInsufficient ? 503 : 500 });
     }
 
-    const consumeResult = await creditService.consumeCredits(user.id, SIMPLE_GENERATE_OPERATIONS);
+    let consumeResult;
+    try {
+      consumeResult = await creditService.consumeCredits(user.id, SIMPLE_GENERATE_OPERATIONS);
+    } catch (error: any) {
+      const errorMessage = getConsumeCreditsErrorMessage(undefined as any);
+      console.error('[kie/simple-generate] Credits consume threw:', error);
+
+      await supabaseAdmin.from('generation_tasks').update({
+        status: 'failed',
+        error_code: 'CREDITS_NOT_ENOUGH',
+        error_message: errorMessage,
+        credits_consumed: 0,
+        updated_at: new Date().toISOString(),
+      } as any).eq('id', localTaskId).eq('user_id', user.id);
+
+      await supabaseAdmin.from('generation_batches').update({
+        status: 'failed',
+        updated_at: new Date().toISOString(),
+      } as any).eq('id', batchId).eq('user_id', user.id);
+
+      return NextResponse.json({ error: errorMessage }, { status: 402 });
+    }
+
     if (!consumeResult.success) {
       const errorMessage = getConsumeCreditsErrorMessage(consumeResult.error);
 
@@ -146,11 +168,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: errorMessage, code: consumeResult.error }, { status: 402 });
     }
 
-    await supabaseAdmin.from('generation_tasks').update({
+    const { error: finalUpdateError } = await supabaseAdmin.from('generation_tasks').update({
       raw_audio_path: `kie:${result.taskId}`,
       credits_consumed: consumeResult.consumed,
       updated_at: new Date().toISOString(),
     } as any).eq('id', localTaskId).eq('user_id', user.id);
+
+    if (finalUpdateError) {
+      console.error('[kie/simple-generate] Final task update failed:', finalUpdateError);
+      return NextResponse.json({ error: '更新创作任务失败，请稍后重试' }, { status: 500 });
+    }
 
     return NextResponse.json({
       taskId: result.taskId,
