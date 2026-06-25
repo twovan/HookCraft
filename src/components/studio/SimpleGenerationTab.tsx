@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import GenerationProgress from '@/components/studio/GenerationProgress';
 import SensitivityBlockDialog from '@/components/studio/SensitivityBlockDialog';
 import SensitivityConfirmDialog from '@/components/studio/SensitivityConfirmDialog';
 import { useSensitivityCheck } from '@/hooks/useSensitivityCheck';
@@ -38,6 +39,7 @@ export default function SimpleGenerationTab() {
   const [prompt, setPrompt] = useState('');
   const [instrumental, setInstrumental] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [showBlockDialog, setShowBlockDialog] = useState(false);
@@ -58,6 +60,7 @@ export default function SimpleGenerationTab() {
     }
 
     setIsGenerating(true);
+    setIsSubmitted(false);
     setError(null);
 
     try {
@@ -69,22 +72,31 @@ export default function SimpleGenerationTab() {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
+        setIsSubmitted(false);
         setError(data.error || '生成失败，请稍后重试');
         return;
       }
 
       if (data.creationUrl) {
-        router.push(data.creationUrl);
+        setIsSubmitted(true);
+        window.setTimeout(() => {
+          router.push(data.creationUrl);
+        }, 700);
         return;
       }
 
       if (data.batchId) {
-        router.push(`/account/creations?expand=${encodeURIComponent(data.batchId)}`);
+        setIsSubmitted(true);
+        window.setTimeout(() => {
+          router.push(`/account/creations?expand=${encodeURIComponent(data.batchId)}`);
+        }, 700);
         return;
       }
 
+      setIsSubmitted(true);
       setError('生成已提交，但无法打开结果页，请到创作历史查看');
     } catch {
+      setIsSubmitted(false);
       setError('生成失败，请稍后重试');
     } finally {
       setIsGenerating(false);
@@ -99,6 +111,7 @@ export default function SimpleGenerationTab() {
     }
 
     setError(null);
+    setIsSubmitted(false);
     const checkResult = await sensitivityCheck({ description: trimmed });
 
     if (checkResult?.resultType === 'block') {
@@ -121,6 +134,7 @@ export default function SimpleGenerationTab() {
   const handleUseExample = () => {
     setPrompt(pickPromptExample(prompt));
     setError(null);
+    setIsSubmitted(false);
     resetSensitivity();
   };
 
@@ -202,7 +216,7 @@ export default function SimpleGenerationTab() {
           <button
             type="button"
             onClick={handleUseExample}
-            disabled={isGenerating || isSensitivityLoading}
+            disabled={isGenerating || isSensitivityLoading || isSubmitted}
             style={{
               flex: '0 0 auto',
               display: 'inline-flex',
@@ -216,8 +230,8 @@ export default function SimpleGenerationTab() {
               color: 'var(--hc-text)',
               fontSize: 12,
               fontWeight: 800,
-              cursor: isGenerating || isSensitivityLoading ? 'not-allowed' : 'pointer',
-              opacity: isGenerating || isSensitivityLoading ? 0.56 : 1,
+              cursor: isGenerating || isSensitivityLoading || isSubmitted ? 'not-allowed' : 'pointer',
+              opacity: isGenerating || isSensitivityLoading || isSubmitted ? 0.56 : 1,
               fontFamily: 'var(--hc-font)',
             }}
           >
@@ -275,44 +289,74 @@ export default function SimpleGenerationTab() {
           <span>{prompt.length}/500</span>
         </div>
 
-        {(error || isSensitivityLoading) && (
+        {(isSensitivityLoading || isGenerating || isSubmitted) && (
+          <div style={{ marginTop: 18 }}>
+            {isSensitivityLoading ? (
+              <div style={statusPanelStyle}>
+                <div style={spinnerStyle} />
+                <div>
+                  <strong style={statusTitleStyle}>正在进行内容安全检查</strong>
+                  <p style={statusTextStyle}>
+                    {sensitivityLoadingMessage || '正在检查描述内容，确认通过后会继续提交生成任务。'}
+                  </p>
+                </div>
+              </div>
+            ) : isGenerating ? (
+              <GenerationProgress
+                completedCount={0}
+                totalCount={1}
+                isGenerating={true}
+              />
+            ) : (
+              <div style={successPanelStyle}>
+                <div style={successIconStyle}>✓</div>
+                <div>
+                  <strong style={statusTitleStyle}>生成任务已提交成功</strong>
+                  <p style={statusTextStyle}>正在打开创作历史，音频生成完成后会在作品列表中更新。</p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {error && (
           <div
             role="alert"
             style={{
               marginTop: 16,
               padding: '12px 14px',
               borderRadius: 10,
-              border: error ? '1px solid rgba(229, 57, 53, 0.32)' : '1px solid rgba(206,255,53,0.24)',
-              background: error ? 'rgba(229, 57, 53, 0.1)' : 'rgba(206,255,53,0.08)',
-              color: error ? '#ff8a80' : 'var(--hc-text-muted)',
+              border: '1px solid rgba(229, 57, 53, 0.32)',
+              background: 'rgba(229, 57, 53, 0.1)',
+              color: '#ff8a80',
               fontSize: 13,
               lineHeight: 1.6,
             }}
           >
-            {error || sensitivityLoadingMessage || '正在进行内容安全检查...'}
+            {error}
           </div>
         )}
 
         <button
           type="button"
           onClick={handleGenerate}
-          disabled={isGenerating || isSensitivityLoading}
+          disabled={isGenerating || isSensitivityLoading || isSubmitted}
           style={{
             width: '100%',
             marginTop: 20,
             padding: '14px 24px',
             borderRadius: 999,
             border: 'none',
-            background: isGenerating || isSensitivityLoading ? '#20222b' : '#ceff35',
-            color: isGenerating || isSensitivityLoading ? 'var(--hc-text-weak)' : '#08090c',
+            background: isGenerating || isSensitivityLoading || isSubmitted ? '#20222b' : '#ceff35',
+            color: isGenerating || isSensitivityLoading || isSubmitted ? 'var(--hc-text-weak)' : '#08090c',
             fontSize: 15,
             fontWeight: 900,
-            cursor: isGenerating || isSensitivityLoading ? 'not-allowed' : 'pointer',
+            cursor: isGenerating || isSensitivityLoading || isSubmitted ? 'not-allowed' : 'pointer',
             fontFamily: 'var(--hc-font)',
             transition: 'all 0.2s ease',
           }}
         >
-          {isSensitivityLoading ? '安全检查中...' : isGenerating ? '生成中...' : '开始生成'}
+          {isSensitivityLoading ? '安全检查中...' : isGenerating ? '提交生成任务中...' : isSubmitted ? '任务已提交' : '开始生成'}
         </button>
       </section>
 
@@ -328,6 +372,61 @@ export default function SimpleGenerationTab() {
         source="description"
         onClose={handleBlockClose}
       />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </>
   );
 }
+
+const statusPanelStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 14,
+  padding: '18px 20px',
+  borderRadius: 14,
+  border: '1px solid rgba(206,255,53,0.22)',
+  background: 'rgba(206,255,53,0.07)',
+};
+
+const successPanelStyle: React.CSSProperties = {
+  ...statusPanelStyle,
+  border: '1px solid rgba(82,214,198,0.32)',
+  background: 'rgba(82,214,198,0.08)',
+};
+
+const spinnerStyle: React.CSSProperties = {
+  flex: '0 0 auto',
+  width: 34,
+  height: 34,
+  borderRadius: '50%',
+  border: '3px solid rgba(255,255,255,0.12)',
+  borderTopColor: '#ceff35',
+  animation: 'spin 1s linear infinite',
+};
+
+const successIconStyle: React.CSSProperties = {
+  flex: '0 0 auto',
+  width: 34,
+  height: 34,
+  borderRadius: '50%',
+  display: 'grid',
+  placeItems: 'center',
+  background: 'linear-gradient(135deg, var(--hc-lime), var(--hc-cyan))',
+  color: '#08090c',
+  fontSize: 18,
+  fontWeight: 950,
+};
+
+const statusTitleStyle: React.CSSProperties = {
+  display: 'block',
+  color: 'var(--hc-text)',
+  fontSize: 14,
+  fontWeight: 900,
+  marginBottom: 4,
+};
+
+const statusTextStyle: React.CSSProperties = {
+  margin: 0,
+  color: 'var(--hc-text-muted)',
+  fontSize: 12,
+  lineHeight: 1.6,
+};
