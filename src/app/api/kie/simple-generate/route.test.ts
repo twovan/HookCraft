@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => {
   });
   const inserts: Array<{ table: string; values: Record<string, unknown> }> = [];
   const updates: SupabaseUpdate[] = [];
+  const events: string[] = [];
 
   function createEqChain(result: { error: Error | null } = { error: null }) {
     let calls = 0;
@@ -40,6 +41,9 @@ const mocks = vi.hoisted(() => {
     }),
     update: vi.fn((values: Record<string, unknown>) => {
       updates.push({ table, values });
+      if (table === 'generation_tasks' && values.raw_audio_path) {
+        events.push('raw_audio_path_update');
+      }
       return createEqChain(updateResults.shift() || { error: null });
     }),
     delete: vi.fn(() => createEqChain()),
@@ -55,6 +59,7 @@ const mocks = vi.hoisted(() => {
     from,
     inserts,
     updates,
+    events,
     updateResults,
   };
 });
@@ -96,10 +101,14 @@ describe('/api/kie/simple-generate', () => {
     vi.clearAllMocks();
     mocks.inserts.length = 0;
     mocks.updates.length = 0;
+    mocks.events.length = 0;
     mocks.updateResults.length = 0;
     mocks.getAuthUser.mockResolvedValue({ id: 'user-1' });
     mocks.hasEnoughCredits.mockResolvedValue(true);
-    mocks.consumeCredits.mockResolvedValue({ success: true, consumed: 20, remaining: 80 });
+    mocks.consumeCredits.mockImplementation(() => {
+      mocks.events.push('consumeCredits');
+      return Promise.resolve({ success: true, consumed: 20, remaining: 80 });
+    });
     mocks.generateMusic.mockResolvedValue({ taskId: 'kie-task-1' });
   });
 
@@ -114,7 +123,10 @@ describe('/api/kie/simple-generate', () => {
   });
 
   it('marks task and batch failed when consuming credits throws after provider success', async () => {
-    mocks.consumeCredits.mockRejectedValue(new Error('credits write failed'));
+    mocks.consumeCredits.mockImplementation(() => {
+      mocks.events.push('consumeCredits');
+      return Promise.reject(new Error('credits write failed'));
+    });
 
     const res = await POST(createRequest({ prompt: 'ambient pop hook', instrumental: true }));
     const body = await res.json();
@@ -159,9 +171,65 @@ describe('/api/kie/simple-generate', () => {
         table: 'generation_tasks',
         values: expect.objectContaining({
           raw_audio_path: 'kie:kie-task-1',
+        }),
+      })
+    );
+    expect(mocks.updates).toContainEqual(
+      expect.objectContaining({
+        table: 'generation_tasks',
+        values: expect.objectContaining({
           credits_consumed: 20,
         }),
       })
+    );
+  });
+
+  it('stores provider task id before consuming credits', async () => {
+    const res = await POST(createRequest({ prompt: 'ambient pop hook' }));
+
+    expect(res.status).toBe(200);
+    expect(mocks.events).toEqual(expect.arrayContaining(['raw_audio_path_update', 'consumeCredits']));
+    expect(mocks.events.indexOf('raw_audio_path_update')).toBeLessThan(mocks.events.indexOf('consumeCredits'));
+  });
+
+  it('returns 500 when credit failure marking fails after consumeCredits throws', async () => {
+    mocks.consumeCredits.mockImplementation(() => {
+      mocks.events.push('consumeCredits');
+      return Promise.reject(new Error('credits write failed'));
+    });
+    mocks.updateResults.push({ error: null }, { error: new Error('mark task failed') });
+
+    const res = await POST(createRequest({ prompt: 'ambient pop hook' }));
+    const body = await res.json();
+
+    expect(res.status).toBe(500);
+    expect(body.error).toBe('记录任务失败状态失败，请联系管理员处理');
+  });
+
+  it('marks task failed when final credits update fails after credits are consumed', async () => {
+    mocks.updateResults.push(
+      { error: null },
+      { error: new Error('final credits update failed') },
+      { error: null },
+      { error: null }
+    );
+
+    const res = await POST(createRequest({ prompt: 'ambient pop hook' }));
+    const body = await res.json();
+
+    expect(res.status).toBe(500);
+    expect(body.error).toBe('Credits 已扣减，但任务状态更新失败，请联系管理员处理');
+    expect(mocks.updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          table: 'generation_tasks',
+          values: expect.objectContaining({
+            status: 'failed',
+            error_code: 'CREDITS_NOT_ENOUGH',
+            error_message: 'Credits 已扣减，但任务状态更新失败，请联系管理员处理',
+          }),
+        }),
+      ])
     );
   });
 });

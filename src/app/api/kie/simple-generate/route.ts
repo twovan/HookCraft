@@ -22,6 +22,34 @@ function createId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+async function markSimpleGenerationFailed(input: {
+  userId: string;
+  localTaskId: string;
+  batchId: string;
+  errorCode: string;
+  errorMessage: string;
+  creditsConsumed?: number;
+}): Promise<{ ok: true } | { ok: false; error: unknown }> {
+  const taskResult = await supabaseAdmin.from('generation_tasks').update({
+    status: 'failed',
+    error_code: input.errorCode,
+    error_message: input.errorMessage,
+    credits_consumed: input.creditsConsumed ?? 0,
+    updated_at: new Date().toISOString(),
+  } as any).eq('id', input.localTaskId).eq('user_id', input.userId);
+
+  const batchResult = await supabaseAdmin.from('generation_batches').update({
+    status: 'failed',
+    updated_at: new Date().toISOString(),
+  } as any).eq('id', input.batchId).eq('user_id', input.userId);
+
+  if (taskResult.error || batchResult.error) {
+    return { ok: false, error: taskResult.error || batchResult.error };
+  }
+
+  return { ok: true };
+}
+
 export async function POST(req: NextRequest) {
   try {
     const user = await getAuthUser();
@@ -108,22 +136,41 @@ export async function POST(req: NextRequest) {
       const errorMessage = getKieUserFacingErrorMessage(rawMessage) || rawMessage;
       const providerCreditsInsufficient = isKieProviderCreditsInsufficient(rawMessage);
 
-      await supabaseAdmin.from('generation_tasks').update({
-        status: 'failed',
-        error_code: providerCreditsInsufficient
+      const markResult = await markSimpleGenerationFailed({
+        userId: user.id,
+        localTaskId,
+        batchId,
+        errorCode: providerCreditsInsufficient
           ? 'KIE_PROVIDER_CREDITS_INSUFFICIENT'
           : 'KIE_SIMPLE_GENERATE_FAILED',
-        error_message: errorMessage,
-        credits_consumed: 0,
-        updated_at: new Date().toISOString(),
-      } as any).eq('id', localTaskId).eq('user_id', user.id);
-
-      await supabaseAdmin.from('generation_batches').update({
-        status: 'failed',
-        updated_at: new Date().toISOString(),
-      } as any).eq('id', batchId).eq('user_id', user.id);
+        errorMessage,
+      });
+      if (!markResult.ok) {
+        console.error('[kie/simple-generate] Mark provider failure failed:', markResult.error);
+        return NextResponse.json({ error: '记录任务失败状态失败，请联系管理员处理' }, { status: 500 });
+      }
 
       return NextResponse.json({ error: errorMessage }, { status: providerCreditsInsufficient ? 503 : 500 });
+    }
+
+    const { error: providerLinkError } = await supabaseAdmin.from('generation_tasks').update({
+      raw_audio_path: `kie:${result.taskId}`,
+      updated_at: new Date().toISOString(),
+    } as any).eq('id', localTaskId).eq('user_id', user.id);
+
+    if (providerLinkError) {
+      console.error('[kie/simple-generate] Provider task link update failed:', providerLinkError);
+      const markResult = await markSimpleGenerationFailed({
+        userId: user.id,
+        localTaskId,
+        batchId,
+        errorCode: 'KIE_SIMPLE_PROVIDER_LINK_FAILED',
+        errorMessage: '记录生成服务任务失败，请稍后重试',
+      });
+      if (!markResult.ok) {
+        console.error('[kie/simple-generate] Mark provider link failure failed:', markResult.error);
+      }
+      return NextResponse.json({ error: '记录生成服务任务失败，请稍后重试' }, { status: 500 });
     }
 
     let consumeResult;
@@ -133,18 +180,17 @@ export async function POST(req: NextRequest) {
       const errorMessage = getConsumeCreditsErrorMessage(undefined as any);
       console.error('[kie/simple-generate] Credits consume threw:', error);
 
-      await supabaseAdmin.from('generation_tasks').update({
-        status: 'failed',
-        error_code: 'CREDITS_NOT_ENOUGH',
-        error_message: errorMessage,
-        credits_consumed: 0,
-        updated_at: new Date().toISOString(),
-      } as any).eq('id', localTaskId).eq('user_id', user.id);
-
-      await supabaseAdmin.from('generation_batches').update({
-        status: 'failed',
-        updated_at: new Date().toISOString(),
-      } as any).eq('id', batchId).eq('user_id', user.id);
+      const markResult = await markSimpleGenerationFailed({
+        userId: user.id,
+        localTaskId,
+        batchId,
+        errorCode: 'CREDITS_NOT_ENOUGH',
+        errorMessage,
+      });
+      if (!markResult.ok) {
+        console.error('[kie/simple-generate] Mark credits thrown failure failed:', markResult.error);
+        return NextResponse.json({ error: '记录任务失败状态失败，请联系管理员处理' }, { status: 500 });
+      }
 
       return NextResponse.json({ error: errorMessage }, { status: 402 });
     }
@@ -152,31 +198,41 @@ export async function POST(req: NextRequest) {
     if (!consumeResult.success) {
       const errorMessage = getConsumeCreditsErrorMessage(consumeResult.error);
 
-      await supabaseAdmin.from('generation_tasks').update({
-        status: 'failed',
-        error_code: 'CREDITS_NOT_ENOUGH',
-        error_message: errorMessage,
-        credits_consumed: 0,
-        updated_at: new Date().toISOString(),
-      } as any).eq('id', localTaskId).eq('user_id', user.id);
-
-      await supabaseAdmin.from('generation_batches').update({
-        status: 'failed',
-        updated_at: new Date().toISOString(),
-      } as any).eq('id', batchId).eq('user_id', user.id);
+      const markResult = await markSimpleGenerationFailed({
+        userId: user.id,
+        localTaskId,
+        batchId,
+        errorCode: 'CREDITS_NOT_ENOUGH',
+        errorMessage,
+      });
+      if (!markResult.ok) {
+        console.error('[kie/simple-generate] Mark credits returned failure failed:', markResult.error);
+        return NextResponse.json({ error: '记录任务失败状态失败，请联系管理员处理' }, { status: 500 });
+      }
 
       return NextResponse.json({ error: errorMessage, code: consumeResult.error }, { status: 402 });
     }
 
     const { error: finalUpdateError } = await supabaseAdmin.from('generation_tasks').update({
-      raw_audio_path: `kie:${result.taskId}`,
       credits_consumed: consumeResult.consumed,
       updated_at: new Date().toISOString(),
     } as any).eq('id', localTaskId).eq('user_id', user.id);
 
     if (finalUpdateError) {
+      const accountingErrorMessage = 'Credits 已扣减，但任务状态更新失败，请联系管理员处理';
       console.error('[kie/simple-generate] Final task update failed:', finalUpdateError);
-      return NextResponse.json({ error: '更新创作任务失败，请稍后重试' }, { status: 500 });
+      const markResult = await markSimpleGenerationFailed({
+        userId: user.id,
+        localTaskId,
+        batchId,
+        errorCode: 'CREDITS_NOT_ENOUGH',
+        errorMessage: accountingErrorMessage,
+        creditsConsumed: consumeResult.consumed,
+      });
+      if (!markResult.ok) {
+        console.error('[kie/simple-generate] Mark final update failure failed:', markResult.error);
+      }
+      return NextResponse.json({ error: accountingErrorMessage }, { status: 500 });
     }
 
     return NextResponse.json({
