@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HookCraft Logo Motion</title>
+  <style>
+    :root {
+      --p2m-duration: 1500ms;
+      --p2m-ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
+      --p2m-ease-settle: cubic-bezier(0.22, 1, 0.36, 1);
+      --ink: #16131f;
+      --panel: #f6f5f8;
+      --line: #ddd9e6;
+      --violet: #7a52ff;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(circle at 50% 28%, rgba(122, 82, 255, .16), transparent 32%),
+        linear-gradient(180deg, #ffffff 0%, #f1eff6 100%);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    main {
+      width: min(860px, calc(100vw - 32px));
+      padding: 28px 0;
+    }
+
+    .stage {
+      min-height: 360px;
+      display: grid;
+      place-items: center;
+      border-bottom: 1px solid var(--line);
+    }
+
+    #logo-root {
+      width: min(80px, 70vw);
+      aspect-ratio: 114 / 141;
+      display: grid;
+      place-items: center;
+    }
+
+    #logo-root svg {
+      width: 100%;
+      height: auto;
+      overflow: visible;
+      filter: drop-shadow(0 18px 28px rgba(45, 32, 86, .14));
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      padding: 20px 0 18px;
+    }
+
+    button {
+      height: 36px;
+      border: 1px solid #cfc9df;
+      background: #fff;
+      color: var(--ink);
+      border-radius: 7px;
+      padding: 0 13px;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    button:hover, button:focus-visible {
+      border-color: var(--violet);
+      outline: none;
+    }
+
+    label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: #5d5968;
+    }
+
+    input[type="range"] { accent-color: var(--violet); }
+
+    .principles {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      padding-bottom: 22px;
+    }
+
+    .principles span {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, .7);
+      padding: 5px 10px;
+      font-size: 12px;
+      color: #625d70;
+    }
+
+    .principles span.active {
+      background: #ede8ff;
+      border-color: #b8a9ff;
+      color: #3d2d8f;
+    }
+
+    .atoms {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .atom {
+      min-height: 168px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, .62);
+      overflow: hidden;
+    }
+
+    .atom svg {
+      width: 70px;
+      height: auto;
+      overflow: visible;
+    }
+
+    .atom-lift svg { transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1), filter 220ms cubic-bezier(0.16, 1, 0.3, 1); }
+    .atom-lift:hover svg { transform: translateY(-5px); filter: drop-shadow(0 14px 18px rgba(87, 56, 177, .18)); }
+
+    .atom-spectrum #spectrum rect {
+      transform-box: fill-box;
+      transform-origin: bottom;
+      animation: bars 1400ms cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+    .atom-spectrum #spectrum rect:nth-child(3n) { animation-delay: -180ms; }
+    .atom-spectrum #spectrum rect:nth-child(4n) { animation-delay: -320ms; }
+
+    .atom-note #note-stem {
+      stroke-dasharray: 1 1;
+      animation: redraw 1200ms cubic-bezier(0.16, 1, 0.3, 1) infinite;
+    }
+
+    .atom-letters #wordmark text {
+      animation: letters 1500ms cubic-bezier(0.22, 1, 0.36, 1) infinite;
+    }
+    .atom-letters #letter-o1 { animation-delay: 70ms; }
+    .atom-letters #letter-o2 { animation-delay: 120ms; }
+    .atom-letters #letter-k { animation-delay: 170ms; }
+    .atom-letters #letter-c { animation-delay: 230ms; }
+    .atom-letters #letter-r { animation-delay: 280ms; }
+    .atom-letters #letter-a { animation-delay: 330ms; }
+    .atom-letters #letter-f { animation-delay: 380ms; }
+    .atom-letters #letter-t { animation-delay: 430ms; }
+
+    @keyframes bars {
+      0%, 100% { transform: scaleY(.62); opacity: .52; }
+      42% { transform: scaleY(1.08); opacity: 1; }
+      68% { transform: scaleY(.82); opacity: .76; }
+    }
+
+    @keyframes redraw {
+      0% { stroke-dashoffset: 1; opacity: .35; }
+      45% { stroke-dashoffset: 0; opacity: 1; }
+      80%, 100% { stroke-dashoffset: 0; opacity: 1; }
+    }
+
+    @keyframes letters {
+      0%, 18% { opacity: 0; transform: translateY(10px); }
+      42%, 100% { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 680px) {
+      main { width: min(420px, calc(100vw - 24px)); }
+      .stage { min-height: 300px; }
+      .atoms { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .atom * { animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="stage" aria-label="HookCraft logo animation">
+      <div id="logo-root"></div>
+    </section>
+
+    <div class="controls">
+      <button id="replay" type="button">Replay</button>
+      <button id="slow" type="button" aria-pressed="false">Slow</button>
+      <label>Speed <input id="speed" type="range" min="0.25" max="1.5" step="0.05" value="0.7"></label>
+    </div>
+
+    <div class="principles" aria-label="Animation principles">
+      <span data-phase="stage">Staging</span>
+      <span data-phase="action">Slow In/Out</span>
+      <span data-phase="overlap">Overlapping Action</span>
+      <span data-phase="settle">Follow Through</span>
+      <span data-phase="settle">Appeal</span>
+    </div>
+
+    <section class="atoms" aria-label="Atomic motion studies">
+      <div class="atom atom-lift" title="Hover lift"></div>
+      <div class="atom atom-spectrum" title="Spectrum pulse"></div>
+      <div class="atom atom-note" title="Note redraw"></div>
+      <div class="atom atom-letters" title="Letter cascade"></div>
+    </section>
+  </main>
+
+  <template id="logo-template">
+    <svg xmlns="http://www.w3.org/2000/svg" width="114" height="141" viewBox="0 0 114 141" role="img" aria-label="HookCraft logo">
+      <defs>
+        <radialGradient id="discGlow" cx="50%" cy="44%" r="56%"><stop offset="0%" stop-color="#161220"/><stop offset="68%" stop-color="#060509"/><stop offset="100%" stop-color="#000"/></radialGradient>
+        <linearGradient id="violetBars" x1="0" y1="31" x2="0" y2="95" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#2733ff"/><stop offset="54%" stop-color="#6d3dff"/><stop offset="100%" stop-color="#b970ff"/></linearGradient>
+        <linearGradient id="floorGlow" x1="21" y1="82" x2="93" y2="82" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#2f2bff" stop-opacity="0"/><stop offset="47%" stop-color="#9b71ff" stop-opacity=".92"/><stop offset="100%" stop-color="#2f2bff" stop-opacity="0"/></linearGradient>
+        <linearGradient id="noteInk" x1="37" y1="19" x2="78" y2="74" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#fff"/><stop offset="42%" stop-color="#c9c5ff"/><stop offset="100%" stop-color="#7865d9"/></linearGradient>
+        <clipPath id="discClip"><circle cx="57" cy="49" r="49"/></clipPath>
+        <filter id="softViolet" x="-20%" y="-80%" width="140%" height="220%"><feGaussianBlur stdDeviation="1.7"/></filter>
+      </defs>
+      <g id="mark">
+        <circle id="disc" cx="57" cy="49" r="49" fill="url(#discGlow)"/>
+        <g id="spectrum" clip-path="url(#discClip)" fill="url(#violetBars)" opacity=".78">
+          <rect x="15" y="39" width="2" height="38" rx="1"/><rect x="19" y="42" width="2" height="35" rx="1"/><rect x="23" y="38" width="2" height="39" rx="1"/><rect x="27" y="48" width="2" height="29" rx="1"/><rect x="31" y="52" width="2" height="25" rx="1"/><rect x="35" y="48" width="2" height="29" rx="1"/><rect x="39" y="56" width="2" height="21" rx="1"/><rect x="43" y="60" width="2" height="17" rx="1"/><rect x="47" y="65" width="2" height="13" rx="1"/><rect x="51" y="60" width="2" height="18" rx="1"/><rect x="55" y="64" width="2" height="14" rx="1"/><rect x="59" y="57" width="2" height="21" rx="1"/><rect x="63" y="61" width="2" height="17" rx="1"/><rect x="67" y="65" width="2" height="13" rx="1"/><rect x="71" y="60" width="2" height="18" rx="1"/><rect x="75" y="53" width="2" height="25" rx="1"/><rect x="79" y="50" width="2" height="28" rx="1"/><rect x="83" y="46" width="2" height="32" rx="1"/><rect x="87" y="42" width="2" height="36" rx="1"/><rect x="91" y="50" width="2" height="28" rx="1"/><rect x="95" y="57" width="2" height="21" rx="1"/>
+        </g>
+        <g id="spectrumDots" clip-path="url(#discClip)" fill="#bfb1ff" opacity=".62">
+          <circle cx="22" cy="69" r="1.1"/><circle cx="28" cy="66" r="1"/><circle cx="34" cy="72" r=".9"/><circle cx="39" cy="66" r=".9"/><circle cx="47" cy="71" r=".9"/><circle cx="57" cy="67" r="1"/><circle cx="66" cy="71" r=".9"/><circle cx="75" cy="65" r="1"/><circle cx="84" cy="69" r=".9"/><circle cx="92" cy="64" r=".9"/>
+        </g>
+        <ellipse id="wave-floor" cx="57" cy="80" rx="38" ry="4.2" fill="url(#floorGlow)" filter="url(#softViolet)"/>
+        <g id="music-note" fill="none" stroke="url(#noteInk)" stroke-linecap="round" stroke-linejoin="round">
+          <path id="note-stem" pathLength="1" d="M61.8 23 C59.7 34.8 60.3 49.4 57.7 60.2 C55.6 68.7 47.8 74.1 41.7 70.6" stroke-width="4.2"/>
+          <ellipse id="note-head" cx="47" cy="58.7" rx="10.8" ry="6.6" transform="rotate(-27 47 58.7)" stroke-width="3.5"/>
+          <path id="note-flag" d="M62.8 22.4 C68.7 19 75.1 19.1 77.2 21.7 C78.8 23.7 76.8 26.2 71.2 27.3 C66.5 28.2 62.7 27.2 61.6 25.4" fill="url(#noteInk)" stroke-width="1.2"/>
+        </g>
+      </g>
+      <g id="wordmark" fill="#d6d6d6" font-family="Arial, Helvetica, sans-serif" font-weight="700">
+        <g id="word-hook" font-size="20"><text id="letter-h" x="8" y="118">H</text><text id="letter-o1" x="36" y="118">O</text><text id="letter-o2" x="63" y="118">O</text><text id="letter-k" x="91" y="118">K</text></g>
+        <g id="word-craft" font-size="19"><text id="letter-c" x="0" y="139">C</text><text id="letter-r" x="23" y="139">R</text><text id="letter-a" x="47" y="139">A</text><text id="letter-f" x="72" y="139">F</text><text id="letter-t" x="94" y="139">T</text></g>
+      </g>
+    </svg>
+  </template>
+
+  <script>
+    const duration = 1500;
+    const root = document.querySelector("#logo-root");
+    const tpl = document.querySelector("#logo-template");
+    const speed = document.querySelector("#speed");
+    const slow = document.querySelector("#slow");
+    const replay = document.querySelector("#replay");
+    const pills = [...document.querySelectorAll(".principles span")];
+    const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const params = new URLSearchParams(location.search);
+    const fixedTime = params.has("t") ? Number(params.get("t")) : null;
+    const forceStatic = params.get("static") === "1" || reduceMotion;
+    let mainSvg;
+    let raf = 0;
+    let playhead = 0;
+    let lastTs = 0;
+    let speedValue = Number(speed.value);
+    let paused = fixedTime !== null || forceStatic;
+
+    function cloneLogo(target) {
+      target.replaceChildren(tpl.content.firstElementChild.cloneNode(true));
+      return target.querySelector("svg");
+    }
+
+    function easeOut(t) { return 1 - Math.pow(1 - clamp(t), 3); }
+    function easeInOut(t) { t = clamp(t); return t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+    function clamp(n) { return Math.min(1, Math.max(0, n)); }
+    function lerp(a, b, t) { return a + (b - a) * t; }
+    function seg(t, a, b) { return clamp((t - a) / (b - a)); }
+
+    function setTransform(el, x, y, s = 1, r = 0, cx = 57, cy = 49) {
+      el.setAttribute("transform", `translate(${x} ${y}) translate(${cx} ${cy}) rotate(${r}) scale(${s}) translate(${-cx} ${-cy})`);
+    }
+
+    function setFinal(svg) {
+      svg.querySelectorAll("*").forEach((el) => {
+        el.style.opacity = "";
+        el.style.strokeDasharray = "";
+        el.style.strokeDashoffset = "";
+        el.removeAttribute("transform");
+      });
+      pills.forEach((p) => p.classList.remove("active"));
+      pills.forEach((p) => p.dataset.phase === "settle" && p.classList.add("active"));
+    }
+
+    function applyFrame(ms) {
+      if (ms >= duration) {
+        setFinal(mainSvg);
+        return;
+      }
+      const t = clamp(ms / duration);
+      const mark = mainSvg.querySelector("#mark");
+      const disc = mainSvg.querySelector("#disc");
+      const bars = [...mainSvg.querySelectorAll("#spectrum rect")];
+      const dots = mainSvg.querySelector("#spectrumDots");
+      const floor = mainSvg.querySelector("#wave-floor");
+      const note = mainSvg.querySelector("#music-note");
+      const stem = mainSvg.querySelector("#note-stem");
+      const head = mainSvg.querySelector("#note-head");
+      const flag = mainSvg.querySelector("#note-flag");
+      const letters = [...mainSvg.querySelectorAll("#wordmark text")];
+
+      const markIn = easeOut(seg(t, 0, .34));
+      setTransform(mark, 0, lerp(9, 0, markIn), lerp(.72, 1, markIn), lerp(-5, 0, markIn));
+      mark.style.opacity = String(lerp(0, 1, markIn));
+      disc.style.opacity = String(lerp(.78, 1, easeOut(seg(t, 0, .25))));
+
+      bars.forEach((bar, i) => {
+        const b = easeOut(seg(t, .18 + i * .008, .53 + i * .008));
+        bar.style.transformBox = "fill-box";
+        bar.style.transformOrigin = "bottom";
+        bar.style.transform = `scaleY(${lerp(.08, 1, b)})`;
+        bar.style.opacity = String(lerp(0, 1, b));
+      });
+      dots.style.opacity = String(lerp(0, .62, easeOut(seg(t, .32, .55))));
+      floor.style.opacity = String(lerp(0, 1, easeOut(seg(t, .26, .58))));
+
+      const draw = easeInOut(seg(t, .34, .72));
+      stem.style.strokeDasharray = "1 1";
+      stem.style.strokeDashoffset = String(1 - draw);
+      note.style.opacity = String(lerp(.25, 1, easeOut(seg(t, .32, .66))));
+      setTransform(note, lerp(10, 0, easeOut(seg(t, .32, .78))), lerp(-4, 0, easeOut(seg(t, .32, .78))), 1, lerp(7, 0, easeOut(seg(t, .32, .78))), 57, 50);
+      head.style.opacity = String(lerp(0, 1, easeOut(seg(t, .49, .76))));
+      flag.style.opacity = String(lerp(0, 1, easeOut(seg(t, .56, .8))));
+
+      letters.forEach((letter, i) => {
+        const l = easeOut(seg(t, .55 + i * .035, .84 + i * .035));
+        letter.style.opacity = String(l);
+        letter.setAttribute("transform", `translate(0 ${lerp(11, 0, l)})`);
+      });
+
+      pills.forEach((p) => p.classList.remove("active"));
+      const phase = t < .2 ? "stage" : t < .62 ? "action" : t < .83 ? "overlap" : "settle";
+      pills.forEach((p) => p.dataset.phase === phase && p.classList.add("active"));
+    }
+
+    function tick(ts) {
+      if (!lastTs) lastTs = ts;
+      const delta = ts - lastTs;
+      lastTs = ts;
+      if (!paused) {
+        playhead += delta * speedValue;
+        if (playhead > duration) playhead = duration;
+        applyFrame(playhead);
+        if (playhead < duration) raf = requestAnimationFrame(tick);
+      }
+      window.__p2mReady = true;
+    }
+
+    function start() {
+      cancelAnimationFrame(raf);
+      playhead = 0;
+      lastTs = 0;
+      paused = false;
+      window.__p2mReady = false;
+      applyFrame(0);
+      raf = requestAnimationFrame(tick);
+    }
+
+    mainSvg = cloneLogo(root);
+    document.querySelectorAll(".atom").forEach((atom) => cloneLogo(atom));
+
+    replay.addEventListener("click", start);
+    slow.addEventListener("click", () => {
+      const active = slow.getAttribute("aria-pressed") !== "true";
+      slow.setAttribute("aria-pressed", String(active));
+      speed.value = active ? "0.25" : "0.7";
+      speedValue = Number(speed.value);
+    });
+    speed.addEventListener("input", () => {
+      speedValue = Number(speed.value);
+      slow.setAttribute("aria-pressed", speedValue <= .25 ? "true" : "false");
+    });
+
+    if (forceStatic) {
+      setFinal(mainSvg);
+      window.__p2mReady = true;
+    } else if (fixedTime !== null && Number.isFinite(fixedTime)) {
+      applyFrame(Math.max(0, Math.min(duration, fixedTime)));
+      window.__p2mReady = true;
+    } else {
+      start();
+    }
+  </script>
+</body>
+</html>
