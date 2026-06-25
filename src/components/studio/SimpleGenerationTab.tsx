@@ -20,6 +20,8 @@ const SIMPLE_PROMPT_EXAMPLES = [
   '梦幻儿童音乐，木琴、钢片琴和轻快打击乐，纯音乐，温柔可爱',
 ];
 
+const VISIBLE_PROMPT_EXAMPLES = SIMPLE_PROMPT_EXAMPLES.slice(0, 6);
+
 function pickPromptExample(currentPrompt: string) {
   if (SIMPLE_PROMPT_EXAMPLES.length === 1) {
     return SIMPLE_PROMPT_EXAMPLES[0];
@@ -257,10 +259,10 @@ export default function SimpleGenerationTab() {
           <div style={sidePanelStyle}>
             <div style={sidePanelHeaderStyle}>
               <span style={sideEyebrowStyle}>灵感样本</span>
-              <span style={sideCountStyle}>10</span>
+              <span style={sideCountStyle}>{VISIBLE_PROMPT_EXAMPLES.length}</span>
             </div>
             <div style={promptChipListStyle}>
-              {SIMPLE_PROMPT_EXAMPLES.slice(0, 4).map((example) => (
+              {VISIBLE_PROMPT_EXAMPLES.map((example) => (
                 <button
                   key={example}
                   type="button"
@@ -271,24 +273,6 @@ export default function SimpleGenerationTab() {
                   {example}
                 </button>
               ))}
-            </div>
-          </div>
-
-          <div style={sidePanelStyle}>
-            <span style={sideEyebrowStyle}>输出设置</span>
-            <div style={settingRowsStyle}>
-              <div style={settingRowStyle}>
-                <span>模式</span>
-                <strong>{instrumental ? '纯音乐' : '含人声'}</strong>
-              </div>
-              <div style={settingRowStyle}>
-                <span>模型</span>
-                <strong>Suno V5.5</strong>
-              </div>
-              <div style={settingRowStyle}>
-                <span>结果</span>
-                <strong>自动写入我的作品</strong>
-              </div>
             </div>
           </div>
 
@@ -323,7 +307,7 @@ export default function SimpleGenerationTab() {
 }
 
 const simpleShellStyle: React.CSSProperties = {
-  maxWidth: 1040,
+  width: '100%',
   margin: '0 auto',
   padding: 18,
   borderRadius: 16,
@@ -331,7 +315,7 @@ const simpleShellStyle: React.CSSProperties = {
   background: 'linear-gradient(135deg, rgba(24,26,34,0.94), rgba(10,12,16,0.92))',
   boxShadow: 'var(--hc-shadow-soft)',
   display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1fr) 310px',
+  gridTemplateColumns: 'minmax(0, 1fr) 340px',
   gap: 18,
 };
 
@@ -524,21 +508,6 @@ const promptChipStyle = (disabled: boolean): React.CSSProperties => ({
   opacity: disabled ? 0.56 : 1,
   fontFamily: 'var(--hc-font)',
 });
-
-const settingRowsStyle: React.CSSProperties = {
-  display: 'grid',
-  gap: 9,
-  marginTop: 12,
-};
-
-const settingRowStyle: React.CSSProperties = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  gap: 12,
-  alignItems: 'center',
-  color: 'var(--hc-text-muted)',
-  fontSize: 12,
-};
 
 const quietNoteStyle: React.CSSProperties = {
   marginTop: 'auto',
