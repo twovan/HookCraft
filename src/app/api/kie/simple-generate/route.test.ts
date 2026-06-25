@@ -206,6 +206,33 @@ describe('/api/kie/simple-generate', () => {
     expect(body.error).toBe('记录任务失败状态失败，请联系管理员处理');
   });
 
+  it('marks provider-link failure with callback-blocking credits error code', async () => {
+    mocks.updateResults.push(
+      { error: new Error('provider link update failed') },
+      { error: null },
+      { error: null }
+    );
+
+    const res = await POST(createRequest({ prompt: 'ambient pop hook' }));
+    const body = await res.json();
+
+    expect(res.status).toBe(500);
+    expect(body.error).toBe('记录生成服务任务失败，请稍后重试');
+    expect(mocks.consumeCredits).not.toHaveBeenCalled();
+    expect(mocks.updates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          table: 'generation_tasks',
+          values: expect.objectContaining({
+            status: 'failed',
+            error_code: 'CREDITS_NOT_ENOUGH',
+            error_message: '记录生成服务任务失败，请稍后重试',
+          }),
+        }),
+      ])
+    );
+  });
+
   it('marks task failed when final credits update fails after credits are consumed', async () => {
     mocks.updateResults.push(
       { error: null },

@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
         userId: user.id,
         localTaskId,
         batchId,
-        errorCode: 'KIE_SIMPLE_PROVIDER_LINK_FAILED',
+        errorCode: 'CREDITS_NOT_ENOUGH',
         errorMessage: '记录生成服务任务失败，请稍后重试',
       });
       if (!markResult.ok) {
