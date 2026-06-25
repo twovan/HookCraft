@@ -33,7 +33,17 @@ export default function SimpleGenerationTab() {
         return;
       }
 
-      router.push(data.creationUrl || `/account/creations?expand=${data.batchId}`);
+      if (data.creationUrl) {
+        router.push(data.creationUrl);
+        return;
+      }
+
+      if (data.batchId) {
+        router.push(`/account/creations?expand=${encodeURIComponent(data.batchId)}`);
+        return;
+      }
+
+      setError('生成已提交，但无法打开结果页，请到创作历史查看');
     } catch {
       setError('生成失败，请稍后重试');
     } finally {
