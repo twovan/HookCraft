@@ -9,6 +9,7 @@ import {
   KieSunoProvider,
 } from '@/lib/generation/KieSunoProvider';
 import { readStudioTabSettings } from '@/lib/studio/StudioTabSettingsStore';
+import { persistCompletedCoverTracks } from '@/app/api/kie/upload-cover/persist-tracks';
 import type { CreditOperationType } from '@/types/credits';
 import type { KieSunoModel } from '@/types/kie';
 
@@ -21,6 +22,10 @@ const SIMPLE_GENERATE_OPERATIONS: CreditOperationType[] = ['cover_generation'];
 
 function createId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function hasPlayableTrack(tracks: Array<{ audioUrl?: string; streamAudioUrl?: string }>) {
+  return tracks.some((track) => track.audioUrl || track.streamAudioUrl);
 }
 
 async function markSimpleGenerationFailed(input: {
@@ -129,9 +134,10 @@ export async function POST(req: NextRequest) {
     }
 
     const callBackUrl = `${req.nextUrl.origin}/api/kie/upload-cover/callback?localTaskId=${encodeURIComponent(localTaskId)}`;
+    const provider = new KieSunoProvider();
     let result;
     try {
-      result = await new KieSunoProvider().generateMusic({
+      result = await provider.generateMusic({
         prompt,
         instrumental,
         model,
@@ -239,6 +245,19 @@ export async function POST(req: NextRequest) {
         console.error('[kie/simple-generate] Mark final update failure failed:', markResult.error);
       }
       return NextResponse.json({ error: accountingErrorMessage }, { status: 500 });
+    }
+
+    try {
+      const details = await provider.getTaskDetails(result.taskId);
+      if (details.status === 'SUCCESS' && hasPlayableTrack(details.tracks)) {
+        await persistCompletedCoverTracks({
+          localTaskId,
+          userId: user.id,
+          tracks: details.tracks,
+        });
+      }
+    } catch (error) {
+      console.warn('[kie/simple-generate] Replay completed provider result failed:', error);
     }
 
     return NextResponse.json({

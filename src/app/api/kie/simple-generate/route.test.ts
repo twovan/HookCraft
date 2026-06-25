@@ -10,8 +10,10 @@ type SupabaseUpdate = {
 const mocks = vi.hoisted(() => {
   const getAuthUser = vi.fn();
   const generateMusic = vi.fn();
+  const getTaskDetails = vi.fn();
+  const persistCompletedCoverTracks = vi.fn();
   const KieSunoProvider = vi.fn(function () {
-    return { generateMusic };
+    return { generateMusic, getTaskDetails };
   });
   const hasEnoughCredits = vi.fn();
   const consumeCredits = vi.fn();
@@ -53,6 +55,8 @@ const mocks = vi.hoisted(() => {
   return {
     getAuthUser,
     generateMusic,
+    getTaskDetails,
+    persistCompletedCoverTracks,
     KieSunoProvider,
     hasEnoughCredits,
     consumeCredits,
@@ -80,6 +84,10 @@ vi.mock('@/lib/generation/KieSunoProvider', () => ({
   KieSunoProvider: mocks.KieSunoProvider,
   getKieUserFacingErrorMessage: (message?: string | null) => message || null,
   isKieProviderCreditsInsufficient: () => false,
+}));
+
+vi.mock('@/app/api/kie/upload-cover/persist-tracks', () => ({
+  persistCompletedCoverTracks: mocks.persistCompletedCoverTracks,
 }));
 
 vi.mock('@/lib/credits/CreditService', () => ({
@@ -120,6 +128,8 @@ describe('/api/kie/simple-generate', () => {
       return Promise.resolve({ success: true, consumed: 20, remaining: 80 });
     });
     mocks.generateMusic.mockResolvedValue({ taskId: 'kie-task-1' });
+    mocks.getTaskDetails.mockResolvedValue({ taskId: 'kie-task-1', status: 'PENDING', tracks: [] });
+    mocks.persistCompletedCoverTracks.mockResolvedValue({ batchId: 'batch-1', savedCount: 0 });
   });
 
   it('rejects an empty prompt before creating a KIE task', async () => {
@@ -207,6 +217,23 @@ describe('/api/kie/simple-generate', () => {
         }),
       })
     );
+  });
+
+  it('replays completed provider results after credits are confirmed', async () => {
+    mocks.getTaskDetails.mockResolvedValue({
+      taskId: 'kie-task-1',
+      status: 'SUCCESS',
+      tracks: [{ id: 'audio-1', audioUrl: 'https://example.com/audio.mp3' }],
+    });
+
+    const res = await POST(createRequest({ prompt: 'ambient pop hook', instrumental: false }));
+
+    expect(res.status).toBe(200);
+    expect(mocks.persistCompletedCoverTracks).toHaveBeenCalledWith({
+      localTaskId: expect.stringMatching(/^kie-simple-task-/),
+      userId: 'user-1',
+      tracks: [{ id: 'audio-1', audioUrl: 'https://example.com/audio.mp3' }],
+    });
   });
 
   it('stores provider task id before consuming credits', async () => {
