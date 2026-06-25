@@ -26,6 +26,7 @@ import SensitivityConfirmDialog from '@/components/studio/SensitivityConfirmDial
 import SensitivityBlockDialog from '@/components/studio/SensitivityBlockDialog';
 import AudioUploadTab from '@/components/studio/AudioUploadTab';
 import AdvancedArrangementTab from '@/components/studio/AdvancedArrangementTab';
+import SimpleGenerationTab from '@/components/studio/SimpleGenerationTab';
 import { useSensitivityCheck } from '@/hooks/useSensitivityCheck';
 import type { Template } from '@/types/template';
 import type { VersionResult } from '@/types/generation';
@@ -559,6 +560,12 @@ export default function StudioPageClient({
           }}
         >
           <button
+            onClick={() => setActiveTab('simple')}
+            style={tabButtonStyle('simple')}
+          >
+            简单模式
+          </button>
+          <button
             onClick={() => setActiveTab('template')}
             style={tabButtonStyle('template')}
           >
@@ -588,6 +595,11 @@ export default function StudioPageClient({
           >
             模板伴奏
           </button>
+        </div>
+
+        {/* Simple Generation Tab Content */}
+        <div style={{ display: activeTab === 'simple' ? 'block' : 'none' }}>
+          <SimpleGenerationTab />
         </div>
 
         {/* Template Generation Tab Content */}
