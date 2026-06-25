@@ -58,6 +58,44 @@ describe('persistCompletedCoverTracks', () => {
     expect(upsert).not.toHaveBeenCalled();
   });
 
+  it('does not complete a task before credits are confirmed', async () => {
+    const upsert = vi.fn();
+    const query: any = {
+      eq: vi.fn(() => query),
+      maybeSingle: vi.fn(async () => ({
+        data: {
+          id: 'task-1',
+          user_id: 'user-1',
+          batch_id: 'batch-1',
+          prompt: 'prompt',
+          title: 'title',
+          raw_audio_path: 'kie:provider-task-1',
+          model_id: 'kie-suno-v5_5',
+          generation_type: 'full_demo',
+          template_id: null,
+          credits_consumed: 0,
+          status: 'generating',
+          error_code: null,
+        },
+        error: null,
+      })),
+    };
+    const table = {
+      select: vi.fn(() => query),
+      upsert,
+    };
+
+    vi.mocked(supabaseAdmin.from).mockReturnValue(table as any);
+
+    const result = await persistCompletedCoverTracks({
+      localTaskId: 'task-1',
+      tracks: [{ id: 'audio-1', audioUrl: 'https://example.com/audio.mp3' } as any],
+    });
+
+    expect(result).toEqual({ batchId: 'batch-1', savedCount: 0 });
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
   it('stores completed Kie track audio in Supabase before saving rows', async () => {
     const upsert = vi.fn(async () => ({ error: null }));
     const batchUpdateQuery: any = {
