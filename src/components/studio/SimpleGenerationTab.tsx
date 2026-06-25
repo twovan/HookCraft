@@ -6,6 +6,33 @@ import SensitivityBlockDialog from '@/components/studio/SensitivityBlockDialog';
 import SensitivityConfirmDialog from '@/components/studio/SensitivityConfirmDialog';
 import { useSensitivityCheck } from '@/hooks/useSensitivityCheck';
 
+const SIMPLE_PROMPT_EXAMPLES = [
+  '新世纪音乐，缓慢空灵，合成器垫音和环境音效，纯音乐，宽广空间感，冥想放松',
+  '明亮的流行电子乐，轻快鼓点，温暖女声，适合短视频开场，旋律抓耳',
+  '城市夜晚氛围，低保真节拍，柔和钢琴和电吉他，慵懒松弛，适合 vlog',
+  '国风流行，古筝和笛子点缀，现代鼓组，情绪递进，适合剧情转场',
+  '热血摇滚，强劲鼓点和电吉他 riff，副歌有爆发力，适合运动宣传片',
+  '清晨咖啡馆氛围，原声吉他，轻柔贝斯，温暖自然，适合生活方式内容',
+  '未来感科技配乐，合成器琶音，稳定节奏，干净高级，适合产品展示',
+  '电影感史诗配乐，弦乐铺底，低鼓推进，宏大但不压迫，适合品牌片',
+  '复古迪斯科，律动贝斯，明亮铜管和拍手节奏，快乐自信，适合活动预热',
+  '梦幻儿童音乐，木琴、钢片琴和轻快打击乐，纯音乐，温柔可爱',
+];
+
+function pickPromptExample(currentPrompt: string) {
+  if (SIMPLE_PROMPT_EXAMPLES.length === 1) {
+    return SIMPLE_PROMPT_EXAMPLES[0];
+  }
+
+  let nextPrompt = currentPrompt;
+  while (nextPrompt === currentPrompt) {
+    nextPrompt = SIMPLE_PROMPT_EXAMPLES[
+      Math.floor(Math.random() * SIMPLE_PROMPT_EXAMPLES.length)
+    ];
+  }
+  return nextPrompt;
+}
+
 export default function SimpleGenerationTab() {
   const router = useRouter();
   const [prompt, setPrompt] = useState('');
@@ -91,6 +118,12 @@ export default function SimpleGenerationTab() {
     await submitGeneration(trimmed);
   };
 
+  const handleUseExample = () => {
+    setPrompt(pickPromptExample(prompt));
+    setError(null);
+    resetSensitivity();
+  };
+
   const handleSensitivityConfirm = () => {
     setShowConfirmDialog(false);
     const rewrittenPrompt = sensitivityResult?.rewrittenPrompt || prompt;
@@ -146,19 +179,51 @@ export default function SimpleGenerationTab() {
           </p>
         </div>
 
-        <label
-          htmlFor="simple-generation-prompt"
+        <div
           style={{
-            display: 'block',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
             marginBottom: 8,
-            color: 'var(--hc-text)',
-            fontSize: 13,
-            fontWeight: 800,
-            fontFamily: 'var(--hc-font)',
           }}
         >
-          生成描述
-        </label>
+          <label
+            htmlFor="simple-generation-prompt"
+            style={{
+              color: 'var(--hc-text)',
+              fontSize: 13,
+              fontWeight: 800,
+              fontFamily: 'var(--hc-font)',
+            }}
+          >
+            生成描述
+          </label>
+          <button
+            type="button"
+            onClick={handleUseExample}
+            disabled={isGenerating || isSensitivityLoading}
+            style={{
+              flex: '0 0 auto',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minHeight: 30,
+              padding: '0 12px',
+              borderRadius: 999,
+              border: '1px solid var(--hc-border)',
+              background: '#11141b',
+              color: 'var(--hc-text)',
+              fontSize: 12,
+              fontWeight: 800,
+              cursor: isGenerating || isSensitivityLoading ? 'not-allowed' : 'pointer',
+              opacity: isGenerating || isSensitivityLoading ? 0.56 : 1,
+              fontFamily: 'var(--hc-font)',
+            }}
+          >
+            换个灵感
+          </button>
+        </div>
         <textarea
           id="simple-generation-prompt"
           value={prompt}
