@@ -229,19 +229,21 @@ export default function StudioPageClient({
     return {
       display: studioTabSettings.visibleTabs.includes(tab) ? 'block' : 'none',
       flex: 1,
-      minWidth: 132,
-      padding: '12px 18px',
+      minWidth: 128,
+      minHeight: 44,
+      padding: '0 18px',
       borderRadius: 8,
       border: '1px solid transparent',
       background: active ? 'rgba(206, 255, 53, 0.12)' : 'transparent',
       color: active ? '#ceff35' : '#a8aaa3',
-      fontSize: 14,
+      fontSize: 13,
       fontWeight: 850,
       cursor: 'pointer',
       fontFamily: 'var(--hc-font)',
       transition: 'all 0.15s ease',
       boxShadow: active ? 'inset 0 0 0 1px rgba(206, 255, 53, 0.16)' : 'none',
       whiteSpace: 'nowrap',
+      lineHeight: '44px',
     };
   };
 
@@ -471,7 +473,6 @@ export default function StudioPageClient({
     display: showTemplateCreationTab ? 'block' : 'none',
     background: templateCreationActive ? 'rgba(206, 255, 53, 0.12)' : 'transparent',
     color: templateCreationActive ? '#ceff35' : '#a8aaa3',
-    fontSize: 0,
     boxShadow: templateCreationActive ? 'inset 0 0 0 1px rgba(206, 255, 53, 0.16)' : 'none',
   };
 
@@ -529,7 +530,7 @@ export default function StudioPageClient({
         }}
       />
 
-      <div className="studio-shell-inner" style={{ position: 'relative', zIndex: 1, maxWidth: 1400, margin: '0 auto', padding: '48px clamp(20px, 4vw, 48px)' }}>
+      <div className="studio-shell-inner" style={{ position: 'relative', zIndex: 1, maxWidth: 1320, margin: '0 auto', padding: '36px clamp(20px, 3.2vw, 40px) 56px' }}>
         {/* Page Header */}
         <div className="studio-hero" style={{ marginBottom: '22px' }}>
           <h1
@@ -570,7 +571,7 @@ export default function StudioPageClient({
           style={{
             display: showStudioTabs ? 'flex' : 'none',
             gap: '6px',
-            marginBottom: '22px',
+            marginBottom: '20px',
             background: 'rgba(6,8,12,0.76)',
             borderRadius: '10px',
             padding: '5px',
@@ -1289,17 +1290,17 @@ const studioPageStyles = `
   }
 
   .studio-shell-inner {
-    width: min(1400px, calc(100% - 48px));
+    width: min(1320px, calc(100% - 48px));
   }
 
   .studio-hero {
-    border: 1px solid rgba(255,255,255,.12);
-    border-radius: 18px;
-    padding: 26px;
+    border: 1px solid rgba(255,255,255,.11);
+    border-radius: 16px;
+    padding: 24px 26px;
     background:
-      linear-gradient(135deg, rgba(255,255,255,.07), transparent 34%),
-      linear-gradient(180deg, rgba(17,18,23,.72), rgba(9,10,14,.54));
-    box-shadow: var(--hc-shadow-soft);
+      linear-gradient(135deg, rgba(255,255,255,.055), transparent 38%),
+      linear-gradient(180deg, rgba(18,20,26,.78), rgba(8,9,12,.62));
+    box-shadow: 0 18px 50px rgba(0,0,0,.26);
   }
 
   .studio-hero h1 {
@@ -1311,12 +1312,14 @@ const studioPageStyles = `
   }
 
   .studio-tabbar {
-    box-shadow: var(--hc-shadow-soft);
+    box-shadow: 0 14px 38px rgba(0,0,0,.24);
     backdrop-filter: blur(16px);
   }
 
   .studio-tabbar button {
     min-height: 44px;
+    line-height: 1 !important;
+    text-align: center;
   }
 
   .studio-production-workbench {
@@ -1362,9 +1365,9 @@ const studioPageStyles = `
 
   .studio-card {
     background:
-      linear-gradient(180deg, rgba(255,255,255,.052), rgba(255,255,255,.018)) !important;
-    border-color: rgba(255,255,255,.12) !important;
-    box-shadow: var(--hc-shadow-soft) !important;
+      linear-gradient(180deg, rgba(255,255,255,.048), rgba(255,255,255,.018)) !important;
+    border-color: rgba(255,255,255,.105) !important;
+    box-shadow: 0 18px 48px rgba(0,0,0,.24) !important;
   }
 
   .studio-page section,

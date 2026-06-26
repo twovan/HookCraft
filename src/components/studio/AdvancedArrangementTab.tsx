@@ -538,7 +538,7 @@ export default function AdvancedArrangementTab({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <div style={{
         display: 'grid',
-        gridTemplateColumns: usesSelectedTemplate ? 'minmax(0, 1fr) minmax(360px, 420px)' : 'minmax(0, 0.9fr) minmax(0, 1.1fr)',
+        gridTemplateColumns: usesSelectedTemplate ? 'minmax(0, 1fr) minmax(380px, 430px)' : 'minmax(0, 0.9fr) minmax(0, 1.1fr)',
         gap: usesSelectedTemplate ? 18 : 32,
         alignItems: 'start',
       }}>
@@ -818,13 +818,13 @@ export default function AdvancedArrangementTab({
             style={{
               width: '100%',
               marginTop: 18,
-              padding: usesSelectedTemplate ? '24px 24px' : '14px 24px',
-              minHeight: usesSelectedTemplate ? 76 : undefined,
-              borderRadius: usesSelectedTemplate ? 18 : 24,
+              padding: '0 24px',
+              minHeight: usesSelectedTemplate ? 56 : 52,
+              borderRadius: 14,
               border: 'none',
               background: canGenerate ? 'linear-gradient(135deg, var(--hc-lime), var(--hc-cyan))' : 'linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.07))',
               color: canGenerate ? '#08090c' : '#6b7280',
-              fontSize: usesSelectedTemplate ? 18 : 15,
+              fontSize: usesSelectedTemplate ? 15 : 15,
               fontWeight: 800,
               cursor: canGenerate ? 'pointer' : 'not-allowed',
               fontFamily: 'var(--hc-font)',
@@ -1239,11 +1239,11 @@ function ResultMeta({ label, value }: { label: string; value: string }) {
 }
 
 const panelStyle: CSSProperties = {
-  background: 'linear-gradient(180deg, rgba(24, 26, 34, 0.96), rgba(17, 18, 23, 0.96))',
-  borderRadius: 20,
-  padding: 24,
-  border: '1px solid var(--hc-border)',
-  boxShadow: 'var(--hc-shadow)',
+  background: 'linear-gradient(180deg, rgba(255,255,255,0.048), rgba(255,255,255,0.018))',
+  borderRadius: 16,
+  padding: 22,
+  border: '1px solid rgba(255,255,255,0.105)',
+  boxShadow: '0 18px 48px rgba(0,0,0,.24)',
   minWidth: 0,
 };
 
@@ -1258,7 +1258,7 @@ const sectionHeaderStyle: CSSProperties = {
 const titleStyle: CSSProperties = {
   fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
   fontSize: 18,
-  fontWeight: 700,
+  fontWeight: 850,
   color: '#e8e8f0',
   margin: 0,
 };
@@ -1276,8 +1276,8 @@ const pillStyle: CSSProperties = {
 const modelBadgeStyle: CSSProperties = {
   fontSize: 12,
   color: '#e8e8f0',
-  background: '#12121e',
-  border: '1px solid #2a2a40',
+  background: 'rgba(7,8,11,.74)',
+  border: '1px solid rgba(255,255,255,0.1)',
   borderRadius: 10,
   padding: '9px 12px',
   whiteSpace: 'nowrap',
@@ -1294,7 +1294,7 @@ const modeRowStyle: CSSProperties = {
 const templateCreationSwitchStyle: CSSProperties = {
   ...modeRowStyle,
   padding: 4,
-  borderRadius: 14,
+  borderRadius: 12,
   border: '1px solid rgba(255,255,255,0.1)',
   background: 'rgba(6,8,12,0.54)',
 };
@@ -1307,8 +1307,8 @@ const instrumentalSettingStyle: CSSProperties = {
   marginBottom: 18,
   padding: '12px 14px',
   borderRadius: 12,
-  border: '1px solid #2a2a40',
-  background: '#12121e',
+  border: '1px solid rgba(255,255,255,0.1)',
+  background: 'rgba(7,8,11,.74)',
 };
 
 const templateModeNoticeStyle: CSSProperties = {
@@ -1318,7 +1318,7 @@ const templateModeNoticeStyle: CSSProperties = {
   gap: 12,
   marginBottom: 14,
   padding: '10px 12px',
-  borderRadius: 10,
+  borderRadius: 12,
   border: '1px solid rgba(206, 255, 53, 0.24)',
   background: 'rgba(206, 255, 53, 0.08)',
 };
@@ -1350,7 +1350,7 @@ function templateCoverThumbStyle(coverUrl?: string): CSSProperties {
 const hintBoxStyle: CSSProperties = {
   marginTop: 16,
   background: '#12121e',
-  border: '1px solid #2a2a40',
+  border: '1px solid rgba(255,255,255,0.1)',
   borderRadius: 12,
   padding: 16,
 };
@@ -1407,8 +1407,8 @@ const inputStyle: CSSProperties = {
   width: '100%',
   boxSizing: 'border-box',
   borderRadius: 10,
-  border: '1px solid #2a2a40',
-  background: '#12121e',
+  border: '1px solid rgba(255,255,255,0.12)',
+  background: 'rgba(7,8,11,.86)',
   color: '#e8e8f0',
   padding: '10px 12px',
   outline: 'none',
@@ -1431,8 +1431,8 @@ const textareaStyle: CSSProperties = {
 const lockedStyleCardStyle: CSSProperties = {
   marginBottom: 14,
   borderRadius: 12,
-  border: '1px solid #2a2a40',
-  background: '#12121e',
+  border: '1px solid rgba(255,255,255,0.1)',
+  background: 'rgba(7,8,11,.74)',
   padding: 12,
 };
 
