@@ -376,8 +376,8 @@ export default function HistoryList({
               <div style={detailLoadingStyle}>
                 <span style={pendingPulseStyle} />
                 <div>
-                  <strong>正在打开当前作品</strong>
-                  <p>正在读取最新状态，避免显示上一首的内容。</p>
+                  <strong>正在打开</strong>
+                  <p>请稍候...</p>
                 </div>
               </div>
             )}
