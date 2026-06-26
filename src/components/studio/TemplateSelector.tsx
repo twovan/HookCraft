@@ -184,22 +184,25 @@ export default function TemplateSelector({
 
 const tabsStyle: React.CSSProperties = {
   display: 'inline-flex',
-  gap: 4,
-  marginBottom: 16,
-  padding: 4,
-  border: '1px solid var(--hc-line)',
+  gap: 3,
+  marginBottom: 14,
+  padding: 3,
+  border: '1px solid rgba(255,255,255,0.1)',
   borderRadius: 999,
-  background: 'rgba(255,255,255,.03)',
+  background: 'rgba(7,8,11,.58)',
 };
 
 const tabStyle: React.CSSProperties = {
   border: '1px solid transparent',
   borderRadius: 999,
   background: 'transparent',
-  padding: '8px 14px',
-  fontSize: 13,
+  minWidth: 52,
+  minHeight: 30,
+  padding: '0 12px',
+  fontSize: 12,
   fontWeight: 900,
   cursor: 'pointer',
+  lineHeight: '30px',
 };
 
 function skeletonStyle(cardVariant: TemplateSelectorProps['cardVariant']): React.CSSProperties {
