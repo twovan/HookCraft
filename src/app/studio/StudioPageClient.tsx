@@ -211,7 +211,15 @@ export default function StudioPageClient({
       : previewCount === null || creditLoading;
   const templateStudioLoading = templatesLoading || usageLoading || membershipLoading;
   const visibleStudioTabs = STUDIO_TAB_OPTIONS.filter((tab) => studioTabSettings.visibleTabs.includes(tab.id));
-  const showStudioTabs = visibleStudioTabs.length > 1;
+  const showTemplateCreationTab = studioTabSettings.visibleTabs.includes('templateArrangement') || studioTabSettings.visibleTabs.includes('templateInstrumental');
+  const templateCreationActive = activeTab === 'templateArrangement' || activeTab === 'templateInstrumental';
+  const templateCreationTabTarget: StudioTab = studioTabSettings.visibleTabs.includes('templateArrangement')
+    ? 'templateArrangement'
+    : 'templateInstrumental';
+  const visibleStudioTabCount =
+    visibleStudioTabs.filter((tab) => tab.id !== 'templateArrangement' && tab.id !== 'templateInstrumental').length +
+    (showTemplateCreationTab ? 1 : 0);
+  const showStudioTabs = visibleStudioTabCount > 1;
 
   const creditsExhaustedPaid = isPaid && isExhausted;
   const previewsExhaustedFree = !isPaid && previewCount !== null && previewCount.remaining < 1;
@@ -458,6 +466,15 @@ export default function StudioPageClient({
     }
   };
 
+  const templateCreationTabButtonStyle: React.CSSProperties = {
+    ...tabButtonStyle(templateCreationTabTarget),
+    display: showTemplateCreationTab ? 'block' : 'none',
+    background: templateCreationActive ? 'rgba(206, 255, 53, 0.12)' : 'transparent',
+    color: templateCreationActive ? '#ceff35' : '#a8aaa3',
+    fontSize: 0,
+    boxShadow: templateCreationActive ? 'inset 0 0 0 1px rgba(206, 255, 53, 0.16)' : 'none',
+  };
+
   const renderTemplatePicker = (description: string) => (
     <div className="studio-template-picker">
       <div className="studio-template-picker-head">
@@ -586,16 +603,10 @@ export default function StudioPageClient({
             参考编曲模式
           </button>
           <button
-            onClick={() => setActiveTab('templateArrangement')}
-            style={tabButtonStyle('templateArrangement')}
+            onClick={() => setActiveTab(templateCreationTabTarget)}
+            style={templateCreationTabButtonStyle}
           >
-            模板编曲
-          </button>
-          <button
-            onClick={() => setActiveTab('templateInstrumental')}
-            style={tabButtonStyle('templateInstrumental')}
-          >
-            模板伴奏
+            <span style={{ fontSize: 14 }}>模板创作</span>
           </button>
         </div>
 
@@ -1154,22 +1165,15 @@ export default function StudioPageClient({
         </div>
 
         {/* Template Arrangement Tab Content */}
-        <div style={{ display: activeTab === 'templateArrangement' ? 'block' : 'none' }}>
+        <div style={{ display: templateCreationActive ? 'block' : 'none' }}>
           <AdvancedArrangementTab
-            variant="template"
+            variant="templateUnified"
+            templateModeDefault={activeTab === 'templateInstrumental' ? 'instrumental' : 'song'}
             selectedTemplate={selectedTemplate}
             templatePicker={renderTemplatePicker('模板将作为主创作基调，选择一个模板开始创作。')}
           />
         </div>
 
-        {/* Template Instrumental Tab Content */}
-        <div style={{ display: activeTab === 'templateInstrumental' ? 'block' : 'none' }}>
-          <AdvancedArrangementTab
-            variant="templateInstrumental"
-            selectedTemplate={selectedTemplate}
-            templatePicker={renderTemplatePicker('模板解析会自动生成风格标签，默认使用 V5.5 伴奏模型。')}
-          />
-        </div>
       </div>
 
       {/* Copyright & Safety Modal */}

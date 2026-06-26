@@ -53,20 +53,31 @@ interface GeneratedTrack {
   duration?: number;
 }
 
+type TemplateCreationMode = 'song' | 'instrumental';
+
 interface AdvancedArrangementTabProps {
-  variant?: 'advanced' | 'template' | 'templateInstrumental';
+  variant?: 'advanced' | 'template' | 'templateInstrumental' | 'templateUnified';
   selectedTemplate?: Template | null;
   templatePicker?: ReactNode;
+  templateModeDefault?: TemplateCreationMode;
 }
 
 export default function AdvancedArrangementTab({
   variant = 'advanced',
   selectedTemplate = null,
   templatePicker,
+  templateModeDefault = 'song',
 }: AdvancedArrangementTabProps) {
   const router = useRouter();
-  const isTemplateVariant = variant === 'template';
-  const isTemplateInstrumentalVariant = variant === 'templateInstrumental';
+  const [templateCreationMode, setTemplateCreationMode] = useState<TemplateCreationMode>(templateModeDefault);
+  const isTemplateUnifiedVariant = variant === 'templateUnified';
+  const effectiveVariant = isTemplateUnifiedVariant
+    ? templateCreationMode === 'instrumental'
+      ? 'templateInstrumental'
+      : 'template'
+    : variant;
+  const isTemplateVariant = effectiveVariant === 'template';
+  const isTemplateInstrumentalVariant = effectiveVariant === 'templateInstrumental';
   const usesSelectedTemplate = isTemplateVariant || isTemplateInstrumentalVariant;
   const templateStyle = getTemplateStyle(selectedTemplate);
   const templateAdvancedTags = getTemplateAdvancedTags(selectedTemplate);
@@ -106,6 +117,11 @@ export default function AdvancedArrangementTab({
   const effectiveStyle = lockedStyle ?? style;
   const effectiveTags = templateAdvancedTags;
   const showTemplateInstrumentalTagsField = false;
+
+  useEffect(() => {
+    if (!isTemplateUnifiedVariant) return;
+    setTemplateCreationMode(templateModeDefault);
+  }, [isTemplateUnifiedVariant, templateModeDefault]);
 
   useEffect(() => {
     if (!usesSelectedTemplate) return;
@@ -612,6 +628,37 @@ export default function AdvancedArrangementTab({
             <h2 style={titleStyle}>{isTemplateInstrumentalVariant ? '模板伴奏参数' : isTemplateVariant ? '模板编曲参数' : '高级编曲参数'}</h2>
           </div>
 
+          {isTemplateUnifiedVariant && (
+            <div style={templateCreationSwitchStyle}>
+              <ModeButton
+                active={templateCreationMode === 'song'}
+                disabled={isBusy}
+                onClick={() => {
+                  setTemplateCreationMode('song');
+                  setError(null);
+                  setResult(null);
+                  setGenerateStatus('idle');
+                }}
+              >
+                歌曲编曲
+              </ModeButton>
+              <ModeButton
+                active={templateCreationMode === 'instrumental'}
+                disabled={isBusy}
+                onClick={() => {
+                  setTemplateCreationMode('instrumental');
+                  setInstrumental(false);
+                  setPrompt('');
+                  setError(null);
+                  setResult(null);
+                  setGenerateStatus('idle');
+                }}
+              >
+                纯伴奏
+              </ModeButton>
+            </div>
+          )}
+
           {!usesSelectedTemplate && (
             <div style={modeRowStyle}>
               <ModeButton active={customMode} disabled={isBusy} onClick={() => setCustomMode(true)}>自定义模式</ModeButton>
@@ -1074,6 +1121,7 @@ function ModeButton({
       disabled={disabled}
       style={{
         flex: 1,
+        minWidth: 0,
         padding: '9px 12px',
         borderRadius: 10,
         border: active ? '1px solid rgba(206, 255, 53, 0.48)' : '1px solid #2a2a40',
@@ -1084,6 +1132,9 @@ function ModeButton({
         cursor: disabled ? 'not-allowed' : 'pointer',
         opacity: disabled ? 0.6 : 1,
         fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
       }}
     >
       {children}
@@ -1238,6 +1289,14 @@ const modeRowStyle: CSSProperties = {
   gridTemplateColumns: '1fr 1fr',
   gap: 10,
   marginBottom: 12,
+};
+
+const templateCreationSwitchStyle: CSSProperties = {
+  ...modeRowStyle,
+  padding: 4,
+  borderRadius: 14,
+  border: '1px solid rgba(255,255,255,0.1)',
+  background: 'rgba(6,8,12,0.54)',
 };
 
 const instrumentalSettingStyle: CSSProperties = {
