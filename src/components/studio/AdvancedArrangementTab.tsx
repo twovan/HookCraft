@@ -640,7 +640,7 @@ export default function AdvancedArrangementTab({
                   setGenerateStatus('idle');
                 }}
               >
-                歌曲编曲
+                音频改编
               </ModeButton>
               <ModeButton
                 active={templateCreationMode === 'instrumental'}
@@ -654,7 +654,7 @@ export default function AdvancedArrangementTab({
                   setGenerateStatus('idle');
                 }}
               >
-                纯伴奏
+                添加伴奏
               </ModeButton>
             </div>
           )}
