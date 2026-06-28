@@ -7,6 +7,7 @@ interface FloatingGenerateButtonProps {
   onClick: () => void;
   busy?: boolean;
   className?: string;
+  containerStyle?: CSSProperties;
 }
 
 export default function FloatingGenerateButton({
@@ -16,12 +17,13 @@ export default function FloatingGenerateButton({
   onClick,
   busy = false,
   className,
+  containerStyle,
 }: FloatingGenerateButtonProps) {
   const inactive = disabled || busy;
 
   return createElement(
     'div',
-    { className, style: wrapperStyle },
+    { className, style: { ...wrapperStyle, ...containerStyle } },
     createElement('style', null, animationStyles),
     createElement(
       'button',
@@ -31,10 +33,14 @@ export default function FloatingGenerateButton({
         onClick,
         style: buttonStyle(inactive),
         onMouseEnter: (event: { currentTarget: HTMLButtonElement }) => {
-          if (!inactive) event.currentTarget.style.transform = 'translateY(-3px)';
+          if (!inactive) {
+            event.currentTarget.style.transform = 'translateY(-3px)';
+            event.currentTarget.style.boxShadow = activeHoverShadow;
+          }
         },
         onMouseLeave: (event: { currentTarget: HTMLButtonElement }) => {
           event.currentTarget.style.transform = 'translateY(0)';
+          event.currentTarget.style.boxShadow = inactive ? 'none' : activeShadow;
         },
       },
       createElement('span', { style: labelStyle }, createElement('span', { style: musicIconStyle }, '♪'), children),
@@ -44,12 +50,11 @@ export default function FloatingGenerateButton({
 }
 
 const wrapperStyle: CSSProperties = {
-  position: 'fixed',
-  left: '50%',
+  position: 'sticky',
   bottom: 24,
-  transform: 'translateX(-50%)',
   zIndex: 60,
-  width: 'min(1240px, calc(100vw - 48px))',
+  width: '100%',
+  marginTop: 24,
   padding: '0 clamp(0px, 1vw, 18px)',
   pointerEvents: 'none',
 };
@@ -60,12 +65,10 @@ const animationStyles = `
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
 }
-
-@keyframes studioGenerateGlow {
-  0%, 100% { box-shadow: 0 18px 46px rgba(233,8,111,.34), inset 0 1px 0 rgba(255,255,255,.24); }
-  50% { box-shadow: 0 20px 56px rgba(233,8,111,.46), 0 0 22px rgba(217,52,180,.26), inset 0 1px 0 rgba(255,255,255,.3); }
-}
 `;
+
+const activeShadow = '0 18px 46px rgba(233,8,111,.34), inset 0 1px 0 rgba(255,255,255,.24)';
+const activeHoverShadow = '0 20px 56px rgba(233,8,111,.48), 0 0 22px rgba(217,52,180,.26), inset 0 1px 0 rgba(255,255,255,.3)';
 
 const labelStyle: CSSProperties = {
   minWidth: 0,
@@ -108,11 +111,9 @@ function buttonStyle(disabled: boolean): CSSProperties {
     color: disabled ? '#8a8d94' : '#fff',
     fontFamily: 'var(--hc-font)',
     cursor: disabled ? 'not-allowed' : 'pointer',
-    boxShadow: disabled
-      ? 'none'
-      : '0 18px 46px rgba(233,8,111,.34), inset 0 1px 0 rgba(255,255,255,.24)',
-    transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s ease',
-    animation: disabled ? 'none' : 'studioGenerateGradient 4.8s ease-in-out infinite, studioGenerateGlow 2.8s ease-in-out infinite',
+    boxShadow: disabled ? 'none' : activeShadow,
+    transition: 'transform 0.12s ease-out, box-shadow 0.12s ease-out',
+    animation: disabled ? 'none' : 'studioGenerateGradient 4.8s ease-in-out infinite',
     display: 'grid',
     gridTemplateColumns: 'minmax(0, 1fr) auto',
     alignItems: 'center',

@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import AudioUploader from './AudioUploader';
 import WaveformVisualizer from './WaveformVisualizer';
 import ArrangementParamsEditor from './ArrangementParamsEditor';
+import FloatingGenerateButton from '@/components/studio/FloatingGenerateButton';
 import { buildArrangementPrompt } from '@/lib/audio/buildArrangementPrompt';
 import { validateLyricsStructure } from '@/lib/audio/validateLyricsStructure';
 import { terminateWorker } from '@/lib/audio/fileToBase64';
@@ -740,10 +741,8 @@ export default function AudioUploadTab() {
             params={params}
             onChange={setParams}
             extractedLyrics={extractedLyrics}
-            onGenerate={handleGenerate}
             isGenerating={isGenerating}
             disabled={paramsDisabled}
-            creditLabel={`${CREDITS_COST.arrangement_generation} 积分`}
             coverMode={coverMode}
             onCoverModeChange={setCoverMode}
           />
@@ -865,6 +864,16 @@ export default function AudioUploadTab() {
             </div>
           )}
         </div>
+
+        <FloatingGenerateButton
+          onClick={handleGenerate}
+          disabled={paramsDisabled || isGenerating}
+          busy={isGenerating}
+          creditLabel={`${CREDITS_COST.arrangement_generation} 积分`}
+          containerStyle={{ gridColumn: '1 / -1' }}
+        >
+          {isGenerating ? '生成中...' : '生成音乐'}
+        </FloatingGenerateButton>
       </div>
 
       {/* Generation Progress (Task 8.1) */}

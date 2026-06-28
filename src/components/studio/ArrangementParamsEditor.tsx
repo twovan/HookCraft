@@ -3,16 +3,13 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { ArrangementParams } from '@/types/arrangement';
-import FloatingGenerateButton from '@/components/studio/FloatingGenerateButton';
 
 export interface ArrangementParamsEditorProps {
   params: ArrangementParams;
   onChange: (params: ArrangementParams) => void;
   extractedLyrics: string | null;
-  onGenerate: () => void;
   isGenerating: boolean;
   disabled: boolean;
-  creditLabel: string;
   coverMode: 'one-step' | 'two-step';
   onCoverModeChange: (mode: 'one-step' | 'two-step') => void;
 }
@@ -33,10 +30,8 @@ export default function ArrangementParamsEditor({
   params,
   onChange,
   extractedLyrics,
-  onGenerate,
   isGenerating,
   disabled,
-  creditLabel,
   coverMode,
   onCoverModeChange,
 }: ArrangementParamsEditorProps) {
@@ -210,15 +205,6 @@ export default function ArrangementParamsEditor({
           </div>
         )}
       </div>
-
-      <FloatingGenerateButton
-        onClick={onGenerate}
-        disabled={disabled || isGenerating}
-        busy={isGenerating}
-        creditLabel={creditLabel}
-      >
-        {isGenerating ? '生成中...' : '生成音乐'}
-      </FloatingGenerateButton>
     </div>
   );
 }

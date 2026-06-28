@@ -510,7 +510,7 @@ export default function StudioPageClient({
         minHeight: '100vh',
         background: 'var(--hc-bg)',
         position: 'relative',
-        paddingBottom: '140px',
+        paddingBottom: '80px',
       }}
       className="studio-page"
     >

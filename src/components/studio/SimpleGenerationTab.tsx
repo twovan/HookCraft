@@ -247,14 +247,6 @@ export default function SimpleGenerationTab() {
             </div>
           )}
 
-          <FloatingGenerateButton
-            onClick={handleGenerate}
-            disabled={isGenerating || isSensitivityLoading || isSubmitted}
-            busy={isGenerating || isSensitivityLoading}
-            creditLabel={`${CREDITS_COST.cover_generation} 积分`}
-          >
-            {isSensitivityLoading ? '安全检查中...' : isGenerating ? '提交生成任务中...' : isSubmitted ? '任务已提交' : '开始生成'}
-          </FloatingGenerateButton>
         </div>
 
         <aside style={simpleSideStyle}>
@@ -282,6 +274,16 @@ export default function SimpleGenerationTab() {
             生成提交成功后会进入「我的作品」，音频完成时自动补齐播放器。
           </div>
         </aside>
+
+        <FloatingGenerateButton
+          onClick={handleGenerate}
+          disabled={isGenerating || isSensitivityLoading || isSubmitted}
+          busy={isGenerating || isSensitivityLoading}
+          creditLabel={`${CREDITS_COST.cover_generation} 积分`}
+          containerStyle={{ gridColumn: '1 / -1' }}
+        >
+          {isSensitivityLoading ? '安全检查中...' : isGenerating ? '提交生成任务中...' : isSubmitted ? '任务已提交' : '开始生成'}
+        </FloatingGenerateButton>
       </section>
 
       <SensitivityConfirmDialog
