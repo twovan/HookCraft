@@ -22,6 +22,7 @@ export default function FloatingGenerateButton({
   return createElement(
     'div',
     { className, style: wrapperStyle },
+    createElement('style', null, animationStyles),
     createElement(
       'button',
       {
@@ -52,6 +53,19 @@ const wrapperStyle: CSSProperties = {
   padding: '0 clamp(0px, 1vw, 18px)',
   pointerEvents: 'none',
 };
+
+const animationStyles = `
+@keyframes studioGenerateGradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes studioGenerateGlow {
+  0%, 100% { box-shadow: 0 18px 46px rgba(233,8,111,.34), inset 0 1px 0 rgba(255,255,255,.24); }
+  50% { box-shadow: 0 20px 56px rgba(233,8,111,.46), 0 0 22px rgba(217,52,180,.26), inset 0 1px 0 rgba(255,255,255,.3); }
+}
+`;
 
 const labelStyle: CSSProperties = {
   minWidth: 0,
@@ -90,6 +104,7 @@ function buttonStyle(disabled: boolean): CSSProperties {
     borderRadius: 999,
     border: 'none',
     background: disabled ? '#26272b' : 'linear-gradient(90deg, #e9086f, #d934b4)',
+    backgroundSize: disabled ? '100% 100%' : '220% 100%',
     color: disabled ? '#8a8d94' : '#fff',
     fontFamily: 'var(--hc-font)',
     cursor: disabled ? 'not-allowed' : 'pointer',
@@ -97,6 +112,7 @@ function buttonStyle(disabled: boolean): CSSProperties {
       ? 'none'
       : '0 18px 46px rgba(233,8,111,.34), inset 0 1px 0 rgba(255,255,255,.24)',
     transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s ease',
+    animation: disabled ? 'none' : 'studioGenerateGradient 4.8s ease-in-out infinite, studioGenerateGlow 2.8s ease-in-out infinite',
     display: 'grid',
     gridTemplateColumns: 'minmax(0, 1fr) auto',
     alignItems: 'center',
