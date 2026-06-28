@@ -8,7 +8,7 @@ function getButton(element: any) {
 }
 
 describe('FloatingGenerateButton', () => {
-  it('renders as a sticky wide pill with the credit cost visible', () => {
+  it('renders as a sticky wide button with the credit cost visible', () => {
     const element = FloatingGenerateButton({
       children: '开始生成',
       creditLabel: '20 积分',
@@ -20,7 +20,7 @@ describe('FloatingGenerateButton', () => {
     expect(element.props.style.position).toBe('sticky');
     expect(element.props.style.bottom).toBe(24);
     expect(element.props.style.width).toBe('100%');
-    expect(button.props.style.borderRadius).toBe(999);
+    expect(button.props.style.borderRadius).toBe(16);
     expect(button.props.children[1].props.children).toContain('20 积分');
   });
 
