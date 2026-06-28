@@ -89,10 +89,8 @@ function buttonStyle(disabled: boolean): CSSProperties {
     padding: '0 clamp(18px, 3vw, 30px)',
     borderRadius: 999,
     border: 'none',
-    background: disabled
-      ? 'linear-gradient(90deg, rgba(255,255,255,.13), rgba(255,255,255,.08))'
-      : 'linear-gradient(90deg, #e9086f, #d934b4)',
-    color: disabled ? 'var(--hc-text-weak)' : '#fff',
+    background: disabled ? '#26272b' : 'linear-gradient(90deg, #e9086f, #d934b4)',
+    color: disabled ? '#8a8d94' : '#fff',
     fontFamily: 'var(--hc-font)',
     cursor: disabled ? 'not-allowed' : 'pointer',
     boxShadow: disabled
@@ -118,8 +116,8 @@ function creditStyle(disabled: boolean): CSSProperties {
     padding: '0 13px',
     borderRadius: 999,
     border: '1px solid rgba(255,255,255,.22)',
-    background: disabled ? 'rgba(0,0,0,.12)' : 'rgba(0,0,0,.2)',
-    color: disabled ? 'var(--hc-text-weak)' : 'rgba(255,255,255,.92)',
+    background: disabled ? '#1b1c20' : 'rgba(0,0,0,.2)',
+    color: disabled ? '#a5a8af' : 'rgba(255,255,255,.92)',
     fontSize: 12,
     fontWeight: 900,
     whiteSpace: 'nowrap',

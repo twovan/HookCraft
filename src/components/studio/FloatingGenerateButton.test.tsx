@@ -15,4 +15,15 @@ describe('FloatingGenerateButton', () => {
     expect(element.props.children.props.style.borderRadius).toBe(999);
     expect(element.props.children.props.children[1].props.children).toContain('20 积分');
   });
+
+  it('uses an opaque disabled background', () => {
+    const element = FloatingGenerateButton({
+      children: '开始生成',
+      creditLabel: '20 积分',
+      disabled: true,
+      onClick: () => undefined,
+    }) as any;
+
+    expect(element.props.children.props.style.background).toBe('#26272b');
+  });
 });
