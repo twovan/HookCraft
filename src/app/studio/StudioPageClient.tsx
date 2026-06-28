@@ -224,6 +224,32 @@ export default function StudioPageClient({
 
   const creditsExhaustedPaid = isPaid && isExhausted;
   const previewsExhaustedFree = !isPaid && previewCount !== null && previewCount.remaining < 1;
+  const templateGenerateMissingSteps = (() => {
+    const steps: string[] = [];
+    if (templateStudioLoading) steps.push('请等待创作配置加载');
+    if (!selectedTemplate && !prompt.trim()) steps.push('请选择模板或填写生成描述');
+    if (!canGenerate) {
+      const beforeCreditChecks = steps.length;
+      if (isPaid && credits !== null && credits.totalAvailable < totalCost) {
+        steps.push('请补充积分');
+      }
+      if (!isPaid && previewCount !== null && previewCount.remaining < 1) {
+        steps.push('请补充预览次数');
+      }
+      if (steps.length === beforeCreditChecks && !templateStudioLoading) {
+        steps.push('请检查创作额度');
+      }
+    }
+    return Array.from(new Set(steps));
+  })();
+  const templateGenerateButtonDisabled = isGenerating || isSensitivityLoading || templateGenerateMissingSteps.length > 0;
+  const templateGenerateButtonText = isGenerating
+    ? '生成中...'
+    : isSensitivityLoading
+      ? '检测中...'
+      : templateGenerateMissingSteps.length > 0
+        ? `开始创作（${templateGenerateMissingSteps.join('，')}）`
+        : '开始创作';
 
   const tabButtonStyle = (tab: StudioTab): React.CSSProperties => {
     const active = activeTab === tab;
@@ -1095,17 +1121,17 @@ export default function StudioPageClient({
 
           <FloatingGenerateButton
             onClick={handleGenerate}
-            disabled={templateStudioLoading || !canGenerate || isGenerating || isSensitivityLoading || (!selectedTemplate && !prompt.trim())}
+            disabled={templateGenerateButtonDisabled}
             busy={isGenerating || isSensitivityLoading}
             creditLabel={
               templateStudioLoading
                 ? '正在同步模板与额度'
                 : isPaid
                   ? `${totalCost} 积分 · 剩余 ${credits?.totalAvailable ?? 0}`
-                  : `1 次预览 · 剩余 ${previewCount?.remaining ?? 0} 次`
+                : `1 次预览 · 剩余 ${previewCount?.remaining ?? 0} 次`
             }
           >
-            {templateStudioLoading ? '正在加载创作配置...' : isGenerating ? '生成中...' : isSensitivityLoading ? '检测中...' : '开始 AI 创作'}
+            {templateGenerateButtonText}
           </FloatingGenerateButton>
 
           {/* Credits exhausted messages */}

@@ -15,6 +15,6 @@ describe('AdvancedArrangementTab layout', () => {
     expect(source).toContain('添加伴奏说明');
     expect(source).toContain('添加伴奏参数');
     expect(source).toContain('创建添加伴奏任务');
-    expect(source).toContain('开始添加伴奏');
+    expect(source).toContain('开始创作');
   });
 });

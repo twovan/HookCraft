@@ -485,6 +485,32 @@ export default function AudioUploadTab() {
   const paramsDisabled = coverMode === 'one-step'
     ? (uploadStatus !== 'ready') || isGenerating
     : (!isPreprocessed) || isGenerating;
+  const generateMissingSteps = (() => {
+    const steps: string[] = [];
+    if (uploadStatus !== 'ready') {
+      steps.push('请上传参考音频');
+    } else if (coverMode === 'two-step' && (!isPreprocessed || !coverFeatureId)) {
+      steps.push('请完成音频预处理');
+    }
+
+    const promptLength = params.prompt.trim().length;
+    if (promptLength === 0) {
+      steps.push('请填写风格描述');
+    } else if (promptLength < 10) {
+      steps.push('风格描述至少 10 个字符');
+    } else if (coverMode === 'one-step' && promptLength > 300) {
+      steps.push('风格描述不超过 300 个字符');
+    }
+
+    if (!isOnline) steps.push('请检查网络连接');
+    return steps;
+  })();
+  const generateButtonDisabled = isGenerating || generateMissingSteps.length > 0;
+  const generateButtonText = isGenerating
+    ? '生成中...'
+    : generateMissingSteps.length > 0
+      ? `开始创作（${generateMissingSteps.join('，')}）`
+      : '开始创作';
   const isCreditError = generationError?.includes('额度余额不足') ?? false;
 
   return (
@@ -867,12 +893,12 @@ export default function AudioUploadTab() {
 
         <FloatingGenerateButton
           onClick={handleGenerate}
-          disabled={paramsDisabled || isGenerating}
+          disabled={generateButtonDisabled}
           busy={isGenerating}
           creditLabel={`${CREDITS_COST.arrangement_generation} 积分`}
           containerStyle={{ gridColumn: '1 / -1' }}
         >
-          {isGenerating ? '生成中...' : '生成音乐'}
+          {generateButtonText}
         </FloatingGenerateButton>
       </div>
 

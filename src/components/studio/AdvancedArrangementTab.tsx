@@ -231,7 +231,7 @@ export default function AdvancedArrangementTab({
     if (usesSelectedTemplate && !selectedTemplate) return '请先选择一个模板';
     if (isTemplateInstrumentalVariant) {
       if (!effectiveTags.trim()) return '当前模板缺少风格标签，请先在后台完成模板分析';
-      if (!(title.trim() || templateTitle)) return '请填写作品标题';
+      if (!(title.trim() || templateTitle)) return '请填写歌曲名称';
       if (effectiveTags.length > 1000) return '风格标签不能超过 1000 个字符';
       if (title.length > 100) return '标题不能超过 100 个字符';
       if (negativeTags.length > 500) return '排除标签不能超过 500 个字符';
@@ -240,7 +240,7 @@ export default function AdvancedArrangementTab({
     if (isTemplateVariant && !effectiveStyle.trim()) return '当前模板缺少可用风格，请换一个模板';
     if (effectiveCustomMode) {
       if (!effectiveStyle.trim()) return '请填写风格描述';
-      if (!((isTemplateVariant ? title.trim() || templateTitle : title.trim()))) return '请填写作品标题';
+      if (!((isTemplateVariant ? title.trim() || templateTitle : title.trim()))) return '请填写歌曲名称';
       if (!instrumental && !prompt.trim()) return '非纯音乐模式下请填写歌词';
       if (!hidePromptField && prompt.length > 5000) return `${instrumental ? '创作描述' : '歌词'}不能超过 5000 个字符`;
     } else {
@@ -433,10 +433,29 @@ export default function AdvancedArrangementTab({
     };
   }, [showProgressOverlay]);
 
-  const canGenerate = uploadStatus === 'ready' && !isBusy && (
-    !usesSelectedTemplate ||
-    Boolean(selectedTemplate && (isTemplateInstrumentalVariant || effectiveStyle.trim()))
-  );
+  const generateMissingSteps = (() => {
+    const steps: string[] = [];
+    if (uploadStatus !== 'ready') steps.push('请上传参考音频');
+    if (usesSelectedTemplate && !selectedTemplate) steps.push('请选择模板');
+
+    if (isTemplateInstrumentalVariant) {
+      if (!effectiveTags.trim()) steps.push('请先完成模板风格分析');
+      if (!(title.trim() || templateTitle)) steps.push('请填写歌曲名称');
+    } else if (effectiveCustomMode) {
+      if (!effectiveStyle.trim()) steps.push('请填写风格描述');
+      if (!(isTemplateVariant ? title.trim() || templateTitle : title.trim())) steps.push('请填写歌曲名称');
+      if (!instrumental && !prompt.trim()) steps.push('请填写歌词');
+    } else if (!prompt.trim()) {
+      steps.push('请填写生成描述');
+    }
+
+    if (isTemplateVariant && !isTemplateInstrumentalVariant && !effectiveStyle.trim()) {
+      steps.push('请选择可用模板');
+    }
+
+    return Array.from(new Set(steps));
+  })();
+  const canGenerate = !isBusy && generateMissingSteps.length === 0;
   const resultTracks = Array.isArray(result?.tracks) ? result.tracks : [];
   const playableTracks = resultTracks.some(hasTrackAudio)
     ? resultTracks.filter(hasTrackAudio)
@@ -534,6 +553,11 @@ export default function AdvancedArrangementTab({
       : generateStatus === 'queued'
         ? '任务已提交'
         : '正在生成';
+  const generateButtonText = isBusy
+    ? progressText
+    : generateMissingSteps.length > 0
+      ? `开始创作（${generateMissingSteps.join('，')}）`
+      : '开始创作';
 
   const progressDialogText = generateStatus === 'completed' ? '生成已完成' : progressText;
   const progressDetailText = generateStatus === 'uploading'
@@ -840,7 +864,7 @@ export default function AdvancedArrangementTab({
           creditLabel={`${isTemplateInstrumentalVariant ? CREDITS_COST.add_instrumental : CREDITS_COST.cover_generation} 积分`}
           containerStyle={{ gridColumn: '1 / -1' }}
         >
-          {isBusy ? progressText : isTemplateInstrumentalVariant ? '开始添加伴奏' : isTemplateVariant ? '开始 AI 创作' : '开始高级编曲'}
+          {generateButtonText}
         </FloatingGenerateButton>
       </div>
 

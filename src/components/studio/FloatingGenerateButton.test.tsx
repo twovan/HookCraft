@@ -10,7 +10,7 @@ function getButton(element: any) {
 describe('FloatingGenerateButton', () => {
   it('renders as a sticky wide button with the credit cost visible', () => {
     const element = FloatingGenerateButton({
-      children: '开始生成',
+      children: '开始创作',
       creditLabel: '20 积分',
       disabled: false,
       onClick: () => undefined,
@@ -26,7 +26,7 @@ describe('FloatingGenerateButton', () => {
 
   it('allows callers to place it across a parent grid', () => {
     const element = FloatingGenerateButton({
-      children: '开始生成',
+      children: '开始创作',
       creditLabel: '20 积分',
       containerStyle: { gridColumn: '1 / -1' },
       onClick: () => undefined,
@@ -37,7 +37,7 @@ describe('FloatingGenerateButton', () => {
 
   it('uses an opaque disabled background', () => {
     const element = FloatingGenerateButton({
-      children: '开始生成',
+      children: '开始创作',
       creditLabel: '20 积分',
       disabled: true,
       onClick: () => undefined,
@@ -49,13 +49,13 @@ describe('FloatingGenerateButton', () => {
 
   it('animates the enabled button without animating disabled state', () => {
     const enabled = FloatingGenerateButton({
-      children: '开始生成',
+      children: '开始创作',
       creditLabel: '20 积分',
       disabled: false,
       onClick: () => undefined,
     }) as any;
     const disabled = FloatingGenerateButton({
-      children: '开始生成',
+      children: '开始创作',
       creditLabel: '20 积分',
       disabled: true,
       onClick: () => undefined,
@@ -71,7 +71,7 @@ describe('FloatingGenerateButton', () => {
 
   it('uses the site lime and cyan palette for the enabled state', () => {
     const element = FloatingGenerateButton({
-      children: '开始生成',
+      children: '开始创作',
       creditLabel: '20 积分',
       disabled: false,
       onClick: () => undefined,
@@ -84,7 +84,7 @@ describe('FloatingGenerateButton', () => {
 
   it('restores hover transform immediately on mouse leave', () => {
     const element = FloatingGenerateButton({
-      children: '开始生成',
+      children: '开始创作',
       creditLabel: '20 积分',
       onClick: () => undefined,
     }) as any;

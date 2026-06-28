@@ -55,6 +55,17 @@ export default function SimpleGenerationTab() {
     reset: resetSensitivity,
   } = useSensitivityCheck();
   const isSensitivityLoading = sensitivityStatus === 'loading';
+  const generateMissingSteps = prompt.trim() ? [] : ['请填写生成描述'];
+  const generateButtonDisabled = isGenerating || isSensitivityLoading || isSubmitted || generateMissingSteps.length > 0;
+  const generateButtonText = isSensitivityLoading
+    ? '安全检查中...'
+    : isGenerating
+      ? '提交生成任务中...'
+      : isSubmitted
+        ? '任务已提交'
+        : generateMissingSteps.length > 0
+          ? `开始创作（${generateMissingSteps.join('，')}）`
+          : '开始创作';
 
   const submitGeneration = async (generationPrompt: string) => {
     const trimmed = generationPrompt.trim();
@@ -277,12 +288,12 @@ export default function SimpleGenerationTab() {
 
         <FloatingGenerateButton
           onClick={handleGenerate}
-          disabled={isGenerating || isSensitivityLoading || isSubmitted}
+          disabled={generateButtonDisabled}
           busy={isGenerating || isSensitivityLoading}
           creditLabel={`${CREDITS_COST.cover_generation} 积分`}
           containerStyle={{ gridColumn: '1 / -1' }}
         >
-          {isSensitivityLoading ? '安全检查中...' : isGenerating ? '提交生成任务中...' : isSubmitted ? '任务已提交' : '开始生成'}
+          {generateButtonText}
         </FloatingGenerateButton>
       </section>
 
