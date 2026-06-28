@@ -552,7 +552,7 @@ export default function AdvancedArrangementTab({
         display: 'grid',
         gridTemplateColumns: usesSelectedTemplate ? 'minmax(0, 1fr) minmax(380px, 430px)' : 'minmax(0, 0.9fr) minmax(0, 1.1fr)',
         gap: usesSelectedTemplate ? 18 : 32,
-        alignItems: 'start',
+        alignItems: 'stretch',
       }}>
         <section style={panelStyle}>
           {templatePicker && (
@@ -1250,6 +1250,7 @@ const panelStyle: CSSProperties = {
   border: '1px solid rgba(255,255,255,0.105)',
   boxShadow: '0 18px 48px rgba(0,0,0,.24)',
   minWidth: 0,
+  height: '100%',
 };
 
 const sectionHeaderStyle: CSSProperties = {
