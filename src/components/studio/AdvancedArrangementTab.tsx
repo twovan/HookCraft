@@ -14,7 +14,17 @@ type GenerateStatus = 'idle' | 'uploading' | 'queued' | 'generating' | 'complete
 type UploadPhase = 'idle' | 'signing' | 'uploading' | 'uploaded' | 'creating';
 
 const FIXED_MODEL = 'V5_5';
-const LYRIC_STRUCTURE_TAGS = ['[Intro]', '[Verse]', '[Pre Chorus]', '[Chorus]', '[Bridge]', '[Outro]', '[Interlude]', '[Hook]', '[Inst]'];
+const LYRIC_STRUCTURE_TAGS = [
+  { label: '主歌', value: '[Verse]' },
+  { label: '副歌', value: '[Chorus]' },
+  { label: '预副歌', value: '[Pre Chorus]' },
+  { label: '桥段', value: '[Bridge]' },
+  { label: '前奏', value: '[Intro]' },
+  { label: '尾奏', value: '[Outro]' },
+  { label: '间奏', value: '[Interlude]' },
+  { label: 'Hook', value: '[Hook]' },
+  { label: '纯音乐', value: '[Inst]' },
+];
 
 const STATUS_TEXT: Record<string, string> = {
   PENDING: '任务排队中',
@@ -53,20 +63,31 @@ interface GeneratedTrack {
   duration?: number;
 }
 
+type TemplateCreationMode = 'song' | 'instrumental';
+
 interface AdvancedArrangementTabProps {
-  variant?: 'advanced' | 'template' | 'templateInstrumental';
+  variant?: 'advanced' | 'template' | 'templateInstrumental' | 'templateUnified';
   selectedTemplate?: Template | null;
   templatePicker?: ReactNode;
+  templateModeDefault?: TemplateCreationMode;
 }
 
 export default function AdvancedArrangementTab({
   variant = 'advanced',
   selectedTemplate = null,
   templatePicker,
+  templateModeDefault = 'song',
 }: AdvancedArrangementTabProps) {
   const router = useRouter();
-  const isTemplateVariant = variant === 'template';
-  const isTemplateInstrumentalVariant = variant === 'templateInstrumental';
+  const [templateCreationMode, setTemplateCreationMode] = useState<TemplateCreationMode>(templateModeDefault);
+  const isTemplateUnifiedVariant = variant === 'templateUnified';
+  const effectiveVariant = isTemplateUnifiedVariant
+    ? templateCreationMode === 'instrumental'
+      ? 'templateInstrumental'
+      : 'template'
+    : variant;
+  const isTemplateVariant = effectiveVariant === 'template';
+  const isTemplateInstrumentalVariant = effectiveVariant === 'templateInstrumental';
   const usesSelectedTemplate = isTemplateVariant || isTemplateInstrumentalVariant;
   const templateStyle = getTemplateStyle(selectedTemplate);
   const templateAdvancedTags = getTemplateAdvancedTags(selectedTemplate);
@@ -106,6 +127,11 @@ export default function AdvancedArrangementTab({
   const effectiveStyle = lockedStyle ?? style;
   const effectiveTags = templateAdvancedTags;
   const showTemplateInstrumentalTagsField = false;
+
+  useEffect(() => {
+    if (!isTemplateUnifiedVariant) return;
+    setTemplateCreationMode(templateModeDefault);
+  }, [isTemplateUnifiedVariant, templateModeDefault]);
 
   useEffect(() => {
     if (!usesSelectedTemplate) return;
@@ -522,7 +548,7 @@ export default function AdvancedArrangementTab({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <div style={{
         display: 'grid',
-        gridTemplateColumns: usesSelectedTemplate ? 'minmax(0, 1fr) minmax(360px, 420px)' : 'minmax(0, 0.9fr) minmax(0, 1.1fr)',
+        gridTemplateColumns: usesSelectedTemplate ? 'minmax(0, 1fr) minmax(380px, 430px)' : 'minmax(0, 0.9fr) minmax(0, 1.1fr)',
         gap: usesSelectedTemplate ? 18 : 32,
         alignItems: 'start',
       }}>
@@ -568,32 +594,6 @@ export default function AdvancedArrangementTab({
             <WaveformVisualizer file={audioFile} />
           )}
 
-          {effectiveCustomMode && !instrumental && !isTemplateInstrumentalVariant && (
-            <div style={lyricTagPanelStyle}>
-              <div style={lyricTagHeaderStyle}>
-                <span style={{ ...labelStyle, color: '#e8e8f0' }}>歌词结构标签</span>
-                <span style={lyricTagHintStyle}>点击插入右侧歌词</span>
-              </div>
-              <div style={lyricTagGridStyle}>
-                {LYRIC_STRUCTURE_TAGS.map((tag) => (
-                  <button
-                    key={tag}
-                    type="button"
-                    disabled={isBusy}
-                    onClick={() => insertLyricTag(tag)}
-                    style={{
-                      ...lyricTagButtonStyle,
-                      opacity: isBusy ? 0.55 : 1,
-                      cursor: isBusy ? 'not-allowed' : 'pointer',
-                    }}
-                  >
-                    {tag}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
           <div style={hintBoxStyle}>
             <div style={{ color: '#e8e8f0', fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
               {isTemplateInstrumentalVariant ? '模板伴奏说明' : isTemplateVariant ? '模板编曲说明' : '上传与参考说明'}
@@ -611,6 +611,37 @@ export default function AdvancedArrangementTab({
           <div style={sectionHeaderStyle}>
             <h2 style={titleStyle}>{isTemplateInstrumentalVariant ? '模板伴奏参数' : isTemplateVariant ? '模板编曲参数' : '高级编曲参数'}</h2>
           </div>
+
+          {isTemplateUnifiedVariant && (
+            <div style={templateCreationSwitchStyle}>
+              <ModeButton
+                active={templateCreationMode === 'song'}
+                disabled={isBusy}
+                onClick={() => {
+                  setTemplateCreationMode('song');
+                  setError(null);
+                  setResult(null);
+                  setGenerateStatus('idle');
+                }}
+              >
+                音频改编
+              </ModeButton>
+              <ModeButton
+                active={templateCreationMode === 'instrumental'}
+                disabled={isBusy}
+                onClick={() => {
+                  setTemplateCreationMode('instrumental');
+                  setInstrumental(false);
+                  setPrompt('');
+                  setError(null);
+                  setResult(null);
+                  setGenerateStatus('idle');
+                }}
+              >
+                添加伴奏
+              </ModeButton>
+            </div>
+          )}
 
           {!usesSelectedTemplate && (
             <div style={modeRowStyle}>
@@ -706,7 +737,42 @@ export default function AdvancedArrangementTab({
             <label style={fieldStyle}>
               <span style={fieldHeaderStyle}>
                 <span style={!instrumental ? requiredLabelStyle : labelStyle}>{promptLabel}</span>
-                <span style={countTextStyle}>{prompt.length}/{effectiveCustomMode ? 5000 : 500}</span>
+                <span style={fieldHeaderActionsStyle}>
+                  {effectiveCustomMode && !instrumental && !isTemplateInstrumentalVariant && (
+                    <span className="lyric-tag-popover" style={lyricTagPopoverStyle}>
+                      <button
+                        type="button"
+                        disabled={isBusy}
+                        style={{
+                          ...lyricTagTriggerStyle,
+                          opacity: isBusy ? 0.55 : 1,
+                          cursor: isBusy ? 'not-allowed' : 'pointer',
+                        }}
+                      >
+                        段落标签
+                      </button>
+                      <span className="lyric-tag-menu" style={lyricTagMenuStyle}>
+                        {LYRIC_STRUCTURE_TAGS.map((tag) => (
+                          <button
+                            key={tag.value}
+                            type="button"
+                            disabled={isBusy}
+                            onClick={() => insertLyricTag(tag.value)}
+                            title={`插入 ${tag.value}`}
+                            style={{
+                              ...lyricTagButtonStyle,
+                              opacity: isBusy ? 0.55 : 1,
+                              cursor: isBusy ? 'not-allowed' : 'pointer',
+                            }}
+                          >
+                            {tag.label}
+                          </button>
+                        ))}
+                      </span>
+                    </span>
+                  )}
+                  <span style={countTextStyle}>{prompt.length}/{effectiveCustomMode ? 5000 : 500}</span>
+                </span>
               </span>
               <textarea
                 value={prompt}
@@ -771,13 +837,13 @@ export default function AdvancedArrangementTab({
             style={{
               width: '100%',
               marginTop: 18,
-              padding: usesSelectedTemplate ? '24px 24px' : '14px 24px',
-              minHeight: usesSelectedTemplate ? 76 : undefined,
-              borderRadius: usesSelectedTemplate ? 18 : 24,
+              padding: '0 24px',
+              minHeight: usesSelectedTemplate ? 56 : 52,
+              borderRadius: 14,
               border: 'none',
               background: canGenerate ? 'linear-gradient(135deg, var(--hc-lime), var(--hc-cyan))' : 'linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.07))',
               color: canGenerate ? '#08090c' : '#6b7280',
-              fontSize: usesSelectedTemplate ? 18 : 15,
+              fontSize: usesSelectedTemplate ? 15 : 15,
               fontWeight: 800,
               cursor: canGenerate ? 'pointer' : 'not-allowed',
               fontFamily: 'var(--hc-font)',
@@ -923,6 +989,17 @@ export default function AdvancedArrangementTab({
         @keyframes advancedArrangementSpin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
+        }
+        .lyric-tag-popover .lyric-tag-menu {
+          opacity: 0;
+          transform: translateY(6px);
+          pointer-events: none;
+        }
+        .lyric-tag-popover:hover .lyric-tag-menu,
+        .lyric-tag-popover:focus-within .lyric-tag-menu {
+          opacity: 1;
+          transform: translateY(0);
+          pointer-events: auto;
         }
       `}</style>
     </div>
@@ -1074,6 +1151,7 @@ function ModeButton({
       disabled={disabled}
       style={{
         flex: 1,
+        minWidth: 0,
         padding: '9px 12px',
         borderRadius: 10,
         border: active ? '1px solid rgba(206, 255, 53, 0.48)' : '1px solid #2a2a40',
@@ -1084,6 +1162,9 @@ function ModeButton({
         cursor: disabled ? 'not-allowed' : 'pointer',
         opacity: disabled ? 0.6 : 1,
         fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
       }}
     >
       {children}
@@ -1188,11 +1269,11 @@ function ResultMeta({ label, value }: { label: string; value: string }) {
 }
 
 const panelStyle: CSSProperties = {
-  background: 'linear-gradient(180deg, rgba(24, 26, 34, 0.96), rgba(17, 18, 23, 0.96))',
-  borderRadius: 20,
-  padding: 24,
-  border: '1px solid var(--hc-border)',
-  boxShadow: 'var(--hc-shadow)',
+  background: 'linear-gradient(180deg, rgba(255,255,255,0.048), rgba(255,255,255,0.018))',
+  borderRadius: 16,
+  padding: 22,
+  border: '1px solid rgba(255,255,255,0.105)',
+  boxShadow: '0 18px 48px rgba(0,0,0,.24)',
   minWidth: 0,
 };
 
@@ -1207,7 +1288,7 @@ const sectionHeaderStyle: CSSProperties = {
 const titleStyle: CSSProperties = {
   fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
   fontSize: 18,
-  fontWeight: 700,
+  fontWeight: 850,
   color: '#e8e8f0',
   margin: 0,
 };
@@ -1225,8 +1306,8 @@ const pillStyle: CSSProperties = {
 const modelBadgeStyle: CSSProperties = {
   fontSize: 12,
   color: '#e8e8f0',
-  background: '#12121e',
-  border: '1px solid #2a2a40',
+  background: 'rgba(7,8,11,.74)',
+  border: '1px solid rgba(255,255,255,0.1)',
   borderRadius: 10,
   padding: '9px 12px',
   whiteSpace: 'nowrap',
@@ -1240,6 +1321,14 @@ const modeRowStyle: CSSProperties = {
   marginBottom: 12,
 };
 
+const templateCreationSwitchStyle: CSSProperties = {
+  ...modeRowStyle,
+  padding: 4,
+  borderRadius: 12,
+  border: '1px solid rgba(255,255,255,0.1)',
+  background: 'rgba(6,8,12,0.54)',
+};
+
 const instrumentalSettingStyle: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
@@ -1248,8 +1337,8 @@ const instrumentalSettingStyle: CSSProperties = {
   marginBottom: 18,
   padding: '12px 14px',
   borderRadius: 12,
-  border: '1px solid #2a2a40',
-  background: '#12121e',
+  border: '1px solid rgba(255,255,255,0.1)',
+  background: 'rgba(7,8,11,.74)',
 };
 
 const templateModeNoticeStyle: CSSProperties = {
@@ -1259,7 +1348,7 @@ const templateModeNoticeStyle: CSSProperties = {
   gap: 12,
   marginBottom: 14,
   padding: '10px 12px',
-  borderRadius: 10,
+  borderRadius: 12,
   border: '1px solid rgba(206, 255, 53, 0.24)',
   background: 'rgba(206, 255, 53, 0.08)',
 };
@@ -1291,7 +1380,7 @@ function templateCoverThumbStyle(coverUrl?: string): CSSProperties {
 const hintBoxStyle: CSSProperties = {
   marginTop: 16,
   background: '#12121e',
-  border: '1px solid #2a2a40',
+  border: '1px solid rgba(255,255,255,0.1)',
   borderRadius: 12,
   padding: 16,
 };
@@ -1336,6 +1425,14 @@ const fieldHeaderStyle: CSSProperties = {
   gap: 12,
 };
 
+const fieldHeaderActionsStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'flex-end',
+  gap: 8,
+  minWidth: 0,
+};
+
 const countTextStyle: CSSProperties = {
   color: '#6b7280',
   fontSize: 11,
@@ -1344,12 +1441,51 @@ const countTextStyle: CSSProperties = {
   whiteSpace: 'nowrap',
 };
 
+const lyricTagPopoverStyle: CSSProperties = {
+  position: 'relative',
+  display: 'inline-flex',
+  alignItems: 'center',
+  flexShrink: 0,
+  paddingBottom: 8,
+  marginBottom: -8,
+};
+
+const lyricTagTriggerStyle: CSSProperties = {
+  height: 30,
+  padding: '0 13px',
+  borderRadius: 999,
+  border: '1px solid rgba(206, 255, 53, 0.42)',
+  background: 'rgba(206, 255, 53, 0.08)',
+  color: 'var(--hc-lime)',
+  fontSize: 12,
+  fontWeight: 850,
+  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+  whiteSpace: 'nowrap',
+};
+
+const lyricTagMenuStyle: CSSProperties = {
+  position: 'absolute',
+  top: 'calc(100% - 1px)',
+  right: 0,
+  zIndex: 30,
+  width: 278,
+  display: 'grid',
+  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+  gap: 8,
+  padding: 14,
+  borderRadius: 10,
+  border: '1px solid rgba(255,255,255,0.1)',
+  background: 'rgba(24, 26, 34, 0.98)',
+  boxShadow: '0 18px 44px rgba(0,0,0,0.35)',
+  transition: 'opacity 0.14s ease, transform 0.14s ease',
+};
+
 const inputStyle: CSSProperties = {
   width: '100%',
   boxSizing: 'border-box',
   borderRadius: 10,
-  border: '1px solid #2a2a40',
-  background: '#12121e',
+  border: '1px solid rgba(255,255,255,0.12)',
+  background: 'rgba(7,8,11,.86)',
   color: '#e8e8f0',
   padding: '10px 12px',
   outline: 'none',
@@ -1372,8 +1508,8 @@ const textareaStyle: CSSProperties = {
 const lockedStyleCardStyle: CSSProperties = {
   marginBottom: 14,
   borderRadius: 12,
-  border: '1px solid #2a2a40',
-  background: '#12121e',
+  border: '1px solid rgba(255,255,255,0.1)',
+  background: 'rgba(7,8,11,.74)',
   padding: 12,
 };
 
@@ -1388,43 +1524,17 @@ const lockedStyleTextStyle: CSSProperties = {
   fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
 };
 
-const lyricTagPanelStyle: CSSProperties = {
-  margin: '16px 0',
-  background: 'rgba(18, 18, 30, 0.82)',
-  border: '1px solid rgba(206, 255, 53, 0.18)',
-  borderRadius: 12,
-  padding: 14,
-};
-
-const lyricTagHeaderStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 12,
-  marginBottom: 10,
-};
-
-const lyricTagHintStyle: CSSProperties = {
-  color: '#6b7280',
-  fontSize: 11,
-  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-};
-
-const lyricTagGridStyle: CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 8,
-};
-
 const lyricTagButtonStyle: CSSProperties = {
-  padding: '5px 10px',
-  borderRadius: 7,
-  border: '1px solid rgba(206, 255, 53, 0.24)',
-  background: 'rgba(206, 255, 53, 0.08)',
-  color: '#e8e8f0',
+  height: 28,
+  borderRadius: 999,
+  border: '1px solid rgba(255,255,255,0.18)',
+  background: 'rgba(9,10,14,0.48)',
+  color: '#a8aaa3',
   fontSize: 12,
-  fontFamily: 'monospace',
+  fontWeight: 700,
+  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
   transition: 'all 0.15s ease',
+  whiteSpace: 'nowrap',
 };
 
 const sliderGridStyle: CSSProperties = {

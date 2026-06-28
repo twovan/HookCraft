@@ -1,5 +1,7 @@
 import type {
   KieAddInstrumentalRequest,
+  KieGenerateMusicRequest,
+  KieGenerateMusicStartResult,
   KieMusicTaskDetails,
   KieStemSplitDetails,
   KieStemSplitRequest,
@@ -162,6 +164,38 @@ export class KieSunoProvider {
       taskId,
       uploadUrl: input.uploadUrl,
     };
+  }
+
+  async generateMusic(input: KieGenerateMusicRequest): Promise<KieGenerateMusicStartResult> {
+    const requestBody: Record<string, unknown> = {
+      prompt: input.prompt,
+      customMode: false,
+      instrumental: input.instrumental,
+      model: input.model,
+    };
+
+    const callBackUrl = input.callBackUrl || process.env.KIE_CALLBACK_URL;
+    if (callBackUrl) {
+      requestBody.callBackUrl = callBackUrl;
+    }
+
+    const response = await fetch(`${this.baseUrl}/api/v1/generate`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    const payload = await this.parseJson<KieApiResponse<KieUploadCoverData>>(response);
+    const taskId = payload.data?.taskId;
+
+    if (!response.ok || payload.code !== 200 || !taskId) {
+      throw new Error(payload.msg || `Kie generate-music task failed (${response.status})`);
+    }
+
+    return { taskId };
   }
 
   async addInstrumental(input: KieAddInstrumentalRequest): Promise<KieUploadCoverStartResult> {

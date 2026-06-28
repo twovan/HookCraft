@@ -103,3 +103,39 @@ describe('KieSunoProvider error normalization', () => {
     expect(getKieUserFacingErrorMessage(null)).toBeNull();
   });
 });
+
+describe('KieSunoProvider generate music', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('sends a prompt-only generate-music request in non-custom mode', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      code: 200,
+      data: { taskId: 'kie-simple-task' },
+    }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const provider = new KieSunoProvider({ apiKey: 'test-key' });
+    await provider.generateMusic({
+      prompt: 'bright mandopop chorus for short video',
+      instrumental: false,
+      model: 'V5_5',
+      callBackUrl: 'https://example.com/callback',
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.kie.ai/api/v1/generate',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          prompt: 'bright mandopop chorus for short video',
+          customMode: false,
+          instrumental: false,
+          model: 'V5_5',
+          callBackUrl: 'https://example.com/callback',
+        }),
+      }),
+    );
+  });
+});

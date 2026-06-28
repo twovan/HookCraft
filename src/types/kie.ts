@@ -16,6 +16,13 @@ export interface KieUploadCoverRequest {
   callBackUrl?: string;
 }
 
+export interface KieGenerateMusicRequest {
+  prompt: string;
+  instrumental: boolean;
+  model: KieSunoModel;
+  callBackUrl?: string;
+}
+
 export interface KieAddInstrumentalRequest {
   uploadUrl: string;
   title: string;
@@ -31,6 +38,10 @@ export interface KieAddInstrumentalRequest {
 export interface KieUploadCoverStartResult {
   taskId: string;
   uploadUrl: string;
+}
+
+export interface KieGenerateMusicStartResult {
+  taskId: string;
 }
 
 export interface KieStemSplitRequest {

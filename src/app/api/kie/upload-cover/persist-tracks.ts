@@ -118,6 +118,10 @@ export async function persistCompletedCoverTracks({
     return { batchId: baseTask.batch_id || null, savedCount: 0 };
   }
 
+  if ((baseTask.credits_consumed || 0) <= 0) {
+    return { batchId: baseTask.batch_id || null, savedCount: 0 };
+  }
+
   const now = new Date().toISOString();
   const rows = await Promise.all(completedTracks.map(async (track, index) => {
     const versionNumber = index + 1;

@@ -26,6 +26,7 @@ import SensitivityConfirmDialog from '@/components/studio/SensitivityConfirmDial
 import SensitivityBlockDialog from '@/components/studio/SensitivityBlockDialog';
 import AudioUploadTab from '@/components/studio/AudioUploadTab';
 import AdvancedArrangementTab from '@/components/studio/AdvancedArrangementTab';
+import SimpleGenerationTab from '@/components/studio/SimpleGenerationTab';
 import { useSensitivityCheck } from '@/hooks/useSensitivityCheck';
 import type { Template } from '@/types/template';
 import type { VersionResult } from '@/types/generation';
@@ -154,7 +155,9 @@ export default function StudioPageClient({
       if (!res.ok) return;
       const data = normalizeStudioTabSettings(await res.json());
       setStudioTabSettings(data);
-      setActiveTab(data.defaultTab);
+      setActiveTab((current) => (
+        data.visibleTabs.includes(current) ? current : data.defaultTab
+      ));
     } catch {
       // Keep local defaults if Studio settings cannot be loaded.
     }
@@ -208,7 +211,15 @@ export default function StudioPageClient({
       : previewCount === null || creditLoading;
   const templateStudioLoading = templatesLoading || usageLoading || membershipLoading;
   const visibleStudioTabs = STUDIO_TAB_OPTIONS.filter((tab) => studioTabSettings.visibleTabs.includes(tab.id));
-  const showStudioTabs = visibleStudioTabs.length > 1;
+  const showTemplateCreationTab = studioTabSettings.visibleTabs.includes('templateArrangement') || studioTabSettings.visibleTabs.includes('templateInstrumental');
+  const templateCreationActive = activeTab === 'templateArrangement' || activeTab === 'templateInstrumental';
+  const templateCreationTabTarget: StudioTab = studioTabSettings.visibleTabs.includes('templateArrangement')
+    ? 'templateArrangement'
+    : 'templateInstrumental';
+  const visibleStudioTabCount =
+    visibleStudioTabs.filter((tab) => tab.id !== 'templateArrangement' && tab.id !== 'templateInstrumental').length +
+    (showTemplateCreationTab ? 1 : 0);
+  const showStudioTabs = visibleStudioTabCount > 1;
 
   const creditsExhaustedPaid = isPaid && isExhausted;
   const previewsExhaustedFree = !isPaid && previewCount !== null && previewCount.remaining < 1;
@@ -218,19 +229,21 @@ export default function StudioPageClient({
     return {
       display: studioTabSettings.visibleTabs.includes(tab) ? 'block' : 'none',
       flex: 1,
-      minWidth: 132,
-      padding: '12px 18px',
+      minWidth: 128,
+      minHeight: 44,
+      padding: '0 18px',
       borderRadius: 8,
       border: '1px solid transparent',
       background: active ? 'rgba(206, 255, 53, 0.12)' : 'transparent',
       color: active ? '#ceff35' : '#a8aaa3',
-      fontSize: 14,
+      fontSize: 13,
       fontWeight: 850,
       cursor: 'pointer',
       fontFamily: 'var(--hc-font)',
       transition: 'all 0.15s ease',
       boxShadow: active ? 'inset 0 0 0 1px rgba(206, 255, 53, 0.16)' : 'none',
       whiteSpace: 'nowrap',
+      lineHeight: '44px',
     };
   };
 
@@ -455,6 +468,14 @@ export default function StudioPageClient({
     }
   };
 
+  const templateCreationTabButtonStyle: React.CSSProperties = {
+    ...tabButtonStyle(templateCreationTabTarget),
+    display: showTemplateCreationTab ? 'block' : 'none',
+    background: templateCreationActive ? 'rgba(206, 255, 53, 0.12)' : 'transparent',
+    color: templateCreationActive ? '#ceff35' : '#a8aaa3',
+    boxShadow: templateCreationActive ? 'inset 0 0 0 1px rgba(206, 255, 53, 0.16)' : 'none',
+  };
+
   const renderTemplatePicker = (description: string) => (
     <div className="studio-template-picker">
       <div className="studio-template-picker-head">
@@ -509,7 +530,7 @@ export default function StudioPageClient({
         }}
       />
 
-      <div className="studio-shell-inner" style={{ position: 'relative', zIndex: 1, maxWidth: 1400, margin: '0 auto', padding: '48px clamp(20px, 4vw, 48px)' }}>
+      <div className="studio-shell-inner" style={{ position: 'relative', zIndex: 1, maxWidth: 1320, margin: '0 auto', padding: '36px clamp(20px, 3.2vw, 40px) 56px' }}>
         {/* Page Header */}
         <div className="studio-hero" style={{ marginBottom: '22px' }}>
           <h1
@@ -550,7 +571,7 @@ export default function StudioPageClient({
           style={{
             display: showStudioTabs ? 'flex' : 'none',
             gap: '6px',
-            marginBottom: '22px',
+            marginBottom: '20px',
             background: 'rgba(6,8,12,0.76)',
             borderRadius: '10px',
             padding: '5px',
@@ -558,6 +579,12 @@ export default function StudioPageClient({
             overflowX: 'auto',
           }}
         >
+          <button
+            onClick={() => setActiveTab('simple')}
+            style={tabButtonStyle('simple')}
+          >
+            简单模式
+          </button>
           <button
             onClick={() => setActiveTab('template')}
             style={tabButtonStyle('template')}
@@ -577,17 +604,16 @@ export default function StudioPageClient({
             参考编曲模式
           </button>
           <button
-            onClick={() => setActiveTab('templateArrangement')}
-            style={tabButtonStyle('templateArrangement')}
+            onClick={() => setActiveTab(templateCreationTabTarget)}
+            style={templateCreationTabButtonStyle}
           >
-            模板编曲
+            <span style={{ fontSize: 14 }}>模板创作</span>
           </button>
-          <button
-            onClick={() => setActiveTab('templateInstrumental')}
-            style={tabButtonStyle('templateInstrumental')}
-          >
-            模板伴奏
-          </button>
+        </div>
+
+        {/* Simple Generation Tab Content */}
+        <div style={{ display: activeTab === 'simple' ? 'block' : 'none' }}>
+          <SimpleGenerationTab />
         </div>
 
         {/* Template Generation Tab Content */}
@@ -1140,22 +1166,15 @@ export default function StudioPageClient({
         </div>
 
         {/* Template Arrangement Tab Content */}
-        <div style={{ display: activeTab === 'templateArrangement' ? 'block' : 'none' }}>
+        <div style={{ display: templateCreationActive ? 'block' : 'none' }}>
           <AdvancedArrangementTab
-            variant="template"
+            variant="templateUnified"
+            templateModeDefault={activeTab === 'templateInstrumental' ? 'instrumental' : 'song'}
             selectedTemplate={selectedTemplate}
             templatePicker={renderTemplatePicker('模板将作为主创作基调，选择一个模板开始创作。')}
           />
         </div>
 
-        {/* Template Instrumental Tab Content */}
-        <div style={{ display: activeTab === 'templateInstrumental' ? 'block' : 'none' }}>
-          <AdvancedArrangementTab
-            variant="templateInstrumental"
-            selectedTemplate={selectedTemplate}
-            templatePicker={renderTemplatePicker('模板解析会自动生成风格标签，默认使用 V5.5 伴奏模型。')}
-          />
-        </div>
       </div>
 
       {/* Copyright & Safety Modal */}
@@ -1271,17 +1290,17 @@ const studioPageStyles = `
   }
 
   .studio-shell-inner {
-    width: min(1400px, calc(100% - 48px));
+    width: min(1320px, calc(100% - 48px));
   }
 
   .studio-hero {
-    border: 1px solid rgba(255,255,255,.12);
-    border-radius: 18px;
-    padding: 26px;
+    border: 1px solid rgba(255,255,255,.11);
+    border-radius: 16px;
+    padding: 24px 26px;
     background:
-      linear-gradient(135deg, rgba(255,255,255,.07), transparent 34%),
-      linear-gradient(180deg, rgba(17,18,23,.72), rgba(9,10,14,.54));
-    box-shadow: var(--hc-shadow-soft);
+      linear-gradient(135deg, rgba(255,255,255,.055), transparent 38%),
+      linear-gradient(180deg, rgba(18,20,26,.78), rgba(8,9,12,.62));
+    box-shadow: 0 18px 50px rgba(0,0,0,.26);
   }
 
   .studio-hero h1 {
@@ -1293,12 +1312,14 @@ const studioPageStyles = `
   }
 
   .studio-tabbar {
-    box-shadow: var(--hc-shadow-soft);
+    box-shadow: 0 14px 38px rgba(0,0,0,.24);
     backdrop-filter: blur(16px);
   }
 
   .studio-tabbar button {
     min-height: 44px;
+    line-height: 1 !important;
+    text-align: center;
   }
 
   .studio-production-workbench {
@@ -1344,9 +1365,9 @@ const studioPageStyles = `
 
   .studio-card {
     background:
-      linear-gradient(180deg, rgba(255,255,255,.052), rgba(255,255,255,.018)) !important;
-    border-color: rgba(255,255,255,.12) !important;
-    box-shadow: var(--hc-shadow-soft) !important;
+      linear-gradient(180deg, rgba(255,255,255,.048), rgba(255,255,255,.018)) !important;
+    border-color: rgba(255,255,255,.105) !important;
+    box-shadow: 0 18px 48px rgba(0,0,0,.24) !important;
   }
 
   .studio-page section,

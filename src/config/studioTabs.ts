@@ -1,4 +1,5 @@
 export const STUDIO_TAB_OPTIONS = [
+  { id: 'simple', label: '简单模式' },
   { id: 'template', label: '模板生成' },
   { id: 'upload', label: '翻唱模式' },
   { id: 'advanced', label: '参考编曲模式' },

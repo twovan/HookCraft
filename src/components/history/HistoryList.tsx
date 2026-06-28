@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
 import SyncedLyrics from '@/components/studio/SyncedLyrics';
@@ -82,11 +82,22 @@ export default function HistoryList({
   const [editName, setEditName] = useState('');
   const [batchNames, setBatchNames] = useState<Record<string, string>>({});
   const [audioTimes, setAudioTimes] = useState<Record<string, number>>({});
+  const [now, setNow] = useState(() => Date.now());
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const audioRefs = useRef<Record<string, HTMLAudioElement>>({});
 
   const expandedBatch = batches.find((batch) => (batch.taskId || batch.batchId) === expandedTaskId);
-  const showDetail = Boolean(expandedBatchId && expandedBatch && expandedVersions);
+  const showDetail = Boolean(expandedBatchId && expandedBatch);
+
+  useEffect(() => {
+    const hasPendingAudio = (expandedVersions || []).some((version) =>
+      !version.audioUrl && version.status !== 'failed'
+    );
+    if (!hasPendingAudio) return;
+
+    const timer = window.setInterval(() => setNow(Date.now()), 10000);
+    return () => window.clearInterval(timer);
+  }, [expandedVersions]);
 
   const handleAudioPlay = (taskId: string) => {
     Object.entries(audioRefs.current).forEach(([id, el]) => {
@@ -361,6 +372,15 @@ export default function HistoryList({
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {!expandedVersions && (
+              <div style={detailLoadingStyle}>
+                <span style={pendingPulseStyle} />
+                <div>
+                  <strong>正在打开</strong>
+                  <p>请稍候...</p>
+                </div>
+              </div>
+            )}
             {(expandedVersions || []).map((version) => {
               const isSelected = version.status === 'selected';
               return (
@@ -407,26 +427,29 @@ export default function HistoryList({
                   </div>
 
                   {version.audioUrl ? (
-                    <audio
-                      ref={(el) => {
-                        if (el) audioRefs.current[version.taskId] = el;
-                      }}
-                      controls
-                      src={version.audioUrl}
-                      onTimeUpdate={(e) =>
-                        setAudioTimes((prev) => ({
-                          ...prev,
-                          [version.taskId]: (e.target as HTMLAudioElement).currentTime,
-                        }))
-                      }
-                      onPlay={() => handleAudioPlay(version.taskId)}
-                      onPause={() => {
-                        if (playingTaskId === version.taskId) setPlayingTaskId(null);
-                      }}
-                      style={{ width: '100%', height: 36, marginTop: 12 }}
-                    />
+                    <>
+                      <div style={audioReadyStyle}>音频已就绪，可以播放了</div>
+                      <audio
+                        ref={(el) => {
+                          if (el) audioRefs.current[version.taskId] = el;
+                        }}
+                        controls
+                        src={version.audioUrl}
+                        onTimeUpdate={(e) =>
+                          setAudioTimes((prev) => ({
+                            ...prev,
+                            [version.taskId]: (e.target as HTMLAudioElement).currentTime,
+                          }))
+                        }
+                        onPlay={() => handleAudioPlay(version.taskId)}
+                        onPause={() => {
+                          if (playingTaskId === version.taskId) setPlayingTaskId(null);
+                        }}
+                        style={{ width: '100%', height: 36, marginTop: 10 }}
+                      />
+                    </>
                   ) : (
-                    <div style={{ marginTop: 12, color: 'var(--hc-muted)', fontSize: 13 }}>音频加载中...</div>
+                    <PendingAudioStatus createdAt={version.createdAt} now={now} />
                   )}
 
                   {version.lyrics ? (
@@ -464,6 +487,29 @@ function formatStemCacheBadge(modes?: string[]) {
   if (hasBasic) return '基础分轨已缓存';
   if (hasPro) return '高级分轨已缓存';
   return '分轨已缓存';
+}
+
+function getPendingAudioMessage(createdAt: string, now: number) {
+  const createdTime = new Date(createdAt).getTime();
+  const elapsedMs = Number.isFinite(createdTime) ? Math.max(0, now - createdTime) : 0;
+
+  if (elapsedMs > 2 * 60 * 1000) {
+    return '生成仍在进行中。你可以先离开页面，稍后回到我的创作查看。';
+  }
+
+  return '可以先听其他作品；自动检查只更新当前详情，不会打断播放。';
+}
+
+function PendingAudioStatus({ createdAt, now }: { createdAt: string; now: number }) {
+  return (
+    <div style={pendingAudioStyle}>
+      <div style={pendingHeaderStyle}>
+        <span style={pendingPulseStyle} />
+        <strong>正在生成音频 · 自动检查中</strong>
+      </div>
+      <p style={pendingTextStyle}>{getPendingAudioMessage(createdAt, now)}</p>
+    </div>
+  );
 }
 
 function resolveStemCacheBadgeTone(modes?: string[]): 'basic' | 'pro' | 'both' | 'legacy' {
@@ -800,6 +846,58 @@ const downloadErrorStyle: CSSProperties = {
   marginBottom: 14,
 };
 
+const detailLoadingStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 12,
+  border: '1px solid rgba(206, 255, 53, 0.18)',
+  borderRadius: 14,
+  background: 'rgba(206, 255, 53, 0.06)',
+  padding: 14,
+  color: 'var(--hc-text)',
+};
+
+const pendingAudioStyle: CSSProperties = {
+  marginTop: 12,
+  border: '1px solid rgba(206, 255, 53, 0.2)',
+  borderRadius: 12,
+  background: 'rgba(206, 255, 53, 0.06)',
+  padding: '12px 13px',
+};
+
+const pendingHeaderStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  color: 'var(--hc-text)',
+  fontSize: 13,
+  fontWeight: 900,
+};
+
+const pendingPulseStyle: CSSProperties = {
+  flex: '0 0 auto',
+  width: 9,
+  height: 9,
+  borderRadius: 999,
+  background: 'var(--hc-lime)',
+  boxShadow: '0 0 0 0 rgba(206, 255, 53, 0.34)',
+  animation: 'history-pulse 1.6s ease-out infinite',
+};
+
+const pendingTextStyle: CSSProperties = {
+  margin: '8px 0 0 17px',
+  color: 'var(--hc-muted)',
+  fontSize: 12,
+  lineHeight: 1.6,
+};
+
+const audioReadyStyle: CSSProperties = {
+  marginTop: 12,
+  color: 'var(--hc-lime)',
+  fontSize: 12,
+  fontWeight: 900,
+};
+
 const selectedBadgeStyle: CSSProperties = {
   borderRadius: 999,
   background: 'rgba(206, 255, 53, 0.12)',
@@ -849,6 +947,12 @@ const failedMessageStyle: CSSProperties = {
 function HistoryListStyles() {
   return (
     <style>{`
+      @keyframes history-pulse {
+        0% { box-shadow: 0 0 0 0 rgba(206, 255, 53, 0.34); opacity: 1; }
+        80% { box-shadow: 0 0 0 9px rgba(206, 255, 53, 0); opacity: 0.62; }
+        100% { box-shadow: 0 0 0 0 rgba(206, 255, 53, 0); opacity: 1; }
+      }
+
       @media (max-width: 920px) {
         .history-list-grid {
           grid-template-columns: minmax(0, 1fr) !important;
