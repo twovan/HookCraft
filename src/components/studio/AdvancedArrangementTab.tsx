@@ -14,7 +14,17 @@ type GenerateStatus = 'idle' | 'uploading' | 'queued' | 'generating' | 'complete
 type UploadPhase = 'idle' | 'signing' | 'uploading' | 'uploaded' | 'creating';
 
 const FIXED_MODEL = 'V5_5';
-const LYRIC_STRUCTURE_TAGS = ['[Intro]', '[Verse]', '[Pre Chorus]', '[Chorus]', '[Bridge]', '[Outro]', '[Interlude]', '[Hook]', '[Inst]'];
+const LYRIC_STRUCTURE_TAGS = [
+  { label: '主歌', value: '[Verse]' },
+  { label: '副歌', value: '[Chorus]' },
+  { label: '预副歌', value: '[Pre Chorus]' },
+  { label: '桥段', value: '[Bridge]' },
+  { label: '前奏', value: '[Intro]' },
+  { label: '尾奏', value: '[Outro]' },
+  { label: '间奏', value: '[Interlude]' },
+  { label: 'Hook', value: '[Hook]' },
+  { label: '纯音乐', value: '[Inst]' },
+];
 
 const STATUS_TEXT: Record<string, string> = {
   PENDING: '任务排队中',
@@ -584,32 +594,6 @@ export default function AdvancedArrangementTab({
             <WaveformVisualizer file={audioFile} />
           )}
 
-          {effectiveCustomMode && !instrumental && !isTemplateInstrumentalVariant && (
-            <div style={lyricTagPanelStyle}>
-              <div style={lyricTagHeaderStyle}>
-                <span style={{ ...labelStyle, color: '#e8e8f0' }}>歌词结构标签</span>
-                <span style={lyricTagHintStyle}>点击插入右侧歌词</span>
-              </div>
-              <div style={lyricTagGridStyle}>
-                {LYRIC_STRUCTURE_TAGS.map((tag) => (
-                  <button
-                    key={tag}
-                    type="button"
-                    disabled={isBusy}
-                    onClick={() => insertLyricTag(tag)}
-                    style={{
-                      ...lyricTagButtonStyle,
-                      opacity: isBusy ? 0.55 : 1,
-                      cursor: isBusy ? 'not-allowed' : 'pointer',
-                    }}
-                  >
-                    {tag}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
           <div style={hintBoxStyle}>
             <div style={{ color: '#e8e8f0', fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
               {isTemplateInstrumentalVariant ? '模板伴奏说明' : isTemplateVariant ? '模板编曲说明' : '上传与参考说明'}
@@ -753,7 +737,42 @@ export default function AdvancedArrangementTab({
             <label style={fieldStyle}>
               <span style={fieldHeaderStyle}>
                 <span style={!instrumental ? requiredLabelStyle : labelStyle}>{promptLabel}</span>
-                <span style={countTextStyle}>{prompt.length}/{effectiveCustomMode ? 5000 : 500}</span>
+                <span style={fieldHeaderActionsStyle}>
+                  {effectiveCustomMode && !instrumental && !isTemplateInstrumentalVariant && (
+                    <span className="lyric-tag-popover" style={lyricTagPopoverStyle}>
+                      <button
+                        type="button"
+                        disabled={isBusy}
+                        style={{
+                          ...lyricTagTriggerStyle,
+                          opacity: isBusy ? 0.55 : 1,
+                          cursor: isBusy ? 'not-allowed' : 'pointer',
+                        }}
+                      >
+                        段落标签
+                      </button>
+                      <span className="lyric-tag-menu" style={lyricTagMenuStyle}>
+                        {LYRIC_STRUCTURE_TAGS.map((tag) => (
+                          <button
+                            key={tag.value}
+                            type="button"
+                            disabled={isBusy}
+                            onClick={() => insertLyricTag(tag.value)}
+                            title={`插入 ${tag.value}`}
+                            style={{
+                              ...lyricTagButtonStyle,
+                              opacity: isBusy ? 0.55 : 1,
+                              cursor: isBusy ? 'not-allowed' : 'pointer',
+                            }}
+                          >
+                            {tag.label}
+                          </button>
+                        ))}
+                      </span>
+                    </span>
+                  )}
+                  <span style={countTextStyle}>{prompt.length}/{effectiveCustomMode ? 5000 : 500}</span>
+                </span>
               </span>
               <textarea
                 value={prompt}
@@ -970,6 +989,17 @@ export default function AdvancedArrangementTab({
         @keyframes advancedArrangementSpin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
+        }
+        .lyric-tag-popover .lyric-tag-menu {
+          opacity: 0;
+          transform: translateY(6px);
+          pointer-events: none;
+        }
+        .lyric-tag-popover:hover .lyric-tag-menu,
+        .lyric-tag-popover:focus-within .lyric-tag-menu {
+          opacity: 1;
+          transform: translateY(0);
+          pointer-events: auto;
         }
       `}</style>
     </div>
@@ -1395,12 +1425,59 @@ const fieldHeaderStyle: CSSProperties = {
   gap: 12,
 };
 
+const fieldHeaderActionsStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'flex-end',
+  gap: 8,
+  minWidth: 0,
+};
+
 const countTextStyle: CSSProperties = {
   color: '#6b7280',
   fontSize: 11,
   fontWeight: 600,
   fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
   whiteSpace: 'nowrap',
+};
+
+const lyricTagPopoverStyle: CSSProperties = {
+  position: 'relative',
+  display: 'inline-flex',
+  alignItems: 'center',
+  flexShrink: 0,
+  paddingBottom: 8,
+  marginBottom: -8,
+};
+
+const lyricTagTriggerStyle: CSSProperties = {
+  height: 30,
+  padding: '0 13px',
+  borderRadius: 999,
+  border: '1px solid rgba(206, 255, 53, 0.42)',
+  background: 'rgba(206, 255, 53, 0.08)',
+  color: 'var(--hc-lime)',
+  fontSize: 12,
+  fontWeight: 850,
+  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+  whiteSpace: 'nowrap',
+};
+
+const lyricTagMenuStyle: CSSProperties = {
+  position: 'absolute',
+  top: 'calc(100% - 1px)',
+  right: 0,
+  zIndex: 30,
+  width: 278,
+  display: 'grid',
+  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+  gap: 8,
+  padding: 14,
+  borderRadius: 10,
+  border: '1px solid rgba(255,255,255,0.1)',
+  background: 'rgba(24, 26, 34, 0.98)',
+  boxShadow: '0 18px 44px rgba(0,0,0,0.35)',
+  transition: 'opacity 0.14s ease, transform 0.14s ease',
 };
 
 const inputStyle: CSSProperties = {
@@ -1447,43 +1524,17 @@ const lockedStyleTextStyle: CSSProperties = {
   fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
 };
 
-const lyricTagPanelStyle: CSSProperties = {
-  margin: '16px 0',
-  background: 'rgba(18, 18, 30, 0.82)',
-  border: '1px solid rgba(206, 255, 53, 0.18)',
-  borderRadius: 12,
-  padding: 14,
-};
-
-const lyricTagHeaderStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 12,
-  marginBottom: 10,
-};
-
-const lyricTagHintStyle: CSSProperties = {
-  color: '#6b7280',
-  fontSize: 11,
-  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
-};
-
-const lyricTagGridStyle: CSSProperties = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: 8,
-};
-
 const lyricTagButtonStyle: CSSProperties = {
-  padding: '5px 10px',
-  borderRadius: 7,
-  border: '1px solid rgba(206, 255, 53, 0.24)',
-  background: 'rgba(206, 255, 53, 0.08)',
-  color: '#e8e8f0',
+  height: 28,
+  borderRadius: 999,
+  border: '1px solid rgba(255,255,255,0.18)',
+  background: 'rgba(9,10,14,0.48)',
+  color: '#a8aaa3',
   fontSize: 12,
-  fontFamily: 'monospace',
+  fontWeight: 700,
+  fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
   transition: 'all 0.15s ease',
+  whiteSpace: 'nowrap',
 };
 
 const sliderGridStyle: CSSProperties = {
