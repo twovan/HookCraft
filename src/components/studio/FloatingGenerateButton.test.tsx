@@ -69,6 +69,19 @@ describe('FloatingGenerateButton', () => {
     expect(disabledButton.props.style.animation).toBe('none');
   });
 
+  it('uses the site lime and cyan palette for the enabled state', () => {
+    const element = FloatingGenerateButton({
+      children: '开始生成',
+      creditLabel: '20 积分',
+      disabled: false,
+      onClick: () => undefined,
+    }) as any;
+    const button = getButton(element);
+
+    expect(button.props.style.background).toBe('linear-gradient(90deg, var(--hc-lime), var(--hc-cyan))');
+    expect(button.props.style.background).not.toContain('#e9086f');
+  });
+
   it('restores hover transform immediately on mouse leave', () => {
     const element = FloatingGenerateButton({
       children: '开始生成',

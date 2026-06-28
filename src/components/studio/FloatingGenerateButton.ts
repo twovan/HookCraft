@@ -67,8 +67,8 @@ const animationStyles = `
 }
 `;
 
-const activeShadow = '0 18px 46px rgba(233,8,111,.34), inset 0 1px 0 rgba(255,255,255,.24)';
-const activeHoverShadow = '0 20px 56px rgba(233,8,111,.48), 0 0 22px rgba(217,52,180,.26), inset 0 1px 0 rgba(255,255,255,.3)';
+const activeShadow = '0 18px 46px rgba(206,255,53,.22), 0 0 20px rgba(82,214,198,.16), inset 0 1px 0 rgba(255,255,255,.24)';
+const activeHoverShadow = '0 20px 56px rgba(206,255,53,.34), 0 0 26px rgba(82,214,198,.24), inset 0 1px 0 rgba(255,255,255,.3)';
 
 const labelStyle: CSSProperties = {
   minWidth: 0,
@@ -106,9 +106,9 @@ function buttonStyle(disabled: boolean): CSSProperties {
     padding: '0 clamp(18px, 3vw, 30px)',
     borderRadius: 999,
     border: 'none',
-    background: disabled ? '#26272b' : 'linear-gradient(90deg, #e9086f, #d934b4)',
+    background: disabled ? '#26272b' : 'linear-gradient(90deg, var(--hc-lime), var(--hc-cyan))',
     backgroundSize: disabled ? '100% 100%' : '220% 100%',
-    color: disabled ? '#8a8d94' : '#fff',
+    color: disabled ? '#8a8d94' : '#08090c',
     fontFamily: 'var(--hc-font)',
     cursor: disabled ? 'not-allowed' : 'pointer',
     boxShadow: disabled ? 'none' : activeShadow,
