@@ -598,10 +598,10 @@ export default function AdvancedArrangementTab({
 
           <div style={hintBoxStyle}>
             <div style={{ color: '#e8e8f0', fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
-              {isTemplateInstrumentalVariant ? '模板伴奏说明' : isTemplateVariant ? '模板编曲说明' : '上传与参考说明'}
+              {isTemplateInstrumentalVariant ? '添加伴奏说明' : isTemplateVariant ? '模板编曲说明' : '上传与参考说明'}
             </div>
-            <p style={hintTextStyle}>上传参考音频后，系统会先完成音频处理，再创建高级编曲任务。</p>
-            <p style={hintTextStyle}>{isTemplateInstrumentalVariant ? '模板风格会随任务自动传递，参考音频作为需要加伴奏的音频。' : isTemplateVariant ? '模板会锁定风格方向，参考音频影响旋律、情绪和声线，歌词控制最终表达。' : '参考音频仅支持 MP3/WAV，建议 6 秒到 8 分钟内；自定义模式下，非纯音乐请填写歌词，纯音乐可以补充创作描述。'}</p>
+            <p style={hintTextStyle}>{isTemplateInstrumentalVariant ? '上传参考音频后，系统会先完成音频处理，再创建添加伴奏任务。' : '上传参考音频后，系统会先完成音频处理，再创建高级编曲任务。'}</p>
+            <p style={hintTextStyle}>{isTemplateInstrumentalVariant ? '模板风格会随任务自动传递，参考音频作为需要添加伴奏的音频。' : isTemplateVariant ? '模板会锁定风格方向，参考音频影响旋律、情绪和声线，歌词控制最终表达。' : '参考音频仅支持 MP3/WAV，建议 6 秒到 8 分钟内；自定义模式下，非纯音乐请填写歌词，纯音乐可以补充创作描述。'}</p>
             {!usesSelectedTemplate && <p style={hintTextStyle}>参考音频会影响旋律、情绪和声线方向；右侧的风格、权重和歌词会控制最终改编强度。</p>}
             {audioDuration !== null && (
               <p style={hintTextStyle}>当前音频时长：{Math.round(audioDuration)} 秒</p>
@@ -611,7 +611,7 @@ export default function AdvancedArrangementTab({
 
         <section style={panelStyle}>
           <div style={sectionHeaderStyle}>
-            <h2 style={titleStyle}>{isTemplateInstrumentalVariant ? '模板伴奏参数' : isTemplateVariant ? '模板编曲参数' : '高级编曲参数'}</h2>
+            <h2 style={titleStyle}>{isTemplateInstrumentalVariant ? '添加伴奏参数' : isTemplateVariant ? '模板编曲参数' : '高级编曲参数'}</h2>
           </div>
 
           {isTemplateUnifiedVariant && (
