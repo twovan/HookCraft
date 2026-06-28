@@ -840,7 +840,7 @@ export default function AdvancedArrangementTab({
           creditLabel={`${isTemplateInstrumentalVariant ? CREDITS_COST.add_instrumental : CREDITS_COST.cover_generation} 积分`}
           containerStyle={{ gridColumn: '1 / -1' }}
         >
-          {isBusy ? progressText : isTemplateInstrumentalVariant ? '开始生成伴奏' : isTemplateVariant ? '开始 AI 创作' : '开始高级编曲'}
+          {isBusy ? progressText : isTemplateInstrumentalVariant ? '开始添加伴奏' : isTemplateVariant ? '开始 AI 创作' : '开始高级编曲'}
         </FloatingGenerateButton>
       </div>
 
