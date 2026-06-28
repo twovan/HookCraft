@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useMembershipStore } from '@/store/membershipStore';
 import { useCreditStore } from '@/store/creditStore';
 import { useMembershipPermission } from '@/hooks/useMembershipPermission';
-import { calculateGenerationCost, CREDITS_COST } from '@/config/creditsCost';
+import { calculateGenerationCost } from '@/config/creditsCost';
 import {
   STUDIO_TAB_OPTIONS,
   normalizeStudioTabSettings,
@@ -24,6 +24,7 @@ import VersionPanel from '@/components/studio/VersionPanel';
 import SyncedLyrics from '@/components/studio/SyncedLyrics';
 import SensitivityConfirmDialog from '@/components/studio/SensitivityConfirmDialog';
 import SensitivityBlockDialog from '@/components/studio/SensitivityBlockDialog';
+import FloatingGenerateButton from '@/components/studio/FloatingGenerateButton';
 import AudioUploadTab from '@/components/studio/AudioUploadTab';
 import AdvancedArrangementTab from '@/components/studio/AdvancedArrangementTab';
 import SimpleGenerationTab from '@/components/studio/SimpleGenerationTab';
@@ -509,7 +510,7 @@ export default function StudioPageClient({
         minHeight: '100vh',
         background: 'var(--hc-bg)',
         position: 'relative',
-        paddingBottom: '80px',
+        paddingBottom: '140px',
       }}
       className="studio-page"
     >
@@ -1092,51 +1093,20 @@ export default function StudioPageClient({
             </div>
           </div>
 
-          {/* Generate Button - full width, sticky at bottom */}
-          <div style={{ position: 'sticky', bottom: 24, zIndex: 10, marginTop: 24 }}>
-            <button
-              onClick={handleGenerate}
-              disabled={templateStudioLoading || !canGenerate || isGenerating || isSensitivityLoading || (!selectedTemplate && !prompt.trim())}
-              onMouseEnter={(e) => { if (!templateStudioLoading && canGenerate && !isGenerating && !isSensitivityLoading && (selectedTemplate || prompt.trim())) e.currentTarget.style.transform = 'translateY(-3px)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; }}
-              style={{
-                width: '100%',
-                padding: '14px 24px',
-                borderRadius: 999,
-                border: 'none',
-                background: !templateStudioLoading && canGenerate && !isGenerating && !isSensitivityLoading && (selectedTemplate || prompt.trim())
-                  ? '#ceff35'
-                  : '#20222b',
-                color: !templateStudioLoading && canGenerate && !isGenerating && !isSensitivityLoading && (selectedTemplate || prompt.trim())
-                  ? '#08090c'
-                  : 'var(--hc-text-weak)',
-                fontSize: '15px',
-                fontWeight: 900,
-                cursor: !templateStudioLoading && canGenerate && !isGenerating && !isSensitivityLoading && (selectedTemplate || prompt.trim())
-                  ? 'pointer'
-                  : 'not-allowed',
-                fontFamily: 'var(--hc-font)',
-                boxShadow: !templateStudioLoading && canGenerate && !isGenerating && !isSensitivityLoading && (selectedTemplate || prompt.trim())
-                  ? '0 10px 26px rgba(206, 255, 53, 0.12)'
-                  : 'none',
-                transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 12,
-              }}
-            >
-              <span>{templateStudioLoading ? '正在加载创作配置...' : isGenerating ? '生成中...' : isSensitivityLoading ? '检测中...' : '开始 AI 创作'}</span>
-              <span style={{ fontSize: 12, fontWeight: 500, opacity: 0.8 }}>
-                {templateStudioLoading
-                  ? '正在同步模板与额度'
-                  : isPaid
-                  ? `消耗 ${totalCost} 点额度（2版本）· 剩余 ${credits?.totalAvailable ?? 0}`
-                  : `消耗 1 次预览（2版本）· 剩余 ${previewCount?.remaining ?? 0} 次`
-                }
-              </span>
-            </button>
-          </div>
+          <FloatingGenerateButton
+            onClick={handleGenerate}
+            disabled={templateStudioLoading || !canGenerate || isGenerating || isSensitivityLoading || (!selectedTemplate && !prompt.trim())}
+            busy={isGenerating || isSensitivityLoading}
+            creditLabel={
+              templateStudioLoading
+                ? '正在同步模板与额度'
+                : isPaid
+                  ? `${totalCost} 积分 · 剩余 ${credits?.totalAvailable ?? 0}`
+                  : `1 次预览 · 剩余 ${previewCount?.remaining ?? 0} 次`
+            }
+          >
+            {templateStudioLoading ? '正在加载创作配置...' : isGenerating ? '生成中...' : isSensitivityLoading ? '检测中...' : '开始 AI 创作'}
+          </FloatingGenerateButton>
 
           {/* Credits exhausted messages */}
           {creditsExhaustedPaid && (

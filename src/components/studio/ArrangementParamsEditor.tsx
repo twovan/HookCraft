@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { ArrangementParams } from '@/types/arrangement';
+import FloatingGenerateButton from '@/components/studio/FloatingGenerateButton';
 
 export interface ArrangementParamsEditorProps {
   params: ArrangementParams;
@@ -11,6 +12,7 @@ export interface ArrangementParamsEditorProps {
   onGenerate: () => void;
   isGenerating: boolean;
   disabled: boolean;
+  creditLabel: string;
   coverMode: 'one-step' | 'two-step';
   onCoverModeChange: (mode: 'one-step' | 'two-step') => void;
 }
@@ -34,6 +36,7 @@ export default function ArrangementParamsEditor({
   onGenerate,
   isGenerating,
   disabled,
+  creditLabel,
   coverMode,
   onCoverModeChange,
 }: ArrangementParamsEditorProps) {
@@ -208,22 +211,14 @@ export default function ArrangementParamsEditor({
         )}
       </div>
 
-      <button
-        type="button"
+      <FloatingGenerateButton
         onClick={onGenerate}
         disabled={disabled || isGenerating}
-        aria-label="生成音乐"
-        style={generateButtonStyle(disabled || isGenerating)}
+        busy={isGenerating}
+        creditLabel={creditLabel}
       >
-        {isGenerating ? (
-          <>
-            <span style={spinnerStyle} />
-            生成中...
-          </>
-        ) : (
-          '生成音乐'
-        )}
-      </button>
+        {isGenerating ? '生成中...' : '生成音乐'}
+      </FloatingGenerateButton>
     </div>
   );
 }
@@ -506,33 +501,3 @@ function formatButtonStyle(active: boolean, disabled: boolean): CSSProperties {
     opacity: disabled ? 0.55 : 1,
   };
 }
-
-function generateButtonStyle(disabled: boolean): CSSProperties {
-  return {
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    width: '100%',
-    minHeight: 52,
-    borderRadius: 12,
-    border: disabled ? '1px solid var(--hc-line)' : '1px solid rgba(208,255,90,0.9)',
-    background: disabled
-      ? 'rgba(255,255,255,0.045)'
-      : 'linear-gradient(135deg, var(--hc-lime), #73f7d7)',
-    color: disabled ? 'var(--hc-muted)' : '#0e1212',
-    fontSize: 15,
-    fontWeight: 900,
-    cursor: disabled ? 'not-allowed' : 'pointer',
-    boxShadow: disabled ? 'none' : '0 18px 50px rgba(208,255,90,0.18)',
-  };
-}
-
-const spinnerStyle: CSSProperties = {
-  width: 16,
-  height: 16,
-  borderRadius: 999,
-  border: '2px solid rgba(14,18,18,0.24)',
-  borderTopColor: '#0e1212',
-  animation: 'spin 0.8s linear infinite',
-};

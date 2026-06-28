@@ -5,7 +5,9 @@ import type { CSSProperties, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import AudioUploader from './AudioUploader';
 import WaveformVisualizer from './WaveformVisualizer';
+import FloatingGenerateButton from '@/components/studio/FloatingGenerateButton';
 import type { Template } from '@/types/template';
+import { CREDITS_COST } from '@/config/creditsCost';
 import { createAdvancedArrangementTask, fetchAdvancedArrangementStatus, uploadAdvancedArrangementAudio } from '@/lib/studio/advancedArrangementClient';
 import { getTemplateAdvancedAnalysis, getTemplateAdvancedPrompt } from '@/lib/template/advancedTemplateFields';
 
@@ -829,43 +831,14 @@ export default function AdvancedArrangementTab({
             </div>
           )}
 
-          <button
+          <FloatingGenerateButton
             onClick={handleGenerate}
             disabled={!canGenerate}
-            onMouseEnter={(e) => { if (canGenerate) e.currentTarget.style.transform = 'translateY(-3px)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; }}
-            style={{
-              width: '100%',
-              marginTop: 18,
-              padding: '0 24px',
-              minHeight: usesSelectedTemplate ? 56 : 52,
-              borderRadius: 14,
-              border: 'none',
-              background: canGenerate ? 'linear-gradient(135deg, var(--hc-lime), var(--hc-cyan))' : 'linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.07))',
-              color: canGenerate ? '#08090c' : '#6b7280',
-              fontSize: usesSelectedTemplate ? 15 : 15,
-              fontWeight: 800,
-              cursor: canGenerate ? 'pointer' : 'not-allowed',
-              fontFamily: 'var(--hc-font)',
-              boxShadow: canGenerate ? '0 4px 20px rgba(206, 255, 53, 0.22)' : 'none',
-              transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 12,
-            }}
+            busy={isBusy}
+            creditLabel={`${isTemplateInstrumentalVariant ? CREDITS_COST.add_instrumental : CREDITS_COST.cover_generation} 积分`}
           >
-            <span>{isBusy ? progressText : isTemplateInstrumentalVariant ? '开始生成伴奏' : isTemplateVariant ? '开始 AI 创作' : '开始高级编曲'}</span>
-            {usesSelectedTemplate && (
-              <span style={{ fontSize: 12, fontWeight: 500, opacity: 0.8 }}>
-                {!selectedTemplate
-                  ? '请先选择模板'
-                  : uploadStatus !== 'ready'
-                    ? '请先上传参考音频'
-                    : isTemplateInstrumentalVariant ? 'V5.5 add-instrumental' : '模板编曲'}
-              </span>
-            )}
-          </button>
+            {isBusy ? progressText : isTemplateInstrumentalVariant ? '开始生成伴奏' : isTemplateVariant ? '开始 AI 创作' : '开始高级编曲'}
+          </FloatingGenerateButton>
         </section>
       </div>
 

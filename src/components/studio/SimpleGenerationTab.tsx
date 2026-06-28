@@ -5,7 +5,9 @@ import { useRouter } from 'next/navigation';
 import GenerationProgress from '@/components/studio/GenerationProgress';
 import SensitivityBlockDialog from '@/components/studio/SensitivityBlockDialog';
 import SensitivityConfirmDialog from '@/components/studio/SensitivityConfirmDialog';
+import FloatingGenerateButton from '@/components/studio/FloatingGenerateButton';
 import { useSensitivityCheck } from '@/hooks/useSensitivityCheck';
+import { CREDITS_COST } from '@/config/creditsCost';
 
 const SIMPLE_PROMPT_EXAMPLES = [
   '新世纪音乐，缓慢空灵，合成器垫音和环境音效，纯音乐，宽广空间感，冥想放松',
@@ -245,14 +247,14 @@ export default function SimpleGenerationTab() {
             </div>
           )}
 
-          <button
-            type="button"
+          <FloatingGenerateButton
             onClick={handleGenerate}
             disabled={isGenerating || isSensitivityLoading || isSubmitted}
-            style={primaryButtonStyle(isGenerating || isSensitivityLoading || isSubmitted)}
+            busy={isGenerating || isSensitivityLoading}
+            creditLabel={`${CREDITS_COST.cover_generation} 积分`}
           >
             {isSensitivityLoading ? '安全检查中...' : isGenerating ? '提交生成任务中...' : isSubmitted ? '任务已提交' : '开始生成'}
-          </button>
+          </FloatingGenerateButton>
         </div>
 
         <aside style={simpleSideStyle}>
@@ -428,22 +430,6 @@ const ghostButtonStyle = (disabled: boolean): React.CSSProperties => ({
   cursor: disabled ? 'not-allowed' : 'pointer',
   opacity: disabled ? 0.56 : 1,
   fontFamily: 'var(--hc-font)',
-});
-
-const primaryButtonStyle = (disabled: boolean): React.CSSProperties => ({
-  width: '100%',
-  marginTop: 20,
-  minHeight: 54,
-  padding: '0 24px',
-  borderRadius: 14,
-  border: 'none',
-  background: disabled ? 'linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.07))' : 'linear-gradient(135deg, var(--hc-lime), var(--hc-cyan))',
-  color: disabled ? 'var(--hc-text-weak)' : '#08090c',
-  fontSize: 15,
-  fontWeight: 950,
-  cursor: disabled ? 'not-allowed' : 'pointer',
-  fontFamily: 'var(--hc-font)',
-  transition: 'all 0.2s ease',
 });
 
 const errorPanelStyle: React.CSSProperties = {

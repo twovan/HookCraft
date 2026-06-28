@@ -743,6 +743,7 @@ export default function AudioUploadTab() {
             onGenerate={handleGenerate}
             isGenerating={isGenerating}
             disabled={paramsDisabled}
+            creditLabel={`${CREDITS_COST.arrangement_generation} 积分`}
             coverMode={coverMode}
             onCoverModeChange={setCoverMode}
           />
