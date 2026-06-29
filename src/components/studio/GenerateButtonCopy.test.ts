@@ -30,11 +30,14 @@ describe('studio generate button copy', () => {
       readSource('src/app/studio/StudioPageClient.tsx'),
     ].join('\n');
 
-    expect(sources).toContain('请填写生成描述');
-    expect(sources).toContain('请上传参考音频');
-    expect(sources).toContain('请填写歌曲名称');
-    expect(sources).toContain('请填写歌词');
-    expect(sources).toContain('请选择模板');
-    expect(sources).toContain('请等待创作配置加载');
+    expect(sources).toContain('缺描述');
+    expect(sources).toContain('缺参考音频');
+    expect(sources).toContain('缺歌名');
+    expect(sources).toContain('缺歌词');
+    expect(sources).toContain('缺模板');
+    expect(sources).toContain('配置加载中');
+    expect(sources).not.toContain("steps.push('请填写生成描述')");
+    expect(sources).not.toContain("steps.push('请上传参考音频')");
+    expect(sources).not.toContain("steps.push('请填写歌曲名称')");
   });
 });

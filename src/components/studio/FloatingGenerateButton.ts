@@ -104,7 +104,7 @@ function buttonStyle(disabled: boolean): CSSProperties {
     width: '100%',
     minHeight: 58,
     padding: '0 clamp(18px, 3vw, 30px)',
-    borderRadius: 16,
+    borderRadius: 999,
     border: 'none',
     background: disabled ? '#26272b' : 'linear-gradient(90deg, var(--hc-lime), var(--hc-cyan))',
     backgroundSize: disabled ? '100% 100%' : '220% 100%',

@@ -20,7 +20,7 @@ describe('FloatingGenerateButton', () => {
     expect(element.props.style.position).toBe('sticky');
     expect(element.props.style.bottom).toBe(24);
     expect(element.props.style.width).toBe('100%');
-    expect(button.props.style.borderRadius).toBe(16);
+    expect(button.props.style.borderRadius).toBe(999);
     expect(button.props.children[1].props.children).toContain('20 积分');
   });
 

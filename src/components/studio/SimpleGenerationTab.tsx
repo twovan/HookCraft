@@ -55,7 +55,7 @@ export default function SimpleGenerationTab() {
     reset: resetSensitivity,
   } = useSensitivityCheck();
   const isSensitivityLoading = sensitivityStatus === 'loading';
-  const generateMissingSteps = prompt.trim() ? [] : ['请填写生成描述'];
+  const generateMissingSteps = prompt.trim() ? [] : ['缺描述'];
   const generateButtonDisabled = isGenerating || isSensitivityLoading || isSubmitted || generateMissingSteps.length > 0;
   const generateButtonText = isSensitivityLoading
     ? '安全检查中...'

@@ -488,21 +488,21 @@ export default function AudioUploadTab() {
   const generateMissingSteps = (() => {
     const steps: string[] = [];
     if (uploadStatus !== 'ready') {
-      steps.push('请上传参考音频');
+      steps.push('缺参考音频');
     } else if (coverMode === 'two-step' && (!isPreprocessed || !coverFeatureId)) {
-      steps.push('请完成音频预处理');
+      steps.push('缺预处理');
     }
 
     const promptLength = params.prompt.trim().length;
     if (promptLength === 0) {
-      steps.push('请填写风格描述');
+      steps.push('缺风格');
     } else if (promptLength < 10) {
-      steps.push('风格描述至少 10 个字符');
+      steps.push('风格太短');
     } else if (coverMode === 'one-step' && promptLength > 300) {
-      steps.push('风格描述不超过 300 个字符');
+      steps.push('风格太长');
     }
 
-    if (!isOnline) steps.push('请检查网络连接');
+    if (!isOnline) steps.push('网络异常');
     return steps;
   })();
   const generateButtonDisabled = isGenerating || generateMissingSteps.length > 0;

@@ -226,18 +226,18 @@ export default function StudioPageClient({
   const previewsExhaustedFree = !isPaid && previewCount !== null && previewCount.remaining < 1;
   const templateGenerateMissingSteps = (() => {
     const steps: string[] = [];
-    if (templateStudioLoading) steps.push('请等待创作配置加载');
-    if (!selectedTemplate && !prompt.trim()) steps.push('请选择模板或填写生成描述');
+    if (templateStudioLoading) steps.push('配置加载中');
+    if (!selectedTemplate && !prompt.trim()) steps.push('缺模板或描述');
     if (!canGenerate) {
       const beforeCreditChecks = steps.length;
       if (isPaid && credits !== null && credits.totalAvailable < totalCost) {
-        steps.push('请补充积分');
+        steps.push('积分不足');
       }
       if (!isPaid && previewCount !== null && previewCount.remaining < 1) {
-        steps.push('请补充预览次数');
+        steps.push('预览不足');
       }
       if (steps.length === beforeCreditChecks && !templateStudioLoading) {
-        steps.push('请检查创作额度');
+        steps.push('额度异常');
       }
     }
     return Array.from(new Set(steps));

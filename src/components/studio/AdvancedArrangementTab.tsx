@@ -435,22 +435,22 @@ export default function AdvancedArrangementTab({
 
   const generateMissingSteps = (() => {
     const steps: string[] = [];
-    if (uploadStatus !== 'ready') steps.push('请上传参考音频');
-    if (usesSelectedTemplate && !selectedTemplate) steps.push('请选择模板');
+    if (uploadStatus !== 'ready') steps.push('缺参考音频');
+    if (usesSelectedTemplate && !selectedTemplate) steps.push('缺模板');
 
     if (isTemplateInstrumentalVariant) {
-      if (!effectiveTags.trim()) steps.push('请先完成模板风格分析');
-      if (!(title.trim() || templateTitle)) steps.push('请填写歌曲名称');
+      if (!effectiveTags.trim()) steps.push('缺模板分析');
+      if (!(title.trim() || templateTitle)) steps.push('缺歌名');
     } else if (effectiveCustomMode) {
-      if (!effectiveStyle.trim()) steps.push('请填写风格描述');
-      if (!(isTemplateVariant ? title.trim() || templateTitle : title.trim())) steps.push('请填写歌曲名称');
-      if (!instrumental && !prompt.trim()) steps.push('请填写歌词');
+      if (!effectiveStyle.trim()) steps.push('缺风格');
+      if (!(isTemplateVariant ? title.trim() || templateTitle : title.trim())) steps.push('缺歌名');
+      if (!instrumental && !prompt.trim()) steps.push('缺歌词');
     } else if (!prompt.trim()) {
-      steps.push('请填写生成描述');
+      steps.push('缺描述');
     }
 
     if (isTemplateVariant && !isTemplateInstrumentalVariant && !effectiveStyle.trim()) {
-      steps.push('请选择可用模板');
+      steps.push('模板不可用');
     }
 
     return Array.from(new Set(steps));
